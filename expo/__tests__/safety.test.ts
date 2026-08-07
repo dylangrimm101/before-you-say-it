@@ -123,8 +123,8 @@ describe("onboarding reaches rehearsal through the private safety router", () =>
   it("falls back locally instead of resetting step five when generation fails", async () => {
     const source = await onboarding();
     expect(source).toContain("draft = await buildCustomScenario");
-    expect(source).toContain("draft = fallbackCustomScenario(body, focus, form)");
-    expect(source.indexOf("fallbackCustomScenario(body, focus, form)")).toBeLessThan(
+    expect(source).toContain("draft = fallbackCustomScenario(description, selectedFocus, form)");
+    expect(source.indexOf("fallbackCustomScenario(description, selectedFocus, form)")).toBeLessThan(
       source.indexOf("router.replace({"),
     );
   });

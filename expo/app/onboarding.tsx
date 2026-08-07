@@ -6,6 +6,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, PressCard, PrimaryButton, Reveal, SelectionWipe, tap } from "@/components/ui";
 import { DESIRED_SKILLS, RECURRING_PROBLEMS, type ModuleId, type OnboardingEntryRoute } from "@/constants/modules";
+import {
+  APPROVED_ONBOARDING_SCENARIOS,
+  approvedOnboardingScenario,
+  behavioralGoal,
+  scenarioFromApproved,
+  type ApprovedOnboardingScenarioId,
+} from "@/constants/onboardingScenarios";
 import { PERSONAS } from "@/constants/personas";
 import { CATEGORIES } from "@/constants/scenarios";
 import { C, GUTTER, T, eyebrow, font, radius, shadow } from "@/constants/theme";
@@ -17,18 +24,15 @@ import type { CategoryId, Difficulty, PersonaVoice, ReactionPattern, Scenario } 
 
 const ENTRY_CHOICES: readonly { id: OnboardingEntryRoute; label: string; note: string }[] = [
   { id: "real_conversation", label: "I have a conversation I need to prepare for", note: "Build a private rehearsal around the moment ahead." },
-  { id: "recurring_problem", label: "The same communication problem keeps happening", note: "Start with the pattern, then test it in a conversation." },
-  { id: "desired_skill", label: "I know what I want to get better at", note: "Choose the skill, then try it before we recommend a path." },
+  { id: "recurring_problem", label: "The same communication problem keeps happening", note: "Choose the pattern, then practice it in a ready-made situation." },
+  { id: "desired_skill", label: "I know what I want to get better at", note: "Choose the skill, then practice it in a ready-made situation." },
 ];
 
-const REACTIONS: readonly { id: ReactionPattern; label: string }[] = [
+export const ONBOARDING_REACTIONS: readonly { id: ReactionPattern; label: string }[] = [
   { id: "defensive", label: "Gets defensive" },
-  { id: "hears-criticism", label: "Hears criticism" },
-  { id: "minimizes", label: "Minimizes it" },
-  { id: "quiet", label: "Goes quiet" },
-  { id: "louder", label: "Gets louder" },
+  { id: "minimizes", label: "Minimizes the problem" },
+  { id: "quiet", label: "Avoids or shuts down" },
   { id: "turns-back", label: "Turns it back on me" },
-  { id: "agrees-without-changing", label: "Agrees without changing" },
   { id: "not-sure", label: "I’m not sure" },
 ];
 
@@ -41,88 +45,126 @@ export default function Onboarding() {
   const [step, setStep] = useState<number>(0);
   const [entryRoute, setEntryRoute] = useState<OnboardingEntryRoute | null>(null);
   const [provisionalModuleId, setProvisionalModuleId] = useState<ModuleId | null>(null);
-  const [diagnosisLabel, setDiagnosisLabel] = useState<string>("");
+  const [selectionLabel, setSelectionLabel] = useState<string>("");
+  const [approvedScenarioId, setApprovedScenarioId] = useState<ApprovedOnboardingScenarioId | null>(null);
   const [focus, setFocus] = useState<CategoryId | null>(null);
   const [persona, setPersona] = useState<PersonaVoice | null>(null);
   const [reaction, setReaction] = useState<ReactionPattern | null>(null);
   const [situation, setSituation] = useState<string>("");
+  const [counterpart, setCounterpart] = useState<string>("");
+  const [communication, setCommunication] = useState<string>("");
   const [outcome, setOutcome] = useState<string>("");
   const [building, setBuilding] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [footerHeight, setFooterHeight] = useState<number>(96);
 
-  const totalSteps = entryRoute === "real_conversation" ? 6 : 5;
+  const isReal = entryRoute === "real_conversation";
+  const totalSteps = isReal ? 8 : 5;
   const diagnosisOptions = entryRoute === "desired_skill" ? DESIRED_SKILLS : RECURRING_PROBLEMS;
 
   const canContinue = useMemo((): boolean => {
-    if (step === 0) return entryRoute !== null;
-    if (entryRoute === "real_conversation") {
-      if (step === 1) return situation.trim().length >= 8;
-      if (step === 2) return focus !== null;
-      if (step === 3) return persona !== null;
-      if (step === 4) return reaction !== null;
-      if (step === 5) return outcome.trim().length >= 3;
-    } else {
-      if (step === 1) return provisionalModuleId !== null;
-      if (step === 2) return focus !== null;
-      if (step === 3) return persona !== null;
-      if (step === 4) return reaction !== null;
-    }
+    if (!isReal) return false;
+    if (step === 1) return situation.trim().length >= 8;
+    if (step === 2) return counterpart.trim().length >= 2;
+    if (step === 3) return focus !== null;
+    if (step === 4) return communication.trim().length >= 3;
+    if (step === 5) return outcome.trim().length >= 3;
     return false;
-  }, [entryRoute, focus, outcome, persona, provisionalModuleId, reaction, situation, step]);
+  }, [communication, counterpart, focus, isReal, outcome, situation, step]);
 
   const chooseEntry = useCallback((value: OnboardingEntryRoute): void => {
     tap("light");
     Keyboard.dismiss();
     setEntryRoute(value);
     setProvisionalModuleId(null);
-    setDiagnosisLabel("");
+    setSelectionLabel("");
+    setApprovedScenarioId(null);
+    setSituation("");
+    setCounterpart("");
+    setCommunication("");
+    setOutcome("");
+    setFocus(null);
+    setReaction(null);
     setStep(1);
   }, []);
 
-  const finish = useCallback(async (selectedReaction: ReactionPattern | null = reaction): Promise<void> => {
-    if (!entryRoute || !focus || !persona || !selectedReaction || building) return;
+  const useOwnConversation = useCallback((): void => {
+    tap("light");
+    setEntryRoute("real_conversation");
+    setApprovedScenarioId(null);
+    setStep(1);
+  }, []);
+
+  const finish = useCallback(async (selectedReaction: ReactionPattern): Promise<void> => {
+    if (!entryRoute || !persona || building) return;
+    const approved = approvedOnboardingScenario(approvedScenarioId);
+    if (!isReal && !approved) return;
+    if (isReal && (!focus || situation.trim().length < 8 || counterpart.trim().length < 2)) return;
     setBuilding(true);
     setError("");
-    const body = entryRoute === "real_conversation" ? situation.trim() : diagnosisLabel;
-    const goal = entryRoute === "real_conversation" ? outcome.trim() : "Practice this moment and see which skill should come first.";
+
+    const selectedFocus = approved?.category ?? focus;
+    const selectedOutcome = approved?.desiredOutcome ?? outcome.trim();
+    const selectedCounterpart = approved?.counterpartDisplayLabel ?? counterpart.trim();
+    const selectedGoal = behavioralGoal(entryRoute, provisionalModuleId ?? undefined, selectedOutcome);
+    if (!selectedFocus) return;
+
     try {
       await saveProfile({
-        focus,
+        focus: selectedFocus,
         persona,
         reaction: selectedReaction,
-        outcome: goal,
-        dread: body,
+        outcome: selectedOutcome,
+        dread: approved?.situation ?? situation.trim(),
         pattern: "avoid",
         win: "heard",
         createdAt: Date.now(),
       });
-      const form = { focus, persona, reaction: selectedReaction, outcome: goal, difficulty: DIFFICULTY };
-      let draft: Omit<Scenario, "id" | "isCustom">;
-      try {
-        draft = await buildCustomScenario(body, focus, form);
-      } catch (caught) {
-        safeLog("[onboarding] using rehearsal fallback", errorShape(caught));
-        draft = fallbackCustomScenario(body, focus, form);
+
+      let scenario: Scenario;
+      if (approved) {
+        scenario = scenarioFromApproved(approved, persona);
+      } else {
+        const description = `${situation.trim()}\nWhat you want to communicate: ${communication.trim()}`;
+        const form = { focus: selectedFocus, persona, reaction: selectedReaction, outcome: selectedOutcome, difficulty: DIFFICULTY };
+        let draft: Omit<Scenario, "id" | "isCustom">;
+        try {
+          draft = await buildCustomScenario(description, selectedFocus, form);
+        } catch (caught) {
+          safeLog("[onboarding] using rehearsal fallback", errorShape(caught));
+          draft = fallbackCustomScenario(description, selectedFocus, form);
+        }
+        scenario = {
+          ...draft,
+          category: selectedFocus,
+          id: `onboarding-${Date.now().toString(36)}`,
+          title: "Your conversation",
+          counterpart: selectedCounterpart,
+          situation: description,
+          goal: selectedOutcome,
+          opensWith: "user",
+          isCustom: true,
+        };
       }
-      const scenario: Scenario = {
-        ...draft,
-        category: focus,
-        id: `onboarding-${Date.now().toString(36)}`,
-        isCustom: true,
-      };
+
       await addCustomScenario(scenario);
       const practiceSessionId = createPracticeSessionId();
       await saveActivePracticeSession(createOnboardingPracticeSession(
         practiceSessionId,
         anonymousUserId,
         scenario,
-        goal,
+        selectedOutcome,
         selectedReaction,
         Date.now(),
         {
           entryRoute,
           ...(provisionalModuleId ? { provisionalModuleId } : {}),
+          ...(selectionLabel ? { selectionLabel } : {}),
+          scenarioSource: approved ? "approved_authored" : "user_supplied",
+          scenarioTitle: scenario.title,
+          counterpartRelationship: approved?.counterpartRelationship ?? selectedCounterpart,
+          counterpartDisplayLabel: selectedCounterpart,
+          behavioralGoal: selectedGoal,
           persona,
         },
       ));
@@ -143,43 +185,47 @@ export default function Onboarding() {
       setBuilding(false);
       setError("We couldn't set up your rehearsal. Check your connection and try again.");
     }
-  }, [addCustomScenario, anonymousUserId, building, diagnosisLabel, entryRoute, focus, outcome, persona, provisionalModuleId, reaction, router, saveActivePracticeSession, saveProfile, situation]);
+  }, [addCustomScenario, anonymousUserId, approvedScenarioId, building, communication, counterpart, entryRoute, focus, isReal, outcome, persona, provisionalModuleId, router, saveActivePracticeSession, saveProfile, selectionLabel, situation]);
 
   const chooseDiagnosis = useCallback((moduleId: ModuleId, label: string): void => {
     tap("light");
     setProvisionalModuleId(moduleId);
-    setDiagnosisLabel(label);
+    setSelectionLabel(label);
     setStep(2);
+  }, []);
+
+  const chooseScenario = useCallback((id: ApprovedOnboardingScenarioId): void => {
+    tap("light");
+    setApprovedScenarioId(id);
+    setStep(3);
   }, []);
 
   const chooseFocus = useCallback((value: CategoryId): void => {
     tap("light");
     setFocus(value);
-    setStep(3);
+    setStep(4);
   }, []);
 
   const choosePersona = useCallback((value: PersonaVoice): void => {
     tap("light");
     setPersona(value);
-    setStep(4);
-  }, []);
+    setStep(isReal ? 7 : 4);
+  }, [isReal]);
 
   const chooseReaction = useCallback((value: ReactionPattern): void => {
     tap("light");
     setReaction(value);
-    if (entryRoute === "real_conversation") setStep(5);
-    else void finish(value);
-  }, [entryRoute, finish]);
+    void finish(value);
+  }, [finish]);
 
-  const isLast = step === totalSteps - 1;
-  const requiresContinue = entryRoute === "real_conversation" && (step === 1 || step === 5);
-  const showsFooter = requiresContinue || building;
   const next = (): void => {
     if (!canContinue) return;
     Keyboard.dismiss();
-    if (isLast) void finish();
-    else setStep((value) => value + 1);
+    setStep((value) => value + 1);
   };
+
+  const requiresContinue = isReal && step >= 1 && step <= 5;
+  const showsFooter = requiresContinue || building;
 
   return (
     <View style={styles.root}>
@@ -209,64 +255,44 @@ export default function Onboarding() {
         </View>
 
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: footerHeight + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
-          {step === 0 ? (
-            <Reveal>
-              <Text style={styles.title}>What brought you here?</Text>
-              <Text style={styles.lede}>Choose the closest answer. Every path includes a real rehearsal before any recommendation.</Text>
-              <View style={styles.options}>
-                {ENTRY_CHOICES.map((choice) => <Choice key={choice.id} title={choice.label} note={choice.note} selected={entryRoute === choice.id} onPress={() => chooseEntry(choice.id)} />)}
-              </View>
-            </Reveal>
-          ) : null}
+          {step === 0 ? <Reveal><Text style={styles.title}>What brought you here?</Text><Text style={styles.lede}>Choose the closest answer. Every path includes a real rehearsal before any recommendation.</Text><View style={styles.options}>{ENTRY_CHOICES.map((choice) => <Choice key={choice.id} title={choice.label} note={choice.note} selected={entryRoute === choice.id} onPress={() => chooseEntry(choice.id)} />)}</View></Reveal> : null}
 
-          {entryRoute === "real_conversation" && step === 1 ? (
-            <Reveal><Text style={styles.title}>What conversation do you need to have?</Text><Text style={styles.lede}>No names or identifying details. Describe only what the rehearsal needs.</Text><Input value={situation} onChangeText={setSituation} placeholder="I need to ask my roommate to agree to a payment date." /></Reveal>
-          ) : null}
+          {!isReal && step === 1 ? <Reveal><Text style={styles.title}>{entryRoute === "desired_skill" ? "What do you want to get better at?" : "What keeps happening?"}</Text><Text style={styles.lede}>Choose the closest fit.</Text><View style={styles.options}>{diagnosisOptions.map((option) => <Choice key={option.label} title={option.label} selected={provisionalModuleId === option.moduleId} onPress={() => chooseDiagnosis(option.moduleId, option.label)} />)}</View></Reveal> : null}
 
-          {entryRoute !== "real_conversation" && step === 1 ? (
-            <Reveal><Text style={styles.title}>{entryRoute === "desired_skill" ? "What do you want to get better at?" : "What keeps happening?"}</Text><Text style={styles.lede}>This creates a starting hypothesis. Your spoken rehearsal can confirm or change it.</Text><View style={styles.options}>{diagnosisOptions.map((option) => <Choice key={option.label} title={option.label} selected={provisionalModuleId === option.moduleId} onPress={() => chooseDiagnosis(option.moduleId, option.label)} />)}</View></Reveal>
-          ) : null}
+          {!isReal && step === 2 ? <Reveal><Text style={styles.title}>Pick a situation to practice</Text><Text style={styles.lede}>{entryRoute === "desired_skill" ? "Choose a ready-made situation. You’ll practice your selected skill inside it." : "Choose a ready-made situation. You’ll see how your communication pattern shows up inside it."}</Text><View style={styles.options}>{APPROVED_ONBOARDING_SCENARIOS.map((scenario) => <ScenarioChoice key={scenario.id} context={scenario.contextLabel} title={scenario.title} preview={scenario.preview} selected={approvedScenarioId === scenario.id} onPress={() => chooseScenario(scenario.id)} />)}</View><Pressable onPress={useOwnConversation} style={styles.ownLink} accessibilityRole="link" accessibilityLabel="Use your own conversation"><Text style={styles.ownLinkText}>Have something specific in mind? Use your own conversation</Text></Pressable></Reveal> : null}
 
-          {((entryRoute === "real_conversation" && step === 2) || (entryRoute !== "real_conversation" && step === 2)) ? (
-            <Reveal><Text style={styles.title}>Who is this conversation with?</Text><Text style={styles.lede}>Choose the context. It shapes the role, not a saved contact.</Text><View style={styles.pills}>{CATEGORIES.map((category) => <Pill key={category.id} label={category.label} selected={focus === category.id} onPress={() => chooseFocus(category.id)} />)}</View></Reveal>
-          ) : null}
+          {isReal && step === 1 ? <Reveal><Text style={styles.title}>What happened or needs to be discussed?</Text><Text style={styles.lede}>No identifying details beyond what the rehearsal needs.</Text><Input value={situation} onChangeText={setSituation} placeholder="My manager added another deadline when I’m already at capacity." accessibilityLabel="Conversation situation" /></Reveal> : null}
+          {isReal && step === 2 ? <Reveal><Text style={styles.title}>Who are you talking to?</Text><Text style={styles.lede}>Use their first name if helpful, or a specific relationship such as “my manager.”</Text><Input value={counterpart} onChangeText={setCounterpart} placeholder="Jordan, my manager" maxLength={80} accessibilityLabel="Counterpart name or relationship" /></Reveal> : null}
+          {isReal && step === 3 ? <Reveal><Text style={styles.title}>What kind of relationship is this?</Text><Text style={styles.lede}>This shapes the rehearsal without saving a contact.</Text><View style={styles.pills}>{CATEGORIES.map((category) => <Pill key={category.id} label={category.label} selected={focus === category.id} onPress={() => chooseFocus(category.id)} />)}</View></Reveal> : null}
+          {isReal && step === 4 ? <Reveal><Text style={styles.title}>What do you want to communicate?</Text><Text style={styles.lede}>Write the main point you do not want to lose.</Text><Input value={communication} onChangeText={setCommunication} placeholder="I need us to decide what moves before I accept more work." accessibilityLabel="What you want to communicate" /></Reveal> : null}
+          {isReal && step === 5 ? <Reveal><Text style={styles.title}>What would be useful to leave with?</Text><Text style={styles.lede}>Name one outcome you can influence.</Text><Input value={outcome} onChangeText={setOutcome} placeholder="A clear priority decision and next step." maxLength={160} accessibilityLabel="Desired outcome" /></Reveal> : null}
 
-          {((entryRoute === "real_conversation" && step === 3) || (entryRoute !== "real_conversation" && step === 3)) ? (
-            <Reveal><Text style={styles.title}>Choose the rehearsal voice</Text><Text style={styles.lede}>This selected counterpart stays with you for both replies. It is not the paid curriculum counterpart.</Text><View style={styles.options}>{PERSONAS.map((item) => <Choice key={item.id} title={item.id === "woman-hope" ? "Woman’s voice" : "Man’s voice"} note="Used by your contextual counterpart in the free rehearsal." selected={persona === item.id} onPress={() => choosePersona(item.id)} />)}</View></Reveal>
-          ) : null}
-
-          {((entryRoute === "real_conversation" && step === 4) || (entryRoute !== "real_conversation" && step === 4)) ? (
-            <Reveal><Text style={styles.title}>How might they respond?</Text><Text style={styles.lede}>Choose a response style for this private rehearsal.</Text><View style={styles.pills}>{REACTIONS.map((item) => <Pill key={item.id} label={item.label} selected={reaction === item.id} onPress={() => chooseReaction(item.id)} />)}</View></Reveal>
-          ) : null}
-
-          {entryRoute === "real_conversation" && step === 5 ? (
-            <Reveal><Text style={styles.title}>What would be useful to leave with?</Text><Text style={styles.lede}>Name one outcome you can influence, not a prediction about the other person.</Text><Input value={outcome} onChangeText={setOutcome} placeholder="A clear request and a next step." maxLength={160} /></Reveal>
-          ) : null}
+          {((isReal && step === 6) || (!isReal && step === 3)) ? <Reveal><Text style={styles.title}>Choose the rehearsal voice</Text><Text style={styles.lede}>This voice plays the person in your practice.</Text><View style={styles.options}>{PERSONAS.map((item) => <Choice key={item.id} title={item.id === "woman-hope" ? "Woman’s voice" : "Man’s voice"} selected={persona === item.id} onPress={() => choosePersona(item.id)} />)}</View></Reveal> : null}
+          {((isReal && step === 7) || (!isReal && step === 4)) ? <Reveal><Text style={styles.title}>How might they respond?</Text><Text style={styles.lede}>Choose the closest response style for this rehearsal.</Text><View style={styles.pills}>{ONBOARDING_REACTIONS.map((item) => <Pill key={item.id} label={item.label} selected={reaction === item.id} onPress={() => chooseReaction(item.id)} />)}</View></Reveal> : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </ScrollView>
 
-        {showsFooter ? (
-          <BlurView intensity={Platform.OS === "web" ? 0 : 30} tint="light" style={[styles.footer, { paddingBottom: insets.bottom + 18 }]} onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}>
-            <PrimaryButton label={building ? "Setting up your rehearsal…" : isLast ? "Continue to private safety check" : "Continue"} disabled={!canContinue || building} onPress={next} />
-            {building ? <ActivityIndicator color={C.purple} style={styles.spinner} /> : null}
-          </BlurView>
-        ) : null}
+        {showsFooter ? <BlurView intensity={Platform.OS === "web" ? 0 : 30} tint="light" style={[styles.footer, { paddingBottom: insets.bottom + 18 }]} onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}><PrimaryButton label={building ? "Setting up your rehearsal…" : "Continue"} disabled={!canContinue || building} onPress={next} />{building ? <ActivityIndicator color={C.purple} style={styles.spinner} accessibilityLabel="Setting up your rehearsal" /> : null}</BlurView> : null}
       </KeyboardAvoidingView>
     </View>
   );
 }
 
 function Choice({ title, note, selected, onPress }: { title: string; note?: string; selected: boolean; onPress: () => void }) {
-  return <PressCard onPress={onPress} accessibilityLabel={title}><View style={[styles.choice, selected && styles.choiceOn]}><SelectionWipe selected={selected} /><View style={styles.choiceCopy}><Text style={[styles.choiceTitle, selected && styles.choiceTextOn]}>{title}</Text>{note ? <Text style={[styles.choiceNote, selected && styles.choiceTextOn]}>{note}</Text> : null}</View>{selected ? <Text style={styles.selected}>Selected</Text> : null}</View></PressCard>;
+  return <PressCard onPress={onPress} accessibilityLabel={title}><View style={[styles.choice, selected && styles.choiceOn]}><SelectionWipe selected={selected} /><View style={styles.choiceCopy}><Text style={[styles.choiceTitle, selected && styles.choiceTextOn]}>{title}</Text>{note ? <Text style={[styles.choiceNote, selected && styles.choiceTextOn]}>{note}</Text> : null}</View></View></PressCard>;
+}
+
+function ScenarioChoice({ context, title, preview, selected, onPress }: { context: string; title: string; preview: string; selected: boolean; onPress: () => void }) {
+  return <PressCard onPress={onPress} accessibilityLabel={`${context}: ${title}. ${preview}`}><View style={[styles.scenarioChoice, selected && styles.choiceOn]}><SelectionWipe selected={selected} /><View style={styles.choiceCopy}><Text style={[styles.contextLabel, selected && styles.choiceTextOn]}>{context}</Text><Text style={[styles.choiceTitle, selected && styles.choiceTextOn]}>{title}</Text><Text style={[styles.choiceNote, selected && styles.choiceTextOn]}>{preview}</Text></View></View></PressCard>;
 }
 
 function Pill({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   return <PressCard onPress={onPress} accessibilityLabel={label}><View style={[styles.pill, selected && styles.pillOn]}><SelectionWipe selected={selected} /><Text style={[styles.pillText, selected && styles.choiceTextOn]}>{label}</Text></View></PressCard>;
 }
 
-function Input({ value, onChangeText, placeholder, maxLength = 500 }: { value: string; onChangeText: (value: string) => void; placeholder: string; maxLength?: number }) {
-  return <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={C.dim} multiline maxLength={maxLength} style={styles.input} textAlignVertical="top" />;
+function Input({ value, onChangeText, placeholder, maxLength = 500, accessibilityLabel }: { value: string; onChangeText: (value: string) => void; placeholder: string; maxLength?: number; accessibilityLabel: string }) {
+  return <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={C.dim} multiline maxLength={maxLength} style={styles.input} textAlignVertical="top" accessibilityLabel={accessibilityLabel} />;
 }
 
 const styles = StyleSheet.create({
@@ -274,8 +300,9 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: GUTTER, paddingBottom: 14, gap: 10 }, headerRow: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, backHit: { minWidth: 60, minHeight: 44, justifyContent: "center" }, backText: { fontFamily: font.semi, fontSize: 17, color: C.textSoft }, hidden: { color: "transparent" }, counter: { ...eyebrow, color: C.dim },
   track: { height: 3, borderRadius: 2, backgroundColor: C.line, overflow: "hidden" }, fill: { height: 3, backgroundColor: C.purple },
   scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, title: { ...T.display }, lede: { ...T.body, color: C.textSoft, lineHeight: 27, marginTop: 12 }, options: { gap: 10, marginTop: 24 },
-  choice: { minHeight: 74, flexDirection: "row", alignItems: "center", gap: 12, padding: 17, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, choiceOn: { borderColor: C.purple }, choiceCopy: { flex: 1, zIndex: 1, gap: 4 }, choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: C.text }, choiceNote: { ...T.caption }, choiceTextOn: { color: C.onAccent, zIndex: 1 }, selected: { ...eyebrow, color: C.onAccent, zIndex: 1 },
+  choice: { minHeight: 70, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, scenarioChoice: { minHeight: 112, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, choiceOn: { borderColor: C.purple }, choiceCopy: { flex: 1, zIndex: 1, gap: 4 }, contextLabel: { ...eyebrow, color: C.purple }, choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: C.text }, choiceNote: { ...T.caption }, choiceTextOn: { color: C.onAccent, zIndex: 1 },
   pills: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 24 }, pill: { minHeight: 52, justifyContent: "center", paddingHorizontal: 20, borderRadius: radius.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, overflow: "hidden" }, pillOn: { borderColor: C.purple }, pillText: { fontFamily: font.semi, fontSize: 16, color: C.text, zIndex: 1 },
-  input: { ...T.body, minHeight: 180, marginTop: 24, padding: 18, borderRadius: radius.lg, borderWidth: 1, borderColor: C.glassEdge, backgroundColor: C.surface, color: C.text, ...shadow.layer },
+  ownLink: { minHeight: 48, alignItems: "center", justifyContent: "center", marginTop: 14, paddingHorizontal: 8 }, ownLinkText: { ...T.caption, color: C.purple, textAlign: "center", fontFamily: font.semi },
+  input: { ...T.body, minHeight: 148, marginTop: 24, padding: 18, borderRadius: radius.lg, borderWidth: 1, borderColor: C.glassEdge, backgroundColor: C.surface, color: C.text, ...shadow.layer },
   error: { ...T.caption, color: C.clay, textAlign: "center", marginTop: 18 }, footer: { paddingHorizontal: GUTTER, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.barEdge, backgroundColor: Platform.OS === "web" ? C.barSolid : C.bar }, spinner: { marginTop: 8 },
 });

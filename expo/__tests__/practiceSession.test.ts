@@ -220,7 +220,7 @@ describe("onboarding practice-session continuity", () => {
       },
     };
     const restored = normalizePracticeSession(JSON.parse(JSON.stringify(legacy)) as unknown);
-    expect(restored?.schemaVersion).toBe(5);
+    expect(restored?.schemaVersion).toBe(6);
     expect(restored?.dayThirtyBaseline?.metadata_status).toBe("legacy_partial");
     expect(restored?.dayThirtyBaseline?.scenario_version).toBeNull();
     expect(restored?.dayThirtyBaseline?.conversation_job_id).toBeNull();

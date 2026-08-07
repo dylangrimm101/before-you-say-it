@@ -160,9 +160,9 @@ describe("the gender actually reaches the model", () => {
   it("uses a contextual free counterpart while retaining persona identity for paid rehearsals", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     expect(source).toContain('params.entry === "onboarding"');
-    expect(source).toContain('work: "Your coworker"');
+    expect(source).toContain("activePracticeSession?.counterpartDisplayLabel");
     expect(source).toContain("personaFor(persona).name");
-    expect(source).toContain("openingPrompt(themName)");
+    expect(source).toContain("<RehearsalBriefing");
   });
 
   it("reads voice ids from the shared persona record", async () => {
@@ -290,7 +290,7 @@ describe("onboarding rehearsal always has a safe exit", () => {
     expect(source).toContain('await saveActivePracticeSession(null)');
     expect(source).toContain('router.replace("/onboarding")');
     expect(source).toContain('if (router.canGoBack()) router.back()');
-    expect(source).toContain('accessibilityLabel="Exit rehearsal"');
+    expect(source).toContain('accessibilityLabel="End rehearsal"');
   });
 });
 
@@ -319,8 +319,8 @@ describe("onboarding presents questions without a fictional coach header", () =>
     expect(source).toContain("setStep(2)");
     expect(source).toContain("setStep(3)");
     expect(source).toContain("setStep(4)");
-    expect(source).toContain('if (entryRoute === "real_conversation") setStep(5)');
-    expect(source).toContain("else void finish(value)");
-    expect(source).toContain('const requiresContinue = entryRoute === "real_conversation" && (step === 1 || step === 5)');
+    expect(source).toContain("void finish(value)");
+    expect(source).toContain("const requiresContinue = isReal && step >= 1 && step <= 5");
+    expect(source).toContain("setStep(isReal ? 7 : 4)");
   });
 });

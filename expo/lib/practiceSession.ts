@@ -3,7 +3,7 @@ import type { ModuleId, OnboardingEntryRoute } from "@/constants/modules";
 import type { CategoryId, PersonaVoice, ReactionPattern, Scenario, Turn } from "@/types/convo";
 import type { PilotAttemptKind, PilotAttemptRecord, PilotComparison, PilotDayRun, PilotModuleState } from "@/types/pilotCurriculum";
 
-export const PRACTICE_SESSION_SCHEMA_VERSION = 5 as const;
+export const PRACTICE_SESSION_SCHEMA_VERSION = 6 as const;
 export const BASELINE_COPY_VERSION = "BYSI-approved-copy-v3-2026-08-04" as const;
 
 export type DayOneLearningState =
@@ -96,10 +96,16 @@ export interface ActivePracticeSession {
   topic: string;
   usefulOutcome: string;
   expectedReaction: ReactionPattern;
-  safetyStatus: "cleared";
+  safetyStatus: "pending" | "cleared";
   moduleVersion: string;
   entryRoute?: OnboardingEntryRoute;
   provisionalModuleId?: ModuleId;
+  selectionLabel?: string;
+  scenarioSource?: "user_supplied" | "approved_authored";
+  scenarioTitle?: string;
+  counterpartRelationship?: string;
+  counterpartDisplayLabel?: string;
+  behavioralGoal?: string;
   persona?: PersonaVoice;
   freeRehearsalTurns?: Turn[];
   recommendation?: PracticeRecommendation;
@@ -131,7 +137,17 @@ export function createOnboardingPracticeSession(
   usefulOutcome: string,
   expectedReaction: ReactionPattern,
   now: number = Date.now(),
-  onboarding?: { entryRoute: OnboardingEntryRoute; provisionalModuleId?: ModuleId; persona: PersonaVoice },
+  onboarding?: {
+    entryRoute: OnboardingEntryRoute;
+    provisionalModuleId?: ModuleId;
+    selectionLabel?: string;
+    scenarioSource: "user_supplied" | "approved_authored";
+    scenarioTitle: string;
+    counterpartRelationship: string;
+    counterpartDisplayLabel: string;
+    behavioralGoal: string;
+    persona: PersonaVoice;
+  },
 ): ActivePracticeSession {
   return {
     schemaVersion: PRACTICE_SESSION_SCHEMA_VERSION,
@@ -139,17 +155,21 @@ export function createOnboardingPracticeSession(
     anonymousUserId,
     scenarioId: scenario.id,
     category: scenario.category,
-    counterpart: onboarding
-      ? ({ partner: "Your partner", family: "Your family member", work: "Your coworker", friends: "Your friend" } as const)[scenario.category]
-      : scenario.counterpart,
+    counterpart: onboarding?.counterpartDisplayLabel ?? scenario.counterpart,
     topic: scenario.situation,
     usefulOutcome: usefulOutcome.trim() || scenario.goal,
     expectedReaction,
-    safetyStatus: "cleared",
+    safetyStatus: onboarding ? "pending" : "cleared",
     moduleVersion: PILOT_PROGRAM.curriculum_version,
     ...(onboarding ? {
       entryRoute: onboarding.entryRoute,
       ...(onboarding.provisionalModuleId ? { provisionalModuleId: onboarding.provisionalModuleId } : {}),
+      ...(onboarding.selectionLabel ? { selectionLabel: onboarding.selectionLabel } : {}),
+      scenarioSource: onboarding.scenarioSource,
+      scenarioTitle: onboarding.scenarioTitle,
+      counterpartRelationship: onboarding.counterpartRelationship,
+      counterpartDisplayLabel: onboarding.counterpartDisplayLabel,
+      behavioralGoal: onboarding.behavioralGoal,
       persona: onboarding.persona,
     } : {}),
     pilotRuns: {},
@@ -411,14 +431,16 @@ export function normalizePracticeSession(value: unknown): ActivePracticeSession 
   if (!value || typeof value !== "object") return null;
   const item = value as Record<string, unknown>;
   if (item.schemaVersion === 1) return migrateVersionOne(item);
-  if (item.schemaVersion === 2) return normalizeCurrent(migrateLegacyBaseline({ ...item, schemaVersion: 5, pilotRuns: {} }));
-  if (item.schemaVersion === 3 || item.schemaVersion === 4) return normalizeCurrent(migrateLegacyBaseline({ ...item, schemaVersion: 5 }));
+  if (item.schemaVersion === 2) return normalizeCurrent(migrateLegacyBaseline({ ...item, schemaVersion: 6, pilotRuns: {} }));
+  if (item.schemaVersion === 3 || item.schemaVersion === 4) return normalizeCurrent(migrateLegacyBaseline({ ...item, schemaVersion: 6 }));
+  if (item.schemaVersion === 5) return normalizeCurrent({ ...item, schemaVersion: 6, safetyStatus: "cleared" });
   return normalizeCurrent(item);
 }
 
 function normalizeCurrent(item: Record<string, unknown>): ActivePracticeSession | null {
   const required = ["id", "anonymousUserId", "scenarioId", "category", "counterpart", "topic", "usefulOutcome", "expectedReaction", "moduleVersion"];
-  if (item.schemaVersion !== 5 || required.some((key) => typeof item[key] !== "string") || item.safetyStatus !== "cleared") return null;
+  if (item.schemaVersion !== 6 || required.some((key) => typeof item[key] !== "string")) return null;
+  if (item.safetyStatus !== "pending" && item.safetyStatus !== "cleared") return null;
   if (!DAY_ONE_STATES.includes(item.nextState as PracticeSessionState) || typeof item.createdAt !== "number" || typeof item.updatedAt !== "number") return null;
   if (!item.pilotRuns || typeof item.pilotRuns !== "object" || Array.isArray(item.pilotRuns)) return null;
   return item as unknown as ActivePracticeSession;
@@ -434,7 +456,7 @@ function migrateVersionOne(item: Record<string, unknown>): ActivePracticeSession
   const nextState = legacyState[String(item.nextState)];
   if (!nextState) return null;
   let session: ActivePracticeSession = {
-    schemaVersion: 5,
+    schemaVersion: 6,
     id: item.id as string,
     anonymousUserId: item.anonymousUserId as string,
     ...(typeof item.userId === "string" ? { userId: item.userId } : {}),
@@ -511,5 +533,5 @@ function migrateLegacyBaseline(item: Record<string, unknown>): Record<string, un
     created_at: createdAt,
     metadata_status: "legacy_partial",
   };
-  return { ...item, schemaVersion: 5, originalAdamResponse, dayThirtyBaseline };
+  return { ...item, schemaVersion: 6, originalAdamResponse, dayThirtyBaseline };
 }

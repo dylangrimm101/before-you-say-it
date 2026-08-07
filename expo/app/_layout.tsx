@@ -48,17 +48,19 @@ function RootLayoutNav() {
     }
     const isFreeJourney = onboarding || firstSegment === "rehearse" || firstSegment === "debrief" || firstSegment === "safety-check";
     if (profile && activePracticeSession && !activePracticeSession.recommendation && !isFreeJourney) {
-      router.replace({
-        pathname: "/rehearse/[id]",
-        params: {
-          id: activePracticeSession.scenarioId,
-          difficulty: "steady",
-          reaction: activePracticeSession.expectedReaction,
-          entry: "onboarding",
-          persona: activePracticeSession.persona ?? profile.persona,
-          practiceSessionId: activePracticeSession.id,
-        },
-      });
+      const sharedParams = {
+        id: activePracticeSession.scenarioId,
+        difficulty: "steady" as const,
+        reaction: activePracticeSession.expectedReaction,
+        entry: "onboarding" as const,
+        persona: activePracticeSession.persona ?? profile.persona,
+        practiceSessionId: activePracticeSession.id,
+      };
+      if (activePracticeSession.safetyStatus === "pending") {
+        router.replace({ pathname: "/safety-check", params: sharedParams });
+      } else {
+        router.replace({ pathname: "/rehearse/[id]", params: sharedParams });
+      }
     }
   }, [activePracticeSession, ready, profile, segments, router]);
 

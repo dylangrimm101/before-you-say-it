@@ -8,7 +8,6 @@ import {
   Square,
   Volume2,
   VolumeX,
-  X,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -32,9 +31,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { RehearsalBriefing } from "@/components/RehearsalBriefing";
 import {
   Backdrop,
-  Eyebrow,
   Meter,
   MicControl,
   PressCard,
@@ -51,7 +50,7 @@ import {
   personaFor,
   voiceForRehearsal,
 } from "@/constants/personas";
-import { DIFFICULTY } from "@/constants/scenarios";
+import { expectedReactionLabel } from "@/constants/onboardingScenarios";
 import { C, GUTTER, eyebrow, font, radius, T } from "@/constants/theme";
 import { generateDebrief, nextCounterpartTurn } from "@/lib/ai";
 import { FREE_REHEARSAL_USER_TURNS, rehearsalTurnCap } from "@/lib/access";
@@ -66,7 +65,6 @@ import { preserveFreeRehearsalArtifact } from "@/lib/practiceSession";
 import { errorShape, safeLog } from "@/lib/redact";
 import {
   initialRehearsalState,
-  openingPrompt,
   renderCounterpartMessage,
   speechTextFor,
   turnFailureMessage,
@@ -217,7 +215,7 @@ export default function Rehearse() {
   // Hope or Adam is the stable rehearsal identity. The scenario describes the
   // role they are playing; it must never replace the selected name in the UI.
   const themName = params.entry === "onboarding"
-    ? ({ partner: "Your partner", family: "Your family member", work: "Your coworker", friends: "Your friend" } as const)[scenario?.category ?? "friends"]
+    ? activePracticeSession?.counterpartDisplayLabel ?? activePracticeSession?.counterpart ?? scenario?.counterpart ?? "The other person"
     : personaFor(persona).name;
 
   /**
@@ -615,7 +613,11 @@ export default function Rehearse() {
     return (
       <View style={[styles.root, styles.center]}>
         <Backdrop />
-        <Text style={T.support}>That scenario is gone.</Text>
+        <Text style={T.title}>This rehearsal needs fresh context.</Text>
+        <Text style={[T.support, styles.missingBody]}>Choose another conversation to continue your practice.</Text>
+        <PressCard onPress={leave} accessibilityLabel="Choose another conversation">
+          <View style={styles.analyzeBtn}><Text style={styles.analyzeText}>Choose another conversation</Text></View>
+        </PressCard>
       </View>
     );
   }
@@ -640,38 +642,18 @@ export default function Rehearse() {
 
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerRow}>
-          <Pressable
-            onPress={leave}
-            hitSlop={12}
-            style={styles.iconHit}
-            accessibilityRole="button"
-            accessibilityLabel="Leave the rehearsal"
-          >
-            <X size={20} color={C.textSoft} strokeWidth={1.7} />
-          </Pressable>
           <View style={styles.headerCenter}>
-            <Text style={styles.headerName} numberOfLines={1}>
-              {themName}
-            </Text>
-            <Text style={[eyebrow, styles.headerMeta]} numberOfLines={1}>
-              {DIFFICULTY[difficulty].label} ·{" "}
-              {turnCap !== null
-                ? `free rehearsal · ${Math.min(myTurnCount + 1, turnCap)} of ${turnCap}`
-                : "live rehearsal"}
-            </Text>
+            <Text style={[eyebrow, styles.headerMeta]}>{turnCap !== null ? "FREE REHEARSAL" : "LIVE REHEARSAL"}</Text>
+            <Text style={styles.headerName} numberOfLines={1}>{themName}</Text>
           </View>
-          {hasReachedTurnCap ? (
-            <View style={styles.iconHit} />
-          ) : (
-            <PressCard onPress={finish} disabled={closing} accessibilityLabel="End rep">
-              <View style={styles.endBtn}>
-                <Text style={styles.endText}>End rep</Text>
-              </View>
-            </PressCard>
-          )}
+          <PressCard onPress={leave} disabled={closing} accessibilityLabel="End rehearsal">
+            <View style={styles.endBtn}>
+              <Text style={styles.endText}>End rep</Text>
+            </View>
+          </PressCard>
         </View>
 
-        <View style={styles.tensionWrap}>
+        {turns.length > 0 ? <View style={styles.tensionWrap}>
           <Text style={[eyebrow, styles.tensionLabel]}>Tension</Text>
           <View style={styles.flex}>
             <Meter
@@ -680,7 +662,7 @@ export default function Rehearse() {
               tone={tension > 66 ? C.clay : tension > 33 ? C.amber : C.sage}
             />
           </View>
-        </View>
+        </View> : null}
       </View>
 
       <KeyboardAvoidingView
@@ -697,26 +679,15 @@ export default function Rehearse() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* The scene is type, not a card — it sets up the rep and then recedes. */}
-          <View style={styles.scene}>
-            <Eyebrow>The scene</Eyebrow>
-            <Text style={styles.sceneText}>{scenario.situation}</Text>
-            <Text style={styles.sceneGoal}>
-              Objective — {outcome ?? scenario.goal}
-            </Text>
-          </View>
-
           {turns.length === 0 && initial.waitingForUserOpening ? (
-            <View style={styles.opening}>
-              <Text style={styles.openingText}>
-                {openingPrompt(themName)}
-              </Text>
-              <Text style={styles.openingHint}>
-                {mode === "voice"
-                  ? "Tap the mic and say your opening line out loud. You'll see it before it lands."
-                  : "Type your opening line the way you would actually say it."}
-              </Text>
-            </View>
+            <RehearsalBriefing
+              entryRoute={activePracticeSession?.entryRoute}
+              counterpart={themName}
+              situation={scenario.situation}
+              desiredOutcome={outcome ?? scenario.goal}
+              expectedReaction={expectedReactionLabel(reaction ?? activePracticeSession?.expectedReaction ?? "not-sure")}
+              behavioralGoal={activePracticeSession?.behavioralGoal ?? "Say what you need clearly and ask for a concrete next step."}
+            />
           ) : null}
 
           {turns.map((t) =>
@@ -757,7 +728,7 @@ export default function Rehearse() {
         </ScrollView>
 
         <StateDock bottomInset={insets.bottom}>
-          <View style={styles.dockHead}>
+          <View style={styles.dockHead} accessibilityLiveRegion="polite" accessibilityRole="text">
             <View
               style={[
                 styles.dockDot,
@@ -835,11 +806,7 @@ export default function Rehearse() {
               <View style={styles.completeWaiting}>
                 <ActivityIndicator color={C.purple} />
               </View>
-              <PressCard onPress={leave} accessibilityLabel="Exit rehearsal">
-                <View style={styles.secondaryBtn}>
-                  <Text style={styles.secondaryText}>Exit rehearsal</Text>
-                </View>
-              </PressCard>
+
             </View>
           ) : dockState === "complete" ? (
             <View style={styles.completeActions}>
@@ -853,25 +820,14 @@ export default function Rehearse() {
                   <Text style={styles.analyzeText}>Analyze your rep</Text>
                 </View>
               </PressCard>
-              <View style={styles.row}>
-                {speech.canReplay ? (
-                  <PressCard onPress={onReplay} containerStyle={styles.flexOne}>
-                    <View style={styles.secondaryBtn}>
-                      <Volume2 size={17} color={C.textSoft} strokeWidth={1.7} />
-                      <Text style={styles.secondaryText}>Replay response</Text>
-                    </View>
-                  </PressCard>
-                ) : null}
-                <PressCard
-                  onPress={leave}
-                  containerStyle={styles.flexOne}
-                  accessibilityLabel="Exit rehearsal"
-                >
+              {speech.canReplay ? (
+                <PressCard onPress={onReplay} accessibilityLabel={`Replay ${themName}'s response`}>
                   <View style={styles.secondaryBtn}>
-                    <Text style={styles.secondaryText}>Exit rehearsal</Text>
+                    <Volume2 size={17} color={C.textSoft} strokeWidth={1.7} />
+                    <Text style={styles.secondaryText}>Replay response</Text>
                   </View>
                 </PressCard>
-              </View>
+              ) : null}
             </View>
           ) : dockState === "composing" ? (
             <View style={styles.composeWrap}>
@@ -990,6 +946,7 @@ export default function Rehearse() {
                 multiline
                 maxLength={600}
                 editable={!closing}
+                accessibilityLabel="Type your line"
               />
               <PressCard onPress={send} disabled={draft.trim().length === 0 || thinking}>
                 <View
@@ -1308,7 +1265,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   flexOne: { flex: 1 },
   flexWide: { flex: 1.3 },
-  center: { alignItems: "center", justifyContent: "center" },
+  center: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER, gap: 16 },
+  missingBody: { textAlign: "center", color: C.textSoft },
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
 
   header: {
@@ -1317,9 +1275,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.line,
   },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 48 },
   iconHit: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  headerCenter: { flex: 1, alignItems: "center", gap: 3 },
+  headerCenter: { flex: 1, alignItems: "flex-start", gap: 2, minWidth: 0 },
   headerName: { ...T.support, fontFamily: font.semi, color: C.text },
   headerMeta: { ...T.caption, color: C.dim },
   endBtn: {
@@ -1338,13 +1296,7 @@ const styles = StyleSheet.create({
   },
   tensionLabel: { ...eyebrow, color: C.dim },
 
-  transcript: { paddingHorizontal: GUTTER, paddingTop: 20, paddingBottom: 28 },
-  scene: { marginBottom: 28, gap: 8 },
-  sceneText: { ...T.support, color: C.textSoft },
-  sceneGoal: { ...T.caption, color: C.purple, fontFamily: font.medium },
-  opening: { marginBottom: 26, gap: 10 },
-  openingText: T.display,
-  openingHint: { ...T.support, color: C.textDim },
+  transcript: { paddingHorizontal: GUTTER, paddingTop: 14, paddingBottom: 20 },
 
   themWrap: { marginBottom: 22 },
   mineWrap: { marginBottom: 22 },
