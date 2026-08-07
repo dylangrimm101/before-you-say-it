@@ -309,8 +309,18 @@ describe("onboarding presents questions without a fictional coach header", () =>
     expect(source).not.toContain("coachAvatar");
     expect(source).toContain("Choose the rehearsal voice");
     expect(source).toContain("PERSONAS.map");
-    expect(source).toContain("setPersona(item.id)");
+    expect(source).toContain("choosePersona(item.id)");
     expect(source).toContain("selected={persona === item.id}");
     expect(source).not.toContain("Adam will play the conversation counterpart.");
+  });
+
+  it("advances immediately after every tap-only onboarding answer", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
+    expect(source).toContain("setStep(2)");
+    expect(source).toContain("setStep(3)");
+    expect(source).toContain("setStep(4)");
+    expect(source).toContain('if (entryRoute === "real_conversation") setStep(5)');
+    expect(source).toContain("else void finish(value)");
+    expect(source).toContain('const requiresContinue = entryRoute === "real_conversation" && (step === 1 || step === 5)');
   });
 });

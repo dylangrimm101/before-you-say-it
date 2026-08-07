@@ -80,8 +80,8 @@ export default function Onboarding() {
     setStep(1);
   }, []);
 
-  const finish = useCallback(async (): Promise<void> => {
-    if (!entryRoute || !focus || !persona || !reaction || building) return;
+  const finish = useCallback(async (selectedReaction: ReactionPattern | null = reaction): Promise<void> => {
+    if (!entryRoute || !focus || !persona || !selectedReaction || building) return;
     setBuilding(true);
     setError("");
     const body = entryRoute === "real_conversation" ? situation.trim() : diagnosisLabel;
@@ -90,14 +90,14 @@ export default function Onboarding() {
       await saveProfile({
         focus,
         persona,
-        reaction,
+        reaction: selectedReaction,
         outcome: goal,
         dread: body,
         pattern: "avoid",
         win: "heard",
         createdAt: Date.now(),
       });
-      const form = { focus, persona, reaction, outcome: goal, difficulty: DIFFICULTY };
+      const form = { focus, persona, reaction: selectedReaction, outcome: goal, difficulty: DIFFICULTY };
       let draft: Omit<Scenario, "id" | "isCustom">;
       try {
         draft = await buildCustomScenario(body, focus, form);
@@ -118,7 +118,7 @@ export default function Onboarding() {
         anonymousUserId,
         scenario,
         goal,
-        reaction,
+        selectedReaction,
         Date.now(),
         {
           entryRoute,
@@ -132,7 +132,7 @@ export default function Onboarding() {
         params: {
           id: scenario.id,
           difficulty: DIFFICULTY,
-          reaction,
+          reaction: selectedReaction,
           entry: "onboarding",
           persona,
           practiceSessionId,
@@ -145,7 +145,35 @@ export default function Onboarding() {
     }
   }, [addCustomScenario, anonymousUserId, building, diagnosisLabel, entryRoute, focus, outcome, persona, provisionalModuleId, reaction, router, saveActivePracticeSession, saveProfile, situation]);
 
+  const chooseDiagnosis = useCallback((moduleId: ModuleId, label: string): void => {
+    tap("light");
+    setProvisionalModuleId(moduleId);
+    setDiagnosisLabel(label);
+    setStep(2);
+  }, []);
+
+  const chooseFocus = useCallback((value: CategoryId): void => {
+    tap("light");
+    setFocus(value);
+    setStep(3);
+  }, []);
+
+  const choosePersona = useCallback((value: PersonaVoice): void => {
+    tap("light");
+    setPersona(value);
+    setStep(4);
+  }, []);
+
+  const chooseReaction = useCallback((value: ReactionPattern): void => {
+    tap("light");
+    setReaction(value);
+    if (entryRoute === "real_conversation") setStep(5);
+    else void finish(value);
+  }, [entryRoute, finish]);
+
   const isLast = step === totalSteps - 1;
+  const requiresContinue = entryRoute === "real_conversation" && (step === 1 || step === 5);
+  const showsFooter = requiresContinue || building;
   const next = (): void => {
     if (!canContinue) return;
     Keyboard.dismiss();
@@ -196,19 +224,19 @@ export default function Onboarding() {
           ) : null}
 
           {entryRoute !== "real_conversation" && step === 1 ? (
-            <Reveal><Text style={styles.title}>{entryRoute === "desired_skill" ? "What do you want to get better at?" : "What keeps happening?"}</Text><Text style={styles.lede}>This creates a starting hypothesis. Your spoken rehearsal can confirm or change it.</Text><View style={styles.options}>{diagnosisOptions.map((option) => <Choice key={option.label} title={option.label} selected={provisionalModuleId === option.moduleId} onPress={() => { setProvisionalModuleId(option.moduleId); setDiagnosisLabel(option.label); }} />)}</View></Reveal>
+            <Reveal><Text style={styles.title}>{entryRoute === "desired_skill" ? "What do you want to get better at?" : "What keeps happening?"}</Text><Text style={styles.lede}>This creates a starting hypothesis. Your spoken rehearsal can confirm or change it.</Text><View style={styles.options}>{diagnosisOptions.map((option) => <Choice key={option.label} title={option.label} selected={provisionalModuleId === option.moduleId} onPress={() => chooseDiagnosis(option.moduleId, option.label)} />)}</View></Reveal>
           ) : null}
 
           {((entryRoute === "real_conversation" && step === 2) || (entryRoute !== "real_conversation" && step === 2)) ? (
-            <Reveal><Text style={styles.title}>Who is this conversation with?</Text><Text style={styles.lede}>Choose the context. It shapes the role, not a saved contact.</Text><View style={styles.pills}>{CATEGORIES.map((category) => <Pill key={category.id} label={category.label} selected={focus === category.id} onPress={() => setFocus(category.id)} />)}</View></Reveal>
+            <Reveal><Text style={styles.title}>Who is this conversation with?</Text><Text style={styles.lede}>Choose the context. It shapes the role, not a saved contact.</Text><View style={styles.pills}>{CATEGORIES.map((category) => <Pill key={category.id} label={category.label} selected={focus === category.id} onPress={() => chooseFocus(category.id)} />)}</View></Reveal>
           ) : null}
 
           {((entryRoute === "real_conversation" && step === 3) || (entryRoute !== "real_conversation" && step === 3)) ? (
-            <Reveal><Text style={styles.title}>Choose the rehearsal voice</Text><Text style={styles.lede}>This selected counterpart stays with you for both replies. It is not the paid curriculum counterpart.</Text><View style={styles.options}>{PERSONAS.map((item) => <Choice key={item.id} title={item.id === "woman-hope" ? "Woman’s voice" : "Man’s voice"} note="Used by your contextual counterpart in the free rehearsal." selected={persona === item.id} onPress={() => setPersona(item.id)} />)}</View></Reveal>
+            <Reveal><Text style={styles.title}>Choose the rehearsal voice</Text><Text style={styles.lede}>This selected counterpart stays with you for both replies. It is not the paid curriculum counterpart.</Text><View style={styles.options}>{PERSONAS.map((item) => <Choice key={item.id} title={item.id === "woman-hope" ? "Woman’s voice" : "Man’s voice"} note="Used by your contextual counterpart in the free rehearsal." selected={persona === item.id} onPress={() => choosePersona(item.id)} />)}</View></Reveal>
           ) : null}
 
           {((entryRoute === "real_conversation" && step === 4) || (entryRoute !== "real_conversation" && step === 4)) ? (
-            <Reveal><Text style={styles.title}>How might they respond?</Text><Text style={styles.lede}>Choose a response style for this private rehearsal.</Text><View style={styles.pills}>{REACTIONS.map((item) => <Pill key={item.id} label={item.label} selected={reaction === item.id} onPress={() => setReaction(item.id)} />)}</View></Reveal>
+            <Reveal><Text style={styles.title}>How might they respond?</Text><Text style={styles.lede}>Choose a response style for this private rehearsal.</Text><View style={styles.pills}>{REACTIONS.map((item) => <Pill key={item.id} label={item.label} selected={reaction === item.id} onPress={() => chooseReaction(item.id)} />)}</View></Reveal>
           ) : null}
 
           {entryRoute === "real_conversation" && step === 5 ? (
@@ -218,7 +246,7 @@ export default function Onboarding() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </ScrollView>
 
-        {step > 0 ? (
+        {showsFooter ? (
           <BlurView intensity={Platform.OS === "web" ? 0 : 30} tint="light" style={[styles.footer, { paddingBottom: insets.bottom + 18 }]} onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}>
             <PrimaryButton label={building ? "Setting up your rehearsal…" : isLast ? "Continue to private safety check" : "Continue"} disabled={!canContinue || building} onPress={next} />
             {building ? <ActivityIndicator color={C.purple} style={styles.spinner} /> : null}
