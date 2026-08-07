@@ -82,27 +82,21 @@ export function rehearsalTurnCap(entitlement: Entitlement): number | null {
   return isPro(entitlement) ? null : FREE_REHEARSAL_USER_TURNS;
 }
 
-/** Working through the legacy 30-day program day by day. */
+/**
+ * Entering curriculum content after the free acquisition rehearsal.
+ *
+ * The onboarding rehearsal, counterpart interaction, debrief, and recommendation
+ * are the complete free experience. Curriculum coaching starts behind the paid
+ * program boundary, including its first module.
+ */
 export function canContinueProgram(state: AccessState): GateDecision {
   if (isPro(state.entitlement)) return ALLOWED;
-  if (state.completedReps >= 1) return { allowed: false, gate: "program" };
-  return ALLOWED;
+  return { allowed: false, gate: "program" };
 }
 
-/**
- * Entering the Days 1–8 pilot.
- *
- * Pilot Day 1 is its own promised free entry experience. A rehearsal completed
- * during onboarding must not consume it. Once the first pilot module is done,
- * continuing to Day 2 is part of the paid program.
- */
-export function canContinuePilot(
-  state: AccessState,
-  completedPilotDays: number,
-): GateDecision {
-  if (isPro(state.entitlement)) return ALLOWED;
-  if (completedPilotDays >= 1) return { allowed: false, gate: "program" };
-  return ALLOWED;
+/** Entering any module in the eight-module curriculum. */
+export function canContinuePilot(state: AccessState): GateDecision {
+  return canContinueProgram(state);
 }
 
 /**

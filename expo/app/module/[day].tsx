@@ -33,7 +33,7 @@ import { useStore } from "@/providers/store";
 import type { PilotAttemptKind, PilotAudioLine, PilotCoachResponse, PilotDayRun, PilotModuleState } from "@/types/pilotCurriculum";
 
 const DAY_ONE_RECOVERY_HEADING = "We couldn’t recover your first attempt";
-const DAY_ONE_RECOVERY_BODY = "Start with a sample conversation, or pick a different one of your own.";
+const DAY_ONE_RECOVERY_BODY = "Choose another conversation to continue your practice.";
 const RETRY_INVITATION = "Try that same moment again.";
 
 export default function PilotModuleScreen() {
@@ -349,12 +349,11 @@ export default function PilotModuleScreen() {
 
   if (!module) return <Missing title="That practice day isn't available." onBack={() => router.navigate("/(tabs)")} />;
   if (!moduleId && !isPilotModuleUnlocked(day, pilotDoneDays)) return <Missing title="That legacy practice is not available yet." onBack={() => router.navigate("/(tabs)")} />;
-  const decision = canContinuePilot(access, pilotDoneDays.size);
-  // In preview builds the store's development entitlement unlocks the pilot;
-  // production still reaches "pro" only through a real RevenueCat purchase.
-  const requiresPaidDayOneCoaching = day === 1 && access.entitlement !== "pro" && !pilotDoneDays.has(1);
-  if ((moduleId && access.entitlement !== "pro") || requiresPaidDayOneCoaching || (!moduleId && !decision.allowed && !pilotDoneDays.has(day))) {
-    return <Missing title="This practice day is part of the full program." action="See the program" onBack={() => router.replace({ pathname: "/paywall", params: { gate: requiresPaidDayOneCoaching ? "targeted-feedback" : "program" } })} />;
+  const decision = canContinuePilot(access);
+  // Development preview access is folded into `access`; release behavior reaches
+  // Pro only through the existing RevenueCat entitlement.
+  if (!decision.allowed) {
+    return <Missing title="This practice module is part of the paid program." action="See the program" onBack={() => router.replace({ pathname: "/paywall", params: { gate: decision.gate ?? "program", ...(moduleId ? { moduleId } : {}) } })} />;
   }
 
   const dayOneRecoverable = Boolean(session?.attemptOne && session.originalAdamResponse);
@@ -382,7 +381,7 @@ export default function PilotModuleScreen() {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 140 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
           {effectiveState === "module_preview" ? day === 1 && !dayOneRecoverable ? (
-            <Reveal><Text style={styles.title}>{DAY_ONE_RECOVERY_HEADING}</Text><Text style={styles.lede}>{DAY_ONE_RECOVERY_BODY}</Text><PrimaryButton label="Use a sample conversation" disabled onPress={() => {}} style={styles.actionTop} /><Text style={styles.note}>Sample conversation not yet approved.</Text><GhostButton label="Choose another conversation" onPress={() => router.push("/custom")} style={styles.secondaryAction} /></Reveal>
+            <Reveal><Text style={styles.title}>{DAY_ONE_RECOVERY_HEADING}</Text><Text style={styles.lede}>{DAY_ONE_RECOVERY_BODY}</Text><PrimaryButton label="Choose another conversation" onPress={() => router.push("/custom")} style={styles.actionTop} /></Reveal>
           ) : (
             <Reveal><Eyebrow color={C.purple}>{module.copy.eyebrow}</Eyebrow><Text style={styles.title}>{module.copy.heading}</Text><Text style={styles.lede}>{module.copy.body}</Text>{module.copy.practice_points.length ? <GlassCard style={styles.card}>{module.copy.practice_points.map((point) => <Text key={point} style={styles.point}>• {point}</Text>)}</GlassCard> : null}<PrimaryButton label={module.copy.primary_button} onPress={startDay} style={styles.actionTop} /><GhostButton label={module.copy.secondary_button} onPress={chooseCarriedContext} style={styles.secondaryAction} /></Reveal>
           ) : null}

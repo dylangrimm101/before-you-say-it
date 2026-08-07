@@ -48,14 +48,21 @@ describe("required exercised curriculum paths", () => {
     expect(session.nextState).toBe("awaiting_onboarding_baseline");
   });
 
-  test("Day 1 missing-artifact recovery renders only approved recovery copy", async () => {
+  test("Day 1 missing-artifact recovery has one supported route and no disabled sample dead end", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text();
     expect(source).toContain("We couldn’t recover your first attempt");
-    expect(source).toContain("Start with a sample conversation, or pick a different one of your own.");
-    expect(source).toContain('label="Use a sample conversation" disabled');
-    expect(source).toContain("Sample conversation not yet approved.");
-    expect(source).toContain("Choose another conversation");
-    expect(source).not.toContain('label="Use a sample conversation" onPress={() => router.push("/custom")}');
+    expect(source).toContain("Choose another conversation to continue your practice.");
+    expect(source).toContain('label="Choose another conversation" onPress={() => router.push("/custom")}');
+    expect(source).not.toContain("Use a sample conversation");
+    expect(source).not.toContain("Sample conversation not yet approved.");
+  });
+
+  test("Day 1 preserves valid onboarding artifacts and only shows recovery when either is missing", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text();
+    expect(source).toContain("Boolean(session?.attemptOne && session.originalAdamResponse)");
+    expect(source).toContain('day === 1 && !dayOneRecoverable');
+    expect(source).toContain("setAttemptText(session.attemptOne.transcript)");
+    expect(source).toContain("session.originalAdamResponse.text");
   });
 
   test("Day 2 selects only the coached segment and always reuses the ten-minute line", () => {
@@ -121,6 +128,24 @@ describe("required exercised curriculum paths", () => {
     expect(module).toContain('setState("microphone_error")');
     expect(module).toContain('effectiveState === "microphone_error"');
     expect(module).not.toContain("automatic listening");
+  });
+
+  test("recording and transcription failures remain recoverable through retry or typed fallback", async () => {
+    const dictation = await Bun.file(`${import.meta.dir}/../lib/useDictation.ts`).text();
+    const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    expect(dictation).toContain('setError("Could not start the microphone.")');
+    expect(dictation).toContain('setError("No recording was captured.")');
+    expect(dictation).toContain('setError("Could not transcribe that. Try again.")');
+    expect(rehearsal).toContain('dockState === "mic-blocked" || dockState === "mic-error"');
+    expect(rehearsal).toContain("Type instead");
+    expect(rehearsal).toContain('dockState === "mic-blocked" ? "Open Settings" : "Try mic again"');
+  });
+
+  test("playback interruption never blocks the rehearsal", async () => {
+    const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    expect(rehearsal).toContain('dockState === "autoplay-blocked" || dockState === "playback-failed"');
+    expect(rehearsal).toContain("continueWithoutAudio");
+    expect(rehearsal).toContain("stopSpeech().catch(() => {})");
   });
 
   test("safety interruption preserves confirmation state and blocks ordinary processing", () => {

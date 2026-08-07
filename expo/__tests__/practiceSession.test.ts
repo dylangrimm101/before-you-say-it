@@ -311,11 +311,12 @@ describe("paid Day 1 sequence and guardrails", () => {
     expect(source).toContain("Use this transcript");
   });
 
-  test("free users stop before focused coaching while preview testers can exercise it", async () => {
+  test("free users stop before every curriculum module while preview testers can exercise it", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text();
-    expect(source).toContain('access.entitlement !== "pro"');
-    expect(source).toContain("requiresPaidDayOneCoaching");
-    expect(source.indexOf("if (requiresPaidDayOneCoaching")).toBeLessThan(source.indexOf("return (\n    <View style={styles.root}>"));
+    expect(source).toContain("const decision = canContinuePilot(access)");
+    expect(source).toContain("if (!decision.allowed)");
+    expect(source.indexOf("if (!decision.allowed)")).toBeLessThan(source.indexOf("return (\n    <View style={styles.root}>"));
+    expect(source).not.toContain("requiresPaidDayOneCoaching");
   });
 
   test("new sensitive spoken content routes to the private safety check", () => {

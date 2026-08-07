@@ -90,7 +90,7 @@ describe("paid accounts are never gated", () => {
       expect(canStartRehearsal(pro(n)).allowed).toBe(true);
       expect(canRetryRehearsal(pro(n)).allowed).toBe(true);
       expect(canContinueProgram(pro(n)).allowed).toBe(true);
-      expect(canContinuePilot(pro(n), n).allowed).toBe(true);
+      expect(canContinuePilot(pro(n)).allowed).toBe(true);
       expect(canSeeTargetedFeedback(pro(n)).allowed).toBe(true);
     });
   });
@@ -105,27 +105,24 @@ describe("paid accounts are never gated", () => {
   });
 });
 
-describe("the 30-day program is paid beyond the first rep", () => {
-  it("lets a free account do its first day", () => {
-    expect(canContinueProgram(free(0)).allowed).toBe(true);
+describe("curriculum access starts behind the paid boundary", () => {
+  it("does not treat paid Module 1 as a second free experience", () => {
+    const beforeOnboarding = canContinueProgram(free(0));
+    const afterOnboarding = canContinueProgram(free(1));
+    expect(beforeOnboarding).toEqual({ allowed: false, gate: "program" });
+    expect(afterOnboarding).toEqual({ allowed: false, gate: "program" });
   });
 
-  it("gates the program after that", () => {
-    const decision = canContinueProgram(free(1));
-    expect(decision.allowed).toBe(false);
-    expect(decision.gate).toBe("program");
-  });
-});
-
-describe("the Days 1–8 pilot has its own free entry", () => {
-  it("allows pilot Day 1 even after the onboarding rehearsal is complete", () => {
-    expect(canContinuePilot(free(1), 0).allowed).toBe(true);
+  it("keeps every module in the eight-module curriculum paid", () => {
+    expect(canContinuePilot(free(0))).toEqual({ allowed: false, gate: "program" });
+    expect(canContinuePilot(free(1))).toEqual({ allowed: false, gate: "program" });
   });
 
-  it("keeps pilot Day 2 and later behind the program entitlement", () => {
-    const decision = canContinuePilot(free(2), 1);
-    expect(decision.allowed).toBe(false);
-    expect(decision.gate).toBe("program");
+  it("keeps the free onboarding rehearsal separate from curriculum access", () => {
+    expect(canStartRehearsal(free(0)).allowed).toBe(true);
+    expect(canContinuePilot(free(0)).allowed).toBe(false);
+    expect(canStartRehearsal(free(1)).allowed).toBe(false);
+    expect(canContinuePilot(pro(1)).allowed).toBe(true);
   });
 });
 
@@ -139,7 +136,8 @@ describe("preview pilot access", () => {
     expect(paywall).toContain('label="Unlock all modules for testing"');
     expect(paywall).toContain("await toggleDevPro(true)");
     expect(paywall).toContain("Preview only · no purchase or subscription");
-    expect(module).toContain('access.entitlement !== "pro"');
+    expect(module).toContain("const decision = canContinuePilot(access)");
+    expect(module).toContain("if (!decision.allowed)");
     expect(module).not.toContain("const hasPurchasedPro = useIsPro()");
     expect(today).toContain('access.entitlement !== "pro"');
     expect(store).toContain('purchasedPro || (__DEV__ && devPro) ? "pro" : "free"');
@@ -151,6 +149,20 @@ describe("preview pilot access", () => {
     expect(paywall).toContain("if (!__DEV__) return");
     expect(paywall).toContain("{__DEV__ && !devProEnabled ? (");
     expect(store).toContain("if (!__DEV__) return");
+    expect(store).toContain("__DEV__ ? AsyncStorage.getItem(KEYS.devPro) : Promise.resolve(null)");
+    expect(store).toContain('purchasedPro || (__DEV__ && devPro) ? "pro" : "free"');
+  });
+
+  it("keeps RevenueCat configuration identifiers unchanged", async () => {
+    const purchases = await Bun.file(`${import.meta.dir}/../lib/purchases.ts`).text();
+    const paywall = await Bun.file(`${import.meta.dir}/../app/paywall.tsx`).text();
+    expect(purchases).toContain('export const PRO_ENTITLEMENT = "pro"');
+    expect(purchases).toContain("EXPO_PUBLIC_REVENUECAT_TEST_API_KEY");
+    expect(purchases).toContain("EXPO_PUBLIC_REVENUECAT_IOS_API_KEY");
+    expect(purchases).toContain("EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY");
+    expect(paywall).toContain("current?.monthly");
+    expect(paywall).toContain("current?.annual");
+    expect(purchases).not.toContain("productIdentifier ===");
   });
 });
 
