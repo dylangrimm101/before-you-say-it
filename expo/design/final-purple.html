@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#DEDCE8; font-family:-apple-system, 'SF Pro Text', 'Plus Jakarta Sans', system-ui, sans-serif; color:#171A1F; -webkit-font-smoothing:antialiased; }
+  a { color:#512888; text-decoration:none; border-bottom:1px solid rgba(81,40,136,.35); }
+  a:hover { color:#B1402F; border-bottom-color:#B1402F; }
+  @keyframes bysi-halo { 0%,100% { transform:scale(1); opacity:.55 } 50% { transform:scale(1.16); opacity:.12 } }
+  @keyframes bysi-bar { 0%,100% { transform:scaleY(.3) } 50% { transform:scaleY(1) } }
+  @keyframes bysi-dot { 0%,100% { opacity:.25; transform:translateY(0) } 50% { opacity:1; transform:translateY(-2px) } }
+  @keyframes bysi-word { 0% { opacity:0; transform:translateY(4px); } 100% { opacity:1; transform:none; } }
+  @keyframes bysi-settle { 0% { opacity:0; transform:translateY(14px) scale(1.03); } 100% { opacity:1; transform:none; } }
+  @keyframes bysi-meter { 0% { transform:scaleX(0); } 70% { transform:scaleX(1.03); } 100% { transform:scaleX(1); } }
+  @keyframes bysi-fill { 0% { background-size:0% 100%; color:#171A1F; } 44% { color:#171A1F; } 56% { color:#FFFFFF; } 100% { background-size:100% 100%; color:#FFFFFF; } }
+  @keyframes bysi-fill-cta { 0% { background-size:0% 100%; } 100% { background-size:100% 100%; } }
+  @keyframes bysi-slide-a { 0% { opacity:0; transform:translateX(26px) scale(.985); } 100% { opacity:1; transform:none; } }
+  @keyframes bysi-slide-b { 0% { opacity:0; transform:translateX(26px) scale(.985); } 100% { opacity:1; transform:none; } }
+  @keyframes bysi-sweep { 0% { transform:translateX(-110%) } 100% { transform:translateX(360%) } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.001ms !important; animation-iteration-count:1 !important; } }
+</style>
+</helmet>
+
+<section style="padding:56px 48px 96px;display:flex;flex-direction:column;gap:72px;max-width:2400px">
+
+  <div id="6a" style="display:flex;flex-direction:column;gap:18px;max-width:900px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font:600 12px/1 'Plus Jakarta Sans', system-ui;letter-spacing:.14em;color:#512888;border:1px solid rgba(81,40,136,.4);border-radius:999px;padding:7px 11px">6a</span>
+      <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Before You Say It · FINAL PURPLE · Rork handoff · locked visual direction</span>
+    </div>
+    <h1 style="font:700 44px/1.1 'Plus Jakarta Sans', system-ui, sans-serif;margin:0;letter-spacing:-.01em;text-wrap:pretty">Frosted layers on a cool luminous field, with a single purple gradient carrying the one thing to do today.</h1>
+    <p style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui;color:#4B5259;margin:0;max-width:70ch;text-wrap:pretty">This is the locked visual direction. The earlier peach and slate explorations are superseded — nothing in this document carries them forward. This pass is implementation readiness only: contrast, privacy copy, button geometry, demo-data consistency, keyboard states, production icons, dynamic-content annotations and overflow behaviour. No curriculum, product-strategy, flow or scoring changes. Depth carries the hierarchy: a cool near-white gradient field behind everything, cooling into violet where the light falls, translucent frosted cards at 28 pt radius that sit a measurable distance off it, and one saturated gradient surface per screen holding the single action that matters. Everything less important recedes — lower opacity, softer shadow, further back. One geometric sans (Plus Jakarta Sans) across the product; weight does the rest. Type scale rationalized 12 sizes → 6. Horizontal padding unified at 22 pt. Card borders removed wherever type hierarchy can do the grouping. The <strong>gradient surface</strong> appears at most once per screen, and it is always the thing to do next. Frames are 393 × 852 with 59 pt top and 34 pt bottom safe areas, laid out in flexbox only — no CSS grid and no hover-dependent states. Translucency is deliberate and load-bearing here: every card is a real glass layer over the gradient, so depth reads without borders. Program is always the <strong>30-Day Conversation Practice</strong>; the word “challenge” is gone.</p>
+    <p style="font:400 15px/1.6 'Plus Jakarta Sans', system-ui;color:#5B646E;margin:0;max-width:70ch">Button geometry is now consistent with the component system: primary and ghost buttons 18 pt radius, chips and category filters pills, the mic circular, and a pill CTA only inside the HeroSurface where it is intentional. Small type has been darkened to #646D77 / #5B646E for AA on the pale field.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:baseline;gap:16px;border-bottom:1px solid rgba(23,26,31,.10);padding-bottom:12px">
+      <h2 style="font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif;margin:0">1 · Interactive prototype</h2>
+      <span style="font:400 15px/1 'Plus Jakarta Sans', system-ui;color:#646D77">Onboarding 1–5 → rehearsal states → debrief → paywall → retry → Today. Tap inside the frame.</span>
+    </div>
+
+    <div style="display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start">
+
+      <div style="width:393px;height:852px;border-radius:44px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);box-shadow:0 40px 90px rgba(28,36,48,.28);background:radial-gradient(125% 75% at 15% 0%, #FDFDFE 0%, rgba(253,253,254,0) 55%), radial-gradient(115% 70% at 100% 18%, #DFDCEC 0%, rgba(223,220,236,0) 62%), radial-gradient(140% 85% at 55% 105%, #DED5EA 0%, rgba(222,213,234,0) 58%), #F2F2F6;display:flex;flex-direction:column">
+        <div style="flex:none;height:59px;padding:0 22px;display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:8px">
+          <span style="font:600 15px/1 'Plus Jakarta Sans', system-ui">9:41</span>
+          <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Private practice</span>
+        </div>
+
+        <sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+            <div onScroll="{{ onTodayScroll }}" style="flex:1;min-height:0;overflow:auto;padding:8px 22px 24px;display:flex;flex-direction:column;gap:28px">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Today · day 1 of 30</span>
+                <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">One rep today keeps it alive.</h2>
+                <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">30-Day Conversation Practice · Block 1, find your voice</span>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:16px">
+                <span style="width:52px;height:52px;border-radius:18px;background:rgba(81,40,136,.10);display:flex;align-items:center;justify-content:center;flex:none;font:400 20px/1 'Plus Jakarta Sans', system-ui, sans-serif;color:#512888">1</span>
+                <span style="display:flex;flex-direction:column;gap:3px">
+                  <span style="font:400 17px/1.3 'Plus Jakarta Sans', system-ui">1 day in a row</span>
+                  <span style="font:400 13px/1.4 'Plus Jakarta Sans', system-ui;color:#5B646E">Do today's rep to keep it lit. One skip saved.</span>
+                </span>
+              </div>
+
+              <div style="position:relative;padding-top:16px">
+                <span style="position:absolute;left:22px;right:22px;top:0;height:40px;border-radius:28px;background:rgba(255,255,255,.30);border:1px solid rgba(255,255,255,.42);box-shadow:0 10px 24px rgba(28,36,48,.07);transform:{{ layerFar }}"></span>
+                <span style="position:absolute;left:11px;right:11px;top:8px;height:44px;border-radius:28px;background:rgba(255,255,255,.44);border:1px solid rgba(255,255,255,.55);box-shadow:0 12px 28px rgba(28,36,48,.08);transform:{{ layerNear }}"></span>
+                <div style="position:relative;background:linear-gradient(158deg, #4A2380 0%, #512888 34%, #63409B 70%, #7B62AC 100%);border-radius:28px;padding:24px;box-shadow:0 2px 2px rgba(120,96,110,.10), 0 14px 30px rgba(120,96,110,.22), 0 34px 64px rgba(120,96,110,.26), inset 0 1px 0 rgba(255,255,255,.45);display:flex;flex-direction:column;gap:20px">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
+                  <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:rgba(255,255,255,.86)">Today's rep</span>
+                  <span style="font:400 13px/1 'Plus Jakarta Sans', system-ui;color:rgba(255,255,255,.62)">2 min · clarity</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <span style="font:600 24px/1.22 'Plus Jakarta Sans', system-ui, sans-serif;color:#FFFFFF">Open the hard conversation</span>
+                  <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:rgba(255,255,255,.72)">Say the first sentence out loud, once, without softening it.</span>
+                </div>
+                <button onClick="{{ goStep1 }}" style="height:56px;border:none;border-radius:999px;background:#FFFFFF;color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer;box-shadow:0 6px 16px rgba(28,36,48,.18)">Start today's rep</button>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Your active scenario</span>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <span style="font:600 20px/1.28 'Plus Jakarta Sans', system-ui, sans-serif">Get a rent repayment plan</span>
+                  <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Marcus — your roommate and friend · steady · 7 min</span>
+                </div>
+                <button onClick="{{ goDetail }}" style="align-self:flex-start;min-height:44px;background:none;border:none;padding:0;font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#512888;cursor:pointer">Open the scenario</button>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:10px;padding-top:4px;border-top:1px solid rgba(23,26,31,.10)">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Next up</span>
+                <sc-for list="{{ upcoming }}" as="u" hint-placeholder-count="4">
+                  <div style="display:flex;gap:14px;align-items:baseline;padding:12px 0;border-bottom:1px solid rgba(23,26,31,.10)">
+                    <span style="flex:none;width:46px;font:600 11px/1.3 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">{{ u.day }}</span>
+                    <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+                      <span style="font:400 17px/1.35 'Plus Jakarta Sans', system-ui;color:#4B5259">{{ u.name }}</span>
+                      <span style="font:400 13px/1.3 'Plus Jakarta Sans', system-ui;color:#646D77">{{ u.meta }}</span>
+                    </span>
+                    <span style="flex:none;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">{{ u.state }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="flex:none;padding:10px 22px 34px;border-top:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);display:flex">
+              <sc-for list="{{ tabsToday }}" as="t" hint-placeholder-count="3">
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 0">
+                  <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:{{ t.color }}">{{ t.name }}</span>
+                  <span style="width:16px;height:2px;border-radius:2px;background:{{ t.rule }}"></span>
+                </span>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+            <div style="flex:none;padding:0 22px 12px">
+              <button onClick="{{ goToday }}" style="min-height:44px;background:none;border:none;padding:0;font:600 17px/1 'Plus Jakarta Sans', system-ui;color:#512888;cursor:pointer">‹ Today</button>
+            </div>
+            <div style="flex:1;min-height:0;overflow:auto;padding:8px 22px 24px;display:flex;flex-direction:column;gap:26px">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Scenario · yours</span>
+                <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">Get a rent repayment plan</h2>
+                <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Marcus is two months behind on his half of the rent. You want to leave the conversation with a dollar amount and a date.</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:16px">
+                <div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Who you're facing</span><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">Marcus — roommate and friend. Adam's voice, steady.</span></div>
+                <div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">What makes it hard</span><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">He minimizes it and puts the delay on the bank, so the ask quietly drops.</span></div>
+                <div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Outcome you want</span><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">A specific amount and a date he commits to out loud.</span></div>
+              </div>
+              <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Free tier — one spoken rehearsal and one full debrief. The mic is requested when you start, not before.</span>
+            </div>
+            <div style="flex:none;padding:12px 22px 34px;background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid rgba(255,255,255,.5)">
+              <button onClick="{{ goRehearsal }}" style="width:100%;height:56px;border:none;border-radius:18px;background:#512888;color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer;box-shadow:0 2px 3px rgba(81,40,136,.14), 0 10px 22px rgba(81,40,136,.22), 0 24px 46px rgba(81,40,136,.18)">Start the rehearsal</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isSetup }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+            <div style="flex:none;padding:0 22px 14px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <button onClick="{{ prevStep }}" style="min-height:44px;background:none;border:none;padding:0;font:600 17px/1 'Plus Jakarta Sans', system-ui;color:{{ backColor }};cursor:{{ backCursor }}">‹ Back</button>
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">{{ stepLabel }}</span>
+              </div>
+              <span style="display:block;height:3px;border-radius:2px;background:rgba(23,26,31,.10)"><span style="display:block;height:100%;border-radius:2px;background:#512888;width:{{ stepPct }}"></span></span>
+            </div>
+
+            <div style="flex:1;min-height:0;overflow:auto;padding:14px 22px 24px;display:flex;flex-direction:column;gap:24px;animation:{{ slideAnim }}">
+              <sc-if value="{{ step1 }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:18px">
+                  <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">What conversation do you need to have?</h2>
+                  <span style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui;color:#4B5259">Say it the way you would to a friend. No names or identifying details. If you can't find the words, tap the mic and talk it out.</span>
+                  <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:18px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 6px 14px rgba(28,36,48,.06), 0 18px 34px rgba(28,36,48,.07);padding:18px;min-height:170px;display:flex;flex-direction:column;justify-content:space-between;gap:18px">
+                    <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">My roommate is two months behind on rent and I keep letting it slide.</span>
+                    <span style="display:flex;align-items:center;gap:12px">
+                      <span style="width:44px;height:44px;border-radius:999px;border:1px solid rgba(23,26,31,.20);display:flex;align-items:center;justify-content:center;flex:none"><span style="width:10px;height:16px;border-radius:6px;background:#512888;display:block"></span></span>
+                      <span style="font:400 15px/1.4 'Plus Jakarta Sans', system-ui;color:#4B5259">Tap to dictate · 62 of 500 characters</span>
+                    </span>
+                  </div>
+                  <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Dictation asks for the microphone the first time you tap it. Nothing is captured until you allow it, and dictation never submits on its own.</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ step2 }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:18px">
+                  <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">Who are you talking with?</h2>
+                  <div style="display:flex;flex-wrap:wrap;gap:10px">
+                    <sc-for list="{{ whoOptions }}" as="w" hint-placeholder-count="4">
+                      <button onClick="{{ w.pick }}" style="min-height:52px;padding:0 22px;border-radius:999px;cursor:pointer;font:600 17px/1 'Plus Jakarta Sans', system-ui;color:{{ w.fg }};background:{{ w.bg }};border:{{ w.border }};background-size:200% 100%;animation:{{ w.anim }}">{{ w.name }}</button>
+                    </sc-for>
+                  </div>
+                  <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">This only shapes how the counterpart behaves — it is not stored as a contact.</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ step3 }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:18px">
+                  <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">Who should the counterpart sound like?</h2>
+                  <div style="display:flex;flex-direction:column;gap:10px">
+                    <sc-for list="{{ castOptions }}" as="c" hint-placeholder-count="2">
+                      <div style="border-radius:18px;padding:16px 18px;display:flex;align-items:center;gap:14px;color:{{ c.fg }};background:{{ c.bg }};border:{{ c.border }};background-size:200% 100%;animation:{{ c.anim }}">
+                        <button onClick="{{ c.preview }}" style="width:44px;height:44px;border-radius:999px;flex:none;border:1px solid rgba(23,26,31,.20);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center" aria-label="{{ c.playLabel }}">{{ c.playIcon }}</button>
+                        <button onClick="{{ c.pick }}" style="flex:1;text-align:left;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;gap:3px;padding:0;color:inherit">
+                          <span style="font:600 17px/1.25 'Plus Jakarta Sans', system-ui;color:inherit">{{ c.name }}</span>
+                          <span style="font:400 15px/1.4 'Plus Jakarta Sans', system-ui;color:inherit;opacity:.78">{{ c.sub }}</span>
+                        </button>
+                        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#512888">{{ c.mark }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Tap the circle to hear a two-second sample. You'll hear this voice reply aloud in the rehearsal.</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ step4 }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:18px">
+                  <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">How do they usually react to you?</h2>
+                  <div style="display:flex;flex-wrap:wrap;gap:10px">
+                    <sc-for list="{{ reactionOptions }}" as="r" hint-placeholder-count="8">
+                      <button onClick="{{ r.pick }}" style="min-height:52px;padding:0 18px;border-radius:999px;cursor:pointer;font:600 17px/1.2 'Plus Jakarta Sans', system-ui;color:{{ r.fg }};text-align:left;background:{{ r.bg }};border:{{ r.border }};background-size:200% 100%;animation:{{ r.anim }}">{{ r.name }}</button>
+                    </sc-for>
+                  </div>
+                  <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">“I'm not sure” lets the counterpart pick. You can change this later in the scenario.</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ step5 }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:22px">
+                  <div style="display:flex;flex-direction:column;gap:14px">
+                    <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">What would a useful outcome be?</h2>
+                    <span style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui;color:#4B5259">One concrete thing you could walk away with.</span>
+                    <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:18px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 6px 14px rgba(28,36,48,.06), 0 18px 34px rgba(28,36,48,.07);padding:18px;min-height:150px;display:flex;flex-direction:column;justify-content:space-between;gap:18px">
+                      <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">A specific amount and a date he commits to out loud.</span>
+                      <span style="display:flex;align-items:center;gap:12px">
+                        <span style="width:44px;height:44px;border-radius:999px;border:1px solid rgba(23,26,31,.20);display:flex;align-items:center;justify-content:center;flex:none"><span style="width:10px;height:16px;border-radius:6px;background:#512888;display:block"></span></span>
+                        <span style="font:400 15px/1.4 'Plus Jakarta Sans', system-ui;color:#4B5259">Tap to dictate</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:10px">
+                    <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Practice difficulty</span>
+                    <sc-for list="{{ difficulties }}" as="d" hint-placeholder-count="3">
+                      <button onClick="{{ d.select }}" style="text-align:left;cursor:pointer;min-height:64px;border-radius:18px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:{{ d.fg }};background:{{ d.bg }};border:{{ d.border }};background-size:200% 100%;animation:{{ d.anim }}">
+                        <span style="display:flex;flex-direction:column;gap:3px">
+                          <span style="font:600 17px/1.25 'Plus Jakarta Sans', system-ui;color:inherit">{{ d.name }}</span>
+                          <span style="font:400 15px/1.4 'Plus Jakarta Sans', system-ui;color:inherit;opacity:.78">{{ d.sub }}</span>
+                        </span>
+                        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#512888">{{ d.mark }}</span>
+                      </button>
+                    </sc-for>
+                  </div>
+                  <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Next screen is the rehearsal. The microphone is requested there, after you tap.</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="flex:none;padding:12px 22px 34px;border-top:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);display:flex;flex-direction:column;gap:8px">
+              <sc-if value="{{ stepHasButton }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ stepButtonRun }}" style="width:100%;height:56px;border:none;border-radius:18px;background:{{ stepButtonBg }};color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer;background-size:200% 100%;animation:{{ stepButtonAnim }};box-shadow:0 2px 3px rgba(81,40,136,.14), 0 10px 22px rgba(81,40,136,.22), 0 24px 46px rgba(81,40,136,.18)">{{ stepButtonLabel }}</button>
+              </sc-if>
+              <sc-if value="{{ tapToContinue }}" hint-placeholder-val="{{ true }}">
+                <span style="min-height:56px;display:flex;align-items:center;justify-content:center;font:400 15px/1 'Plus Jakarta Sans', system-ui;color:#646D77">Tap an option to continue</span>
+              </sc-if>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isRehearsal }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+            <div style="flex:none;padding:0 22px 12px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <button onClick="{{ goToday }}" style="width:44px;height:44px;border:none;background:none;padding:0;font:400 20px/1 'Plus Jakarta Sans', system-ui;color:#4B5259;cursor:pointer">✕</button>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <span style="font:400 17px/1.25 'Plus Jakarta Sans', system-ui;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Marcus</span>
+                  <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Free rehearsal · {{ turnLabel }}</span>
+                </span>
+                <button onClick="{{ pauseRep }}" style="min-height:44px;padding:0 6px;background:none;border:none;font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#512888;cursor:pointer">Pause</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Tension</span>
+                <span style="flex:1;display:block;height:3px;border-radius:2px;background:rgba(23,26,31,.10)"><span style="display:block;height:100%;border-radius:2px;transform-origin:left center;background:{{ tensionColor }};width:{{ tensionPct }};animation:{{ tensionAnim }}"></span></span>
+              </div>
+            </div>
+
+            <div style="flex:1;min-height:0;overflow:auto;padding:14px 22px 12px;display:flex;flex-direction:column;gap:22px">
+              <sc-if value="{{ showCue }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">The scene</span>
+                  <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Marcus is two months behind on his half of the rent. You want an amount and a date.</span>
+                  <h3 style="margin:0;font:600 28px/1.184 'Plus Jakarta Sans', system-ui, sans-serif">You start. What do you want to say to Marcus?</h3>
+                  <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Tap the mic and say your opening line out loud. You'll see it before it lands.</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ showTranscript }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:22px">
+                  <div style="display:flex;flex-direction:column;gap:6px;animation:{{ youAnim }}">
+                    <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">You</span>
+                    <p style="margin:0;font:400 17px/1.6 'Plus Jakarta Sans', system-ui;color:#171A1F">Totally get that, and we've all been there. But I'd like a plan for when you're expecting certain things to get through — I feel like I'm being left in the dark.</p>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Marcus</span>
+                    <p style="margin:0;font:500 20px/1.45 'Plus Jakarta Sans', system-ui, sans-serif;color:#171A1F">{{ marcusLine }}</p>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="flex:none;background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid rgba(255,255,255,.5);box-shadow:0 -2px 4px rgba(28,36,48,.03), 0 -16px 40px rgba(28,36,48,.10);padding:16px 22px 34px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="width:7px;height:7px;border-radius:999px;flex:none;background:{{ stateDot }}"></span>
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#171A1F">{{ stateLabel }}</span>
+              </div>
+              <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">{{ stateHelp }}</span>
+
+              <sc-if value="{{ dockMic }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:14px">
+                  <button onClick="{{ typeInstead }}" aria-label="Type this turn instead" style="width:44px;height:44px;border-radius:14px;border:1px solid rgba(23,26,31,.20);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center">{{ iconKeyboard }}</button>
+                  <span style="width:104px;height:104px;display:flex;align-items:center;justify-content:center">{{ micNode }}</span>
+                  <button onClick="{{ toggleMute }}" aria-label="{{ muteLabel }}" style="width:44px;height:44px;border-radius:14px;border:1px solid rgba(23,26,31,.20);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center">{{ iconMute }}</button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ dockButtons }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <sc-for list="{{ actions }}" as="a" hint-placeholder-count="2">
+                    <button onClick="{{ a.run }}" disabled="{{ a.disabled }}" style="width:100%;min-height:{{ a.height }};border-radius:18px;cursor:{{ a.cursor }};font:600 17px/1.2 'Plus Jakarta Sans', system-ui;padding:0 18px;background:{{ a.bg }};color:{{ a.fg }};border:{{ a.border }};box-shadow:{{ a.shadow }}">{{ a.label }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ dockComposing }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(23,26,31,.20);border-radius:18px;padding:14px 16px;font:400 17px/1.55 'Plus Jakarta Sans', system-ui">Totally get that, and we've all been there. But I'd like a plan for when you're expecting certain things to get through.</div>
+                  <span style="font:400 13px/1.4 'Plus Jakarta Sans', system-ui;color:#5B646E">Edit it if we misheard. Nothing is sent until you tap Send it.</span>
+                  <div style="display:flex;gap:10px">
+                    <button onClick="{{ setListening }}" style="flex:1;height:52px;border-radius:18px;background:none;border:1px solid rgba(23,26,31,.20);color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer">Say it again</button>
+                    <button onClick="{{ sendLine }}" style="flex:1;height:56px;border-radius:18px;background:#512888;border:none;color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer;box-shadow:0 2px 3px rgba(81,40,136,.14), 0 10px 22px rgba(81,40,136,.22), 0 24px 46px rgba(81,40,136,.18)">Send it</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isReviewing }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:20px;padding:32px 22px 40px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Reviewing your rep</span>
+            <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">Reviewing the transcript from this rehearsal.</h2>
+            <span style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui;color:#4B5259">Looking at clarity, empathy, assertiveness and composure — and writing the three lines that would have landed.</span>
+            <span style="display:block;height:4px;border-radius:2px;background:rgba(23,26,31,.10);overflow:hidden;position:relative">
+              <span style="position:absolute;top:0;left:0;height:100%;width:30%;border-radius:2px;background:#512888;animation:bysi-sweep 1500ms ease-in-out infinite"></span>
+            </span>
+            <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Your practice isn’t shared with the person you’re rehearsing about.</span>
+            <button onClick="{{ goDebrief }}" style="align-self:flex-start;min-height:44px;background:none;border:none;padding:0;font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#512888;cursor:pointer">Skip ahead (prototype)</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isDebrief }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+            <div style="flex:none;padding:0 22px 12px">
+              <button onClick="{{ goToday }}" style="min-height:44px;background:none;border:none;padding:0;font:600 17px/1 'Plus Jakarta Sans', system-ui;color:#512888;cursor:pointer">‹ Today</button>
+            </div>
+            <div style="flex:1;min-height:0;overflow:auto;padding:8px 22px 24px;display:flex;flex-direction:column;gap:28px">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">The debrief</span>
+                <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">You opened well, then let Friday stay a promise instead of a plan.</h2>
+                <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Get a rent repayment plan · Steady · 2 lines spoken · Day 1</span>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:18px">
+                <span style="flex:none">{{ scoreRingLive }}</span>
+                <span style="display:flex;flex-direction:column;gap:6px">
+                  <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#B4823F">Building</span>
+                  <span style="font:400 17px/1.5 'Plus Jakarta Sans', system-ui">The bones are there — sharpen the ask.</span>
+                  <span style="font:400 13px/1.45 'Plus Jakarta Sans', system-ui;color:#5B646E">From your wording and choices. Tone and pace aren't scored on this rep.</span>
+                </span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Four dimensions</span>
+                <sc-for list="{{ dims }}" as="d" hint-placeholder-count="4">
+                  <span style="display:flex;flex-direction:column;gap:7px">
+                    <span style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 17px/1.2 'Plus Jakarta Sans', system-ui">{{ d.name }}</span><span style="font:400 15px/1 'Plus Jakarta Sans', system-ui;color:#4B5259">{{ d.val }}</span></span>
+                    <span style="display:block;height:6px;border-radius:3px;background:rgba(23,26,31,.10)"><span style="display:block;height:100%;border-radius:3px;transform-origin:left center;background:{{ d.color }};width:{{ d.pct }};animation:bysi-meter 900ms cubic-bezier(.22,.9,.28,1) both;animation-delay:{{ d.delay }}"></span></span>
+                  </span>
+                </sc-for>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#5C8A6E">What worked</span>
+                <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">You opened with the actual ask instead of circling it.</span>
+                <span style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui, sans-serif;font-style:italic;color:#4B5259">“When do you think you'll be able to pay your portion of the rent?”</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:10px;padding-top:4px;border-top:1px solid rgba(23,26,31,.10)">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#512888">What to change</span>
+                <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">The ask went vague, so his answer could stay vague.</span>
+                <span style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui, sans-serif;font-style:italic;color:#4B5259">“…a plan of when you're expecting certain things to get through”</span>
+                <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">“Certain things” let him answer with a day of the week instead of an amount and a date.</span>
+                <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui;color:#171A1F">Try instead — “I need a specific dollar amount and the date it'll hit my account. Can we lock that in now?”</span>
+                <button onClick="{{ toggleMore }}" style="align-self:flex-start;min-height:44px;background:none;border:none;padding:0;font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#512888;cursor:pointer">{{ moreLabel }}</button>
+                <sc-if value="{{ showMore }}" hint-placeholder-val="{{ true }}">
+                  <span style="display:flex;flex-direction:column;gap:10px;font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">
+                    <span>You acknowledged his situation before returning to the ask — keep that order.</span>
+                    <span>“Left in the dark” moved the subject from the plan to how you felt about him.</span>
+                  </span>
+                </sc-if>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Your real-conversation script</span>
+                <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:28px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 8px 18px rgba(28,36,48,.07), 0 24px 48px rgba(28,36,48,.09);padding:4px 18px">
+                  <span style="display:flex;gap:14px;padding:14px 0;border-bottom:1px solid rgba(23,26,31,.10)"><span style="font:400 15px/1.6 'Plus Jakarta Sans', system-ui, sans-serif;color:#512888">1</span><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">So just to nail it down — Friday, for the full amount. Is that right?</span></span>
+                  <span style="display:flex;gap:14px;padding:14px 0;border-bottom:1px solid rgba(23,26,31,.10)"><span style="font:400 15px/1.6 'Plus Jakarta Sans', system-ui, sans-serif;color:#512888">2</span><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">If the check doesn't clear by Friday, what's the backup plan and date?</span></span>
+                  <span style="display:flex;gap:14px;padding:14px 0"><span style="font:400 15px/1.6 'Plus Jakarta Sans', system-ui, sans-serif;color:#512888">3</span><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">Can you text me the second it clears?</span></span>
+                </div>
+                <button style="align-self:flex-start;min-height:44px;background:none;border:none;padding:0;font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#512888;cursor:pointer">Copy the script</button>
+                <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Saved with this session, so you'll still have it when the conversation happens.</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Next skill</span>
+                <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">Holding the ask when they hand you a reason it can't happen yet.</span>
+              </div>
+            </div>
+            <div style="flex:none;padding:12px 22px 34px;background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid rgba(255,255,255,.5);display:flex;flex-direction:column;gap:10px">
+              <button onClick="{{ goPaywall }}" style="width:100%;height:56px;border:none;border-radius:18px;background:#512888;color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer;box-shadow:0 2px 3px rgba(81,40,136,.14), 0 10px 22px rgba(81,40,136,.22), 0 24px 46px rgba(81,40,136,.18)">Practice the better version</button>
+              <button onClick="{{ goToday }}" style="width:100%;height:52px;border-radius:18px;background:none;border:1px solid rgba(23,26,31,.20);color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer">Back to today</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isPaywall }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+            <div style="flex:none;padding:0 22px 12px;display:flex;justify-content:space-between;align-items:center">
+              <button onClick="{{ goDebrief }}" style="min-height:44px;background:none;border:none;padding:0;font:600 17px/1 'Plus Jakarta Sans', system-ui;color:#512888;cursor:pointer">‹ Debrief</button>
+              <button style="min-height:44px;background:none;border:none;padding:0;font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#4B5259;cursor:pointer">Restore purchase</button>
+            </div>
+            <div style="flex:1;min-height:0;overflow:auto;padding:8px 22px 24px;display:flex;flex-direction:column;gap:26px">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">30-Day Conversation Practice</span>
+                <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">Say it again, out loud, until it comes out right.</h2>
+                <span style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui;color:#4B5259">Your rehearsal, debrief and script stay yours. The practice is where you speak the same difficult moment again, and keep going for thirty days.</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:16px">
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Free, always</span>
+                  <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Onboarding · one spoken rehearsal · one full debrief · the real-conversation script · next-skill preview</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#512888">Included in the practice</span>
+                  <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#171A1F">Spoken retries of the same moment · continued rehearsals · targeted feedback on one behaviour at a time · the 30-day progression</span>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ plans }}" as="p" hint-placeholder-count="2">
+                  <button onClick="{{ p.pick }}" style="text-align:left;cursor:pointer;min-height:72px;border-radius:18px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:{{ p.bg }};border:{{ p.border }}">
+                    <span style="display:flex;flex-direction:column;gap:3px">
+                      <span style="font:600 17px/1.2 'Plus Jakarta Sans', system-ui;color:inherit">{{ p.name }}</span>
+                      <span style="font:400 15px/1.4 'Plus Jakarta Sans', system-ui;color:inherit;opacity:.78">{{ p.price }}</span>
+                    </span>
+                    <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#512888">{{ p.mark }}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Renews until you cancel in Settings. Cancel any time. <a href="#6a">Terms</a> · <a href="#6a">Privacy</a></span>
+            </div>
+            <div style="flex:none;padding:12px 22px 34px;background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid rgba(255,255,255,.5);display:flex;flex-direction:column;gap:10px">
+              <button onClick="{{ goRetry }}" style="width:100%;height:56px;border:none;border-radius:18px;background:#512888;color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer;box-shadow:0 2px 3px rgba(81,40,136,.14), 0 10px 22px rgba(81,40,136,.22), 0 24px 46px rgba(81,40,136,.18)">{{ planCta }}</button>
+              <button onClick="{{ goDebrief }}" style="width:100%;height:52px;border-radius:18px;background:none;border:1px solid rgba(23,26,31,.20);color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer">Keep my free debrief for now</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:20px;max-width:420px">
+        <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(23,26,31,.10);border-radius:28px;padding:22px;display:flex;flex-direction:column;gap:14px">
+          <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Jump to a rehearsal state</span>
+          <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Inspection rail — not part of the app. The five named states are marked; the rest are recovery paths the build already has to handle.</span>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ stateChips }}" as="c" hint-placeholder-count="13">
+              <button onClick="{{ c.run }}" style="min-height:44px;padding:0 14px;border-radius:999px;cursor:pointer;font:600 13px/1 'Plus Jakarta Sans', system-ui;background:{{ c.bg }};color:{{ c.fg }};border:{{ c.border }}">{{ c.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(23,26,31,.10);border-radius:28px;padding:22px;display:flex;flex-direction:column;gap:12px">
+          <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">What changed on the rehearsal screen</span>
+          <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:10px;font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">
+            <li>Chrome cut to three things: the conversation, the mic, one next action. Scene text is type, not a card.</li>
+            <li>Bubbles gone. Your line is 17/400 in ink, Marcus's is 20/500 — weight and size mark who is speaking, with no container at all.</li>
+            <li>Composing is explicit: a transcript you can edit and a Send it tap. Recognition never auto-submits.</li>
+            <li>During Waiting and Speaking the mic is replaced by the playback pair, so a disabled mic is never sitting there tempting a tap. Analyze your rep stays disabled while audio is playing.</li>
+            <li>The raised layer appears once per state — on the single action that moves the rep forward.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:baseline;gap:16px;border-bottom:1px solid rgba(23,26,31,.10);padding-bottom:12px">
+      <h2 style="font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif;margin:0">2 · Design system</h2>
+      <span style="font:400 15px/1 'Plus Jakarta Sans', system-ui;color:#646D77">Tokens by name · 6-step scale · component states</span>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start">
+
+      <div style="flex:1 1 320px;min-width:300px;background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(23,26,31,.10);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Color tokens</span>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <sc-for list="{{ tokens }}" as="t" hint-placeholder-count="14">
+            <div style="display:flex;align-items:center;gap:14px">
+              <span style="width:40px;height:40px;border-radius:14px;border:1px solid rgba(23,26,31,.10);flex:none;background:{{ t.hex }}"></span>
+              <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                <span style="font:600 15px/1.2 'Plus Jakarta Sans', system-ui">{{ t.name }}</span>
+                <span style="font:400 13px/1.2 'Plus Jakarta Sans', system-ui;color:#646D77">{{ t.use }}</span>
+              </span>
+            </div>
+          </sc-for>
+        </div>
+        <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#646D77">Cool luminous field with a faint violet fall, glass layers over it, and one lilac→royal-purple gradient (#512888 at its deepest) reserved for the single most important surface on a screen. Purple appears nowhere else at full strength — primary buttons, the active tab rule, the step progress bar and selected rows are the only other places it shows. Semantic colours are unchanged in meaning, only in hue. The gradient surface marks one action per screen; purple is the fallback primary where no hero exists; sage, clay and danger are reserved for score and tension semantics.</span>
+      </div>
+
+      <div style="flex:1 1 320px;min-width:300px;background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(23,26,31,.10);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Type scale — 6 steps</span>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">Display · 28/600</span><span style="font:400 13px/1.3 'Plus Jakarta Sans', system-ui;color:#646D77">Screen-opening statement. One per screen.</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font:600 20px/1.28 'Plus Jakarta Sans', system-ui, sans-serif">Title · 20/600</span><span style="font:400 13px/1.3 'Plus Jakarta Sans', system-ui;color:#646D77">Card and section titles, spoken counterpart lines.</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">Body · 17/400</span><span style="font:400 13px/1.3 'Plus Jakarta Sans', system-ui;color:#646D77">Everything the user reads at length.</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Support · 15 · textSoft</span><span style="font:400 13px/1.3 'Plus Jakarta Sans', system-ui;color:#646D77">Secondary explanation, list metadata.</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font:400 13px/1.45 'Plus Jakarta Sans', system-ui;color:#5B646E">Caption · 13 · textDim</span><span style="font:400 13px/1.3 'Plus Jakarta Sans', system-ui;color:#646D77">Trust notes, timestamps, disclosures.</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Eyebrow · 11/600/1.6 · dim</span><span style="font:400 13px/1.3 'Plus Jakarta Sans', system-ui;color:#646D77">Signature element. Kept exactly as built.</span></div>
+        </div>
+        <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#646D77">Retired: 9, 10, 12, 14, 16, 26. One geometric sans across the whole product — weight and size carry hierarchy, so nothing needs a second typeface or a decorative container to be legible.</span>
+      </div>
+
+      <div style="flex:1 1 320px;min-width:300px;background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(23,26,31,.10);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Geometry, elevation, motion</span>
+        <div style="display:flex;flex-direction:column;gap:8px;font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">
+          <span>Horizontal padding — 22, every screen, no exceptions</span>
+          <span>Vertical rhythm — 8 / 12 / 16 / 24 / 32</span>
+          <span>Radius — sm 10 · md 16 · lg 22 · xl 28</span>
+          <span>PrimaryButton 56 pt · GhostButton 52 pt · min target 44</span>
+          <span>Elevation — hairline <code style="font:400 13px/1 Menlo, monospace">line</code> only; a three-stop shadow stack under every raised layer; one dock shadow in Rehearsal</span>
+          <span>Motion — Reveal 70 ms stagger · PressCard spring 0.972 + haptics · Meter 900 ms · Score ring clockwise + counting · Waveform 5 bars · Thinking 3 dots</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <span style="height:56px;border-radius:18px;background:#512888;color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 3px rgba(81,40,136,.14), 0 10px 22px rgba(81,40,136,.22), 0 24px 46px rgba(81,40,136,.18)">PrimaryButton · default</span>
+          <span style="height:56px;border-radius:18px;background:#3C1D66;color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;display:flex;align-items:center;justify-content:center;transform:scale(.972)">PrimaryButton · pressed</span>
+          <span style="height:56px;border-radius:18px;background:rgba(81,40,136,.10);color:#646D77;font:600 17px/1 'Plus Jakarta Sans', system-ui;display:flex;align-items:center;justify-content:center">PrimaryButton · disabled</span>
+          <span style="height:52px;border-radius:18px;border:1px solid rgba(23,26,31,.20);color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;display:flex;align-items:center;justify-content:center">GhostButton · default</span>
+          <span style="height:52px;border-radius:18px;border:1px solid #B1402F;color:#B1402F;font:600 17px/1 'Plus Jakarta Sans', system-ui;display:flex;align-items:center;justify-content:center">GhostButton · destructive</span>
+          <span style="min-height:52px;border-radius:18px;background:rgba(255,255,255,.62);border:1px solid rgba(23,26,31,.20);color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;display:flex;align-items:center;justify-content:center">ChoiceRow · selected (glass-high)</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(23,26,31,.10);border-radius:28px;padding:26px;display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Mic control + playback · all states</span>
+        <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Shape, glyph and label carry state together. The mic is visibly disabled during Waiting and Speaking, and speech recognition never auto-submits — Composing always ends in an explicit tap.</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:18px">
+        <sc-for list="{{ micStates }}" as="m" hint-placeholder-count="13">
+          <div style="flex:0 0 172px;display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px 12px;border-radius:18px;background:#FFFFFF">
+            <span style="height:88px;display:flex;align-items:center;justify-content:center">{{ m.node }}</span>
+            <span style="display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center">
+              <span style="font:600 11px/1.2 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#171A1F">{{ m.label }}</span>
+              <span style="font:400 13px/1.4 'Plus Jakarta Sans', system-ui;color:#646D77">{{ m.note }}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:22px;padding-top:6px;border-top:1px solid rgba(23,26,31,.10)">
+        <span style="display:flex;flex-direction:column;gap:10px"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Waveform</span>{{ waveDemo }}</span>
+        <span style="display:flex;flex-direction:column;gap:10px"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Thinking</span>{{ thinkDemo }}</span>
+        <span style="display:flex;flex-direction:column;gap:10px;min-width:200px"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Meter</span><span style="display:block;height:6px;border-radius:3px;background:rgba(23,26,31,.10)"><span style="display:block;height:100%;width:62%;border-radius:3px;background:#5C8A6E"></span></span></span>
+        <span style="display:flex;flex-direction:column;gap:10px"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Score ring</span>{{ ringDemo }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:baseline;gap:16px;border-bottom:1px solid rgba(23,26,31,.10);padding-bottom:12px">
+      <h2 style="font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif;margin:0">3 · Production screens</h2>
+      <span style="font:400 15px/1 'Plus Jakarta Sans', system-ui;color:#646D77">Scenarios · Progress · Progress empty · Drill · Custom builder · Privacy · Safety check</span>
+    </div>
+
+    <div style="display:flex;gap:36px;flex-wrap:wrap">
+
+      <div style="width:393px;height:852px;border-radius:44px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);box-shadow:0 40px 90px rgba(28,36,48,.22);background:radial-gradient(125% 75% at 15% 0%, #FDFDFE 0%, rgba(253,253,254,0) 55%), radial-gradient(115% 70% at 100% 18%, #DFDCEC 0%, rgba(223,220,236,0) 62%), radial-gradient(140% 85% at 55% 105%, #DED5EA 0%, rgba(222,213,234,0) 58%), #F2F2F6;display:flex;flex-direction:column">
+        <div style="flex:none;height:59px;padding:0 22px 8px;display:flex;align-items:flex-end;justify-content:space-between"><span style="font:600 15px/1 'Plus Jakarta Sans', system-ui">9:41</span><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Private practice</span></div>
+        <div style="flex:1;min-height:0;overflow:auto;padding:8px 22px 24px;display:flex;flex-direction:column;gap:24px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Scenarios</span>
+            <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">Pick what you need to rehearse.</h2>
+          </div>
+          <div style="display:flex;gap:8px;overflow:hidden;flex:none;min-height:44px">
+            <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;border-radius:18px;background:rgba(255,255,255,.62);border:1px solid rgba(23,26,31,.20);font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#171A1F">Yours</span>
+            <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;border-radius:18px;border:1px solid rgba(23,26,31,.10);font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#4B5259">Partner</span>
+            <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;border-radius:18px;border:1px solid rgba(23,26,31,.10);font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#4B5259">Family</span>
+            <span style="min-height:44px;display:flex;align-items:center;padding:0 16px;border-radius:18px;border:1px solid rgba(23,26,31,.10);font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#4B5259">Work</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:18px">
+            <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:28px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 8px 18px rgba(28,36,48,.07), 0 24px 48px rgba(28,36,48,.09);padding:20px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+                <span style="font:600 20px/1.28 'Plus Jakarta Sans', system-ui, sans-serif">Get a rent repayment plan</span>
+                <span style="flex:none;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#5C8A6E">Trained</span>
+              </div>
+              <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Marcus — your roommate and friend</span>
+              <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Leave with a dollar amount and a payment date he commits to.</span>
+              <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77;padding-top:4px">7 min · yours</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;padding-bottom:16px;border-bottom:1px solid rgba(23,26,31,.10)">
+              <span style="font:600 20px/1.28 'Plus Jakarta Sans', system-ui, sans-serif">Ask a friend for the money back</span>
+              <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Tom — a close friend · 6 min</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;padding-bottom:16px;border-bottom:1px solid rgba(23,26,31,.10)">
+              <span style="font:600 20px/1.28 'Plus Jakarta Sans', system-ui, sans-serif">Name the distance that's grown between you</span>
+              <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Nadia — your oldest friend · 8 min</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font:600 20px/1.28 'Plus Jakarta Sans', system-ui, sans-serif">Ask for the raise you've earned</span>
+              <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Your manager · 7 min</span>
+            </div>
+          </div>
+        </div>
+        <div style="flex:none;padding:12px 22px 12px"><button style="width:100%;height:52px;border-radius:18px;background:none;border:1px solid rgba(23,26,31,.20);color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer">Write your own scenario</button></div>
+        <div style="flex:none;padding:10px 22px 34px;border-top:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);display:flex">
+          <span style="flex:1;text-align:center;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Today</span>
+          <span style="flex:1;text-align:center;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#512888">Scenarios</span>
+          <span style="flex:1;text-align:center;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Progress</span>
+        </div>
+      </div>
+
+      <div style="width:393px;height:852px;border-radius:44px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);box-shadow:0 40px 90px rgba(28,36,48,.22);background:radial-gradient(125% 75% at 15% 0%, #FDFDFE 0%, rgba(253,253,254,0) 55%), radial-gradient(115% 70% at 100% 18%, #DFDCEC 0%, rgba(223,220,236,0) 62%), radial-gradient(140% 85% at 55% 105%, #DED5EA 0%, rgba(222,213,234,0) 58%), #F2F2F6;display:flex;flex-direction:column">
+        <div style="flex:none;height:59px;padding:0 22px 8px;display:flex;align-items:flex-end;justify-content:space-between"><span style="font:600 15px/1 'Plus Jakarta Sans', system-ui">9:41</span><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Private practice</span></div>
+        <div style="flex:1;min-height:0;overflow:auto;padding:8px 22px 24px;display:flex;flex-direction:column;gap:26px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Progress</span>
+            <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">1 rehearsal in the bank.</h2>
+            <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Day 1 of 30 · 1 day in a row · 2 lines spoken aloud</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Average across all reps</span>
+            <sc-for list="{{ dims }}" as="d" hint-placeholder-count="4">
+              <span style="display:flex;flex-direction:column;gap:7px">
+                <span style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 17px/1.2 'Plus Jakarta Sans', system-ui">{{ d.name }}</span><span style="font:400 15px/1 'Plus Jakarta Sans', system-ui;color:#4B5259">{{ d.val }}</span></span>
+                <span style="display:block;height:6px;border-radius:3px;background:rgba(23,26,31,.10)"><span style="display:block;height:100%;border-radius:3px;transform-origin:left center;background:{{ d.color }};width:{{ d.pct }};animation:bysi-meter 900ms cubic-bezier(.22,.9,.28,1) both;animation-delay:{{ d.delay }}"></span></span>
+              </span>
+            </sc-for>
+            <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Scored from your wording and choices. Composure is only scored when audio was analysed.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;padding-top:4px;border-top:1px solid rgba(23,26,31,.10)">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Recent reps</span>
+            <span style="display:flex;align-items:center;gap:14px;padding-bottom:14px;border-bottom:1px solid rgba(23,26,31,.10)">
+              <span style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font:400 17px/1.25 'Plus Jakarta Sans', system-ui">Get a rent repayment plan</span><span style="font:400 13px/1.4 'Plus Jakarta Sans', system-ui;color:#646D77">Steady · Day 1 · 58 overall · 2 lines spoken</span></span>
+              <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Swipe to delete</span>
+            </span>
+            <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Swipe a row left to delete it. Deleting removes the transcript, the debrief and the script.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <span style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+              <span style="display:flex;flex-direction:column;gap:3px"><span style="font:400 17px/1.25 'Plus Jakarta Sans', system-ui">Daily reminder</span><span style="font:400 13px/1.4 'Plus Jakarta Sans', system-ui;color:#5B646E">A nudge at a time you choose.</span></span>
+              <span style="width:51px;height:31px;border-radius:999px;background:rgba(23,26,31,.20);flex:none;display:flex;align-items:center;padding:2px"><span style="width:27px;height:27px;border-radius:999px;background:#FFFFFF"></span></span>
+            </span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;border-top:1px solid rgba(23,26,31,.10)">
+            <span style="font:400 17px/1.25 'Plus Jakarta Sans', system-ui">Privacy &amp; data</span>
+            <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">What is recorded, what is stored, and how to delete it.</span>
+          </div>
+        </div>
+        <div style="flex:none;padding:10px 22px 34px;border-top:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);display:flex">
+          <span style="flex:1;text-align:center;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Today</span>
+          <span style="flex:1;text-align:center;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Scenarios</span>
+          <span style="flex:1;text-align:center;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#512888">Progress</span>
+        </div>
+      </div>
+
+      <div style="width:393px;height:852px;border-radius:44px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);box-shadow:0 40px 90px rgba(28,36,48,.22);background:radial-gradient(125% 75% at 15% 0%, #FDFDFE 0%, rgba(253,253,254,0) 55%), radial-gradient(115% 70% at 100% 18%, #DFDCEC 0%, rgba(223,220,236,0) 62%), radial-gradient(140% 85% at 55% 105%, #DED5EA 0%, rgba(222,213,234,0) 58%), #F2F2F6;display:flex;flex-direction:column">
+        <div style="flex:none;height:59px;padding:0 22px 8px;display:flex;align-items:flex-end;justify-content:space-between"><span style="font:600 15px/1 'Plus Jakarta Sans', system-ui">9:41</span><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Private practice</span></div>
+        <div style="flex:1;min-height:0;padding:8px 22px 24px;display:flex;flex-direction:column;gap:26px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Progress · empty</span>
+            <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">No reps logged yet.</h2>
+            <span style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui;color:#4B5259">Speak one rehearsal and this fills in: four dimensions, the reps you've done, and the scripts you kept.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px;opacity:.5">
+            <sc-for list="{{ dims }}" as="d" hint-placeholder-count="4">
+              <span style="display:flex;flex-direction:column;gap:7px">
+                <span style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 17px/1.2 'Plus Jakarta Sans', system-ui">{{ d.name }}</span><span style="font:400 15px/1 'Plus Jakarta Sans', system-ui;color:#646D77">—</span></span>
+                <span style="display:block;height:6px;border-radius:3px;background:rgba(23,26,31,.10)"></span>
+              </span>
+            </sc-for>
+          </div>
+          <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">Nothing is scored until you've spoken at least one line.</span>
+          <span style="flex:1"></span>
+          <button style="width:100%;height:56px;border:none;border-radius:18px;background:#512888;color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer;box-shadow:0 2px 3px rgba(81,40,136,.14), 0 10px 22px rgba(81,40,136,.22), 0 24px 46px rgba(81,40,136,.18)">Start your first rehearsal</button>
+        </div>
+        <div style="flex:none;padding:10px 22px 34px;border-top:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);display:flex">
+          <span style="flex:1;text-align:center;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Today</span>
+          <span style="flex:1;text-align:center;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Scenarios</span>
+          <span style="flex:1;text-align:center;font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#512888">Progress</span>
+        </div>
+      </div>
+
+      <div style="width:393px;height:852px;border-radius:44px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);box-shadow:0 40px 90px rgba(28,36,48,.22);background:radial-gradient(125% 75% at 15% 0%, #FDFDFE 0%, rgba(253,253,254,0) 55%), radial-gradient(115% 70% at 100% 18%, #DFDCEC 0%, rgba(223,220,236,0) 62%), radial-gradient(140% 85% at 55% 105%, #DED5EA 0%, rgba(222,213,234,0) 58%), #F2F2F6;display:flex;flex-direction:column">
+        <div style="flex:none;height:59px;padding:0 22px 8px;display:flex;align-items:flex-end;justify-content:space-between"><span style="font:600 15px/1 'Plus Jakarta Sans', system-ui">9:41</span><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Private practice</span></div>
+        <div style="flex:none;padding:0 22px 12px"><span style="font:600 17px/1 'Plus Jakarta Sans', system-ui;color:#512888">‹ Today</span></div>
+        <div style="flex:1;min-height:0;padding:8px 22px 24px;display:flex;flex-direction:column;gap:24px">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Drill · 2 min · clarity</span>
+            <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">Ask once, plainly.</h2>
+            <span style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui;color:#4B5259">Say the ask in one sentence. No preamble, no apology, no explanation after it. Then stop talking.</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Your prompt</span>
+            <span style="font:500 20px/1.45 'Plus Jakarta Sans', system-ui, sans-serif">“I need your half of the rent by a date we both agree on.”</span>
+            <span style="font:400 15px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">Say it in your own words, out loud, twice.</span>
+          </div>
+          <span style="flex:1"></span>
+          <div style="display:flex;flex-direction:column;gap:16px;align-items:center">
+            <span style="width:104px;height:104px;display:flex;align-items:center;justify-content:center">{{ micReadyDemo }}</span>
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Ready · tap to speak</span>
+          </div>
+          <span style="flex:1"></span>
+          <button style="width:100%;height:52px;border-radius:18px;background:none;border:1px solid rgba(23,26,31,.20);color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer">Skip this drill</button>
+        </div>
+      </div>
+
+      <div style="width:393px;height:852px;border-radius:44px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);box-shadow:0 40px 90px rgba(28,36,48,.22);background:radial-gradient(125% 75% at 15% 0%, #FDFDFE 0%, rgba(253,253,254,0) 55%), radial-gradient(115% 70% at 100% 18%, #DFDCEC 0%, rgba(223,220,236,0) 62%), radial-gradient(140% 85% at 55% 105%, #DED5EA 0%, rgba(222,213,234,0) 58%), #F2F2F6;display:flex;flex-direction:column">
+        <div style="flex:none;height:59px;padding:0 22px 8px;display:flex;align-items:flex-end;justify-content:space-between"><span style="font:600 15px/1 'Plus Jakarta Sans', system-ui">9:41</span><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Private practice</span></div>
+        <div style="flex:none;padding:0 22px 12px"><span style="font:600 17px/1 'Plus Jakarta Sans', system-ui;color:#512888">‹ Scenarios</span></div>
+        <div style="flex:1;min-height:0;overflow:auto;padding:8px 22px 24px;display:flex;flex-direction:column;gap:24px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Write your own</span>
+            <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">Build the conversation you're actually facing.</h2>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">The situation</span>
+            <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:18px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 6px 14px rgba(28,36,48,.06), 0 18px 34px rgba(28,36,48,.07);padding:16px;font:400 17px/1.55 'Plus Jakarta Sans', system-ui;min-height:88px">My sister keeps volunteering me to host holidays without asking first.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Who you're talking to</span>
+            <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:18px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 6px 14px rgba(28,36,48,.06), 0 18px 34px rgba(28,36,48,.07);padding:16px;font:400 17px/1.55 'Plus Jakarta Sans', system-ui">My older sister — close, but avoids conflict</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">How they usually react</span>
+            <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:18px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 6px 14px rgba(28,36,48,.06), 0 18px 34px rgba(28,36,48,.07);padding:16px;font:400 17px/1.55 'Plus Jakarta Sans', system-ui">Turns it back on me</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Outcome you want</span>
+            <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid #B1402F;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:6px">
+              <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui;color:#646D77">One concrete thing you'd walk away with</span>
+              <span style="font:600 13px/1.4 'Plus Jakarta Sans', system-ui;color:#B1402F">Required — add an outcome so the counterpart knows what to resist.</span>
+            </div>
+          </div>
+        </div>
+        <div style="flex:none;padding:12px 22px 34px;background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid rgba(255,255,255,.5)">
+          <span style="width:100%;height:56px;border-radius:18px;background:rgba(81,40,136,.10);color:#646D77;font:600 17px/1 'Plus Jakarta Sans', system-ui;display:flex;align-items:center;justify-content:center">Save and rehearse</span>
+        </div>
+      </div>
+
+      <div style="width:393px;height:852px;border-radius:44px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);box-shadow:0 40px 90px rgba(28,36,48,.22);background:radial-gradient(125% 75% at 15% 0%, #FDFDFE 0%, rgba(253,253,254,0) 55%), radial-gradient(115% 70% at 100% 18%, #DFDCEC 0%, rgba(223,220,236,0) 62%), radial-gradient(140% 85% at 55% 105%, #DED5EA 0%, rgba(222,213,234,0) 58%), #F2F2F6;display:flex;flex-direction:column">
+        <div style="flex:none;height:59px;padding:0 22px 8px;display:flex;align-items:flex-end;justify-content:space-between"><span style="font:600 15px/1 'Plus Jakarta Sans', system-ui">9:41</span><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Private practice</span></div>
+        <div style="flex:none;padding:0 22px 12px"><span style="font:600 17px/1 'Plus Jakarta Sans', system-ui;color:#512888">‹ Progress</span></div>
+        <div style="flex:1;min-height:0;overflow:auto;padding:8px 22px 24px;display:flex;flex-direction:column;gap:26px">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Privacy</span>
+            <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">What happens to what you say.</h2>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:18px">
+            <span style="display:flex;flex-direction:column;gap:6px"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#3C1D66">Recorded</span><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">The mic runs only while you hold a turn, and only after you tap it. A red state and a label show whenever it is live.</span></span>
+            <span style="display:flex;flex-direction:column;gap:6px;padding-top:18px;border-top:1px solid rgba(23,26,31,.10)"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#3C1D66">Sent</span><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">Audio goes out for transcription, then is discarded. The counterpart replies from the text, not the recording.</span></span>
+            <span style="display:flex;flex-direction:column;gap:6px;padding-top:18px;border-top:1px solid rgba(23,26,31,.10)"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#3C1D66">Stored</span><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">Transcripts, debriefs and scripts are kept with your account until you delete them. No audio recordings are kept.</span></span>
+            <span style="display:flex;flex-direction:column;gap:6px;padding-top:18px;border-top:1px solid rgba(23,26,31,.10)"><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#3C1D66">Deleted</span><span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">Delete a single rep by swiping it in Progress, or delete everything here. Deletion is confirmed once and cannot be undone.</span></span>
+          </div>
+        </div>
+        <div style="flex:none;padding:12px 22px 34px;background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid rgba(255,255,255,.5);display:flex;flex-direction:column;gap:10px">
+          <button style="width:100%;height:52px;border-radius:18px;background:none;border:1px solid rgba(23,26,31,.20);color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer">Export my data</button>
+          <button style="width:100%;height:52px;border-radius:18px;background:none;border:1px solid #B1402F;color:#B1402F;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer">Delete all reps and transcripts</button>
+        </div>
+      </div>
+
+      <div style="width:393px;height:852px;border-radius:44px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);box-shadow:0 40px 90px rgba(28,36,48,.22);background:radial-gradient(125% 75% at 15% 0%, #FDFDFE 0%, rgba(253,253,254,0) 55%), radial-gradient(115% 70% at 100% 18%, #DFDCEC 0%, rgba(223,220,236,0) 62%), radial-gradient(140% 85% at 55% 105%, #DED5EA 0%, rgba(222,213,234,0) 58%), #F2F2F6;display:flex;flex-direction:column">
+        <div style="flex:none;height:59px;padding:0 22px 8px;display:flex;align-items:flex-end;justify-content:space-between"><span style="font:600 15px/1 'Plus Jakarta Sans', system-ui">9:41</span><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Private practice</span></div>
+        <div style="flex:1;min-height:0;padding:24px 22px;display:flex;flex-direction:column;gap:22px">
+          <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#B1402F">Before we start</span>
+          <h2 style="margin:0;font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif">This one sounds like more than a hard conversation.</h2>
+          <span style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui;color:#171A1F">Rehearsal helps when you're nervous about how something will land. It is not the right tool when someone is threatening you, hurting you, or you're afraid of what happens after you speak.</span>
+          <span style="font:400 17px/1.6 'Plus Jakarta Sans', system-ui;color:#4B5259">You can keep going if you want to. There's no wrong answer here, and nothing you typed is shared with anyone.</span>
+          <div style="display:flex;flex-direction:column;gap:10px;padding-top:6px;border-top:1px solid rgba(23,26,31,.10)">
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Real help, any time</span>
+            <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">988 Suicide &amp; Crisis Lifeline — call or text 988</span>
+            <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">National DV Hotline — 1-800-799-7233</span>
+            <span style="font:400 13px/1.5 'Plus Jakarta Sans', system-ui;color:#5B646E">US numbers. Local resources are listed in Settings.</span>
+          </div>
+          <span style="flex:1"></span>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button style="width:100%;height:56px;border:none;border-radius:18px;background:#512888;color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer;box-shadow:0 2px 3px rgba(81,40,136,.14), 0 10px 22px rgba(81,40,136,.22), 0 24px 46px rgba(81,40,136,.18)">See these resources</button>
+            <button style="width:100%;height:52px;border-radius:18px;background:none;border:1px solid rgba(23,26,31,.20);color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;cursor:pointer">Continue to the rehearsal</button>
+            <button style="width:100%;min-height:44px;background:none;border:none;font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#4B5259;cursor:pointer">Choose a different scenario</button>
+          </div>
+        </div>
+      </div>
+      <div style="width:393px;height:852px;border-radius:44px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);box-shadow:0 40px 90px rgba(28,36,48,.22);background:radial-gradient(125% 75% at 15% 0%, #FDFDFE 0%, rgba(253,253,254,0) 55%), radial-gradient(115% 70% at 100% 18%, #DFDCEC 0%, rgba(223,220,236,0) 62%), radial-gradient(140% 85% at 55% 105%, #DED5EA 0%, rgba(222,213,234,0) 58%), #F2F2F6;display:flex;flex-direction:column">
+        <div style="flex:none;height:59px;padding:0 22px 8px;display:flex;align-items:flex-end;justify-content:space-between"><span style="font:600 15px/1 'Plus Jakarta Sans', system-ui">9:41</span><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Private practice</span></div>
+        <div style="flex:none;padding:0 22px 14px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="min-height:44px;display:flex;align-items:center;font:600 17px/1 'Plus Jakarta Sans', system-ui;color:#512888">‹ Back</span>
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Step 1 of 5 · keyboard up</span>
+          </div>
+          <span style="display:block;height:3px;border-radius:2px;background:rgba(23,26,31,.10)"><span style="display:block;height:100%;border-radius:2px;background:#512888;width:20%"></span></span>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;padding:6px 22px 12px;display:flex;flex-direction:column;gap:14px">
+          <h2 style="margin:0;font:600 24px/1.2 'Plus Jakarta Sans', system-ui, sans-serif">What conversation do you need to have?</h2>
+          <div style="background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:18px;padding:16px;min-height:120px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 6px 14px rgba(28,36,48,.06)">
+            <span style="font:400 17px/1.55 'Plus Jakarta Sans', system-ui">My roommate is two months behind on rent and I keep letting it slide.<span style="display:inline-block;width:2px;height:19px;background:#512888;vertical-align:-3px;margin-left:1px"></span></span>
+            <span style="font:400 13px/1.4 'Plus Jakarta Sans', system-ui;color:#5B646E">62 of 500</span>
+          </div>
+        </div>
+        <div style="flex:none;padding:8px 22px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid rgba(255,255,255,.5)">
+          <span style="min-height:44px;display:flex;align-items:center;font:600 15px/1 'Plus Jakarta Sans', system-ui;color:#4B5259">Done</span>
+          <span style="flex:1;height:56px;border-radius:18px;background:#512888;color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;display:flex;align-items:center;justify-content:center">Continue</span>
+        </div>
+        <div style="flex:none;background:#D3D5DB;padding:8px 3px 4px;display:flex;flex-direction:column;gap:7px">
+          <sc-for list="{{ kbRows }}" as="row" hint-placeholder-count="4">
+            <div style="display:flex;justify-content:center;gap:5px;padding:0 {{ row.pad }}">
+              <sc-for list="{{ row.keys }}" as="k" hint-placeholder-count="10">
+                <span style="flex:{{ k.flex }};min-width:0;height:42px;border-radius:5px;background:{{ k.bg }};color:{{ k.fg }};box-shadow:0 1px 0 rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;font:400 {{ k.size }}/1 'Plus Jakarta Sans', system-ui">{{ k.c }}</span>
+              </sc-for>
+            </div>
+          </sc-for>
+          <div style="height:22px;display:flex;align-items:center;justify-content:center"><span style="width:134px;height:5px;border-radius:3px;background:rgba(0,0,0,.35)"></span></div>
+        </div>
+      </div>
+
+      <div style="width:393px;height:852px;border-radius:44px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);box-shadow:0 40px 90px rgba(28,36,48,.22);background:radial-gradient(125% 75% at 15% 0%, #FDFDFE 0%, rgba(253,253,254,0) 55%), radial-gradient(115% 70% at 100% 18%, #DFDCEC 0%, rgba(223,220,236,0) 62%), radial-gradient(140% 85% at 55% 105%, #DED5EA 0%, rgba(222,213,234,0) 58%), #F2F2F6;display:flex;flex-direction:column">
+        <div style="flex:none;height:59px;padding:0 22px 8px;display:flex;align-items:flex-end;justify-content:space-between"><span style="font:600 15px/1 'Plus Jakarta Sans', system-ui">9:41</span><span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Private practice</span></div>
+        <div style="flex:none;padding:0 22px 12px;display:flex;align-items:center;gap:12px">
+          <span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;font:400 20px/1 'Plus Jakarta Sans', system-ui;color:#4B5259">✕</span>
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+            <span style="font:400 17px/1.25 'Plus Jakarta Sans', system-ui">Marcus</span>
+            <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Composing · keyboard up</span>
+          </span>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;padding:4px 22px 12px;display:flex;flex-direction:column;gap:10px">
+          <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Marcus</span>
+          <p style="margin:0;font:500 20px/1.45 'Plus Jakarta Sans', system-ui, sans-serif;color:#171A1F">Left in the dark? I literally just told you I'm waiting on a check.</p>
+        </div>
+        <div style="flex:none;background:rgba(255,255,255,.42);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-top:1px solid rgba(255,255,255,.5);padding:14px 22px 10px;display:flex;flex-direction:column;gap:12px">
+          <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#171A1F">Composing · editing the transcript</span>
+          <div style="background:rgba(255,255,255,.62);border:1px solid rgba(23,26,31,.20);border-radius:18px;padding:14px 16px;font:400 17px/1.55 'Plus Jakarta Sans', system-ui">Totally get that, and we've all been there. But I'd like a plan for when<span style="display:inline-block;width:2px;height:19px;background:#512888;vertical-align:-3px;margin-left:1px"></span></div>
+          <div style="display:flex;gap:10px">
+            <span style="flex:1;height:52px;border-radius:18px;border:1px solid rgba(23,26,31,.20);color:#171A1F;font:600 17px/1 'Plus Jakarta Sans', system-ui;display:flex;align-items:center;justify-content:center">Say it again</span>
+            <span style="flex:1;height:56px;border-radius:18px;background:#512888;color:#FFFFFF;font:600 17px/1 'Plus Jakarta Sans', system-ui;display:flex;align-items:center;justify-content:center">Send it</span>
+          </div>
+        </div>
+        <div style="flex:none;background:#D3D5DB;padding:8px 3px 4px;display:flex;flex-direction:column;gap:7px">
+          <sc-for list="{{ kbRows }}" as="row" hint-placeholder-count="4">
+            <div style="display:flex;justify-content:center;gap:5px;padding:0 {{ row.pad }}">
+              <sc-for list="{{ row.keys }}" as="k" hint-placeholder-count="10">
+                <span style="flex:{{ k.flex }};min-width:0;height:42px;border-radius:5px;background:{{ k.bg }};color:{{ k.fg }};box-shadow:0 1px 0 rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;font:400 {{ k.size }}/1 'Plus Jakarta Sans', system-ui">{{ k.c }}</span>
+              </sc-for>
+            </div>
+          </sc-for>
+          <div style="height:22px;display:flex;align-items:center;justify-content:center"><span style="width:134px;height:5px;border-radius:3px;background:rgba(0,0,0,.35)"></span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:baseline;gap:16px;border-bottom:1px solid rgba(23,26,31,.10);padding-bottom:12px">
+      <h2 style="font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif;margin:0">5 · Engineering notes</h2>
+      <span style="font:400 15px/1 'Plus Jakarta Sans', system-ui;color:#646D77">Icons · dynamic content · overflow · platform chrome</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start">
+      <div style="flex:1 1 340px;background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 8px 18px rgba(28,36,48,.07), 0 24px 48px rgba(28,36,48,.09)">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Production icons</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">All glyphs are named SF Symbols equivalents drawn at 1.7 px stroke. Visual size 22–26 pt inside a 44 pt minimum tap target; the mic control is 88 pt visual in a 104 pt target.</span>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ iconSpec }}" as="ic" hint-placeholder-count="9">
+            <div style="display:flex;align-items:center;gap:14px;padding-bottom:10px;border-bottom:1px solid rgba(23,26,31,.10)">
+              <span style="width:44px;height:44px;flex:none;border-radius:14px;border:1px solid rgba(23,26,31,.20);display:flex;align-items:center;justify-content:center">{{ ic.node }}</span>
+              <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                <span style="font:600 15px/1.25 'Plus Jakarta Sans', system-ui">{{ ic.name }}</span>
+                <span style="font:400 13px/1.45 'Plus Jakarta Sans', system-ui;color:#5B646E">{{ ic.use }} · label “{{ ic.label }}”</span>
+              </span>
+            </div>
+          </sc-for>
+        </div>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Pressed — 0.972 scale plus a 6% ink overlay, no colour change. Disabled — 38% opacity, hit test removed, and the control is replaced rather than greyed where the state forbids it (mic during Waiting and Speaking). Every icon-only control carries the accessibility label above; none rely on the glyph alone.</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">The 9:41 status bar and the 59 pt / 34 pt insets in these frames are illustrative only. Implementation must use the native status bar and real safe-area insets; nothing in the layout may assume those exact values.</span>
+      </div>
+
+      <div style="flex:1 1 340px;background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 8px 18px rgba(28,36,48,.07), 0 24px 48px rgba(28,36,48,.09)">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Dynamic content — never hardcode</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Everything below renders from server or store data. The values in these frames are demo fixtures.</span>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ dynamicSpec }}" as="dy" hint-placeholder-count="9">
+            <div style="display:flex;gap:12px;align-items:baseline;padding-bottom:8px;border-bottom:1px solid rgba(23,26,31,.10)">
+              <span style="flex:none;width:120px;font:600 13px/1.4 'Plus Jakarta Sans', system-ui;color:#512888">{{ dy.what }}</span>
+              <span style="flex:1;font:400 14px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">{{ dy.note }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="flex:1 1 340px;background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 8px 18px rgba(28,36,48,.07), 0 24px 48px rgba(28,36,48,.09)">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Overflow &amp; accessibility</span>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ overflowSpec }}" as="ov" hint-placeholder-count="8">
+            <div style="display:flex;flex-direction:column;gap:3px;padding-bottom:10px;border-bottom:1px solid rgba(23,26,31,.10)">
+              <span style="font:600 15px/1.25 'Plus Jakarta Sans', system-ui">{{ ov.case }}</span>
+              <span style="font:400 14px/1.5 'Plus Jakarta Sans', system-ui;color:#4B5259">{{ ov.rule }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="flex:1 1 340px;background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 8px 18px rgba(28,36,48,.07), 0 24px 48px rgba(28,36,48,.09)">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Keyboard behaviour</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Two keyboard frames are in section 3. Rules for both:</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Fixed — the top bar and step progress stay pinned; the primary CTA rides directly above the keyboard on the safe-area inset, never behind it.</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Scrolls — only the question and the text field. When the keyboard opens, the field scrolls to sit just above the accessory row; the heading may scroll off.</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Dismiss — “Done” in the accessory row, a tap outside the field, or a downward drag on the scroll area. Return inserts a newline; it never submits. Dictation and the keyboard are mutually exclusive — opening one closes the other.</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Composing — the transcript field is the same component as Setup step 1. Send it stays enabled with edited text; Say it again discards the edit and returns to Listening.</span>
+      </div>
+
+      <div style="flex:1 1 340px;background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.62);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 1px rgba(28,36,48,.04), 0 8px 18px rgba(28,36,48,.07), 0 24px 48px rgba(28,36,48,.09)">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Privacy language — must match architecture</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">The privacy copy in these frames is a design intent, not a legal statement. Before implementation, audio capture, transcription, storage location, retention period and deletion behaviour must all be confirmed against the built architecture and the copy updated to match — including whether transcripts are device-local, account-scoped, or both.</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Conflicting claims have been removed from this document: transcripts are described as kept with the account until deleted, and no audio recordings are retained. If the implementation differs, this is the copy that changes.</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">“Your practice isn’t shared with the person you’re rehearsing about” replaces every broad “nothing is shared” claim. Do not reintroduce absolute statements the backend cannot guarantee.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:22px">
+    <div style="display:flex;align-items:baseline;gap:16px;border-bottom:1px solid rgba(23,26,31,.10);padding-bottom:12px">
+      <h2 style="font:600 28px/1.18 'Plus Jakarta Sans', system-ui, sans-serif;margin:0">4 · Handoff</h2>
+      <span style="font:400 15px/1 'Plus Jakarta Sans', system-ui;color:#646D77">Reskin vs. layout change · new components · open questions</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start">
+      <div style="flex:1 1 340px;background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(23,26,31,.10);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Token / spec pass only</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Onboarding steps 2–5, Scenarios list, Progress meters and reminder card, Privacy, tension meter, script card, tab bar. Same components — new material, one typeface, 28 pt card radius, 22 pt padding, hairline borders replaced by translucency and shadow.</span>
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#B1402F">Layout change — needs engineering</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Rehearsal: chat bubbles → weight-based speaker distinction, footer → state dock with per-state control sets, mic swapped out (not greyed in place) during Waiting and Speaking, Analyze disabled while audio plays. Debrief: score wall → score ring + verdict on one line, then What worked / What to change with quoted evidence, extra findings behind a disclosure. Today: streak card → a single streak line plus one dominant rep card and a quiet Next-up list.</span>
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">New components</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259"><strong>StateDock</strong> — full-width bottom container, 22 pt padding, 34 pt bottom inset, hairline top border, one dock shadow; slots: dot + Eyebrow label, support line, control set. <strong>GlassCard</strong> — rgba(255,255,255,.52) fill over backdrop-filter blur(24px), 1 px rgba(255,255,255,.62) hairline, 28 pt radius, shadow stack 0 1 1 / 0 8 18 / 0 24 48 rgba(28,36,48,.04/.07/.09). <strong>HeroSurface</strong> — linear-gradient(158deg, #4A2380 0%, #512888 34%, #63409B 70%, #7B62AC 100%) — K-State purple at the text block, lifting to lilac behind the action pill, 28 pt radius, inset 0 1 0 rgba(255,255,255,.45) top light, shadow stack 0 2 2 / 0 14 30 / 0 34 64 rgba(120,96,110,.10/.22/.26); two pale receding layers behind it at 30% and 44% white. <strong>MicControl</strong> — 88 pt circle (104 pt tap area), variants ready / listening / detected / disabled / error, radius 999, purple fill with a breathing halo when live, glass-edge ring when idle, danger ring on error. <strong>ChoiceRow</strong> — min 64 pt, md radius, glass default, glass-high fill + glass-edge border when selected, Eyebrow “Selected” marker. <strong>TranscriptReview</strong> — glass fill, glass-edge border, md radius, editable, paired GhostButton + PrimaryButton. <strong>VerdictHeader</strong> — Score ring 88 pt + tier Eyebrow + one-line read. <strong>TrustNote</strong> — caption in textDim, no container, no glass layer.</span>
+      </div>
+      <div style="flex:1 1 340px;background:rgba(255,255,255,.52);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(23,26,31,.10);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Copy suggestions — not baked in</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">1 — “Get a nudge so the streak never slips” reads as guilt; “A nudge at a time you choose.” 2 — the rehearsal header currently truncates “Marcus — your roommate and f…”; first name only, relationship in the scene line. 3 — “28-Day Communication Challenge” is renamed to the 30-Day Conversation Practice throughout, per the brief. 4 — “Analyze your rep” is kept verbatim; “Reviewing your rep” gains a plain-language second line.</span>
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Needs product clarification</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Screens show a 58 overall and a 24 overall for the same rep — which is authoritative? Is the day list locked by date or by subscription? Real pricing and trial terms. Is typed input available on every turn, or only after a recognition failure? What triggers the safety check, and does it block or only inform? Retention period for transcripts. Does the day counter start at 28 or 30 in the built program?</span>
+        <span style="font:600 11px/1 'Plus Jakarta Sans', system-ui;letter-spacing:1.6px;text-transform:uppercase;color:#646D77">Accessibility</span>
+        <span style="font:400 15px/1.55 'Plus Jakarta Sans', system-ui;color:#4B5259">Every rehearsal state carries a dot, an Eyebrow label and a support sentence — colour is never the only signal. Body text is 17 with 1.55 leading and reflows to 375 pt without truncation; the only clipped string in the set is the header name, which is now first-name-only. All controls are ≥ 44 pt; PrimaryButton is 56. Motion is limited to recording, processing and playback, and all of it is disabled under reduce-motion.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1600,&quot;height&quot;:1100}}">
+const T = {
+  bg:'#EFEEF4', bgDeep:'#DEDCE8', elevated:'#FFFFFF', surface:'#FFFFFF', surfaceHigh:'rgba(255,255,255,.62)',
+  line:'rgba(23,26,31,0.10)', lineStrong:'rgba(23,26,31,0.20)',
+  text:'#171A1F', textSoft:'#4B5259', textDim:'#5B646E', dim:'#646D77',
+  ember:'#512888', emberSoft:'rgba(81,40,136,0.10)', mint:'#5C8A6E', amber:'#B4823F', crimson:'#B1402F', blue:'#3C1D66', onAccent:'#FFFFFF'
+};
+
+const h = React.createElement;
+const sans = "'Plus Jakarta Sans', system-ui, sans-serif";
+
+function circle(opts) {
+  const { fill, ring, glyph, glyphColor, halo, dashed, size = 88 } = opts;
+  const kids = [];
+  if (halo) kids.push(h('span', { key:'h', style:{ position:'absolute', width:size, height:size, borderRadius:999, background:'radial-gradient(circle, rgba(81,40,136,.32) 0%, rgba(81,40,136,0) 70%)', animation:'bysi-halo 1500ms ease-in-out infinite' } }));
+  kids.push(h('span', { key:'c', style:{ width:size - 12, height:size - 12, borderRadius:999, background:fill, border:(dashed ? '2px dashed ' : '1.5px solid ') + ring, display:'flex', alignItems:'center', justifyContent:'center', boxSizing:'border-box' } },
+    icon(glyph, 26, glyphColor)));
+  return h('span', { style:{ position:'relative', width:size, height:size, display:'flex', alignItems:'center', justifyContent:'center' } }, kids);
+}
+
+function waveform(color, height) {
+  const bars = [];
+  for (let i = 0; i < 5; i++) bars.push(h('span', { key:i, style:{ display:'block', width:3, height:height || 26, borderRadius:2, background:color, animation:'bysi-bar 900ms ease-in-out infinite', animationDelay:(i * 120) + 'ms' } }));
+  return h('span', { style:{ display:'flex', gap:4, alignItems:'center', height:height || 26 } }, bars);
+}
+
+const ICONS = {
+  'mic.fill': 'M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3',
+  'mic.slash': 'M12 3a3 3 0 0 1 3 3v5M9 9v2a3 3 0 0 0 4.5 2.6M5 11a7 7 0 0 0 10.5 6M12 18v3M4 4l16 16',
+  'stop.fill': 'M7.5 7.5h9v9h-9z',
+  'play.fill': 'M9 6.5l8 5.5-8 5.5z',
+  'speaker.wave': 'M4 9.5h3.5L12 6v12L7.5 14.5H4zM16 9.5a4 4 0 0 1 0 5M18.5 7.5a7 7 0 0 1 0 9',
+  'speaker.slash': 'M4 9.5h3.5L12 6v12L7.5 14.5H4zM16.5 9.5l5 5M21.5 9.5l-5 5',
+  'keyboard': 'M3 6.5h18v11H3zM6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M6.5 13h.01M17 13h.01M9.5 13.5h5',
+  'arrow.clockwise': 'M20 12a8 8 0 1 1-2.4-5.7M20 4v4h-4',
+  'exclamationmark': 'M12 6.5v7M12 17.2v.3',
+  'checkmark': 'M5.5 12.5l4.2 4.2L18.5 8',
+  'pause.fill': 'M9 6.5v11M15 6.5v11',
+  'chevron.down': 'M6 9.5l6 6 6-6'
+};
+
+function icon(name, size, color, weight) {
+  const d = ICONS[name] || ICONS['mic.fill'];
+  return h('svg', { width:size || 24, height:size || 24, viewBox:'0 0 24 24', fill:'none', 'aria-hidden':'true', focusable:'false' },
+    d.split('M').filter(Boolean).map((seg, i) => h('path', { key:i, d:'M' + seg, stroke:color, strokeWidth:weight || 1.7, strokeLinecap:'round', strokeLinejoin:'round' })));
+}
+
+function liveWave(levels, opts) {
+  const o = opts || {};
+  const m = o.max || 26;
+  const avg = levels.reduce((x, y) => x + y, 0) / levels.length;
+  const bars = levels.map((v, i) => h('span', { key:i, style:{ display:'block', width:3, height:Math.max(3, v * m), borderRadius:2, background:o.color || T.onAccent } }));
+  const wave = h('span', { style:{ display:'flex', gap:4, alignItems:'center', height:m } }, bars);
+  if (!o.halo) return wave;
+  return h('span', { style:{ position:'relative', width:88, height:88, display:'flex', alignItems:'center', justifyContent:'center' } }, [
+    h('span', { key:'h', style:{ position:'absolute', width:88, height:88, borderRadius:999, background:'radial-gradient(circle, rgba(81,40,136,.34) 0%, rgba(81,40,136,0) 70%)', transform:'scale(' + (1 + avg * 0.30).toFixed(3) + ')', opacity:(0.30 + avg * 0.55).toFixed(3) } }),
+    h('span', { key:'c', style:{ width:76, height:76, borderRadius:999, background:T.ember, display:'flex', alignItems:'center', justifyContent:'center' } }, wave)
+  ]);
+}
+
+function wordsIn(text, size) {
+  const words = text.split(' ');
+  return h('span', null, words.map((w, i) => h('span', { key:i, style:{ display:'inline-block', whiteSpace:'pre', animation:'bysi-word 320ms cubic-bezier(.22,.9,.28,1) both', animationDelay:(i * 42) + 'ms' } }, w + (i < words.length - 1 ? ' ' : ''))));
+}
+
+function drawRing(v) {
+  const r = 38, c = 2 * Math.PI * r;
+  return h('span', { style:{ position:'relative', width:88, height:88, display:'flex', alignItems:'center', justifyContent:'center' } }, [
+    h('svg', { key:'s', width:88, height:88, viewBox:'0 0 88 88', style:{ position:'absolute', transform:'rotate(-90deg)' } }, [
+      h('circle', { key:'bg', cx:44, cy:44, r:r, fill:'none', stroke:'rgba(23,26,31,0.10)', strokeWidth:6 }),
+      h('circle', { key:'fg', cx:44, cy:44, r:r, fill:'none', stroke:T.amber, strokeWidth:6, strokeLinecap:'round', strokeDasharray:c, strokeDashoffset:c * (1 - v / 100) })
+    ]),
+    h('span', { key:'v', style:{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 } }, [
+      h('span', { key:'n', style:{ font:"700 26px/1 'Plus Jakarta Sans', system-ui, sans-serif", color:T.amber } }, String(Math.round(v))),
+      h('span', { key:'l', style:{ font:'600 11px/1 ' + sans, letterSpacing:'1.6px', textTransform:'uppercase', color:T.dim } }, 'overall')
+    ])
+  ]);
+}
+
+function thinking(color) {
+  const dots = [];
+  for (let i = 0; i < 3; i++) dots.push(h('span', { key:i, style:{ display:'block', width:7, height:7, borderRadius:999, background:color, animation:'bysi-dot 1200ms ease-in-out infinite', animationDelay:(i * 160) + 'ms' } }));
+  return h('span', { style:{ display:'flex', gap:6, alignItems:'center', height:26 } }, dots);
+}
+
+function scoreRing(value) {
+  const r = 38, c = 2 * Math.PI * r;
+  return h('span', { style:{ position:'relative', width:88, height:88, display:'flex', alignItems:'center', justifyContent:'center' } }, [
+    h('svg', { key:'s', width:88, height:88, viewBox:'0 0 88 88', style:{ position:'absolute', transform:'rotate(-90deg)' } }, [
+      h('circle', { key:'bg', cx:44, cy:44, r:r, fill:'none', stroke:'rgba(23,26,31,0.10)', strokeWidth:6 }),
+      h('circle', { key:'fg', cx:44, cy:44, r:r, fill:'none', stroke:T.amber, strokeWidth:6, strokeLinecap:'round', strokeDasharray:c, strokeDashoffset:c * (1 - value / 100) })
+    ]),
+    h('span', { key:'v', style:{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 } }, [
+      h('span', { key:'n', style:{ font:"400 26px/1 'Plus Jakarta Sans', system-ui, sans-serif", color:T.amber } }, String(value)),
+      h('span', { key:'l', style:{ font:'600 11px/1 ' + sans, letterSpacing:'1.6px', textTransform:'uppercase', color:T.dim } }, 'overall')
+    ])
+  ]);
+}
+
+const MIC_BOARD = [
+  { key:'empty', label:'Empty · ready', note:'Mic is the hero. Tap to speak.', node:() => circle({ fill:T.surface, ring:T.lineStrong, glyph:'mic.fill', glyphColor:T.ember }) },
+  { key:'permission', label:'Asking permission', note:'OS prompt pending, nothing live.', node:() => circle({ fill:T.surface, ring:T.lineStrong, glyph:'mic.fill', glyphColor:T.dim, dashed:true }) },
+  { key:'listening', label:'Listening', note:'Purple fill, breathing halo, label.', node:() => h('span', { style:{ position:'relative', width:88, height:88, display:'flex', alignItems:'center', justifyContent:'center' } }, [
+      h('span', { key:'h', style:{ position:'absolute', width:88, height:88, borderRadius:999, background:'radial-gradient(circle, rgba(81,40,136,.34) 0%, rgba(81,40,136,0) 70%)', animation:'bysi-halo 1500ms ease-in-out infinite' } }),
+      h('span', { key:'c', style:{ width:76, height:76, borderRadius:999, background:T.ember, display:'flex', alignItems:'center', justifyContent:'center' } }, waveform(T.onAccent, 24))
+    ]) },
+  { key:'detected', label:'Speech detected', note:'In the rep the bars track your level and settle flat when you stop.', node:() => h('span', { style:{ position:'relative', width:88, height:88, display:'flex', alignItems:'center', justifyContent:'center' } }, [
+      h('span', { key:'h', style:{ position:'absolute', width:88, height:88, borderRadius:999, background:'radial-gradient(circle, rgba(81,40,136,.34) 0%, rgba(81,40,136,0) 70%)', animation:'bysi-halo 1500ms ease-in-out infinite' } }),
+      h('span', { key:'c', style:{ width:76, height:76, borderRadius:999, background:T.ember, display:'flex', alignItems:'center', justifyContent:'center' } }, waveform(T.onAccent, 28))
+    ]) },
+  { key:'composing', label:'Composing', note:'Mic steps back; text is editable, explicit submit.', node:() => h('span', { style:{ width:88, height:70, borderRadius:18, background:T.surface, border:'1px solid ' + T.lineStrong, display:'flex', alignItems:'center', justifyContent:'center', font:'400 13px/1.35 ' + sans, color:T.textSoft, padding:'0 8px', textAlign:'center', boxSizing:'border-box' } }, 'editable text') },
+  { key:'waiting', label:'Waiting', note:'Thinking dots. Mic reads disabled.', node:() => h('span', { style:{ width:76, height:76, borderRadius:999, background:'rgba(23,26,31,0.06)', border:'1px solid ' + T.line, display:'flex', alignItems:'center', justifyContent:'center' } }, thinking(T.dim)) },
+  { key:'speaking', label:'Speaking', note:'Waveform + stop/mute. Mic removed.', node:() => h('span', { style:{ display:'flex', gap:10, alignItems:'center' } }, [
+      h('span', { key:'w', style:{ width:56, height:56, borderRadius:999, border:'1.5px solid ' + T.blue, display:'flex', alignItems:'center', justifyContent:'center' } }, waveform(T.blue, 20)),
+      h('span', { key:'m', style:{ width:44, height:44, borderRadius:14, border:'1px solid ' + T.lineStrong, display:'flex', alignItems:'center', justifyContent:'center' } }, icon('speaker.slash', 22, T.textSoft))
+    ]) },
+  { key:'autoplay', label:'Audio blocked', note:'Tap to hear Marcus.', node:() => h('span', { style:{ minHeight:52, padding:'0 18px', borderRadius:18, background:T.emberSoft, border:'1px solid ' + T.ember, color:T.crimson, display:'flex', alignItems:'center', font:'600 14px/1 ' + sans } }, 'Tap to hear Marcus') },
+  { key:'failed', label:'Playback failed', note:'Words kept; audio retryable.', node:() => circle({ fill:T.surface, ring:T.crimson, glyph:'exclamationmark', glyphColor:T.crimson, dashed:true }) },
+  { key:'paused', label:'Paused', note:'Nothing recording; rep waits.', node:() => circle({ fill:'rgba(23,26,31,0.06)', ring:T.line, glyph:'pause.fill', glyphColor:T.textSoft }) },
+  { key:'denied', label:'Mic blocked', note:'Route to Settings, offer typing.', node:() => circle({ fill:T.surface, ring:T.crimson, glyph:'mic.fill', glyphColor:T.crimson, dashed:true }) },
+  { key:'error', label:'Connection lost', note:'Retry send, or save and exit.', node:() => circle({ fill:'rgba(23,26,31,0.06)', ring:T.crimson, glyph:'arrow.clockwise', glyphColor:T.crimson }) },
+  { key:'complete', label:'Complete', note:'Mic retires; Analyze becomes primary.', node:() => circle({ fill:T.emberSoft, ring:T.ember, glyph:'checkmark', glyphColor:T.ember }) }
+];
+
+const STATES = {
+  empty:      { label:'Your turn · ready', dot:T.ember, help:'Nothing is recording yet. Tap the mic when you are ready to speak.', dock:'mic', mic:'empty' },
+  permission: { label:'Microphone access', dot:T.ember, help:'iOS will ask for the microphone. Nothing records until you allow it.', dock:'buttons' },
+  listening:  { label:'Listening', dot:T.ember, help:'Recording your line. Tap again when you finish — nothing is sent yet.', dock:'mic', mic:'listening' },
+  detected:   { label:'Speech detected', dot:T.ember, help:'“Totally get that, and we’ve all been there…”', dock:'mic', mic:'detected' },
+  composing:  { label:'Composing', dot:T.ember, help:'This is what we heard. Edit it, say it again, or send it to Marcus.', dock:'composing' },
+  waiting:    { label:'Marcus is thinking', dot:T.dim, help:'Mic is off while he composes a reply. This usually takes a few seconds.', dock:'mic', mic:'waiting' },
+  speaking:   { label:'Marcus is speaking', dot:T.blue, help:'Mic is off while he replies. Stop or mute the audio — his words stay above.', dock:'buttons' },
+  autoplay:   { label:'Audio needs a tap', dot:T.blue, help:'Your phone blocked automatic playback. His reply is written above.', dock:'buttons' },
+  failed:     { label:'Playback failed', dot:T.crimson, help:'The audio would not play. His words are kept above so you can carry on.', dock:'buttons' },
+  paused:     { label:'Paused', dot:T.dim, help:'Nothing is recording. The rep waits here until you come back.', dock:'buttons' },
+  denied:     { label:'Microphone blocked', dot:T.crimson, help:'Microphone access is off for this app. Turn it on in Settings, or type this turn.', dock:'buttons' },
+  error:      { label:'Connection lost', dot:T.crimson, help:'Your line was not sent. It is saved — retry when you have signal.', dock:'buttons' },
+  complete:   { label:'Rep complete', dot:T.ember, help:'Read it again or replay it whenever you are ready. Nothing moves on until you choose.', dock:'buttons' }
+};
+
+const FIVE = { empty:1, composing:1, waiting:1, speaking:1, complete:1 };
+
+class Component extends DCLogic {
+  state = { screen:'setup', step:1, who:'Partner', pulse:'', slideDir:0, scrollY:0, levels:[.05,.05,.05,.05,.05], ringN:0, voice:'empty', muted:false, showMore:false, difficulty:'Steady', focus:'Ask without softening it', cast:"Man's voice — Adam", reaction:'Minimizes it', plan:'Monthly', playing:'', retry:false };
+
+  componentWillUnmount() { if (this.raf) cancelAnimationFrame(this.raf); this._pumping = false; }
+
+  arm = () => {
+    if (this._pumping) return;
+    const s = this.state;
+    const live = s.screen === 'rehearsal' && (s.voice === 'listening' || s.voice === 'detected');
+    const settling = s.levels.some((v) => v > 0.055);
+    const ringing = s.screen === 'debrief' ? s.ringN < 57.95 : s.ringN !== 0;
+    if (!live && !settling && !ringing) return;
+    if (s.screen === 'debrief' && !this.ringT0) this.ringT0 = performance.now();
+    this._pumping = true;
+    this.raf = requestAnimationFrame(this.pump);
+  };
+
+  pump = (now) => {
+    this.raf = 0;
+    const s = this.state;
+    const live = s.screen === 'rehearsal' && (s.voice === 'listening' || s.voice === 'detected');
+    const t = now / 1000;
+    const env = live ? (0.45 + 0.55 * Math.abs(Math.sin(t * 0.8) * Math.sin(t * 0.31 + 1.2))) : 0;
+    const lv = s.levels.map((v, i) => {
+      const target = live ? Math.max(0.12, env * (0.42 + 0.58 * Math.abs(Math.sin(t * (2.3 + i * 0.42) + i * 1.7)))) : 0.05;
+      return v + (target - v) * (live ? 0.22 : 0.07);
+    });
+    const levelsMoved = lv.some((v, i) => Math.abs(v - s.levels[i]) > 0.002);
+
+    let ringN = s.ringN;
+    if (s.screen === 'debrief') {
+      if (!this.ringT0) this.ringT0 = now;
+      const p = Math.min(1, (now - this.ringT0) / 1100);
+      ringN = 58 * (1 - Math.pow(1 - p, 3));
+    } else { this.ringT0 = 0; ringN = 0; }
+    const ringMoved = Math.abs(ringN - s.ringN) > 0.02;
+
+    const settling = lv.some((v) => v > 0.055);
+    const ringing = s.screen === 'debrief' ? ringN < 57.98 : ringN !== 0;
+    const active = live || settling || ringing;
+
+    if (levelsMoved || ringMoved) this.setState({ levels:lv, ringN:ringN });
+
+    if (active) {
+      this.raf = requestAnimationFrame(this.pump);
+    } else {
+      this._pumping = false;
+    }
+  };
+
+  go = (screen) => () => this.setState({ screen });
+
+  press = (id, run) => () => {
+    this.setState({ pulse:id });
+    setTimeout(() => { this.setState({ pulse:'' }); run(); }, 470);
+  };
+  setVoice = (voice) => () => this.setState({ voice });
+
+  review = () => {
+    this.ringT0 = 0;
+    this.setState({ screen:'reviewing' });
+    setTimeout(() => { if (this.state.screen === 'reviewing') this.setState({ screen:'debrief' }); }, 1800);
+  };
+
+  btn(label, run, kind, disabled) {
+    const map = {
+      primary:{ bg:T.ember, fg:T.onAccent, border:'none', height:'56px', shadow:'0 8px 20px rgba(81,40,136,.22)' },
+      ghost:{ bg:'none', fg:T.text, border:'1px solid ' + T.lineStrong, height:'52px', shadow:'none' },
+      danger:{ bg:'none', fg:T.crimson, border:'1px solid ' + T.crimson, height:'52px', shadow:'none' },
+      disabled:{ bg:T.emberSoft, fg:T.dim, border:'none', height:'56px', shadow:'none' }
+    };
+    const s = map[disabled ? 'disabled' : (kind || 'primary')];
+    return { label, run: disabled ? undefined : run, disabled: !!disabled, cursor: disabled ? 'default' : 'pointer', bg:s.bg, fg:s.fg, border:s.border, height:s.height, shadow:s.shadow };
+  }
+
+  actionsFor(v) {
+    const s = this.setVoice;
+    switch (v) {
+      case 'permission': return [this.btn('Allow microphone', s('listening')), this.btn('Type this turn instead', s('composing'), 'ghost')];
+      case 'speaking':   return [this.btn('Analyze your rep', undefined, 'primary', true), this.btn('Stop playback', s('complete'), 'ghost'), this.btn(this.state.muted ? 'Unmute audio' : 'Mute audio', () => this.setState({ muted:!this.state.muted }), 'ghost')];
+      case 'autoplay':   return [this.btn('Tap to hear Marcus', s('speaking')), this.btn('Continue reading instead', s('complete'), 'ghost')];
+      case 'failed':     return [this.btn('Try the audio again', s('speaking'), 'ghost'), this.btn('Continue without audio', s('complete'), 'ghost')];
+      case 'paused':     return [this.btn('Resume the rep', s('empty')), this.btn('End rep and debrief', this.review, 'ghost')];
+      case 'denied':     return [this.btn('Open iOS Settings', s('permission'), 'ghost'), this.btn('Type this turn instead', s('composing'), 'ghost')];
+      case 'error':      return [this.btn('Retry sending', s('waiting')), this.btn('Save and exit the rep', this.go('today'), 'ghost')];
+      case 'complete':   return [this.btn('Analyze your rep', this.review), this.btn('Replay response', s('speaking'), 'ghost'), this.btn('Back to today', this.go('today'), 'ghost')];
+      default: return [];
+    }
+  }
+
+  micNodeFor(v) {
+    if (v === 'listening' || v === 'detected') {
+      return h('button', { onClick:this.setVoice(v === 'listening' ? 'detected' : 'composing'), 'aria-label':STATES[v].label,
+        style:{ border:'none', background:'none', padding:0, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' } },
+        liveWave(this.state.levels, { halo:true, max: v === 'listening' ? 24 : 28 }));
+    }
+    const st = STATES[v];
+    const key = st && st.mic;
+    const found = MIC_BOARD.filter((m) => m.key === key)[0];
+    const clickable = v === 'empty' || v === 'listening' || v === 'detected';
+    const next = v === 'empty' ? 'listening' : (v === 'listening' ? 'detected' : 'composing');
+    return h('button', {
+      onClick: clickable ? this.setVoice(next) : undefined,
+      disabled: !clickable,
+      'aria-label': st ? st.label : 'microphone',
+      style:{ border:'none', background:'none', padding:0, cursor:clickable ? 'pointer' : 'default', display:'flex', alignItems:'center', justifyContent:'center' }
+    }, (found || MIC_BOARD[0]).node());
+  }
+
+  renderVals() {
+    this.arm();
+    const st = this.state;
+    const v = STATES[st.voice] || STATES.empty;
+    const later = ['waiting','speaking','autoplay','failed','complete','error'].indexOf(st.voice) > -1;
+    const GRAD = 'linear-gradient(90deg, #512888 0%, #5E3796 42%, #6A46A0 74%, #7B62AC 100%) no-repeat left center, rgba(255,255,255,.52)';
+    const press = (id, base) => (st.pulse === id
+      ? { bg:GRAD, border:'1px solid rgba(255,255,255,.72)', fg:'#FFFFFF', anim:'bysi-fill 440ms cubic-bezier(.3,0,.2,1) both' }
+      : { bg:base.bg, border:base.border, fg:'#171A1F', anim:'none' });
+    const chip = (on) => ({ bg: on ? T.ember : T.surface, fg: on ? T.onAccent : T.textSoft, border: on ? '1px solid ' + T.ember : '1px solid ' + T.line });
+    const choice = (on) => ({ bg: on ? T.surfaceHigh : T.surface, border: on ? '1px solid ' + T.lineStrong : '1px solid ' + T.line, mark: on ? 'Selected' : '' });
+
+    return {
+      tokens:[
+        { name:'field #EFEEF4', use:'Gradient field base — cool, faint violet', hex:'#EFEEF4' },
+        { name:'field-deep #DEDCE8', use:'Field shadow, bottom of frame', hex:'#DEDCE8' },
+        { name:'glass rgba(255,255,255,.52)', use:'Card fill — over blur(24px)', hex:'#FFFFFF' },
+        { name:'glass-edge rgba(255,255,255,.62)', use:'1 px hairline on every glass layer', hex:'#FFFFFF' },
+        { name:'glass-high rgba(255,255,255,.62)', use:'Selected rows, informational', hex:'rgba(255,255,255,.62)' },
+        { name:'text #171A1F', use:'Ink', hex:'#171A1F' },
+        { name:'textSoft #4B5259', use:'Secondary type', hex:'#4B5259' },
+        { name:'textDim #5B646E', use:'Trust notes, captions', hex:'#5B646E' },
+        { name:'dim #646D77', use:'Eyebrows', hex:'#646D77' },
+        { name:'purple #512888', use:'Primary buttons, active accents', hex:'#512888' },
+        { name:'sage #5C8A6E', use:'What worked, positive score', hex:'#5C8A6E' },
+        { name:'clay #B4823F', use:'Caution, verdict tier, tension', hex:'#B4823F' },
+        { name:'danger #B1402F', use:'Warning, destructive', hex:'#B1402F' },
+        { name:'purple-deep #3C1D66', use:'Pressed, playback, privacy', hex:'#3C1D66' }
+      ],
+      micStates: MIC_BOARD.map((m) => ({ label:m.label, note:m.note, node:m.node() })),
+      waveDemo: waveform(T.ember),
+      thinkDemo: thinking(T.dim),
+      ringDemo: scoreRing(58),
+      micReadyDemo: circle({ fill:T.surface, ring:T.lineStrong, glyph:'mic.fill', glyphColor:T.ember }),
+
+      dims:[
+        { name:'Clarity', val:'58', pct:'58%', color:T.mint, delay:'240ms' },
+        { name:'Empathy', val:'62', pct:'62%', color:T.mint, delay:'310ms' },
+        { name:'Assertiveness', val:'45', pct:'45%', color:T.amber, delay:'380ms' },
+        { name:'Stayed steady', val:'68', pct:'68%', color:T.mint, delay:'450ms' }
+      ],
+      upcoming:[
+        { day:'Day 2', name:'Name the feeling, not the blame', meta:'2 min · empathy', state:'Tomorrow' },
+        { day:'Day 3', name:'Give hard feedback to someone you like', meta:'6 min · rehearsal', state:'Locked' },
+        { day:'Day 4', name:'Say no without apologizing', meta:'2 min · boundaries', state:'Locked' },
+        { day:'Day 5', name:'Ask a friend for the money back', meta:'6 min · rehearsal', state:'Locked' }
+      ],
+      tabsToday:[
+        { name:'Today', color:T.ember, rule:T.ember },
+        { name:'Scenarios', color:T.dim, rule:'transparent' },
+        { name:'Progress', color:T.dim, rule:'transparent' }
+      ],
+
+      whoOptions:['Partner','Family','Work','Friends'].map((name) => {
+        const p = press('who-' + name, choice(st.who === name));
+        return { name, bg:p.bg, border:p.border, fg:p.fg, anim:p.anim, pick: this.press('who-' + name, () => this.setState({ who:name, step:3, slideDir:st.slideDir + 1 })) };
+      }),
+      focusOptions:[
+        { name:'Ask without softening it', sub:'Say the request once, plainly.' },
+        { name:'Hold the line under pushback', sub:'Repeat the ask without shrinking.' },
+        { name:'Stay steady when it gets warm', sub:'Keep your pace when they escalate.' },
+        { name:'Say the hard thing kindly', sub:'Deliver bad news without hedging.' }
+      ].map((o) => {
+        const c = choice(st.focus === o.name);
+        return { name:o.name, sub:o.sub, mark:c.mark, bg:c.bg, border:c.border, pick: () => this.setState({ focus:o.name, step:3 }) };
+      }),
+      castOptions:[
+        { name:"Woman's voice — Hope", sub:'Calm, warm, human' },
+        { name:"Man's voice — Adam", sub:'Steady, present, direct' }
+      ].map((o) => {
+        const p = press('cast-' + o.name, choice(st.cast === o.name));
+        return { name:o.name, sub:o.sub, mark:choice(st.cast === o.name).mark, bg:p.bg, border:p.border, fg:p.fg, anim:p.anim, playIcon: icon(st.playing === o.name ? 'stop.fill' : 'play.fill', 20, T.textSoft), playLabel: (st.playing === o.name ? 'Stop sample of ' : 'Hear a sample of ') + o.name, preview: () => this.setState({ playing: st.playing === o.name ? '' : o.name }), pick: this.press('cast-' + o.name, () => this.setState({ cast:o.name, step:4, slideDir:st.slideDir + 1 })) };
+      }),
+      reactionOptions:['Gets defensive','Hears criticism','Minimizes it','Goes quiet','Gets louder','Turns it back on me','Agrees without changing','I’m not sure'].map((name) => {
+        const p = press('re-' + name, choice(st.reaction === name));
+        return { name, bg:p.bg, border:p.border, fg:p.fg, anim:p.anim, pick: this.press('re-' + name, () => this.setState({ reaction:name, step:5, slideDir:st.slideDir + 1 })) };
+      }),
+      difficulties:['Gentle','Steady','Challenging'].map((name, i) => {
+        const sub = ['They listen, but they still feel it','They deflect and push back','They escalate fast'][i];
+        const p = press('diff-' + name, choice(st.difficulty === name));
+        return { name, sub, mark:choice(st.difficulty === name).mark, bg:p.bg, border:p.border, fg:p.fg, anim:p.anim, select: this.press('diff-' + name, () => this.setState({ difficulty:name })) };
+      }),
+      plans:[
+        { name:'Monthly', price:'$12.99 / month · renews monthly' },
+        { name:'Yearly', price:'$79.99 / year · renews yearly' }
+      ].map((p) => {
+        const c = choice(st.plan === p.name);
+        return { name:p.name, price:p.price, mark:c.mark, bg:c.bg, border:c.border, pick: () => this.setState({ plan:p.name }) };
+      }),
+      planCta: st.plan === 'Yearly' ? 'Start yearly and retry the moment' : 'Start monthly and retry the moment',
+
+      isToday: st.screen === 'today',
+      isDetail: st.screen === 'detail',
+      isSetup: st.screen === 'setup',
+      isRehearsal: st.screen === 'rehearsal',
+      isReviewing: st.screen === 'reviewing',
+      isDebrief: st.screen === 'debrief',
+      isPaywall: st.screen === 'paywall',
+
+      goToday: this.go('today'),
+      goDetail: this.go('detail'),
+      goStep1: () => this.setState({ screen:'setup', step:1 }),
+      goDebrief: this.go('debrief'),
+      goPaywall: this.go('paywall'),
+      goRehearsal: () => this.setState({ screen:'rehearsal', voice:'permission' }),
+      goRetry: () => this.setState({ screen:'rehearsal', voice:'empty', retry:true }),
+
+      step1: st.step === 1, step2: st.step === 2, step3: st.step === 3, step4: st.step === 4, step5: st.step === 5,
+      backColor: st.step === 1 ? 'rgba(23,26,31,.28)' : '#512888',
+      backCursor: st.step === 1 ? 'default' : 'pointer',
+      stepLabel: 'Step ' + st.step + ' of 5',
+      stepPct: (st.step * 20) + '%',
+      tapToContinue: st.step === 2 || st.step === 3 || st.step === 4,
+      stepHasButton: st.step === 1 || st.step === 5,
+      stepButtonLabel: st.step === 5 ? 'Start my rehearsal' : 'Continue',
+      iconSpec:[
+        { name:'mic.fill', use:'Record a turn · 88 pt visual, 104 pt target', label:'Start recording', node:icon('mic.fill', 24, T.text) },
+        { name:'mic.slash', use:'Microphone blocked', label:'Microphone is off — open Settings', node:icon('mic.slash', 24, T.text) },
+        { name:'stop.fill', use:'Stop recording or stop playback', label:'Stop', node:icon('stop.fill', 24, T.text) },
+        { name:'play.fill', use:'Preview a counterpart voice', label:'Hear a sample', node:icon('play.fill', 24, T.text) },
+        { name:'speaker.wave', use:'Audio on', label:'Mute Marcus', node:icon('speaker.wave', 24, T.text) },
+        { name:'speaker.slash', use:'Audio muted', label:'Unmute Marcus', node:icon('speaker.slash', 24, T.text) },
+        { name:'keyboard', use:'Type this turn instead of speaking', label:'Type this turn instead', node:icon('keyboard', 24, T.text) },
+        { name:'arrow.clockwise', use:'Retry a failed send', label:'Retry sending', node:icon('arrow.clockwise', 24, T.text) },
+        { name:'checkmark', use:'Rep complete', label:'Rehearsal complete', node:icon('checkmark', 24, T.text) }
+      ],
+      dynamicSpec:[
+        { what:'Pricing', note:'Amount, currency, subscription period and any trial or intro offer come from the store product — never a literal. $12.99 / $79.99 in these frames are fixtures.' },
+        { what:'Trial language', note:'Only rendered if the product actually carries a trial; the sentence changes per store and region.' },
+        { what:'Terms / Privacy', note:'URLs are configuration, not hardcoded links.' },
+        { what:'Scores', note:'Overall and all four dimensions come from the analysis service, including the tier label. 58 · 62 · 45 · 68 and “Building” are fixtures.' },
+        { what:'Feedback', note:'Headline, what-worked, what-to-change, quoted evidence and the three script lines are all generated per rep.' },
+        { what:'Scenario data', note:'Title, counterpart name and relationship, difficulty, duration, trained state and category all come from the scenario record.' },
+        { what:'Program', note:'Day number, block name, lesson titles and lock state come from the program service. The name is always “30-Day Conversation Practice”.' },
+        { what:'Crisis resources', note:'Region-specific. The 988 and DV numbers shown are US fixtures; resolve by locale and never ship a hardcoded list.' },
+        { what:'Retention copy', note:'Storage location and retention period render from the same config the backend enforces.' }
+      ],
+      overflowSpec:[
+        { case:'Long scenario title', rule:'Wraps to a maximum of three lines, then truncates with an ellipsis. Never shrinks the type. The full title is available on the scenario detail screen.' },
+        { case:'Long counterpart name', rule:'The rehearsal header shows first name only on one line; relationship moves to the scene block. Names longer than the header width truncate at the tail.' },
+        { case:'Maximum situation text', rule:'500 characters. The field scrolls internally past six lines; the counter turns danger at 480 and the Continue button disables at 0 characters.' },
+        { case:'Larger Dynamic Type', rule:'Every screen scrolls. Buttons grow in height rather than clipping their label; the dock reflows to stack its controls vertically above accessibility XL.' },
+        { case:'Long counterpart response', rule:'The transcript area is the scroll region and auto-scrolls to the newest line only when the user is already at the bottom. The dock never moves.' },
+        { case:'No audio analysis', rule:'Composure is omitted from the debrief and Progress rather than shown as zero, with a caption explaining that it is only scored when audio was analysed.' },
+        { case:'375 pt width', rule:'22 pt horizontal padding holds. Chip rows scroll horizontally; the four setup difficulty rows and the paywall plan rows keep their 64 pt minimum height and wrap their subtitles.' },
+        { case:'Reduce Motion', rule:'The press wipe, question slide, mic halo, ring draw and meter fills all resolve instantly to their end state.' }
+      ],
+      kbRows:[
+        { pad:'3px', keys:'qwertyuiop'.split('').map((c) => ({ c, flex:1, bg:'#FFFFFF', fg:'#171A1F', size:'22px' })) },
+        { pad:'20px', keys:'asdfghjkl'.split('').map((c) => ({ c, flex:1, bg:'#FFFFFF', fg:'#171A1F', size:'22px' })) },
+        { pad:'3px', keys:[{ c:'⇧', flex:1.5, bg:'#ADB3BD', fg:'#171A1F', size:'17px' }].concat('zxcvbnm'.split('').map((c) => ({ c, flex:1, bg:'#FFFFFF', fg:'#171A1F', size:'22px' }))).concat([{ c:'⌫', flex:1.5, bg:'#ADB3BD', fg:'#171A1F', size:'17px' }]) },
+        { pad:'3px', keys:[{ c:'123', flex:1.4, bg:'#ADB3BD', fg:'#171A1F', size:'15px' }, { c:'space', flex:5, bg:'#FFFFFF', fg:'#171A1F', size:'15px' }, { c:'return', flex:1.8, bg:'#ADB3BD', fg:'#171A1F', size:'15px' }] }
+      ],
+      iconKeyboard: icon('keyboard', 22, T.textSoft),
+      iconMute: icon(st.muted ? 'speaker.slash' : 'speaker.wave', 22, T.textSoft),
+      muteLabel: st.muted ? 'Unmute Marcus' : 'Mute Marcus',
+      marcusLine: wordsIn("Left in the dark? I literally just told you I'm waiting on a check. It should clear by Friday, but I can't force the bank to hurry up."),
+      youAnim: st.voice === 'waiting' || st.voice === 'speaking' ? 'bysi-settle 420ms cubic-bezier(.22,.9,.28,1) both' : 'none',
+      tensionAnim: 'bysi-meter 900ms cubic-bezier(.22,.9,.28,1) both',
+      scoreRingLive: drawRing(st.ringN),
+      layerFar: 'translateY(' + (-st.scrollY * 0.06).toFixed(2) + 'px)',
+      layerNear: 'translateY(' + (-st.scrollY * 0.03).toFixed(2) + 'px)',
+      onTodayScroll: (e) => { const y = e.target.scrollTop; if (Math.abs(y - st.scrollY) > 1) this.setState({ scrollY:y }); },
+      slideAnim: (st.slideDir % 2 === 0 ? 'bysi-slide-a' : 'bysi-slide-b') + ' 340ms cubic-bezier(.22,.9,.28,1) both',
+      stepButtonBg: st.pulse === 'step-cta' ? 'linear-gradient(90deg, #7B62AC 0%, #63409B 55%, #512888 100%) no-repeat left center, #512888' : '#512888',
+      stepButtonAnim: st.pulse === 'step-cta' ? 'bysi-fill-cta 440ms cubic-bezier(.3,0,.2,1) both' : 'none',
+      stepButtonRun: this.press('step-cta', () => (st.step === 5
+        ? this.setState({ screen:'rehearsal', voice:'permission' })
+        : this.setState({ step:2, slideDir:st.slideDir + 1 }))),
+      prevStep: () => (st.step === 1 ? null : this.setState({ step: st.step - 1, slideDir: st.slideDir + 1 })),
+
+      pauseRep: this.setVoice('paused'),
+      setListening: this.setVoice('listening'),
+      sendLine: () => { this.setState({ voice:'waiting', scrollY:st.scrollY }); setTimeout(() => { if (this.state.voice === 'waiting') this.setState({ voice:'speaking' }); }, 1400); },
+      typeInstead: this.setVoice('composing'),
+      toggleMute: () => this.setState({ muted:!st.muted }),
+
+      turnLabel: later ? '2 of 2' : '1 of 2',
+      tensionPct: later ? '58%' : '22%',
+      tensionColor: later ? T.crimson : T.amber,
+      showCue: !later && st.voice !== 'composing',
+      showTranscript: later || st.voice === 'composing',
+
+      stateLabel: v.label,
+      stateHelp: v.help,
+      stateDot: v.dot,
+      dockMic: v.dock === 'mic',
+      dockButtons: v.dock === 'buttons',
+      dockComposing: v.dock === 'composing',
+      micNode: this.micNodeFor(st.voice),
+      actions: this.actionsFor(st.voice),
+
+      stateChips: Object.keys(STATES).map((k) => {
+        const c = chip(st.voice === k);
+        return { label: (FIVE[k] ? '● ' : '') + STATES[k].label, run: () => this.setState({ screen:'rehearsal', voice:k }), bg:c.bg, fg:c.fg, border:c.border };
+      }),
+
+      showMore: st.showMore,
+      moreLabel: st.showMore ? 'Hide the other 2 moments' : '2 other moments',
+      toggleMore: () => this.setState({ showMore:!st.showMore })
+    };
+  }
+}
+
+</script>
+</body>
+</html>

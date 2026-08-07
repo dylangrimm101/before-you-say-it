@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment and local configuration
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Expo / Metro
+.expo/
+**/.expo/
+expo/expo-env.d.ts
+expo/dist/
+expo/web-build/
+expo/ios/
+expo/android/
+.metro-health-check*
+
+# Build outputs and caches
+dist/
+build/
+DerivedData/
+.build/
+.swiftpm/
+.gradle/
+coverage/
+*.tsbuildinfo
+*.log
+*.tmp
+*.cache
+
+# Apple / Android signing and release artifacts
+*.cer
+*.crt
+*.der
+*.p8
+*.p12
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+*.jks
+*.keystore
+*.xcarchive
+*.ipa
+*.apk
+*.aab
+
+# Xcode user state
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+
+# Local generated configuration
+ios/BeforeYouSayIt/Config.swift
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Hosting and local tooling
+.vercel/
+.local-tools/
+core
+.rork
