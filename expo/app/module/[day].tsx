@@ -26,7 +26,6 @@ import {
   upsertPilotDayRun,
   type ActivePracticeSession,
 } from "@/lib/practiceSession";
-import { newlySpokenContentNeedsSafetyCheck } from "@/lib/safety";
 import { useDictation } from "@/lib/useDictation";
 import { replaySpeech, resetSpeech, speakPilotAudio, stopSpeech, useSpeech } from "@/lib/voice";
 import { useStore } from "@/providers/store";
@@ -130,12 +129,6 @@ export default function PilotModuleScreen() {
     setSession(next);
     await saveActivePracticeSession(next);
   }, [saveActivePracticeSession, session]);
-
-  const routeToSafety = useCallback(async (): Promise<void> => {
-    await stopSpeech();
-    await Promise.all([attemptDictation.cancel(), responseDictation.cancel(), retryDictation.cancel()]);
-    router.replace({ pathname: "/safety-check", params: { id: session?.id ?? "pilot", pilotDay: String(day) } });
-  }, [attemptDictation, day, responseDictation, retryDictation, router, session?.id]);
 
   const startDay = useCallback(async (): Promise<void> => {
     if (!module) return;
@@ -245,15 +238,13 @@ export default function PilotModuleScreen() {
 
   const confirmAttempt = useCallback(async (): Promise<void> => {
     if (!run || attemptText.trim().length < 2) return;
-    if (newlySpokenContentNeedsSafetyCheck(attemptText)) { await routeToSafety(); return; }
     const preserved = preservePilotAttempt(run, "opener", attemptText);
     await persistRun(preserved);
     await playAdam(preserved, preserved.attempt?.transcript ?? attemptText);
-  }, [attemptText, persistRun, playAdam, routeToSafety, run]);
+  }, [attemptText, persistRun, playAdam, run]);
 
   const confirmResponse = useCallback(async (): Promise<void> => {
     if (!module || !run || responseText.trim().length < 2) return;
-    if (newlySpokenContentNeedsSafetyCheck(responseText)) { await routeToSafety(); return; }
     const preserved = preservePilotAttempt(run, "response", responseText);
     await persistRun(transitionPilotRun(preserved, "hope_coaching"));
     const coachingTranscript = module.day === 2 || module.day === 8
@@ -272,7 +263,7 @@ export default function PilotModuleScreen() {
       updatedAt: Date.now(),
     };
     await persistRun(withCoach);
-  }, [module, persistRun, responseText, routeToSafety, run]);
+  }, [module, persistRun, responseText, run]);
 
   const beginRetry = useCallback(async (): Promise<void> => {
     if (!module || !run) return;
@@ -300,7 +291,6 @@ export default function PilotModuleScreen() {
 
   const confirmRetry = useCallback(async (): Promise<void> => {
     if (!module || retryText.trim().length < 2) return;
-    if (newlySpokenContentNeedsSafetyCheck(retryText)) { await routeToSafety(); return; }
     if (day === 1 && session) {
       const preserved = preserveDayOneRetry(session, retryText);
       const behavior = (session.coachedBehaviorId ?? module.primary_behavior_id) as typeof module.primary_behavior_id;
@@ -322,7 +312,7 @@ export default function PilotModuleScreen() {
       return;
     }
     await persistRun({ ...transitionPilotRun(preserved, "attempt_comparison"), comparison });
-  }, [attemptText, day, isMuted, module, persistRun, retryText, routeToSafety, run, saveActivePracticeSession, session]);
+  }, [attemptText, day, isMuted, module, persistRun, retryText, run, saveActivePracticeSession, session]);
 
   const showTransfer = useCallback(async (): Promise<void> => {
     if (day === 1) {

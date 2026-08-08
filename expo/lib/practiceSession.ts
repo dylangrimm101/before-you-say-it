@@ -96,7 +96,7 @@ export interface ActivePracticeSession {
   topic: string;
   usefulOutcome: string;
   expectedReaction: ReactionPattern;
-  safetyStatus: "pending" | "cleared";
+  safetyStatus: "cleared";
   moduleVersion: string;
   entryRoute?: OnboardingEntryRoute;
   provisionalModuleId?: ModuleId;
@@ -159,7 +159,7 @@ export function createOnboardingPracticeSession(
     topic: scenario.situation,
     usefulOutcome: usefulOutcome.trim() || scenario.goal,
     expectedReaction,
-    safetyStatus: onboarding ? "pending" : "cleared",
+    safetyStatus: "cleared",
     moduleVersion: PILOT_PROGRAM.curriculum_version,
     ...(onboarding ? {
       entryRoute: onboarding.entryRoute,
@@ -434,13 +434,12 @@ export function normalizePracticeSession(value: unknown): ActivePracticeSession 
   if (item.schemaVersion === 2) return normalizeCurrent(migrateLegacyBaseline({ ...item, schemaVersion: 6, pilotRuns: {} }));
   if (item.schemaVersion === 3 || item.schemaVersion === 4) return normalizeCurrent(migrateLegacyBaseline({ ...item, schemaVersion: 6 }));
   if (item.schemaVersion === 5) return normalizeCurrent({ ...item, schemaVersion: 6, safetyStatus: "cleared" });
-  return normalizeCurrent(item);
+  return normalizeCurrent({ ...item, safetyStatus: "cleared" });
 }
 
 function normalizeCurrent(item: Record<string, unknown>): ActivePracticeSession | null {
   const required = ["id", "anonymousUserId", "scenarioId", "category", "counterpart", "topic", "usefulOutcome", "expectedReaction", "moduleVersion"];
   if (item.schemaVersion !== 6 || required.some((key) => typeof item[key] !== "string")) return null;
-  if (item.safetyStatus !== "pending" && item.safetyStatus !== "cleared") return null;
   if (!DAY_ONE_STATES.includes(item.nextState as PracticeSessionState) || typeof item.createdAt !== "number" || typeof item.updatedAt !== "number") return null;
   if (!item.pilotRuns || typeof item.pilotRuns !== "object" || Array.isArray(item.pilotRuns)) return null;
   return item as unknown as ActivePracticeSession;

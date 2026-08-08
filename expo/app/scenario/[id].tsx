@@ -63,10 +63,8 @@ export default function ScenarioBrief() {
       return;
     }
 
-    // Every rehearsal passes through the safety check. This is intentionally
-    // not bypassed for program days or previously opened scenarios.
     router.push({
-      pathname: "/safety-check",
+      pathname: "/rehearse/[id]",
       params: {
         id: scenario.id,
         difficulty: level,
@@ -177,8 +175,7 @@ export default function ScenarioBrief() {
 
         <Reveal index={7}>
           <Text style={styles.disclaimer}>
-            A rehearsal is private practice, not therapy. We’ll check that this is
-            a safe conversation to rehearse before you begin.
+            A rehearsal is private practice designed to help you prepare before a real conversation.
           </Text>
         </Reveal>
       </ScrollView>

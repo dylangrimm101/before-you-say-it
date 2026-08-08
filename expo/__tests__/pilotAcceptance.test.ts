@@ -15,7 +15,6 @@ import {
   transitionPilotRun,
   upsertPilotDayRun,
 } from "@/lib/practiceSession";
-import { newlySpokenContentNeedsSafetyCheck } from "@/lib/safety";
 import type { Scenario } from "@/types/convo";
 
 const scenario: Scenario = {
@@ -146,11 +145,6 @@ describe("required exercised curriculum paths", () => {
     expect(rehearsal).toContain('dockState === "autoplay-blocked" || dockState === "playback-failed"');
     expect(rehearsal).toContain("continueWithoutAudio");
     expect(rehearsal).toContain("stopSpeech().catch(() => {})");
-  });
-
-  test("safety interruption preserves confirmation state and blocks ordinary processing", () => {
-    expect(newlySpokenContentNeedsSafetyCheck("He threatened me with a knife")).toBe(true);
-    expect(newlySpokenContentNeedsSafetyCheck("Could you take Tuesday bedtime?")).toBe(false);
   });
 
   test("restart resumes an unfinished attempt and completion stays blocked until retry", () => {

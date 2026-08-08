@@ -203,7 +203,6 @@ describe("pressable cards claim the width they are supposed to", () => {
     "app/debrief/[id].tsx",
     "app/drill/[id].tsx",
     "app/rehearse/[id].tsx",
-    "app/safety-check.tsx",
     "app/privacy.tsx",
     "app/paywall.tsx",
   ];

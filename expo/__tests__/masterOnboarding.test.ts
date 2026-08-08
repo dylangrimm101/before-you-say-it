@@ -175,7 +175,7 @@ describe("shared mobile rehearsal briefing and controls", () => {
 describe("context persistence, recovery, and free boundary", () => {
   test("persists all route and briefing context and safely resumes before recording", () => {
     const session = sessionFor("recurring_problem", 0);
-    expect(session.safetyStatus).toBe("pending");
+    expect(session.safetyStatus).toBe("cleared");
     expect(session.entryRoute).toBe("recurring_problem");
     expect(session.selectionLabel).toBe("I say too much and lose the point");
     expect(session.scenarioSource).toBe("approved_authored");
@@ -193,25 +193,22 @@ describe("context persistence, recovery, and free boundary", () => {
       { id: "t2", role: "them", text: "Fine, let's review the deadlines." },
     ];
     for (let count = 1; count <= turns.length; count += 1) {
-      const staged = { ...sessionFor("desired_skill", 0), safetyStatus: "cleared" as const, freeRehearsalTurns: turns.slice(0, count) };
+      const staged = { ...sessionFor("desired_skill", 0), freeRehearsalTurns: turns.slice(0, count) };
       const restored = normalizePracticeSession(JSON.parse(JSON.stringify(staged)));
       expect(restored?.freeRehearsalTurns).toEqual(turns.slice(0, count));
       expect(restored?.counterpartDisplayLabel).toBe("Your manager");
     }
-    const completed = preserveFreeRehearsalArtifact({ ...sessionFor("desired_skill"), safetyStatus: "cleared" }, turns, 200);
+    const completed = preserveFreeRehearsalArtifact(sessionFor("desired_skill"), turns, 200);
     expect(completed.freeRehearsalCompletedAt).toBe(200);
     expect(completed.freeRehearsalTurns).toEqual(turns);
   });
 
-  test("routes pending safety, cleared resume, failures, debrief, recommendation, and paywall through existing shared surfaces", async () => {
+  test("routes resume, failures, debrief, recommendation, and paywall through existing shared surfaces", async () => {
     const layout = await Bun.file(`${import.meta.dir}/../app/_layout.tsx`).text();
-    const safety = await Bun.file(`${import.meta.dir}/../app/safety-check.tsx`).text();
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     const debrief = await Bun.file(`${import.meta.dir}/../app/debrief/[id].tsx`).text();
-    expect(layout).toContain('activePracticeSession.safetyStatus === "pending"');
-    expect(layout).toContain('pathname: "/safety-check"');
     expect(layout).toContain('pathname: "/rehearse/[id]"');
-    expect(safety).toContain('safetyStatus: "cleared"');
+    expect(layout).not.toContain("safety-check");
     expect(rehearsal).toContain('dockState === "mic-blocked" || dockState === "mic-error"');
     expect(rehearsal).toContain('dockState === "autoplay-blocked" || dockState === "playback-failed"');
     expect(rehearsal).toContain("preserveFreeRehearsalArtifact");

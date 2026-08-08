@@ -198,10 +198,10 @@ describe("shared engine, privacy, and navigation source contracts", () => {
     expect(voice).toContain("staticAudioId: line.audio_id");
   });
 
-  test("retains safety interruption and stops voice/capture without automatic restart", () => {
-    expect(moduleScreen).toContain("newlySpokenContentNeedsSafetyCheck");
-    expect(moduleScreen).toContain("await stopSpeech()");
-    expect(moduleScreen).toContain("attemptDictation.cancel()");
+  test("keeps transcript confirmation uninterrupted without automatic restart", () => {
+    expect(moduleScreen).not.toContain("newlySpokenContentNeedsSafetyCheck");
+    expect(moduleScreen).not.toContain("safety-check");
+    expect(moduleScreen).toContain("preservePilotAttempt");
     expect(moduleScreen).not.toContain("autoStart");
   });
 

@@ -170,7 +170,7 @@ export default function Onboarding() {
       ));
       tap("success");
       router.replace({
-        pathname: "/safety-check",
+        pathname: "/rehearse/[id]",
         params: {
           id: scenario.id,
           difficulty: DIFFICULTY,

@@ -46,7 +46,7 @@ function RootLayoutNav() {
       router.replace("/onboarding");
       return;
     }
-    const isFreeJourney = onboarding || firstSegment === "rehearse" || firstSegment === "debrief" || firstSegment === "safety-check";
+    const isFreeJourney = onboarding || firstSegment === "rehearse" || firstSegment === "debrief";
     if (profile && activePracticeSession && !activePracticeSession.recommendation && !isFreeJourney) {
       const sharedParams = {
         id: activePracticeSession.scenarioId,
@@ -56,11 +56,7 @@ function RootLayoutNav() {
         persona: activePracticeSession.persona ?? profile.persona,
         practiceSessionId: activePracticeSession.id,
       };
-      if (activePracticeSession.safetyStatus === "pending") {
-        router.replace({ pathname: "/safety-check", params: sharedParams });
-      } else {
-        router.replace({ pathname: "/rehearse/[id]", params: sharedParams });
-      }
+      router.replace({ pathname: "/rehearse/[id]", params: sharedParams });
     }
   }, [activePracticeSession, ready, profile, segments, router]);
 
@@ -93,10 +89,6 @@ function RootLayoutNav() {
         <Stack.Screen name="custom" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
         <Stack.Screen name="paywall" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
         <Stack.Screen name="purchase-success" options={{ animation: "fade", gestureEnabled: false }} />
-        <Stack.Screen
-          name="safety-check"
-          options={{ animation: "slide_from_right", animationTypeForReplace: "push" }}
-        />
         <Stack.Screen name="privacy" />
       </Stack>
       <MigrationNotice visible={migrationNotice} onDismiss={dismissMigrationNotice} />

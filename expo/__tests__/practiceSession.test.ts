@@ -16,7 +16,6 @@ import {
   type ActivePracticeSession,
   type DayOneLearningState,
 } from "@/lib/practiceSession";
-import { newlySpokenContentNeedsSafetyCheck } from "@/lib/safety";
 import type { Scenario } from "@/types/convo";
 
 const scenario: Scenario = {
@@ -319,11 +318,6 @@ describe("paid Day 1 sequence and guardrails", () => {
     expect(source).not.toContain("requiresPaidDayOneCoaching");
   });
 
-  test("new sensitive spoken content routes to the private safety check", () => {
-    expect(newlySpokenContentNeedsSafetyCheck("He threatened me with a gun")).toBe(true);
-    expect(newlySpokenContentNeedsSafetyCheck("Could we decide by Tuesday?")).toBe(false);
-  });
-
   test("never renders Day 1's repeated generic setup form", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text();
     expect(source).toContain("module.copy.heading");
@@ -338,7 +332,6 @@ describe("sensitive-content boundaries", () => {
       "onboarding.tsx",
       "scenario/[id].tsx",
       "custom.tsx",
-      "safety-check.tsx",
     ].map((file) => Bun.file(`${import.meta.dir}/../app/${file}`).text()));
     const combinedRoutes = routeSources.join("\n");
     expect(combinedRoutes).not.toContain("outcome: goal || scenario.goal");
