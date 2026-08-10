@@ -1,0 +1,50 @@
+BYSI native free-journey visual correction — evidence manifest
+
+Capture source baseline
+- Parent checkpoint before this correction: 78748171ea8322e9275da049f2433d166a71df31
+- Approved free-journey checkpoint preserved: 0c03b9b555492a48610aee7a5015e8f5e3e50859
+- Captures were produced from the correction working tree that follows the parent checkpoint above.
+
+Capture environment
+- Customer-only Expo React Native web-preview viewport
+- Viewport for every individual capture: 393 × 852 CSS pixels
+- Browser chrome, Rork controls, fixture controls, and development navigation are excluded
+- Successful result data is injected only by this explicit visual-verification script; it is not persisted as user history and is not imported by production source
+- Production runtime behavior remains the honest insufficient-evidence result when evidence-supported scoring is unavailable
+
+Files
+01-opening.png — preserved acquisition opening, public-figure framing, and CTA
+02-route-selection.png — three-route acquisition choice
+03-real-conversation-questions.png — real-conversation intake question
+04-recurring-problem-questions.png — recurring-problem intake question
+05-desired-skill-questions.png — desired-skill intake question
+06-briefing.png — personalized rehearsal briefing
+07-spoken-capture.png — active spoken recording surface
+08-typed-fallback.png — typed fallback surface
+09-user-turn-one-review-edit.png — opening text available for review and edit before explicit submission
+10-counterpart-pushback.png — approved opening followed by counterpart pushback
+11-user-turn-two-review-edit.png — response-under-pressure text available for review and edit
+12-complete-transcript-approval.png — both user turns editable before explicit complete-transcript approval
+13-generating.png — analysis/building state after transcript approval
+14-pressure-moment-collapsed.png — Pressure Moment disclosure closed
+15-pressure-moment-expanded.png — Pressure Moment disclosure open
+16-practice-shift-narrow.png — approved two-column Practice Shift at 393-pixel width
+17-successful-partial-starting-index.png — explicit visual fixture: Partial Index 64; 3 of 6 observed; 72/66/54
+18-insufficient-evidence-starting-index.png — production-safe recovery state: no calculated Index; 0 of 6 observed
+19-practice-path-second-card.png — practice-path card after explicit forward interaction
+20-safety-resources.png — actionable US-only safety resources
+21-privacy-details.png — Privacy & details surface
+22-microphone-denied.png — microphone denied/unavailable recovery
+23-generation-connection-failure.png — connection failure with retry and preserved user turn
+bysi-free-journey-labelled-contact-sheet.png — labelled 3-column contact sheet containing all 23 states
+capture.mjs — deterministic visual capture and card-interaction verifier; explicit development verification only
+INTERACTION-EVIDENCE.txt — deterministic interaction assertions and their evidence locations
+
+Successful fixture boundaries
+- Test fixture source: expo/__tests__/fixtures/freeJourneyVisual.ts
+- Scores: Clarity 72, Specificity 66, Steadiness 54; all reference approved turn IDs
+- Listening, Boundaries, Repair: unobserved with null scores and no evidence IDs
+- Partial Index: 64, averaging only the three observed scores
+- First focus fields remain separate: first_focus_key, first_focus_label, recommended_module_id
+- No production module imports the test fixture
+- No purchase, entitlement, progress, analytics, backend, Supabase, or route behavior consumes the fixture

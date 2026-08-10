@@ -1,0 +1,30 @@
+BYSI native free-journey correction — deterministic interaction evidence
+
+Required rehearsal sequence
+1. User opening enters an editable review state: capture 09.
+2. Submission is explicit; shouldGeneratePushback([]) is true only after opening approval: expo/__tests__/freeJourney.test.ts.
+3. Counterpart pushback follows the approved opening: capture 10.
+4. Response under pressure remains editable before submission: capture 11.
+5. Both user turns remain editable in complete-transcript review: capture 12.
+6. Analysis starts only after the explicit Approve transcript action: source-order assertion in expo/__tests__/freeJourney.test.ts.
+7. Generating state follows transcript approval: capture 13.
+
+Interaction safeguards
+PASS — recognizer onend returns reviewable pending text with shouldSubmit: false; deterministic assertion in expo/__tests__/freeJourney.test.ts.
+PASS — pushback generation is gated by shouldGeneratePushback and is false after the first user turn; deterministic assertion in expo/__tests__/freeJourney.test.ts.
+PASS — Pressure Moment disclosure opens and closes through one labelled button; captures 14 and 15 plus source assertion.
+PASS — Starting Index advances to the practice-path card; capture script clicks See my practice path and verifies capture 19.
+PASS — Reverse interaction restores the Starting Index; capture script clicks Back to Starting Index and requires 3 of 6 signals observed to be visible.
+PASS — Reduced motion removes the card transition; capture script uses reducedMotion: reduce and verifies both path and Index states remain visible after forward and reverse actions.
+PASS — Safety cancellation rolls the checkpoint back to transcript_review and clears recommendation/result so stale result recovery cannot navigate; deterministic assertion in expo/__tests__/freeJourney.test.ts.
+PASS — Audio failure preserves counterpart text and offers Keep reading; source assertion in expo/__tests__/freeJourney.test.ts and speech regression coverage.
+PASS — Connection failure preserves the approved user opening and exposes Retry sending; capture 23.
+
+Fixture isolation
+PASS — production buildFreeJourneyResult still emits six null insufficient-evidence signals when evidence-supported scoring is unavailable.
+PASS — visual scores 72/66/54 exist only in test/explicit visual-verification sources.
+PASS — production source roots are checked for fixture module/key imports.
+PASS — visual fixture is never written through the production store and has no purchase, entitlement, progress, or analytics integration.
+
+Visual capture dimensions
+Every numbered capture is 393 × 852 CSS pixels. The script asserts customer-facing controls only and captures without browser chrome or fixture-selection controls.

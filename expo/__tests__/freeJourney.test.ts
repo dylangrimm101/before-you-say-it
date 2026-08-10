@@ -3,6 +3,7 @@ import { createOnboardingPracticeSession, normalizePracticeSession, preserveFree
 import { activePracticeSessionToSharedRoute, completedPracticeSessionToSharedTranscript, sharedProductAnalyticsMeta, sharedProductRouteParams } from "@/lib/sharedProductAdapters";
 import { approvedUserTurn, buildFreeJourneyResult, cancelPendingResult, invalidateFreeJourney, recognizerEndState, shouldGeneratePushback, validFreeJourneyCheckpoint } from "@/lib/freeJourney";
 import type { Debrief, Scenario, Turn } from "@/types/convo";
+import { createSuccessfulVisualResult } from "./fixtures/freeJourneyVisual";
 
 const turns: Turn[] = [
   { id: "opening", role: "user", text: "Can we decide who owns Tuesday pickup?" },
@@ -86,6 +87,63 @@ describe("Claude Design free journey contract", () => {
     expect(JSON.stringify(result)).not.toContain('"score":72');
   });
 
+  test("test-only successful visual result averages only its three evidence-linked signals", () => {
+    const current = session();
+    const fixture = createSuccessfulVisualResult(completedPracticeSessionToSharedTranscript(current));
+    expect(fixture.starting_index).toMatchObject({ index_value: 64, observed_count: 3, total_signal_count: 6 });
+    expect(fixture.signals.map((signal) => signal.score)).toEqual([72, 66, 54, null, null, null]);
+    expect(fixture.signals.slice(0, 3).every((signal) => signal.evidence_turn_ids.length > 0)).toBe(true);
+    expect(fixture.signals.slice(3).every((signal) => signal.observation_status === "unobserved" && signal.evidence_turn_ids.length === 0)).toBe(true);
+    expect(fixture.first_focus).toMatchObject({
+      first_focus_key: "visual-fixture-specific-after-pushback",
+      first_focus_label: "Stay specific after pushback.",
+      recommended_module_id: "stay_clear_under_pushback",
+    });
+    expect(new Set([
+      fixture.first_focus?.first_focus_key,
+      fixture.first_focus?.first_focus_label,
+      fixture.first_focus?.recommended_module_id,
+    ]).size).toBe(3);
+  });
+
+  test("successful visual fixture remains outside every production source root", async () => {
+    const productionSources = [
+      "../app/_layout.tsx",
+      "../app/debrief/[id].tsx",
+      "../app/rehearse/[id].tsx",
+      "../components/FreeJourneyResults.tsx",
+      "../lib/freeJourney.ts",
+      "../lib/practiceSession.ts",
+      "../providers/store.tsx",
+    ];
+    for (const relativePath of productionSources) {
+      const source = await Bun.file(`${import.meta.dir}/${relativePath}`).text();
+      expect(source).not.toContain("freeJourneyVisual");
+      expect(source).not.toContain("visual-fixture-specific-after-pushback");
+    }
+    const runtime = await Bun.file(`${import.meta.dir}/../lib/freeJourney.ts`).text();
+    expect(runtime).not.toContain("score: 72");
+    expect(runtime).not.toContain("score: 66");
+    expect(runtime).not.toContain("score: 54");
+  });
+
+  test("visual fixture preserves the approved narrow two-column Practice Shift wording", () => {
+    const fixture = createSuccessfulVisualResult(completedPracticeSessionToSharedTranscript(session()));
+    expect(fixture.practice_shift?.current_pattern_steps).toEqual([
+      "Clear request",
+      "They push back",
+      "You acknowledge, then add history",
+      "The decision disappears",
+    ]);
+    expect(fixture.practice_shift?.practice_target_steps).toEqual([
+      "Clear request",
+      "They push back",
+      "Acknowledge the concern",
+      "Return to one answerable decision",
+    ]);
+    expect(fixture.practice_shift?.caveat).toBe("A practice target, not a result you’ve already achieved.");
+  });
+
   test("first-focus label stays separate from the module ID and evidence", () => {
     const result = buildFreeJourneyResult(session(), debrief);
     expect(result.first_focus?.first_focus_label).toBe("Stay Clear Under Pushback");
@@ -133,5 +191,23 @@ describe("Claude Design free journey contract", () => {
     expect(source).toContain('help: audioFailureMessage(counterpart)');
     expect(source).toContain('text={t.text}');
     expect(source).toContain('Keep reading');
+  });
+
+  test("result interactions are explicit, reversible, and reduce-motion safe", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../components/FreeJourneyResults.tsx`).text();
+    expect(source).toContain('label="See my practice path"');
+    expect(source).toContain('accessibilityLabel="Back to Starting Index"');
+    expect(source).toContain('showResultCard("path")');
+    expect(source).toContain('showResultCard("index")');
+    expect(source).toContain("if (isReduced)");
+    expect(source).toContain("cardProgress.setValue(1)");
+    expect(source).toContain('accessibilityLabel="How BYSI read this"');
+  });
+
+  test("the approved opening framing and CTA remain byte-for-byte present", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
+    expect(source).toContain("Build the qualities of world-class communicators.");
+    expect(source).toContain("Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.");
+    expect(source).toContain('label="Build my communication skills"');
   });
 });
