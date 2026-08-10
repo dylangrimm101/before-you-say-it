@@ -71,7 +71,3 @@ Thumbs.db
 .local-tools/
 core
 .rork
-
-# Cloudflare Functions
-functions/node_modules
-!functions/package.json
