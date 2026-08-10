@@ -1,0 +1,28 @@
+BYSI Native Free Journey — Visual Verification Manifest
+
+Implementation checkpoint commit
+0c03b9b555492a48610aee7a5015e8f5e3e50859
+
+Capture environment
+- Surface: Expo React Native web preview rendered at a representative mobile viewport
+- Individual capture viewport: 393 × 852 CSS pixels
+- Contact sheet: 896 × 1812 pixels; composite of the individual captures below
+- The captures are committed in the implementation checkpoint listed above.
+
+Files
+- bysi-home.png — Fresh-install acquisition opening screen — 393 × 852
+- bysi-route-selection.png — Free-journey route selection — 393 × 852
+- bysi-real-question.png — Real-conversation route question — 393 × 852
+- bysi-recurring-question.png — Recurring-problem route question — 393 × 852
+- bysi-desired-question.png — Desired-skill route question — 393 × 852
+- bysi-briefing.png — Personalized rehearsal briefing — 393 × 852
+- bysi-typed-opening.png — Typed opening-turn capture state — 393 × 852
+- bysi-microphone-error.png — Microphone unavailable/denied recovery state — 393 × 852
+- bysi-counterpart-pushback.png — Approved opening followed by counterpart pushback / connection retry state — 393 × 852
+- bysi-pressure-collapsed.png — Pressure Moment with interpretation details collapsed — 393 × 852
+- bysi-pressure-expanded.png — Pressure Moment with interpretation details expanded — 393 × 852
+- bysi-practice-shift.png — Structured Practice Shift — 393 × 852
+- bysi-starting-index.png — Partial Starting Index — 393 × 852
+- bysi-practice-path.png — Personalized practice path below the Partial Starting Index — 393 × 852
+- bysi-safety-resources.png — US-only actionable safety resources — 393 × 852
+- bysi-free-journey-contact-sheet.png — Composite contact sheet of all states — 896 × 1812
