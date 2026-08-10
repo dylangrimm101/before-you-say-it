@@ -122,8 +122,18 @@ describe("required exercised curriculum paths", () => {
 
   test("microphone denial has an explicit recoverable state and never auto-starts", async () => {
     const dictation = await Bun.file(`${import.meta.dir}/../lib/useDictation.ts`).text();
+    const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     const module = await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text();
-    expect(dictation).toContain('setStatus("denied")');
+    const denialBranch = dictation.indexOf("if (!permission.granted)");
+    const recordingStart = dictation.indexOf("Audio.Recording.createAsync");
+    expect(denialBranch).toBeGreaterThan(-1);
+    expect(denialBranch).toBeLessThan(recordingStart);
+    expect(dictation.slice(denialBranch, recordingStart)).toContain('setStatus("denied")');
+    expect(dictation.slice(denialBranch, recordingStart)).toContain("return;");
+    expect(rehearsal).toContain('label: "Microphone access is off."');
+    expect(rehearsal).toContain("Linking.openSettings()");
+    expect(rehearsal).toContain('accessibilityLabel="Try again"');
+    expect(rehearsal).toContain('accessibilityLabel="Type instead"');
     expect(module).toContain('setState("microphone_error")');
     expect(module).toContain('effectiveState === "microphone_error"');
     expect(module).not.toContain("automatic listening");
@@ -135,9 +145,11 @@ describe("required exercised curriculum paths", () => {
     expect(dictation).toContain('setError("Could not start the microphone.")');
     expect(dictation).toContain('setError("No recording was captured.")');
     expect(dictation).toContain('setError("Could not transcribe that. Try again.")');
-    expect(rehearsal).toContain('dockState === "mic-blocked" || dockState === "mic-error"');
+    expect(rehearsal).toContain('dockState === "mic-blocked"');
+    expect(rehearsal).toContain('dockState === "mic-error"');
     expect(rehearsal).toContain("Type instead");
-    expect(rehearsal).toContain('dockState === "mic-blocked" ? "Open Settings" : "Try mic again"');
+    expect(rehearsal).toContain("openMicrophoneSettings");
+    expect(rehearsal).toContain("retryMicrophone");
   });
 
   test("playback interruption never blocks the rehearsal", async () => {

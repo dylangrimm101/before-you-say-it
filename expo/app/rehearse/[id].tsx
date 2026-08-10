@@ -460,6 +460,20 @@ export default function Rehearse() {
     setMode("text");
   }, [dictation]);
 
+  const retryMicrophone = useCallback((): void => {
+    if (thinking || closing || micLocked(speech.phase)) return;
+    tap("light");
+    dictation.reset();
+    void dictation.start();
+  }, [closing, dictation, speech.phase, thinking]);
+
+  const openMicrophoneSettings = useCallback((): void => {
+    tap("light");
+    Linking.openSettings().catch((caught) => {
+      safeLog("[rehearse] open settings failed", errorShape(caught));
+    });
+  }, []);
+
   const analyzeApprovedTranscript = useCallback(async (approvedTurns: Turn[]) => {
     if (!scenario) return;
     const turns = approvedTurns;
@@ -783,31 +797,41 @@ export default function Rehearse() {
                 </View>
               </PressCard>
             </View>
-          ) : dockState === "mic-blocked" || dockState === "mic-error" ? (
+          ) : dockState === "mic-blocked" ? (
+            <View style={styles.deniedActions}>
+              <PressCard onPress={openMicrophoneSettings} accessibilityLabel="Open Settings">
+                <View style={styles.analyzeBtn}>
+                  <Settings size={18} color={C.onAccent} strokeWidth={1.7} />
+                  <Text style={styles.analyzeText}>Open Settings</Text>
+                </View>
+              </PressCard>
+              <View style={styles.row}>
+                <PressCard onPress={retryMicrophone} containerStyle={styles.flexOne} accessibilityLabel="Try again">
+                  <View style={styles.secondaryBtn}>
+                    <RotateCcw size={18} color={C.textSoft} strokeWidth={1.7} />
+                    <Text style={styles.secondaryText}>Try again</Text>
+                  </View>
+                </PressCard>
+                <PressCard onPress={switchToText} containerStyle={styles.flexOne} accessibilityLabel="Type instead">
+                  <View style={styles.secondaryBtn}>
+                    <Keyboard size={18} color={C.textSoft} strokeWidth={1.7} />
+                    <Text style={styles.secondaryText}>Type instead</Text>
+                  </View>
+                </PressCard>
+              </View>
+            </View>
+          ) : dockState === "mic-error" ? (
             <View style={styles.row}>
-              <PressCard onPress={switchToText} containerStyle={styles.flexOne}>
+              <PressCard onPress={switchToText} containerStyle={styles.flexOne} accessibilityLabel="Type instead">
                 <View style={styles.secondaryBtn}>
                   <Keyboard size={18} color={C.textSoft} strokeWidth={1.7} />
                   <Text style={styles.secondaryText}>Type instead</Text>
                 </View>
               </PressCard>
-              <PressCard
-                onPress={
-                  dockState === "mic-blocked"
-                    ? () => Linking.openSettings().catch(() => switchToText())
-                    : onMicTap
-                }
-                containerStyle={styles.flexWide}
-              >
+              <PressCard onPress={onMicTap} containerStyle={styles.flexWide} accessibilityLabel="Try mic again">
                 <View style={styles.analyzeBtn}>
-                  {dockState === "mic-blocked" ? (
-                    <Settings size={18} color={C.onAccent} strokeWidth={1.7} />
-                  ) : (
-                    <RotateCcw size={18} color={C.onAccent} strokeWidth={1.7} />
-                  )}
-                  <Text style={styles.analyzeText}>
-                    {dockState === "mic-blocked" ? "Open Settings" : "Try mic again"}
-                  </Text>
+                  <RotateCcw size={18} color={C.onAccent} strokeWidth={1.7} />
+                  <Text style={styles.analyzeText}>Try mic again</Text>
                 </View>
               </PressCard>
             </View>
@@ -1121,8 +1145,8 @@ const DOCK_COPY: Record<
     help: h.dictation ?? "Your line is safe. Retry when you're ready.",
   }),
   "mic-blocked": () => ({
-    label: "Microphone is off",
-    help: "Allow microphone access in Settings, or type this turn instead.",
+    label: "Microphone access is off.",
+    help: "Open Settings to allow access, try the permission request again, or type this turn instead.",
   }),
   "mic-error": (_them, _counterpart, h) => ({
     label: "Microphone unavailable",
@@ -1299,6 +1323,7 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER, gap: 16 },
   missingBody: { textAlign: "center", color: C.textSoft },
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
+  deniedActions: { gap: 10 },
 
   header: {
     paddingHorizontal: GUTTER,

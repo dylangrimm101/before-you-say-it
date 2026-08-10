@@ -209,7 +209,8 @@ describe("context persistence, recovery, and free boundary", () => {
     const debrief = await Bun.file(`${import.meta.dir}/../app/debrief/[id].tsx`).text();
     expect(layout).toContain('pathname: "/rehearse/[id]"');
     expect(layout).not.toContain("safety-check");
-    expect(rehearsal).toContain('dockState === "mic-blocked" || dockState === "mic-error"');
+    expect(rehearsal).toContain('dockState === "mic-blocked"');
+    expect(rehearsal).toContain('dockState === "mic-error"');
     expect(rehearsal).toContain('dockState === "autoplay-blocked" || dockState === "playback-failed"');
     expect(rehearsal).toContain("preserveFreeRehearsalArtifact");
     expect(rehearsal).toContain("recommendation:");

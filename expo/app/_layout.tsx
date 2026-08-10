@@ -47,11 +47,12 @@ function RootLayoutNav() {
       return;
     }
     const isFreeJourney = onboarding || firstSegment === "rehearse" || firstSegment === "debrief" || firstSegment === "safety";
-    if (profile && activePracticeSession?.sharedResult && activePracticeSession.freeJourneyCheckpoint !== "complete" && !isFreeJourney) {
+    const canInterruptFreeJourney = isFreeJourney || firstSegment === "privacy";
+    if (profile && activePracticeSession?.sharedResult && activePracticeSession.freeJourneyCheckpoint !== "complete" && !canInterruptFreeJourney) {
       router.replace(`/debrief/${activePracticeSession.id}`);
       return;
     }
-    if (profile && activePracticeSession && !activePracticeSession.recommendation && !isFreeJourney) {
+    if (profile && activePracticeSession && !activePracticeSession.recommendation && !canInterruptFreeJourney) {
       const sharedParams = {
         id: activePracticeSession.scenarioId,
         difficulty: "steady" as const,

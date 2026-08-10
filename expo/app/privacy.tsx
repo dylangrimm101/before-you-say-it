@@ -118,7 +118,7 @@ export default function PrivacyScreen() {
         </PressCard>
 
         <Reveal index={0}>
-          <Eyebrow color={C.purpleLight}>Privacy &amp; data</Eyebrow>
+          <Eyebrow color={C.purpleLight}>Privacy &amp; details</Eyebrow>
           <Text style={styles.title}>What this app keeps, and what it sends</Text>
           <Text style={styles.lede}>
             A plain-language guide to your practice data, where it goes, and the controls you have over it.
@@ -148,7 +148,7 @@ export default function PrivacyScreen() {
             head="Recordings"
             body={
               keptAudio > 0
-                ? `${keptAudio} recording${keptAudio === 1 ? "" : "s"} kept, because you turned that on below. They sit in this app's private folder and are never uploaded.`
+                ? `${keptAudio} recording${keptAudio === 1 ? "" : "s"} kept, because you turned that on below. The retained copy stays in this app's private folder. The recording is sent once for transcription as explained below.`
                 : "Not kept. Each recording is deleted from this device as soon as its transcription comes back."
             }
           />
@@ -174,7 +174,7 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="How it is stored"
-            body="In this app's own storage on this device. A stable anonymous ID owns the active handoff; if you later sign in, the same session can be associated with that user ID. It is not separately encrypted by this app — protection is whatever your phone applies to app data, which no claim is made about here."
+            body="In this app's own storage on this device, under a stable anonymous device ID. This build does not provide an account or cross-device recovery. The data is not separately encrypted by this app; protection is whatever your phone applies to app data."
             tone={C.amber}
           />
         </Section>
@@ -214,7 +214,7 @@ export default function PrivacyScreen() {
         <Section title="Your choices">
           <Toggle
             label="Keep baseline recordings on this device"
-            body="Off by default. When on, the recording from a baseline rehearsal stays in this app's private folder so you can hear it again later. It is never uploaded, and you can delete it any time."
+            body="Off by default. When on, a retained copy of the baseline recording stays in this app's private folder so you can hear it again later. The recording is still sent once for transcription, and you can delete the retained copy any time."
             value={consent.keepBaselineAudio}
             onChange={(v) => {
               tap("light");

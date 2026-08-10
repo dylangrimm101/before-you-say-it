@@ -3,7 +3,11 @@ import { createOnboardingPracticeSession, normalizePracticeSession, preserveFree
 import { activePracticeSessionToSharedRoute, completedPracticeSessionToSharedTranscript, sharedProductAnalyticsMeta, sharedProductRouteParams } from "@/lib/sharedProductAdapters";
 import { approvedUserTurn, buildFreeJourneyResult, cancelPendingResult, invalidateFreeJourney, recognizerEndState, shouldGeneratePushback, validFreeJourneyCheckpoint } from "@/lib/freeJourney";
 import type { Debrief, Scenario, Turn } from "@/types/convo";
-import { createSuccessfulVisualResult } from "./fixtures/freeJourneyVisual";
+import {
+  SUCCESSFUL_VISUAL_APPROVED_TURNS,
+  createSuccessfulVisualResult,
+  createSuccessfulVisualTranscript,
+} from "./fixtures/freeJourneyVisual";
 
 const turns: Turn[] = [
   { id: "opening", role: "user", text: "Can we decide who owns Tuesday pickup?" },
@@ -88,8 +92,7 @@ describe("Claude Design free journey contract", () => {
   });
 
   test("test-only successful visual result averages only its three evidence-linked signals", () => {
-    const current = session();
-    const fixture = createSuccessfulVisualResult(completedPracticeSessionToSharedTranscript(current));
+    const fixture = createSuccessfulVisualResult(createSuccessfulVisualTranscript());
     expect(fixture.starting_index).toMatchObject({ index_value: 64, observed_count: 3, total_signal_count: 6 });
     expect(fixture.signals.map((signal) => signal.score)).toEqual([72, 66, 54, null, null, null]);
     expect(fixture.signals.slice(0, 3).every((signal) => signal.evidence_turn_ids.length > 0)).toBe(true);
@@ -127,8 +130,37 @@ describe("Claude Design free journey contract", () => {
     expect(runtime).not.toContain("score: 54");
   });
 
+  test("successful visual fixture ties its approved response and all coaching evidence to one rehearsal", () => {
+    const transcript = createSuccessfulVisualTranscript();
+    const fixture = createSuccessfulVisualResult(transcript);
+    const response = transcript.turns.find((turn) => turn.turn_kind === "pressure_response");
+    expect(response).toMatchObject(SUCCESSFUL_VISUAL_APPROVED_TURNS.response);
+    expect(fixture.rehearsal_id).toBe(transcript.rehearsal_id);
+    expect(fixture.pressure_moment).toMatchObject({
+      headline: "You were clear until the pushback.",
+      opening_turn_id: SUCCESSFUL_VISUAL_APPROVED_TURNS.opening.id,
+      pushback_turn_id: SUCCESSFUL_VISUAL_APPROVED_TURNS.pushback.id,
+      pressure_response_turn_id: SUCCESSFUL_VISUAL_APPROVED_TURNS.response.id,
+    });
+    expect(fixture.pressure_moment?.observation).toContain("answerable decision disappeared");
+    expect(fixture.practice_shift?.current_pattern_steps.at(-1)).toBe("The decision disappears");
+    expect(fixture.practice_shift?.practice_target_steps.at(-1)).toBe("Return to one answerable decision");
+    expect(fixture.practice_shift?.first_focus_key).toBe(fixture.first_focus?.first_focus_key);
+    expect(fixture.practice_shift?.first_focus_label).toBe("Stay specific after pushback.");
+    expect(fixture.practice_shift?.recommended_module_id).toBe(fixture.first_focus?.recommended_module_id);
+    for (const signal of fixture.signals.filter((item) => item.observation_status === "observed")) {
+      signal.evidence_turn_ids.forEach((id) => expect(transcript.turns.some((turn) => turn.id === id)).toBe(true));
+    }
+  });
+
+  test("successful visual fixture rejects a different approved exchange", () => {
+    const transcript = createSuccessfulVisualTranscript();
+    transcript.turns[2] = { ...transcript.turns[2]!, approved_text: "Which priority should move?" };
+    expect(() => createSuccessfulVisualResult(transcript)).toThrow("one approved transcript fixture");
+  });
+
   test("visual fixture preserves the approved narrow two-column Practice Shift wording", () => {
-    const fixture = createSuccessfulVisualResult(completedPracticeSessionToSharedTranscript(session()));
+    const fixture = createSuccessfulVisualResult(createSuccessfulVisualTranscript());
     expect(fixture.practice_shift?.current_pattern_steps).toEqual([
       "Clear request",
       "They push back",
@@ -184,6 +216,22 @@ describe("Claude Design free journey contract", () => {
     expect(source).toContain('accessibilityLabel="Edit your response under pressure"');
     expect(source).toContain('label="Approve transcript"');
     expect(source.indexOf("approveTranscript")).toBeLessThan(source.indexOf("analyzeApprovedTranscript(approvedTurns)"));
+  });
+
+  test("Privacy & details opens the real local privacy route with truthful current-build claims", async () => {
+    const briefing = await Bun.file(`${import.meta.dir}/../components/RehearsalBriefing.tsx`).text();
+    const layout = await Bun.file(`${import.meta.dir}/../app/_layout.tsx`).text();
+    const privacy = await Bun.file(`${import.meta.dir}/../app/privacy.tsx`).text();
+    expect(briefing).toContain('accessibilityLabel="Privacy and details"');
+    expect(briefing).toContain('router.push("/privacy")');
+    expect(layout).toContain('firstSegment === "privacy"');
+    expect(layout).toContain("canInterruptFreeJourney");
+    expect(privacy).toContain("Privacy &amp; details");
+    expect(privacy).toContain("This build does not provide an account or cross-device recovery.");
+    expect(privacy).toContain("The recording is sent once for transcription");
+    expect(privacy).not.toContain("if you later sign in");
+    expect(privacy).not.toContain("It is never uploaded");
+    expect(privacy).not.toContain("privacy policy URL");
   });
 
   test("audio failure keeps counterpart response text visible", async () => {

@@ -54,7 +54,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
         setStatus("denied");
-        setError("Microphone access is needed to speak your line.");
+        setError("Microphone access is off.");
         return;
       }
 
@@ -79,6 +79,11 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       tap("medium");
     } catch (e) {
       safeLog("[dictation] start failed", errorShape(e));
+      if (isPermissionDenied(e)) {
+        setStatus("denied");
+        setError("Microphone access is off.");
+        return;
+      }
       setStatus("error");
       setError("Could not start the microphone.");
     }
@@ -143,6 +148,14 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   }, [keepAudioAs]);
 
   return { status, error, level, start, stop, cancel, reset };
+}
+
+function isPermissionDenied(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const candidate = error as { name?: unknown; message?: unknown };
+  const name = typeof candidate.name === "string" ? candidate.name.toLowerCase() : "";
+  const message = typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
+  return name === "notallowederror" || name === "securityerror" || message.includes("permission denied") || message.includes("not allowed");
 }
 
 /** Delete a temporary recording, ignoring the case where it is already gone. */
