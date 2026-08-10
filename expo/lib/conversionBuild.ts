@@ -51,6 +51,16 @@ export function emitConversionEvent(id: string, event: ConversionEvent, debrief?
   });
 }
 
+export function cancelConversionBuild(id: string): void {
+  if (current?.id !== id) return;
+  current = null;
+  listeners.forEach((listener) => listener());
+}
+
+export function isConversionBuildActive(id: string): boolean {
+  return current?.id === id;
+}
+
 export function failConversionBuild(id: string): void {
   if (current?.id !== id) return;
   publish({ ...current, error: "We couldn't finish your starting point. Your rehearsal is still safe." });

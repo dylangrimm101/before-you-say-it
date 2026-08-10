@@ -42,7 +42,7 @@ export default function Onboarding() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profile, saveProfile, addCustomScenario, anonymousUserId, saveActivePracticeSession } = useStore();
-  const [step, setStep] = useState<number>(0);
+  const [step, setStep] = useState<number>(-1);
   const [entryRoute, setEntryRoute] = useState<OnboardingEntryRoute | null>(null);
   const [provisionalModuleId, setProvisionalModuleId] = useState<ModuleId | null>(null);
   const [selectionLabel, setSelectionLabel] = useState<string>("");
@@ -191,24 +191,34 @@ export default function Onboarding() {
     tap("light");
     setProvisionalModuleId(moduleId);
     setSelectionLabel(label);
+    setApprovedScenarioId(null);
+    setPersona(null);
+    setReaction(null);
     setStep(2);
   }, []);
 
   const chooseScenario = useCallback((id: ApprovedOnboardingScenarioId): void => {
     tap("light");
     setApprovedScenarioId(id);
+    setPersona(null);
+    setReaction(null);
     setStep(3);
   }, []);
 
   const chooseFocus = useCallback((value: CategoryId): void => {
     tap("light");
     setFocus(value);
+    setCommunication("");
+    setOutcome("");
+    setPersona(null);
+    setReaction(null);
     setStep(4);
   }, []);
 
   const choosePersona = useCallback((value: PersonaVoice): void => {
     tap("light");
     setPersona(value);
+    setReaction(null);
     setStep(isReal ? 7 : 4);
   }, [isReal]);
 
@@ -231,13 +241,13 @@ export default function Onboarding() {
     <View style={styles.root}>
       <Backdrop />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        {step >= 0 ? <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
           <View style={styles.headerRow}>
             <Pressable
               onPress={() => {
                 Keyboard.dismiss();
                 if (step === 0) {
-                  if (profile) router.back();
+                  setStep(-1);
                   return;
                 }
                 setStep((value) => Math.max(0, value - 1));
@@ -252,20 +262,21 @@ export default function Onboarding() {
             <Text style={styles.counter}>{`Step ${step + 1} of ${totalSteps}`}</Text>
           </View>
           <View style={styles.track}><View style={[styles.fill, { width: `${((step + 1) / totalSteps) * 100}%` }]} /></View>
-        </View>
+        </View> : null}
 
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: footerHeight + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scroll, step < 0 && styles.openingScroll, { paddingBottom: footerHeight + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
+          {step === -1 ? <Reveal><View style={styles.opening}><View style={styles.mark}><Text style={styles.markText}>BYSI</Text></View><Text style={styles.openingTitle}>Build the qualities of world-class communicators.</Text><Text style={styles.openingBody}>Learn to communicate with Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.</Text><PrimaryButton label="Build my communication skills" onPress={() => setStep(0)} style={styles.openingButton} /></View></Reveal> : null}
           {step === 0 ? <Reveal><Text style={styles.title}>What brought you here?</Text><Text style={styles.lede}>Choose the closest answer. Every path includes a real rehearsal before any recommendation.</Text><View style={styles.options}>{ENTRY_CHOICES.map((choice) => <Choice key={choice.id} title={choice.label} note={choice.note} selected={entryRoute === choice.id} onPress={() => chooseEntry(choice.id)} />)}</View></Reveal> : null}
 
           {!isReal && step === 1 ? <Reveal><Text style={styles.title}>{entryRoute === "desired_skill" ? "What do you want to get better at?" : "What keeps happening?"}</Text><Text style={styles.lede}>Choose the closest fit.</Text><View style={styles.options}>{diagnosisOptions.map((option) => <Choice key={option.label} title={option.label} selected={provisionalModuleId === option.moduleId} onPress={() => chooseDiagnosis(option.moduleId, option.label)} />)}</View></Reveal> : null}
 
           {!isReal && step === 2 ? <Reveal><Text style={styles.title}>Pick a situation to practice</Text><Text style={styles.lede}>{entryRoute === "desired_skill" ? "Choose a ready-made situation. You’ll practice your selected skill inside it." : "Choose a ready-made situation. You’ll see how your communication pattern shows up inside it."}</Text><View style={styles.options}>{APPROVED_ONBOARDING_SCENARIOS.map((scenario) => <ScenarioChoice key={scenario.id} context={scenario.contextLabel} title={scenario.title} preview={scenario.preview} selected={approvedScenarioId === scenario.id} onPress={() => chooseScenario(scenario.id)} />)}</View><Pressable onPress={useOwnConversation} style={styles.ownLink} accessibilityRole="link" accessibilityLabel="Use your own conversation"><Text style={styles.ownLinkText}>Have something specific in mind? Use your own conversation</Text></Pressable></Reveal> : null}
 
-          {isReal && step === 1 ? <Reveal><Text style={styles.title}>What happened or needs to be discussed?</Text><Text style={styles.lede}>No identifying details beyond what the rehearsal needs.</Text><Input value={situation} onChangeText={setSituation} placeholder="My manager added another deadline when I’m already at capacity." accessibilityLabel="Conversation situation" /></Reveal> : null}
-          {isReal && step === 2 ? <Reveal><Text style={styles.title}>Who are you talking to?</Text><Text style={styles.lede}>Use their first name if helpful, or a specific relationship such as “my manager.”</Text><Input value={counterpart} onChangeText={setCounterpart} placeholder="Jordan, my manager" maxLength={80} accessibilityLabel="Counterpart name or relationship" /></Reveal> : null}
+          {isReal && step === 1 ? <Reveal><Text style={styles.title}>What happened or needs to be discussed?</Text><Text style={styles.lede}>No identifying details beyond what the rehearsal needs.</Text><Input value={situation} onChangeText={(value) => { setSituation(value); setCounterpart(""); setFocus(null); setCommunication(""); setOutcome(""); setPersona(null); setReaction(null); }} placeholder="My manager added another deadline when I’m already at capacity." accessibilityLabel="Conversation situation" /></Reveal> : null}
+          {isReal && step === 2 ? <Reveal><Text style={styles.title}>Who are you talking to?</Text><Text style={styles.lede}>Use their first name if helpful, or a specific relationship such as “my manager.”</Text><Input value={counterpart} onChangeText={(value) => { setCounterpart(value); setFocus(null); setCommunication(""); setOutcome(""); setPersona(null); setReaction(null); }} placeholder="Jordan, my manager" maxLength={80} accessibilityLabel="Counterpart name or relationship" /></Reveal> : null}
           {isReal && step === 3 ? <Reveal><Text style={styles.title}>What kind of relationship is this?</Text><Text style={styles.lede}>This shapes the rehearsal without saving a contact.</Text><View style={styles.pills}>{CATEGORIES.map((category) => <Pill key={category.id} label={category.label} selected={focus === category.id} onPress={() => chooseFocus(category.id)} />)}</View></Reveal> : null}
-          {isReal && step === 4 ? <Reveal><Text style={styles.title}>What do you want to communicate?</Text><Text style={styles.lede}>Write the main point you do not want to lose.</Text><Input value={communication} onChangeText={setCommunication} placeholder="I need us to decide what moves before I accept more work." accessibilityLabel="What you want to communicate" /></Reveal> : null}
-          {isReal && step === 5 ? <Reveal><Text style={styles.title}>What would be useful to leave with?</Text><Text style={styles.lede}>Name one outcome you can influence.</Text><Input value={outcome} onChangeText={setOutcome} placeholder="A clear priority decision and next step." maxLength={160} accessibilityLabel="Desired outcome" /></Reveal> : null}
+          {isReal && step === 4 ? <Reveal><Text style={styles.title}>What do you want to communicate?</Text><Text style={styles.lede}>Write the main point you do not want to lose.</Text><Input value={communication} onChangeText={(value) => { setCommunication(value); setOutcome(""); setPersona(null); setReaction(null); }} placeholder="I need us to decide what moves before I accept more work." accessibilityLabel="What you want to communicate" /></Reveal> : null}
+          {isReal && step === 5 ? <Reveal><Text style={styles.title}>What would be useful to leave with?</Text><Text style={styles.lede}>Name one outcome you can influence.</Text><Input value={outcome} onChangeText={(value) => { setOutcome(value); setPersona(null); setReaction(null); }} placeholder="A clear priority decision and next step." maxLength={160} accessibilityLabel="Desired outcome" /></Reveal> : null}
 
           {((isReal && step === 6) || (!isReal && step === 3)) ? <Reveal><Text style={styles.title}>Choose the rehearsal voice</Text><Text style={styles.lede}>This voice plays the person in your practice.</Text><View style={styles.options}>{PERSONAS.map((item) => <Choice key={item.id} title={item.id === "woman-hope" ? "Woman’s voice" : "Man’s voice"} selected={persona === item.id} onPress={() => choosePersona(item.id)} />)}</View></Reveal> : null}
           {((isReal && step === 7) || (!isReal && step === 4)) ? <Reveal><Text style={styles.title}>How might they respond?</Text><Text style={styles.lede}>Choose the closest response style for this rehearsal.</Text><View style={styles.pills}>{ONBOARDING_REACTIONS.map((item) => <Pill key={item.id} label={item.label} selected={reaction === item.id} onPress={() => chooseReaction(item.id)} />)}</View></Reveal> : null}
@@ -299,7 +310,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 },
   header: { paddingHorizontal: GUTTER, paddingBottom: 14, gap: 10 }, headerRow: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, backHit: { minWidth: 60, minHeight: 44, justifyContent: "center" }, backText: { fontFamily: font.semi, fontSize: 17, color: C.textSoft }, hidden: { color: "transparent" }, counter: { ...eyebrow, color: C.dim },
   track: { height: 3, borderRadius: 2, backgroundColor: C.line, overflow: "hidden" }, fill: { height: 3, backgroundColor: C.purple },
-  scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, title: { ...T.display }, lede: { ...T.body, color: C.textSoft, lineHeight: 27, marginTop: 12 }, options: { gap: 10, marginTop: 24 },
+  scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, openingScroll: { flexGrow: 1, justifyContent: "center" }, opening: { alignItems: "center", gap: 18, paddingHorizontal: 10 }, mark: { width: 112, height: 112, borderRadius: 56, alignItems: "center", justifyContent: "center", backgroundColor: C.purpleSoft, borderWidth: 1, borderColor: `${C.purple}33`, marginBottom: 10 }, markText: { ...eyebrow, color: C.purple, fontSize: 15 }, openingTitle: { fontFamily: font.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.7, color: C.text, textAlign: "center" }, openingBody: { ...T.body, color: C.textSoft, textAlign: "center", lineHeight: 27 }, openingButton: { width: "100%", marginTop: 18 }, title: { ...T.display }, lede: { ...T.body, color: C.textSoft, lineHeight: 27, marginTop: 12 }, options: { gap: 10, marginTop: 24 },
   choice: { minHeight: 70, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, scenarioChoice: { minHeight: 112, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, choiceOn: { borderColor: C.purple }, choiceCopy: { flex: 1, zIndex: 1, gap: 4 }, contextLabel: { ...eyebrow, color: C.purple }, choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: C.text }, choiceNote: { ...T.caption }, choiceTextOn: { color: C.onAccent, zIndex: 1 },
   pills: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 24 }, pill: { minHeight: 52, justifyContent: "center", paddingHorizontal: 20, borderRadius: radius.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, overflow: "hidden" }, pillOn: { borderColor: C.purple }, pillText: { fontFamily: font.semi, fontSize: 16, color: C.text, zIndex: 1 },
   ownLink: { minHeight: 48, alignItems: "center", justifyContent: "center", marginTop: 14, paddingHorizontal: 8 }, ownLinkText: { ...T.caption, color: C.purple, textAlign: "center", fontFamily: font.semi },

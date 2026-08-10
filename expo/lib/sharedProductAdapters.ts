@@ -170,6 +170,7 @@ export function activePracticeSessionToSharedResult(
   session: ActivePracticeSession,
   options: SharedResultAdapterOptions = {},
 ): SharedResultContractV1 {
+  if (session.sharedResult?.rehearsal_id === session.id) return session.sharedResult;
   const result = emptySharedResult(session.id);
   const recommendation = session.recommendation;
   if (!recommendation || !options.firstFocusKey || !options.firstFocusLabel) return result;

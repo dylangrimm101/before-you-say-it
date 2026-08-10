@@ -2,6 +2,7 @@ import { PILOT_PROGRAM } from "@/lib/pilotCurriculum";
 import type { ModuleId, OnboardingEntryRoute } from "@/constants/modules";
 import type { CategoryId, PersonaVoice, ReactionPattern, Scenario, Turn } from "@/types/convo";
 import type { PilotAttemptKind, PilotAttemptRecord, PilotComparison, PilotDayRun, PilotModuleState } from "@/types/pilotCurriculum";
+import type { SharedResultContractV1 } from "@/types/sharedProduct";
 
 export const PRACTICE_SESSION_SCHEMA_VERSION = 6 as const;
 export const BASELINE_COPY_VERSION = "BYSI-approved-copy-v3-2026-08-04" as const;
@@ -16,6 +17,7 @@ export type DayOneLearningState =
   | "complete";
 
 export type PracticeSessionState = "awaiting_onboarding_baseline" | DayOneLearningState;
+export type FreeJourneyCheckpoint = "briefing" | "rehearsal" | "transcript_review" | "generating" | "pressure_moment" | "practice_shift" | "starting_index" | "complete";
 
 export interface ImmutablePracticeAttempt {
   id: string;
@@ -110,6 +112,10 @@ export interface ActivePracticeSession {
   freeRehearsalTurns?: Turn[];
   recommendation?: PracticeRecommendation;
   freeRehearsalCompletedAt?: number;
+  /** Furthest valid local acquisition checkpoint; drafts and raw audio are never stored here. */
+  freeJourneyCheckpoint?: FreeJourneyCheckpoint;
+  /** Evidence-linked v1 result built only from the completely approved transcript. */
+  sharedResult?: SharedResultContractV1;
   attemptOne?: ImmutablePracticeAttempt;
   originalAdamResponse?: OriginalAdamResponse;
   dayThirtyBaseline?: DayThirtyBaselineReference;
@@ -173,6 +179,7 @@ export function createOnboardingPracticeSession(
       persona: onboarding.persona,
     } : {}),
     pilotRuns: {},
+    freeJourneyCheckpoint: "briefing",
     nextState: "awaiting_onboarding_baseline",
     createdAt: now,
     updatedAt: now,
@@ -405,6 +412,7 @@ export function protectImmutablePracticeRecords(existing: ActivePracticeSession,
     ...(existing.originalAdamResponse ? { originalAdamResponse: existing.originalAdamResponse } : {}),
     ...(existing.dayThirtyBaseline ? { dayThirtyBaseline: existing.dayThirtyBaseline } : {}),
     ...(existing.attemptTwo ? { attemptTwo: existing.attemptTwo } : {}),
+    ...(existing.sharedResult ? { sharedResult: existing.sharedResult } : {}),
   };
 }
 

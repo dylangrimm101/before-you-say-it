@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore }
 import { Animated, Easing, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { FreeJourneyResults } from "@/components/FreeJourneyResults";
 import {
   Backdrop,
   Eyebrow,
@@ -23,12 +24,14 @@ import {
   type ConversionEvidence,
 } from "@/lib/conversion";
 import {
+  cancelConversionBuild,
   getConversionBuild,
   subscribeConversionBuild,
   type ConversionBuild,
   type ConversionEvent,
 } from "@/lib/conversionBuild";
 import { getLiveSessionContent } from "@/lib/ephemeral";
+import { cancelPendingResult } from "@/lib/freeJourney";
 import { useIsPro } from "@/lib/purchases";
 import { useStore } from "@/providers/store";
 import type { Turn } from "@/types/convo";
@@ -426,6 +429,7 @@ function PipelineRow({
 function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: () => void }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { activePracticeSession, saveActivePracticeSession } = useStore();
   const isReduced = useReducedMotion();
   const [completedCount, setCompletedCount] = useState<number>(0);
   const stageProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
@@ -458,6 +462,12 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
 
   const isReady =
     completedCount === PIPELINE_ROWS.length && build.events.includes("plan.ready");
+
+  const getSupport = useCallback(async (): Promise<void> => {
+    cancelConversionBuild(build.id);
+    if (activePracticeSession?.id === build.id) await saveActivePracticeSession(cancelPendingResult(activePracticeSession));
+    router.replace({ pathname: "/safety", params: { returnTo: "generating", sessionId: build.id } });
+  }, [activePracticeSession, build.id, router, saveActivePracticeSession]);
 
   const revealDebrief = useCallback(() => {
     if (isReduced) {
@@ -543,6 +553,7 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
             {isReduced ? <Text style={styles.workingText}>Working</Text> : <WaitingDots />}
           </View>
         )}
+        {!isReady && !build.error ? <PressCard onPress={() => void getSupport()} accessibilityLabel="Get support instead"><Text style={styles.supportLink}>Get support instead</Text></PressCard> : null}
       </StateDock>
     </Animated.View>
   );
@@ -660,6 +671,10 @@ function FreeDebrief({ id, build }: { id: string; build: ConversionBuild | null 
     }
     router.replace({ pathname: "/module/[day]", params: { day: recommendedModuleId } });
   }, [hasPurchasedPro, recommendedModuleId, router, session]);
+
+  if (activePracticeSession?.id === id && activePracticeSession.sharedResult) {
+    return <FreeJourneyResults session={activePracticeSession} />;
+  }
 
   if (!evidence) {
     return (
@@ -816,6 +831,7 @@ const styles = StyleSheet.create({
   readySupport: { ...T.support, marginTop: 6 },
   workingRow: { minHeight: 56, alignItems: "center", justifyContent: "center" },
   workingText: { ...T.support, fontFamily: font.semi, color: C.dim },
+  supportLink: { ...T.caption, color: C.clay, fontFamily: font.semi, textAlign: "center", minHeight: 42, textAlignVertical: "center" },
   waitingDots: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
   waitingDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: C.purple },
   errorText: { ...T.support, color: C.clay, textAlign: "center", marginBottom: 10 },

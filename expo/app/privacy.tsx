@@ -133,12 +133,12 @@ export default function PrivacyScreen() {
           <Bullet
             head="Your active Day 1 handoff"
             body={activePracticeSession
-              ? "Stored on this device through the Day 30 comparison: the practice-session ID, anonymous device ID, module version, immutable confirmed opener, original Adam-response reference and text, separate confirmed retry, Day 30 baseline reference, focused note, comparison, and next unfinished step. Raw audio is excluded unless you opt in below."
+              ? "Stored on this device so the journey can resume: the practice-session and anonymous device IDs, route and scenario context, approved rehearsal turns, current checkpoint, and evidence-linked result once complete. Unapproved drafts and raw audio are excluded unless you opt in to keep baseline audio below."
               : "No Day 1-to-Day-30 baseline record is stored on this device."}
           />
           <Bullet
             head="Other transcripts"
-            body="Not stored. Rehearsals outside the active Day 1 handoff and setup answers for later pilot days remain in memory only."
+            body="Not stored. Rehearsals outside the active journey and setup answers for later practice remain in memory only."
           />
           <Bullet
             head="Your script for the real conversation"

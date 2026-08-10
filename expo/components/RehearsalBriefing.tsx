@@ -1,5 +1,6 @@
+import { useRouter } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { C, T, eyebrow, font, radius } from "@/constants/theme";
 import type { OnboardingEntryRoute } from "@/constants/modules";
@@ -22,6 +23,7 @@ export function RehearsalBriefing({
   expectedReaction,
   behavioralGoal,
 }: RehearsalBriefingProps) {
+  const router = useRouter();
   const sourceLabel = entryRoute === "real_conversation" ? "Your real conversation" : "Practice scenario";
   return (
     <View style={styles.wrap} accessibilityLabel={`${sourceLabel}. Talking to ${counterpart}.`}>
@@ -34,6 +36,11 @@ export function RehearsalBriefing({
         <Detail label="Practice goal" value={behavioralGoal} />
       </View>
       <Text style={styles.prompt}>How would you start?</Text>
+      <Text style={styles.trust}>You control when recording starts, and you can correct each turn before it is approved.</Text>
+      <View style={styles.links}>
+        <Pressable accessibilityRole="link" accessibilityLabel="Privacy and details" onPress={() => router.push("/privacy")}><Text style={styles.link}>Privacy &amp; details</Text></Pressable>
+        <Pressable accessibilityRole="link" accessibilityLabel="This does not feel safe" onPress={() => router.push({ pathname: "/safety", params: { returnTo: "rehearsal" } })}><Text style={styles.safetyLink}>This doesn’t feel safe</Text></Pressable>
+      </View>
     </View>
   );
 }
@@ -57,4 +64,8 @@ const styles = StyleSheet.create({
   label: { ...eyebrow, width: 82, paddingTop: 3, color: C.dim },
   value: { ...T.caption, flex: 1, color: C.textSoft, lineHeight: 20 },
   prompt: { ...T.title, marginTop: 5, color: C.text },
+  trust: { ...T.caption, color: C.textSoft, marginTop: 4 },
+  links: { flexDirection: "row", flexWrap: "wrap", gap: 18, paddingTop: 3 },
+  link: { ...T.caption, fontFamily: font.semi, color: C.purple, minHeight: 44, textAlignVertical: "center" },
+  safetyLink: { ...T.caption, fontFamily: font.semi, color: C.textSoft, minHeight: 44, textAlignVertical: "center" },
 });

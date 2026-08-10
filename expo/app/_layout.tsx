@@ -46,7 +46,11 @@ function RootLayoutNav() {
       router.replace("/onboarding");
       return;
     }
-    const isFreeJourney = onboarding || firstSegment === "rehearse" || firstSegment === "debrief";
+    const isFreeJourney = onboarding || firstSegment === "rehearse" || firstSegment === "debrief" || firstSegment === "safety";
+    if (profile && activePracticeSession?.sharedResult && activePracticeSession.freeJourneyCheckpoint !== "complete" && !isFreeJourney) {
+      router.replace(`/debrief/${activePracticeSession.id}`);
+      return;
+    }
     if (profile && activePracticeSession && !activePracticeSession.recommendation && !isFreeJourney) {
       const sharedParams = {
         id: activePracticeSession.scenarioId,
@@ -90,6 +94,7 @@ function RootLayoutNav() {
         <Stack.Screen name="paywall" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
         <Stack.Screen name="purchase-success" options={{ animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="privacy" />
+        <Stack.Screen name="safety" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
       </Stack>
       <MigrationNotice visible={migrationNotice} onDismiss={dismissMigrationNotice} />
       {showLaunch ? <LaunchExperience onFinish={finishLaunch} /> : null}

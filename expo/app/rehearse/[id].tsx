@@ -37,6 +37,7 @@ import {
   Meter,
   MicControl,
   PressCard,
+  PrimaryButton,
   StateDock,
   Thinking,
   Waveform,
@@ -58,8 +59,10 @@ import {
   beginConversionBuild,
   emitConversionEvent,
   failConversionBuild,
+  isConversionBuildActive,
 } from "@/lib/conversionBuild";
 import { conversionEvidence, selectFocusSkill } from "@/lib/conversion";
+import { approvedUserTurn, buildFreeJourneyResult, recognizerEndState, shouldGeneratePushback } from "@/lib/freeJourney";
 import { setLiveSessionContent } from "@/lib/ephemeral";
 import { preserveFreeRehearsalArtifact } from "@/lib/practiceSession";
 import { errorShape, safeLog } from "@/lib/redact";
@@ -185,7 +188,8 @@ export default function Rehearse() {
     const serializedTurns = JSON.stringify(turns);
     if (persistedTurnsRef.current === serializedTurns) return;
     persistedTurnsRef.current = serializedTurns;
-    saveActivePracticeSession({ ...currentSession, freeRehearsalTurns: turns, updatedAt: Date.now() }).catch(() => {});
+    const roles = turns.map((turn) => turn.role).join(",");
+    saveActivePracticeSession({ ...currentSession, freeRehearsalTurns: turns, freeJourneyCheckpoint: roles === "user,them,user" ? "transcript_review" : "rehearsal", updatedAt: Date.now() }).catch(() => {});
   }, [activePracticeSession, params.entry, params.practiceSessionId, saveActivePracticeSession, turns]);
   const [thinking, setThinking] = useState<boolean>(false);
   const [draft, setDraft] = useState<string>("");
@@ -200,11 +204,14 @@ export default function Rehearse() {
   /** Guards against a second submission while one turn is in flight. */
   const busy = useRef<boolean>(false);
   const [closing, setClosing] = useState<boolean>(false);
+  const [reviewingTranscript, setReviewingTranscript] = useState<boolean>(false);
+  const [reviewDrafts, setReviewDrafts] = useState<{ opening: string; response: string }>({ opening: "", response: "" });
   const [mode, setMode] = useState<"voice" | "text">("voice");
   const [voiceOn, setVoiceOn] = useState<boolean>(true);
   const voiceOnRef = useRef<boolean>(true);
   voiceOnRef.current = voiceOn;
   const dictation = useDictation();
+  const cancelDictation = dictation.cancel;
   const speech = useSpeech();
   const isReduced = useReducedMotion();
   const audioBusy = speech.phase === "speaking" || speech.phase === "generating";
@@ -234,7 +241,7 @@ export default function Rehearse() {
     hasReachedTurnCap &&
     !thinking &&
     stream.length === 0 &&
-    turns[turns.length - 1]?.role === "them";
+    turns[turns.length - 1]?.role === "user";
 
   const reveal = useCallback((full: string, nudge: string) => {
     const commit = (): void => {
@@ -294,9 +301,10 @@ export default function Rehearse() {
   useEffect(() => {
     return () => {
       if (revealTimer.current) clearInterval(revealTimer.current);
+      cancelDictation().catch(() => {});
       resetSpeech().catch(() => {});
     };
-  }, []);
+  }, [cancelDictation]);
 
   /**
    * Produce exactly one counterpart reply for the given transcript. The user
@@ -355,12 +363,20 @@ export default function Rehearse() {
       await unlockAudioPlayback();
       setPending("");
       setDraft("");
-      const mine: Turn = { id: uid(), role: "user", text: clean };
+      const mine: Turn = approvedUserTurn(uid(), clean);
       const next = [...turns, mine];
       setTurns(next);
-      await generateCounterpart(next);
+      if (shouldGeneratePushback(turns)) {
+        await generateCounterpart(next);
+      } else {
+        busy.current = false;
+        const currentSession = activePracticeSession;
+        if (params.entry === "onboarding" && currentSession && currentSession.id === params.practiceSessionId) {
+          await saveActivePracticeSession({ ...currentSession, freeRehearsalTurns: next, freeJourneyCheckpoint: "transcript_review", updatedAt: Date.now() });
+        }
+      }
     },
-    [scenario, thinking, turns, generateCounterpart, hasReachedTurnCap],
+    [scenario, thinking, turns, generateCounterpart, hasReachedTurnCap, activePracticeSession, params.entry, params.practiceSessionId, saveActivePracticeSession],
   );
 
   const retryTurn = useCallback(() => {
@@ -389,7 +405,7 @@ export default function Rehearse() {
       // review state and waits for the user to send it.
       if (text && text.trim().length > 0) {
         tap("success");
-        setPending(text.trim());
+        setPending(recognizerEndState(text).pendingText);
       }
       return;
     }
@@ -444,55 +460,39 @@ export default function Rehearse() {
     setMode("text");
   }, [dictation]);
 
-  const finish = useCallback(async () => {
+  const analyzeApprovedTranscript = useCallback(async (approvedTurns: Turn[]) => {
     if (!scenario) return;
-    const mine = turns.filter((t) => t.role === "user");
-    if (mine.length < 2) {
-      const msg = "Say at least a couple of lines so there's something to review.";
-      if (Platform.OS === "web") setError(msg);
-      else Alert.alert("Too early to review", msg);
-      return;
-    }
+    const turns = approvedTurns;
+    const mine = turns.filter((turn) => turn.role === "user");
+    if (mine.length !== 2) return;
     setClosing(true);
     tap("medium");
-    resetSpeech().catch(() => {});
+    await resetSpeech().catch(() => {});
     const id = sessionId.current;
-
-    // Open on an empty first frame. Named pipeline boundaries advance the
-    // sequence after navigation mounts; no staged timer manufactures progress.
-    beginConversionBuild({
-      id,
-      scenarioTitle: scenario.title,
-      counterpartName: themName,
-      turns,
-    });
+    beginConversionBuild({ id, scenarioTitle: scenario.title, counterpartName: themName, turns: approvedTurns });
+    if (params.entry === "onboarding" && activePracticeSession?.id === id) {
+      await saveActivePracticeSession({ ...activePracticeSession, freeRehearsalTurns: approvedTurns, freeRehearsalCompletedAt: Date.now(), freeJourneyCheckpoint: "generating", updatedAt: Date.now() });
+    }
     router.replace(`/debrief/${id}`);
 
     try {
-      await new Promise<void>((resolve) => {
-        InteractionManager.runAfterInteractions(() => resolve());
-      });
+      await new Promise<void>((resolve) => InteractionManager.runAfterInteractions(() => resolve()));
       emitConversionEvent(id, "transcript.confirmed");
       emitConversionEvent(id, "exchange.paired");
-
       const debrief = await generateDebrief(scenario, difficulty, turns, reaction, outcome);
+      if (!isConversionBuildActive(id)) return;
       emitConversionEvent(id, "skill.identified", debrief);
-
-      // The curriculum is fixed. Analysis only selects one authored starting
-      // skill inside phase one; it never generates a personal roadmap.
       const focus = selectFocusSkill(debrief, activePracticeSession?.provisionalModuleId);
-      const evidence = conversionEvidence(turns, debrief, activePracticeSession?.provisionalModuleId);
+      const evidence = conversionEvidence(approvedTurns, debrief, activePracticeSession?.provisionalModuleId);
       emitConversionEvent(id, "path.mapped");
-      setLiveSessionContent(id, { turns, debrief, outcome });
+      setLiveSessionContent(id, { turns: approvedTurns, debrief, outcome });
 
       if (params.entry === "onboarding" && activePracticeSession?.id === id) {
-        const preserved = preserveFreeRehearsalArtifact(activePracticeSession, turns, Date.now());
-        const evidenceTurn = evidence.learnerQuote
-          ? mine.find((turn) => turn.text.includes(evidence.learnerQuote)) ?? null
-          : null;
-        await saveActivePracticeSession({
+        const preserved = preserveFreeRehearsalArtifact(activePracticeSession, approvedTurns, Date.now());
+        const evidenceTurn = evidence.learnerQuote ? mine.find((turn) => turn.text.includes(evidence.learnerQuote)) ?? null : null;
+        const withRecommendation = {
           ...preserved,
-          freeRehearsalTurns: turns,
+          freeRehearsalTurns: approvedTurns,
           freeRehearsalCompletedAt: Date.now(),
           recommendation: {
             moduleId: focus.id,
@@ -500,50 +500,55 @@ export default function Rehearse() {
             evidenceQuote: evidence.learnerQuote || null,
             evidenceTurnId: evidenceTurn?.id ?? null,
             confidence: evidence.confidence,
-            status: "suggested",
+            status: "suggested" as const,
             supportedStrength: evidence.supportedStrength,
             immediateAction: evidence.immediateAction,
             createdAt: Date.now(),
           },
           coachNote: focus.body,
           retryInstruction: focus.name,
-          nextState: "focused_coach_note",
+          nextState: "focused_coach_note" as const,
+          freeJourneyCheckpoint: "pressure_moment" as const,
           updatedAt: Date.now(),
-        });
+        };
+        await saveActivePracticeSession({ ...withRecommendation, sharedResult: buildFreeJourneyResult(withRecommendation, debrief) });
       }
 
       const record: SessionRecord = {
-        schemaVersion: SESSION_SCHEMA_VERSION,
-        id,
-        scenarioId: scenario.id,
+        schemaVersion: SESSION_SCHEMA_VERSION, id, scenarioId: scenario.id,
         title: scenario.isCustom ? undefined : scenario.title,
         counterpart: scenario.isCustom ? undefined : scenario.counterpart,
-        category: scenario.category,
-        difficulty,
-        persona,
-        reaction,
-        skillIds: [focus.id],
-        turnCount: turns.length,
-        userTurnCount: mine.length,
-        retryCount: 0,
-        completed: true,
-        startedAt: startedAt.current,
-        endedAt: Date.now(),
-        contentRetained: false,
+        category: scenario.category, difficulty, persona, reaction, skillIds: [focus.id],
+        turnCount: approvedTurns.length, userTurnCount: mine.length, retryCount: 0,
+        completed: true, startedAt: startedAt.current, endedAt: Date.now(), contentRetained: false,
       };
       await upsertSession(record);
-      if (challengeDay !== null) {
-        await markChallengeDayDone(challengeDay);
-      }
+      if (challengeDay !== null) await markChallengeDayDone(challengeDay);
       emitConversionEvent(id, "plan.ready");
       tap("success");
-    } catch (e) {
-      safeLog("[rehearse] debrief failed", errorShape(e));
+    } catch (caught) {
+      safeLog("[rehearse] debrief failed", errorShape(caught));
       failConversionBuild(id);
     }
-  }, [scenario, turns, difficulty, reaction, outcome, upsertSession, router, challengeDay, markChallengeDayDone, persona, themName, params.entry, activePracticeSession, saveActivePracticeSession]);
+  }, [scenario, difficulty, reaction, outcome, upsertSession, router, challengeDay, markChallengeDayDone, persona, themName, params.entry, activePracticeSession, saveActivePracticeSession]);
+
+  const openTranscriptReview = useCallback((): void => {
+    const userTurns = turns.filter((turn) => turn.role === "user");
+    setReviewDrafts({ opening: userTurns[0]?.text ?? "", response: userTurns[1]?.text ?? "" });
+    setReviewingTranscript(true);
+  }, [turns]);
+
+  const approveTranscript = useCallback((): void => {
+    if (!reviewDrafts.opening.trim() || !reviewDrafts.response.trim()) return;
+    let userIndex = 0;
+    const approvedTurns = turns.map((turn): Turn => turn.role !== "user" ? turn : { ...turn, text: (userIndex++ === 0 ? reviewDrafts.opening : reviewDrafts.response).trim() });
+    setTurns(approvedTurns);
+    setReviewingTranscript(false);
+    void analyzeApprovedTranscript(approvedTurns);
+  }, [analyzeApprovedTranscript, reviewDrafts, turns]);
 
   const exitRehearsal = useCallback(async (): Promise<void> => {
+    await cancelDictation().catch(() => {});
     await resetSpeech().catch(() => {});
     if (params.entry === "onboarding") {
       if (activePracticeSession?.id === params.practiceSessionId) {
@@ -557,7 +562,7 @@ export default function Rehearse() {
     }
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)");
-  }, [activePracticeSession?.id, params.entry, params.practiceSessionId, router, saveActivePracticeSession]);
+  }, [activePracticeSession?.id, cancelDictation, params.entry, params.practiceSessionId, router, saveActivePracticeSession]);
 
   const leave = useCallback(() => {
     const act = (): void => {
@@ -618,6 +623,32 @@ export default function Rehearse() {
         <PressCard onPress={leave} accessibilityLabel="Choose another conversation">
           <View style={styles.analyzeBtn}><Text style={styles.analyzeText}>Choose another conversation</Text></View>
         </PressCard>
+      </View>
+    );
+  }
+
+  if (reviewingTranscript) {
+    const counterpartTurn = turns.find((turn) => turn.role === "them");
+    return (
+      <View style={styles.root}>
+        <Backdrop />
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <ScrollView contentContainerStyle={[styles.reviewScroll, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 150 }]} keyboardShouldPersistTaps="handled">
+            <Text style={styles.reviewEyebrow}>COMPLETE TRANSCRIPT</Text>
+            <Text style={styles.reviewTitle}>Check the exchange before analysis.</Text>
+            <Text style={styles.reviewSupport}>Only the text you approve here will be analyzed.</Text>
+            <Text style={styles.reviewLabel}>Your opening</Text>
+            <TextInput value={reviewDrafts.opening} onChangeText={(opening) => setReviewDrafts((current) => ({ ...current, opening }))} multiline style={styles.reviewInput} accessibilityLabel="Edit your opening" />
+            <Text style={styles.reviewLabel}>{themName}</Text>
+            <View style={styles.counterpartReview}><Text style={styles.counterpartReviewText}>{counterpartTurn?.text ?? ""}</Text></View>
+            <Text style={styles.reviewLabel}>Your response under pressure</Text>
+            <TextInput value={reviewDrafts.response} onChangeText={(response) => setReviewDrafts((current) => ({ ...current, response }))} multiline style={styles.reviewInput} accessibilityLabel="Edit your response under pressure" />
+          </ScrollView>
+          <StateDock bottomInset={insets.bottom}>
+            <PrimaryButton label="Approve transcript" onPress={approveTranscript} disabled={!reviewDrafts.opening.trim() || !reviewDrafts.response.trim() || closing} />
+            <PressCard onPress={() => setReviewingTranscript(false)} accessibilityLabel="Back to rehearsal"><Text style={styles.reviewBack}>Back to rehearsal</Text></PressCard>
+          </StateDock>
+        </KeyboardAvoidingView>
       </View>
     );
   }
@@ -811,13 +842,13 @@ export default function Rehearse() {
           ) : dockState === "complete" ? (
             <View style={styles.completeActions}>
               <PressCard
-                onPress={finish}
+                onPress={openTranscriptReview}
                 disabled={audioBusy || closing}
                 haptic="medium"
-                accessibilityLabel="Analyze your rep"
+                accessibilityLabel="Review complete transcript"
               >
                 <View style={styles.analyzeBtn}>
-                  <Text style={styles.analyzeText}>Analyze your rep</Text>
+                    <Text style={styles.analyzeText}>Review transcript</Text>
                 </View>
               </PressCard>
               {speech.canReplay ? (
@@ -1297,6 +1328,15 @@ const styles = StyleSheet.create({
   tensionLabel: { ...eyebrow, color: C.dim },
 
   transcript: { paddingHorizontal: GUTTER, paddingTop: 14, paddingBottom: 20 },
+  reviewScroll: { paddingHorizontal: GUTTER, gap: 12 },
+  reviewEyebrow: { ...eyebrow, color: C.purple },
+  reviewTitle: { ...T.display },
+  reviewSupport: { ...T.support, marginBottom: 8 },
+  reviewLabel: { ...eyebrow, color: C.dim, marginTop: 8 },
+  reviewInput: { ...T.body, minHeight: 112, borderRadius: radius.md, borderWidth: 1, borderColor: C.lineStrong, backgroundColor: C.surfaceHigh, padding: 16, textAlignVertical: "top", color: C.text },
+  counterpartReview: { borderRadius: radius.md, backgroundColor: C.purpleSoft, padding: 16 },
+  counterpartReviewText: { ...T.body, color: C.text },
+  reviewBack: { ...T.support, color: C.purple, textAlign: "center", paddingVertical: 12, fontFamily: font.semi },
 
   themWrap: { marginBottom: 22 },
   mineWrap: { marginBottom: 22 },

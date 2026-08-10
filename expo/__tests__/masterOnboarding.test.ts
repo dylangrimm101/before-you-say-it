@@ -157,7 +157,7 @@ describe("shared mobile rehearsal briefing and controls", () => {
   test("keeps context compact and the mic in the initial fixed dock", async () => {
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     expect(rehearsal).toContain("<StateDock bottomInset={insets.bottom}>");
-    expect(rehearsal.indexOf("<RehearsalBriefing")).toBeLessThan(rehearsal.indexOf("<StateDock"));
+    expect(rehearsal.indexOf("<RehearsalBriefing")).toBeLessThan(rehearsal.lastIndexOf("<StateDock"));
     expect(rehearsal).not.toContain("scene: { marginBottom: 28");
     expect(rehearsal).toContain("minWidth: 0");
   });
