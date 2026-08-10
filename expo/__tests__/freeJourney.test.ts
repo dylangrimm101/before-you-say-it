@@ -228,10 +228,52 @@ describe("Claude Design free journey contract", () => {
     expect(layout).toContain("canInterruptFreeJourney");
     expect(privacy).toContain("Privacy &amp; details");
     expect(privacy).toContain("This build does not provide an account or cross-device recovery.");
-    expect(privacy).toContain("The recording is sent once for transcription");
+    expect(privacy).toContain("Each saved session keeps a minimized record of the scenario, date, completion details, and result summary when one is available. It does not keep the rehearsal transcript.");
+    expect(privacy).toContain("Raw audio is not stored by this app.");
+    expect(privacy).toContain("A recording is sent once for transcription");
+    expect(privacy).not.toContain("your four scores");
+    expect(privacy).not.toContain("Keep baseline recordings on this device");
+    expect(privacy).not.toContain("unless you opt in to keep baseline audio below");
     expect(privacy).not.toContain("if you later sign in");
     expect(privacy).not.toContain("It is never uploaded");
     expect(privacy).not.toContain("privacy policy URL");
+  });
+
+  test("current dictation callers cannot retain or play baseline audio", async () => {
+    const dictation = await Bun.file(`${import.meta.dir}/../lib/useDictation.ts`).text();
+    const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    const productionCallers = [
+      rehearsal,
+      await Bun.file(`${import.meta.dir}/../app/custom.tsx`).text(),
+      await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text(),
+    ].join("\n");
+    expect(dictation).toContain("keepAudioAs?: string");
+    expect(productionCallers).not.toContain("keepAudioAs:");
+    expect(productionCallers).not.toContain("baselineAudioUri");
+    expect(productionCallers).not.toContain("keepBaselineAudio");
+  });
+
+  test("privacy deletion promises match saved-record, script, ephemeral-content, audio, and active-handoff behavior", async () => {
+    const store = await Bun.file(`${import.meta.dir}/../providers/store.tsx`).text();
+    const privacy = await Bun.file(`${import.meta.dir}/../app/privacy.tsx`).text();
+    const deleteOne = store.slice(store.indexOf("const deleteSession"), store.indexOf("const deleteAllSessions"));
+    const deleteAll = store.slice(store.indexOf("const deleteAllSessions"), store.indexOf("const addCustomScenario"));
+    const reset = store.slice(store.indexOf("const reset"), store.indexOf("const findScenario"));
+
+    expect(deleteOne).toContain("prev.filter((s) => s.id !== id)");
+    expect(deleteOne).toContain("clearLiveSessionContent(id)");
+    expect(deleteOne).toContain("deleteBaselineAudio(id)");
+    expect(deleteOne).toContain("AsyncStorage.setItem(KEYS.sessions");
+    expect(deleteOne).not.toContain("saveActivePracticeSession(null)");
+    expect(deleteAll).toContain("setSessions([])");
+    expect(deleteAll).toContain("clearLiveSessionContent()");
+    expect(deleteAll).toContain("deleteAllBaselineAudio()");
+    expect(deleteAll).toContain("AsyncStorage.removeItem(KEYS.sessions)");
+    expect(reset).toContain("setActivePracticeSession(null)");
+    expect(reset).toContain("KEYS.activePracticeSession");
+    expect(privacy).toContain("Deleting the saved session record deletes those lines.");
+    expect(privacy).toContain("The separate active Day 1 handoff stays available for restart or resume.");
+    expect(privacy).toContain("Reset all app data to remove the separate active Day 1 handoff too.");
   });
 
   test("audio failure keeps counterpart response text visible", async () => {

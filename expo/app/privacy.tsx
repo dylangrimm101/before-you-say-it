@@ -1,12 +1,11 @@
 import { useRouter } from "expo-router";
 import { ChevronLeft, Trash2 } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback } from "react";
 import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, Eyebrow, PressCard, Reveal, tap } from "@/components/ui";
 import { C, GUTTER, T, font, radius, shadow } from "@/constants/theme";
-import { countBaselineAudio } from "@/lib/baselineAudio";
 import {
   DEBRIEF_PROVIDER,
   ROLEPLAY_PROVIDER,
@@ -30,7 +29,6 @@ export default function PrivacyScreen() {
     customScenarios,
     activePracticeSession,
     consent,
-    setKeepBaselineAudio,
     setSaveCustomScenarioText,
     deleteAllSessions,
     deleteAllCustomScenarios,
@@ -38,18 +36,6 @@ export default function PrivacyScreen() {
     devProEnabled,
     toggleDevPro,
   } = useStore();
-
-  const [keptAudio, setKeptAudio] = useState<number>(0);
-
-  useEffect(() => {
-    let alive = true;
-    countBaselineAudio().then((n) => {
-      if (alive) setKeptAudio(n);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [sessions, consent.keepBaselineAudio]);
 
   const confirm = useCallback(
     (title: string, message: string, onConfirm: () => void) => {
@@ -69,9 +55,9 @@ export default function PrivacyScreen() {
   const onDeleteHistory = useCallback(() => {
     confirm(
       "Delete all practice history?",
-      "Every saved session record and any recording you kept will be removed from this device. Your streak days and program progress stay.",
+      "Every saved session record and any legacy retained recording will be removed from this device. Your active Day 1 handoff, streak days, and program progress stay.",
       () => {
-        deleteAllSessions().then(() => setKeptAudio(0));
+        void deleteAllSessions();
       },
     );
   }, [confirm, deleteAllSessions]);
@@ -92,7 +78,6 @@ export default function PrivacyScreen() {
       "Everything is removed: your profile, history, scenarios, drills, streak, reminders and choices. The app returns to a fresh install.",
       () => {
         reset().then(() => {
-          setKeptAudio(0);
           router.replace("/onboarding");
         });
       },
@@ -128,12 +113,12 @@ export default function PrivacyScreen() {
         <Section title="Stored on this device">
           <Bullet
             head="Session records"
-            body={`${sessions.length} saved. Each one holds the scenario, the date, how many lines you spoke, and your four scores. Not the transcript.`}
+            body={`${sessions.length} saved. Each saved session keeps a minimized record of the scenario, date, completion details, and result summary when one is available. It does not keep the rehearsal transcript.`}
           />
           <Bullet
             head="Your active Day 1 handoff"
             body={activePracticeSession
-              ? "Stored on this device so the journey can resume: the practice-session and anonymous device IDs, route and scenario context, approved rehearsal turns, current checkpoint, and evidence-linked result once complete. Unapproved drafts and raw audio are excluded unless you opt in to keep baseline audio below."
+              ? "Stored on this device so the journey can resume: the practice-session and anonymous device IDs, route and scenario context, approved rehearsal turns, current checkpoint, and evidence-linked result once complete. Unapproved drafts and raw audio are excluded."
               : "No Day 1-to-Day-30 baseline record is stored on this device."}
           />
           <Bullet
@@ -142,15 +127,11 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="Your script for the real conversation"
-            body="Kept. The suggested opening lines are saved with the session so you still have them when the conversation actually happens. These are written by the AI as suggestions — not a record of what you said. Deleting the session deletes them."
+            body="When a saved session includes suggested opening lines, they stay with that session so you still have them for the real conversation. These are AI-written suggestions — not a record of what you said. Deleting the saved session record deletes those lines."
           />
           <Bullet
             head="Recordings"
-            body={
-              keptAudio > 0
-                ? `${keptAudio} recording${keptAudio === 1 ? "" : "s"} kept, because you turned that on below. The retained copy stays in this app's private folder. The recording is sent once for transcription as explained below.`
-                : "Not kept. Each recording is deleted from this device as soon as its transcription comes back."
-            }
+            body="Raw audio is not stored by this app. A recording is sent once for transcription, then its temporary file is deleted from this device."
           />
           <Bullet
             head="Your profile"
@@ -213,15 +194,6 @@ export default function PrivacyScreen() {
 
         <Section title="Your choices">
           <Toggle
-            label="Keep baseline recordings on this device"
-            body="Off by default. When on, a retained copy of the baseline recording stays in this app's private folder so you can hear it again later. The recording is still sent once for transcription, and you can delete the retained copy any time."
-            value={consent.keepBaselineAudio}
-            onChange={(v) => {
-              tap("light");
-              setKeepBaselineAudio(v);
-            }}
-          />
-          <Toggle
             label="Save scenarios I write on this device"
             body="Off by default. When on, the exact text of scenarios you write is kept so you can rehearse them again another day."
             value={consent.saveCustomScenarioText}
@@ -249,7 +221,7 @@ export default function PrivacyScreen() {
         <Section title="Delete">
           <Danger
             label="Delete all practice history"
-            body="Removes every session record and any recording you kept."
+            body="Removes every saved session record, its suggested script, its in-memory debrief, and any legacy retained recording. The separate active Day 1 handoff stays available for restart or resume."
             onPress={onDeleteHistory}
           />
           <Danger
@@ -263,7 +235,7 @@ export default function PrivacyScreen() {
             onPress={onResetAll}
           />
           <Text style={styles.perSession}>
-            To delete a single session, open it from History in the Progress tab.
+            To delete a single saved session record, open it from History in the Progress tab. Reset all app data to remove the separate active Day 1 handoff too.
           </Text>
         </Section>
 
