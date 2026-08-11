@@ -78,9 +78,9 @@ const styles = StyleSheet.create({
   downPath: { alignItems: "center", gap: 2, marginVertical: -3 },
   goalBlock: { borderRadius: radius.md, borderWidth: 1, borderColor: "rgba(81,40,136,0.18)", backgroundColor: C.purpleSoft, paddingHorizontal: 14, paddingVertical: 13 },
   goalText: { ...T.caption, fontFamily: font.medium, color: C.text, lineHeight: 20 },
-  trust: { ...T.caption, color: C.textSoft, lineHeight: 21 },
-  links: { flexDirection: "row", flexWrap: "wrap", gap: 18, marginTop: -9 },
-  link: { ...T.caption, fontFamily: font.semi, color: C.purple, minHeight: 44, textAlignVertical: "center" },
-  safetyLink: { ...T.caption, fontFamily: font.semi, color: C.textSoft, minHeight: 44, textAlignVertical: "center" },
+  trust: { ...T.caption, color: C.textSoft, lineHeight: 21, textAlign: "center" },
+  links: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 18, marginTop: -9 },
+  link: { ...T.caption, fontFamily: font.semi, color: C.purple, minHeight: 44, textAlign: "center", textAlignVertical: "center" },
+  safetyLink: { ...T.caption, fontFamily: font.semi, color: C.textSoft, minHeight: 44, textAlign: "center", textAlignVertical: "center" },
   contextNote: { position: "absolute", width: 1, height: 1, opacity: 0 },
 });
