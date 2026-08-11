@@ -1,4 +1,5 @@
 import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -256,6 +257,16 @@ export default function Onboarding() {
   return (
     <View style={styles.root}>
       <Backdrop />
+      {step === -1 ? (
+        <LinearGradient
+          colors={["#F7F2FC", "#EADFF6", "#DDC9EE"]}
+          locations={[0, 0.52, 1]}
+          start={{ x: 0.08, y: 0 }}
+          end={{ x: 0.92, y: 1 }}
+          style={styles.openingTint}
+          pointerEvents="none"
+        />
+      ) : null}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         {step >= 0 ? <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
           <View style={styles.headerRow}>
@@ -323,7 +334,7 @@ function Input({ value, onChangeText, placeholder, maxLength = 500, accessibilit
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 },
+  root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 }, openingTint: { ...StyleSheet.absoluteFillObject },
   header: { paddingHorizontal: GUTTER, paddingBottom: 14, gap: 10 }, headerRow: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, backHit: { minWidth: 60, minHeight: 44, justifyContent: "center" }, backText: { fontFamily: font.semi, fontSize: 17, color: C.textSoft }, hidden: { color: "transparent" }, counter: { ...eyebrow, color: C.dim },
   track: { height: 3, borderRadius: 2, backgroundColor: C.line, overflow: "hidden" }, fill: { height: 3, backgroundColor: C.purple },
   scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, openingScroll: { flexGrow: 1, justifyContent: "center" }, opening: { alignItems: "center", gap: 18, paddingHorizontal: 10 }, mark: { width: 180, height: 86, marginBottom: 12 }, openingTitle: { fontFamily: font.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.7, color: C.text, textAlign: "center" }, openingBody: { ...T.body, color: C.textSoft, textAlign: "center", lineHeight: 27 }, openingButton: { width: "100%", marginTop: 18 }, title: { ...T.display }, lede: { ...T.body, color: C.textSoft, lineHeight: 27, marginTop: 12 }, options: { gap: 10, marginTop: 24 },
