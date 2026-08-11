@@ -24,6 +24,31 @@ export interface PersistedScenarioPracticeRun {
   run: PilotDayRun;
 }
 
+export interface ScenarioCounterpartPresentation {
+  name: string;
+  role: string;
+  text: string;
+  continuityLabel: "Same pressure moment";
+  accessibilityLabel: string;
+}
+
+export type ScenarioPracticePresentation =
+  | {
+      isAvailable: false;
+      title: "This scenario run is unavailable.";
+      body: "Return to Scenarios and start a fresh rehearsal. No generic practice fixture was substituted.";
+    }
+  | {
+      isAvailable: true;
+      counterpart?: ScenarioCounterpartPresentation;
+    };
+
+const UNAVAILABLE_PRESENTATION: ScenarioPracticePresentation = {
+  isAvailable: false,
+  title: "This scenario run is unavailable.",
+  body: "Return to Scenarios and start a fresh rehearsal. No generic practice fixture was substituted.",
+};
+
 function counterpartParts(label: string): { name: string; role: string } {
   const [head, ...tail] = label.split(/[—–]/).map((part) => part.trim()).filter(Boolean);
   return {
@@ -166,6 +191,26 @@ export function completeScenarioComparison(
     run: {
       ...transitionPilotRun(run, "attempt_comparison", now),
       comparison: comparePilotAttempts(behavior, run.responseAttempt.transcript, run.retryAttempt.transcript),
+    },
+  };
+}
+
+/** Builds presentation-safe copy without exposing any persisted identity keys. */
+export function scenarioPracticePresentation(value: unknown): ScenarioPracticePresentation {
+  const normalized = normalizeScenarioPracticeRun(value);
+  if (!normalized) return UNAVAILABLE_PRESENTATION;
+  const context = normalized.run.scenarioContext;
+  const pressure = normalized.run.counterpartTurn;
+  if (!context || !pressure) return { isAvailable: true };
+  const continuityLabel = "Same pressure moment" as const;
+  return {
+    isAvailable: true,
+    counterpart: {
+      name: context.counterpartName,
+      role: context.counterpartRole,
+      text: pressure.text,
+      continuityLabel,
+      accessibilityLabel: `${context.counterpartName}, ${context.counterpartRole}. ${continuityLabel}. ${pressure.text}`,
     },
   };
 }
