@@ -35,6 +35,7 @@ import { RehearsalBriefing } from "@/components/RehearsalBriefing";
 import { ScenarioPaidPractice } from "@/components/ScenarioPaidPractice";
 import {
   Backdrop,
+  GhostButton,
   Meter,
   MicControl,
   PressCard,
@@ -731,14 +732,23 @@ function LegacyRehearse() {
         </View>
         <View style={styles.permissionBody}>
           <View style={styles.permissionIcon}><Mic size={30} color={C.purple} strokeWidth={1.7} /></View>
-          <Text style={styles.permissionTitle}>{permissionDenied ? "Microphone access is off." : "Practice out loud."}</Text>
-          <Text style={styles.permissionCopy}>{permissionDenied ? "Turn microphone access on in Settings, try again, or type your opening instead." : "Allow microphone access so you can say each line naturally. Recording only starts when you tap the mic, and every transcript is yours to review."}</Text>
+          <Text style={styles.permissionTitle}>{permissionDenied ? "Microphone access is off." : "Allow the microphone"}</Text>
+          <Text style={styles.permissionCopy}>{permissionDenied ? "Turn microphone access on in Settings, try again, or type your opening instead." : "Recording only happens while you hold a turn. Audio is transcribed, then discarded — you confirm the text before anything is sent."}</Text>
         </View>
         <StateDock bottomInset={insets.bottom}>
           {permissionDenied ? <PrimaryButton label="Open Settings" onPress={openMicrophoneSettings} /> : <PrimaryButton label={permissionBusy ? "Checking microphone…" : "Allow microphone"} onPress={() => void requestMicrophoneAccess()} disabled={permissionBusy} />}
-          <PressCard onPress={() => permissionDenied ? void requestMicrophoneAccess() : activatePractice("text")} accessibilityLabel={permissionDenied ? "Try microphone again" : "Type instead"}>
-            <Text style={styles.permissionSecondary}>{permissionDenied ? "Try again" : "Type instead"}</Text>
-          </PressCard>
+          {permissionDenied ? (
+            <PressCard onPress={() => void requestMicrophoneAccess()} accessibilityLabel="Try microphone again">
+              <Text style={styles.permissionSecondary}>Try again</Text>
+            </PressCard>
+          ) : (
+            <>
+              <GhostButton label="Type this turn instead" onPress={() => activatePractice("text")} />
+              <PressCard onPress={() => setRehearsalStage("briefing")} accessibilityLabel="Not now">
+                <Text style={styles.permissionSecondary}>Not now</Text>
+              </PressCard>
+            </>
+          )}
         </StateDock>
       </View>
     );

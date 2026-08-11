@@ -203,6 +203,10 @@ describe("shared mobile rehearsal briefing and controls", () => {
     expect(rehearsal).toContain('label="Start my rehearsal"');
     expect(rehearsal).toContain('setRehearsalStage("permission")');
     expect(rehearsal).toContain('label={permissionBusy ? "Checking microphone…" : "Allow microphone"}');
+    expect(rehearsal).toContain('"Allow the microphone"');
+    expect(rehearsal).toContain('"Recording only happens while you hold a turn. Audio is transcribed, then discarded — you confirm the text before anything is sent."');
+    expect(rehearsal).toContain('label="Type this turn instead"');
+    expect(rehearsal).toContain('accessibilityLabel="Not now"');
     expect(rehearsal).toContain('activatePractice("voice")');
     expect(rehearsal).toContain('activatePractice("text")');
     expect(rehearsal).toContain('freeJourneyCheckpoint: "rehearsal"');
