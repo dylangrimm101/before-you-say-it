@@ -1,6 +1,5 @@
 import { useRouter } from "expo-router";
 import { ArrowDown, ArrowRight } from "lucide-react-native";
-import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { C, T, eyebrow, font, radius } from "@/constants/theme";
@@ -47,21 +46,6 @@ export function RehearsalBriefing({
           <Text style={styles.goalText}>{behavioralGoal}</Text>
         </View>
 
-        <View style={styles.sequence} accessibilityLabel="You, then them, then you, then them">
-          {[
-            ["You", true],
-            ["Them", false],
-            ["You", true],
-            ["Them", false],
-          ].map(([label, active], index) => (
-            <React.Fragment key={`${label}-${index}`}>
-              <View style={[styles.sequencePill, active ? styles.sequencePillActive : null]}>
-                <Text style={[styles.sequenceText, active ? styles.sequenceTextActive : null]}>{label}</Text>
-              </View>
-              {index < 3 ? <Text style={styles.sequenceArrow}>›</Text> : null}
-            </React.Fragment>
-          ))}
-        </View>
       </View>
 
       <Text style={styles.trust}>You control when recording starts, and you can correct the transcript before it is analyzed.</Text>
@@ -94,12 +78,6 @@ const styles = StyleSheet.create({
   downPath: { alignItems: "center", gap: 2, marginVertical: -3 },
   goalBlock: { borderRadius: radius.md, borderWidth: 1, borderColor: "rgba(81,40,136,0.18)", backgroundColor: C.purpleSoft, paddingHorizontal: 14, paddingVertical: 13 },
   goalText: { ...T.caption, fontFamily: font.medium, color: C.text, lineHeight: 20 },
-  sequence: { flexDirection: "row", alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, paddingTop: 11, gap: 5 },
-  sequencePill: { borderRadius: radius.pill, backgroundColor: "rgba(23,26,31,0.05)", paddingHorizontal: 10, paddingVertical: 4 },
-  sequencePillActive: { backgroundColor: C.purpleSoft },
-  sequenceText: { fontFamily: font.medium, fontSize: 10, color: C.dim },
-  sequenceTextActive: { color: C.purple },
-  sequenceArrow: { fontFamily: font.medium, fontSize: 14, color: C.textDim },
   trust: { ...T.caption, color: C.textSoft, lineHeight: 21 },
   links: { flexDirection: "row", flexWrap: "wrap", gap: 18, marginTop: -9 },
   link: { ...T.caption, fontFamily: font.semi, color: C.purple, minHeight: 44, textAlignVertical: "center" },
