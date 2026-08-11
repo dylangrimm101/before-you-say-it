@@ -79,6 +79,16 @@ describe("approved onboarding scenario source", () => {
   });
 });
 
+describe("onboarding visual hierarchy", () => {
+  test("keeps a purple field behind a rounded white question sheet", async () => {
+    const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
+    expect(onboarding).toContain('style={[styles.scroller, step >= 0 && styles.questionSheet]}');
+    expect(onboarding).toContain('backgroundColor: "#FCFBFD"');
+    expect(onboarding).toContain("borderTopLeftRadius: 30");
+    expect(onboarding).toContain('["#EADCF7", "#D9C1EE", "#C7A8E3"]');
+  });
+});
+
 describe("three entrances converge into the shared context and engine", () => {
   test("real conversation bypasses the picker and preserves supplied context", async () => {
     const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
