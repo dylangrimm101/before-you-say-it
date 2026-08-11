@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Circle, Path, Rect } from "react-native-svg";
 
 import { Backdrop, PressCard, PrimaryButton, Reveal, SelectionWipe, tap } from "@/components/ui";
 import { DESIRED_SKILLS, RECURRING_PROBLEMS, type ModuleId, type OnboardingEntryRoute } from "@/constants/modules";
@@ -37,6 +38,21 @@ export const ONBOARDING_REACTIONS: readonly { id: ReactionPattern; label: string
 ];
 
 const DIFFICULTY: Difficulty = "steady";
+
+function ConversationMark() {
+  return (
+    <View style={styles.mark} accessibilityRole="image" accessibilityLabel="Two people having a conversation">
+      <Svg width="100%" height="100%" viewBox="0 0 180 86">
+        <Circle cx="43" cy="25" r="22" fill={C.purple} />
+        <Path d="M6 82a37 37 0 0 1 74 0l-74-5z" fill={C.purple} />
+        <Circle cx="137" cy="25" r="22" fill={C.purple} />
+        <Path d="M100 82a37 37 0 0 1 74 0l-74 5z" fill={C.purple} />
+        <Rect x="77" y="5" width="43" height="38" rx="10" fill={C.purple} />
+        <Path d="M94 38h18l-7 22z" fill={C.purple} />
+      </Svg>
+    </View>
+  );
+}
 
 export default function Onboarding() {
   const router = useRouter();
@@ -265,7 +281,7 @@ export default function Onboarding() {
         </View> : null}
 
         <ScrollView contentContainerStyle={[styles.scroll, step < 0 && styles.openingScroll, { paddingBottom: footerHeight + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
-          {step === -1 ? <Reveal><View style={styles.opening}><View style={styles.mark}><Text style={styles.markText}>BYSI</Text></View><Text style={styles.openingTitle}>Build the qualities of world-class communicators.</Text><Text style={styles.openingBody}>Learn to communicate with Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.</Text><PrimaryButton label="Build my communication skills" onPress={() => setStep(0)} style={styles.openingButton} /></View></Reveal> : null}
+          {step === -1 ? <Reveal><View style={styles.opening}><ConversationMark /><Text style={styles.openingTitle}>Build the qualities of world-class communicators.</Text><Text style={styles.openingBody}>Learn to communicate with Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.</Text><PrimaryButton label="Build my communication skills" onPress={() => setStep(0)} style={styles.openingButton} /></View></Reveal> : null}
           {step === 0 ? <Reveal><Text style={styles.title}>What brought you here?</Text><Text style={styles.lede}>Choose the closest answer. Every path includes a real rehearsal before any recommendation.</Text><View style={styles.options}>{ENTRY_CHOICES.map((choice) => <Choice key={choice.id} title={choice.label} note={choice.note} selected={entryRoute === choice.id} onPress={() => chooseEntry(choice.id)} />)}</View></Reveal> : null}
 
           {!isReal && step === 1 ? <Reveal><Text style={styles.title}>{entryRoute === "desired_skill" ? "What do you want to get better at?" : "What keeps happening?"}</Text><Text style={styles.lede}>Choose the closest fit.</Text><View style={styles.options}>{diagnosisOptions.map((option) => <Choice key={option.label} title={option.label} selected={provisionalModuleId === option.moduleId} onPress={() => chooseDiagnosis(option.moduleId, option.label)} />)}</View></Reveal> : null}
@@ -310,7 +326,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 },
   header: { paddingHorizontal: GUTTER, paddingBottom: 14, gap: 10 }, headerRow: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, backHit: { minWidth: 60, minHeight: 44, justifyContent: "center" }, backText: { fontFamily: font.semi, fontSize: 17, color: C.textSoft }, hidden: { color: "transparent" }, counter: { ...eyebrow, color: C.dim },
   track: { height: 3, borderRadius: 2, backgroundColor: C.line, overflow: "hidden" }, fill: { height: 3, backgroundColor: C.purple },
-  scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, openingScroll: { flexGrow: 1, justifyContent: "center" }, opening: { alignItems: "center", gap: 18, paddingHorizontal: 10 }, mark: { width: 112, height: 112, borderRadius: 56, alignItems: "center", justifyContent: "center", backgroundColor: C.purpleSoft, borderWidth: 1, borderColor: `${C.purple}33`, marginBottom: 10 }, markText: { ...eyebrow, color: C.purple, fontSize: 15 }, openingTitle: { fontFamily: font.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.7, color: C.text, textAlign: "center" }, openingBody: { ...T.body, color: C.textSoft, textAlign: "center", lineHeight: 27 }, openingButton: { width: "100%", marginTop: 18 }, title: { ...T.display }, lede: { ...T.body, color: C.textSoft, lineHeight: 27, marginTop: 12 }, options: { gap: 10, marginTop: 24 },
+  scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, openingScroll: { flexGrow: 1, justifyContent: "center" }, opening: { alignItems: "center", gap: 18, paddingHorizontal: 10 }, mark: { width: 180, height: 86, marginBottom: 12 }, openingTitle: { fontFamily: font.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.7, color: C.text, textAlign: "center" }, openingBody: { ...T.body, color: C.textSoft, textAlign: "center", lineHeight: 27 }, openingButton: { width: "100%", marginTop: 18 }, title: { ...T.display }, lede: { ...T.body, color: C.textSoft, lineHeight: 27, marginTop: 12 }, options: { gap: 10, marginTop: 24 },
   choice: { minHeight: 70, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, scenarioChoice: { minHeight: 112, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, choiceOn: { borderColor: C.purple }, choiceCopy: { flex: 1, zIndex: 1, gap: 4 }, contextLabel: { ...eyebrow, color: C.purple }, choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: C.text }, choiceNote: { ...T.caption }, choiceTextOn: { color: C.onAccent, zIndex: 1 },
   pills: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 24 }, pill: { minHeight: 52, justifyContent: "center", paddingHorizontal: 20, borderRadius: radius.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, overflow: "hidden" }, pillOn: { borderColor: C.purple }, pillText: { fontFamily: font.semi, fontSize: 16, color: C.text, zIndex: 1 },
   ownLink: { minHeight: 48, alignItems: "center", justifyContent: "center", marginTop: 14, paddingHorizontal: 8 }, ownLinkText: { ...T.caption, color: C.purple, textAlign: "center", fontFamily: font.semi },

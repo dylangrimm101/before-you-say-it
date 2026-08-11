@@ -299,5 +299,8 @@ describe("Claude Design free journey contract", () => {
     expect(source).toContain("Build the qualities of world-class communicators.");
     expect(source).toContain("Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.");
     expect(source).toContain('label="Build my communication skills"');
+    expect(source).toContain("<ConversationMark />");
+    expect(source).toContain('accessibilityLabel="Two people having a conversation"');
+    expect(source).not.toContain("<Text style={styles.markText}>BYSI</Text>");
   });
 });
