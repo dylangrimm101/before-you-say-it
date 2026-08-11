@@ -38,12 +38,18 @@ export default function SettingsScreen() {
   };
 
   const manage = async (): Promise<void> => {
-    if (!subscription?.managementURL || subscription.provider === "unknown") {
-      setRestoreMessage("A verified subscription-management destination is not available for this account.");
+    if (!subscription || subscription.provider === "unknown") {
+      setRestoreMessage("The purchase provider could not be verified. Review subscriptions manually in the store account used to purchase.");
       return;
     }
     if (subscription.provider === "stripe") {
       setRestoreMessage("Stripe management requires verified web activation and is not available in this native build yet.");
+      return;
+    }
+    if (!subscription.managementURL) {
+      setRestoreMessage(subscription.provider === "apple"
+        ? "A verified Apple destination is unavailable. Review Subscriptions manually in your Apple Account settings."
+        : "A verified Google Play destination is unavailable. Review Subscriptions manually in Google Play.");
       return;
     }
     await Linking.openURL(subscription.managementURL);

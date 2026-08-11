@@ -36,8 +36,9 @@ describe("remaining native acquisition and paid experience", () => {
 
   test("the earned offer is three stages and rejects an incomplete free result", async () => {
     const paywall = await source("app/paywall.tsx");
+    const offerLogic = await source("lib/nativeCommerce.ts");
     const results = await source("components/FreeJourneyResults.tsx");
-    expect(paywall).toContain("type OfferStage = 1 | 2 | 3");
+    expect(offerLogic).toContain("export type OfferStage = 1 | 2 | 3");
     expect(paywall).toContain("earnedOfferBlocked");
     expect(paywall).toContain("Pressure Moment, Practice Shift, Starting Index, and practice path");
     expect(results).toContain('freeJourneyCheckpoint: "complete"');
@@ -63,9 +64,10 @@ describe("remaining native acquisition and paid experience", () => {
 
   test("Purchased carries the actual free result and adds no history", async () => {
     const purchased = await source("app/purchase-success.tsx");
-    expect(purchased).toContain("result?.starting_index");
-    expect(purchased).toContain("index.observed_count");
-    expect(purchased).toContain("result?.first_focus?.first_focus_label");
+    const continuity = await source("lib/nativeCommerce.ts");
+    expect(continuity).toContain("result?.starting_index?.index_value");
+    expect(continuity).toContain("result?.starting_index?.observed_count");
+    expect(continuity).toContain("result?.first_focus?.first_focus_label");
     expect(purchased).toContain("No history was added by purchase");
     expect(purchased).not.toContain("7 practices");
     expect(purchased).not.toContain("streak");
@@ -82,8 +84,9 @@ describe("remaining native acquisition and paid experience", () => {
 
   test("paid practice keeps voice, review, approval, retry, comparison, and microphone recovery", async () => {
     const module = await source("app/module/[day].tsx");
+    const commerceLogic = await source("lib/nativeCommerce.ts");
     ["ready_for_attempt", "listening_attempt", "confirm_attempt_transcript", "hope_coaching", "ready_for_retry", "confirm_retry_transcript", "attempt_comparison"].forEach((state) => expect(module).toContain(state));
-    expect(module).toContain("Type this turn instead");
+    expect(commerceLogic).toContain("Type this turn instead");
     expect(module).toContain("Nothing submits until you approve the transcript");
     expect(module).not.toContain("onend");
   });
@@ -112,8 +115,9 @@ describe("remaining native acquisition and paid experience", () => {
     expect(subscriptionSnapshot({ managementURL: "https://apps.apple.com/account/subscriptions", entitlements: { active: { pro: { store: "APP_STORE", expirationDate: "2026-09-01", willRenew: true } } } }, "pro")?.provider).toBe("apple");
     expect(subscriptionSnapshot({ managementURL: null, entitlements: { active: { pro: { store: "PLAY_STORE" } } } }, "pro")?.managementURL).toBeNull();
     const settings = await source("app/settings.tsx");
-    expect(settings).toContain('if (!subscription?.managementURL || subscription.provider === "unknown")');
+    expect(settings).toContain('subscription.provider === "unknown"');
     expect(settings).toContain('subscription.provider === "stripe"');
+    expect(settings).toContain("if (!subscription.managementURL)");
     expect(settings).toContain("useRestorePurchases");
   });
 

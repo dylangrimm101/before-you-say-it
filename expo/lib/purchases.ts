@@ -7,6 +7,7 @@ import type {
   PurchasesPackage,
 } from "react-native-purchases";
 
+import { hasActiveEntitlement } from "@/lib/commerce";
 import { errorShape, safeLog } from "@/lib/redact";
 
 export const PRO_ENTITLEMENT = "pro";
@@ -89,7 +90,7 @@ function requireSdk(): PurchasesModule {
 }
 
 export function hasPro(info: CustomerInfo | undefined): boolean {
-  return Boolean(info?.entitlements.active[PRO_ENTITLEMENT]);
+  return hasActiveEntitlement(info, PRO_ENTITLEMENT);
 }
 
 export function useCustomerInfo() {

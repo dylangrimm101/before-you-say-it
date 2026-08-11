@@ -9,6 +9,7 @@ import { C, GUTTER, T, eyebrow, font, radius, shadow } from "@/constants/theme";
 import { curriculumModule, isModuleId, practiceDayForRoute, type ModuleId } from "@/constants/modules";
 import { evaluatePilotAttempt, nextPilotCounterpart } from "@/lib/ai";
 import { canContinuePilot } from "@/lib/access";
+import { microphoneRecoveryPresentation } from "@/lib/nativeCommerce";
 import {
   canCompletePilotRun,
   comparePilotAttempts,
@@ -357,6 +358,7 @@ export default function PilotModuleScreen() {
 
   const dayOneRecoverable = Boolean(session?.attemptOne && session.originalAdamResponse);
   const effectiveState = day === 1 && state === "module_preview" && session?.nextState === "complete" ? "complete" : state;
+  const microphoneRecovery = microphoneRecoveryPresentation();
   const adamLine = day === 1 ? null : adamLineForRun(run, module);
   const activeCoach: PilotCoachResponse | null = coach ?? (run?.coachNote ? {
     route: "coach", day, evidenceQuote: null, behaviorId: run.coachedBehaviorId ?? null,
@@ -412,7 +414,7 @@ export default function PilotModuleScreen() {
           {effectiveState === "attempt_comparison" ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><Text style={styles.title}>First attempt and retry</Text><GlassCard style={styles.card}><Text style={styles.cardText}>{day === 1 ? session?.comparison?.text : run?.comparison?.text}</Text></GlassCard><PrimaryButton label="Continue" onPress={showTransfer} style={styles.actionTop} /></Reveal> : null}
           {effectiveState === "transfer_cue" ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><Text style={styles.title}>{module.copy.transfer}</Text><PrimaryButton label={module.copy.finish_button} onPress={complete} style={styles.actionTop} /></Reveal> : null}
           {effectiveState === "complete" ? <Reveal><Eyebrow color={C.sage}>Practice complete</Eyebrow><Text style={styles.title}>You practiced the moment twice.</Text><PrimaryButton label="Back to curriculum" onPress={() => router.navigate("/(tabs)")} style={styles.actionTop} /></Reveal> : null}
-          {effectiveState === "microphone_error" ? <Reveal><Eyebrow color={C.clay}>Microphone recovery</Eyebrow><Text style={styles.title}>{error || dictation.error}</Text><Text style={styles.lede}>Turn microphone access on in device Settings, try again, or type this turn instead. Nothing submits until you approve the transcript.</Text><PrimaryButton label="Open Settings" onPress={() => void Linking.openSettings()} style={styles.actionTop} /><GhostButton label="Try microphone again" onPress={() => startCapture(activeCapture)} style={styles.secondaryAction} /><GhostButton label="Type this turn instead" onPress={() => void openTypedFallback()} style={styles.secondaryAction} /></Reveal> : null}
+          {effectiveState === "microphone_error" ? <Reveal><Eyebrow color={C.clay}>{microphoneRecovery.title}</Eyebrow><Text style={styles.title}>{error || dictation.error}</Text><Text style={styles.lede}>Turn microphone access on in device Settings, try again, or type this turn instead. Nothing submits until you approve the transcript.</Text><PrimaryButton label={microphoneRecovery.actions[0]} onPress={() => void Linking.openSettings()} style={styles.actionTop} /><GhostButton label={microphoneRecovery.actions[1]} onPress={() => startCapture(activeCapture)} style={styles.secondaryAction} /><GhostButton label={microphoneRecovery.actions[2]} onPress={() => void openTypedFallback()} style={styles.secondaryAction} /></Reveal> : null}
         </ScrollView>
       </KeyboardAvoidingView>
       {speech.canReplay && !effectiveState.startsWith("listening") ? <StateDock bottomInset={insets.bottom} style={styles.voiceDock}><GhostButton label={speech.phase === "speaking" ? "Stop voice" : "Replay last voice"} onPress={() => speech.phase === "speaking" ? stopSpeech() : replaySpeech()} /></StateDock> : null}

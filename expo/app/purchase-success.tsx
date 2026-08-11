@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Backdrop, Eyebrow, GlassCard, GhostButton, PrimaryButton, Reveal, StateDock } from "@/components/ui";
 import { curriculumModule, isModuleId, type ModuleId } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
+import { purchasedContinuity } from "@/lib/nativeCommerce";
 import { useCustomerInfo, useIsPro } from "@/lib/purchases";
 import { useStore } from "@/providers/store";
 
@@ -18,10 +19,10 @@ export default function PurchaseSuccess() {
   const isPro = useIsPro();
   const customer = useCustomerInfo();
   const result = activePracticeSession?.sharedResult;
-  const resultModule = result?.first_focus?.recommended_module_id ?? activePracticeSession?.recommendation?.moduleId ?? null;
-  const moduleId: ModuleId | null = isModuleId(params.moduleId) ? params.moduleId : resultModule;
+  const continuity = purchasedContinuity(result, sessions.length, pilotProgress.length);
+  const requestedModule: ModuleId | null = isModuleId(params.moduleId) ? params.moduleId : null;
+  const moduleId: ModuleId | null = continuity.moduleId ?? requestedModule;
   const module = curriculumModule(moduleId);
-  const index = result?.starting_index;
 
   if (!isPro) {
     return (
@@ -44,12 +45,12 @@ export default function PurchaseSuccess() {
         <Reveal index={1}>
           <GlassCard style={styles.continuity}>
             <Text style={styles.cardLabel}>YOUR CARRIED-OVER START</Text>
-            <View style={styles.indexRow}><Text style={styles.indexValue}>{index?.index_value ?? "—"}</Text><View style={styles.indexCopy}><Text style={styles.indexLabel}>PARTIAL INDEX</Text><Text style={styles.indexMeta}>{index ? `${index.observed_count} of 6 signals observed` : "Insufficient evidence for an Index"}</Text></View></View>
+            <View style={styles.indexRow}><Text style={styles.indexValue}>{continuity.indexValue ?? "—"}</Text><View style={styles.indexCopy}><Text style={styles.indexLabel}>PARTIAL INDEX</Text><Text style={styles.indexMeta}>{continuity.indexValue !== null ? `${continuity.observedCount} of 6 signals observed` : "Insufficient evidence for an Index"}</Text></View></View>
             <View style={styles.rule} />
-            <View style={styles.focusRow}><Sparkles size={18} color={C.purple} /><View style={styles.focusCopy}><Text style={styles.focusLabel}>FIRST FOCUS · Recommended starting module</Text><Text style={styles.focusValue}>{result?.first_focus?.first_focus_label ?? "Your first focus is not available yet."}</Text></View></View>
+            <View style={styles.focusRow}><Sparkles size={18} color={C.purple} /><View style={styles.focusCopy}><Text style={styles.focusLabel}>FIRST FOCUS · Recommended starting module</Text><Text style={styles.focusValue}>{continuity.firstFocusLabel ?? "Your first focus is not available yet."}</Text></View></View>
           </GlassCard>
         </Reveal>
-        <Reveal index={2}><View style={styles.truth}><Text style={styles.truthTitle}>A clean start</Text><Text style={styles.truthBody}>{sessions.length} saved rehearsal record{sessions.length === 1 ? "" : "s"} · {pilotProgress.length} paid practice{pilotProgress.length === 1 ? "" : "s"} completed. No history was added by purchase.</Text></View></Reveal>
+        <Reveal index={2}><View style={styles.truth}><Text style={styles.truthTitle}>A clean start</Text><Text style={styles.truthBody}>{continuity.savedHistoryCount} saved rehearsal record{continuity.savedHistoryCount === 1 ? "" : "s"} · {continuity.completedPracticeCount} paid practice{continuity.completedPracticeCount === 1 ? "" : "s"} completed. No history was added by purchase.</Text></View></Reveal>
       </ScrollView>
       <StateDock bottomInset={insets.bottom}><PrimaryButton label="Start my first practice" disabled={!moduleId} onPress={() => moduleId && router.replace({ pathname: "/module/[day]", params: { day: moduleId } })} /><Text style={styles.moduleNote}>{module ? `Begins with ${module.name}` : "Your recommendation needs another look before practice can begin."}</Text></StateDock>
     </View>

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Backdrop, Eyebrow, PressCard, Reveal } from "@/components/ui";
 import { CATEGORIES, SCENARIOS } from "@/constants/scenarios";
 import { C, GUTTER, T, eyebrow, font, radius, shadow } from "@/constants/theme";
+import { scenarioInteraction } from "@/lib/nativeCommerce";
 import { useStore } from "@/providers/store";
 import type { CategoryId, Scenario } from "@/types/convo";
 
@@ -28,8 +29,9 @@ export default function Library() {
     else router.push("/custom");
   };
   const openScenario = (scenario: Scenario): void => {
-    if (isLocked) router.push({ pathname: "/paywall", params: { gate: "another-rehearsal" } });
-    else router.push(`/scenario/${scenario.id}`);
+    const interaction = scenarioInteraction(isLocked, scenario.id);
+    if (interaction.isLocked) router.push({ pathname: "/paywall", params: { gate: "another-rehearsal" } });
+    else router.push(interaction.destination as `/scenario/${string}`);
   };
   const doneIds = useMemo<Set<string>>(
     () => new Set(completed.map((session) => session.scenarioId)),

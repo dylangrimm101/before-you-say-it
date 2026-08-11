@@ -14,6 +14,11 @@ export interface SubscriptionSnapshot {
   willRenew: boolean | null;
 }
 
+const MANAGEMENT_HOSTS: Readonly<Record<"apple" | "google", string>> = {
+  apple: "apps.apple.com",
+  google: "play.google.com",
+};
+
 type UnknownRecord = Record<string, unknown>;
 
 function record(value: unknown): UnknownRecord | null {
@@ -53,6 +58,30 @@ export function storeProductSnapshot(product: unknown): StoreProductSnapshot | n
   };
 }
 
+/** True only when the named entitlement is present in provider-reported active state. */
+export function hasActiveEntitlement(customerInfo: unknown, entitlementId: string): boolean {
+  const info = record(customerInfo);
+  const entitlements = record(info?.entitlements);
+  const active = record(entitlements?.active);
+  return record(active?.[entitlementId]) !== null;
+}
+
+/**
+ * Accepts only the exact Apple or Google host RevenueCat currently returns.
+ * Unknown providers and any URL ambiguity fail closed.
+ */
+export function validatedManagementDestination(provider: PurchaseProvider, rawURL: string | null): string | null {
+  if ((provider !== "apple" && provider !== "google") || !rawURL) return null;
+  try {
+    const parsed = new URL(rawURL);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return null;
+    if (parsed.hostname.toLowerCase() !== MANAGEMENT_HOSTS[provider]) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 /** Maps RevenueCat lifecycle data without guessing a provider or management destination. */
 export function subscriptionSnapshot(customerInfo: unknown, entitlementId: string): SubscriptionSnapshot | null {
   const info = record(customerInfo);
@@ -70,7 +99,7 @@ export function subscriptionSnapshot(customerInfo: unknown, entitlementId: strin
         : "unknown";
   return {
     provider,
-    managementURL: nonEmpty(info?.managementURL),
+    managementURL: validatedManagementDestination(provider, nonEmpty(info?.managementURL)),
     expirationDate: nonEmpty(entitlement.expirationDate),
     willRenew: typeof entitlement.willRenew === "boolean" ? entitlement.willRenew : null,
   };

@@ -9,12 +9,19 @@ import { Backdrop, Eyebrow, GhostButton, GlassCard, PressCard, PrimaryButton, Re
 import { curriculumModule, isModuleId, type ModuleId } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { storeProductSnapshot } from "@/lib/commerce";
+import {
+  commerceStatusMessage,
+  openOffer,
+  transitionOffer,
+  transitionPurchase,
+  transitionRestore,
+  type CommercePresentationState,
+  type OfferState,
+} from "@/lib/nativeCommerce";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useIsPro, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
 import { useStore } from "@/providers/store";
-
-type OfferStage = 1 | 2 | 3;
-type CommerceState = "ready" | "pending" | "cancelled" | "failed" | "entitlement_delayed" | "restoring" | "restore_empty";
+import type { SharedResultContractV1 } from "@/types/sharedProduct";
 
 const VALUE_POINTS: readonly string[] = [
   "A short lesson tied to your first focus",
@@ -34,9 +41,10 @@ export default function Paywall() {
   const { data: offerings, isLoading, error: offeringsError } = useOfferings();
   const purchase = usePurchasePackage();
   const restore = useRestorePurchases();
-  const [stage, setStage] = useState<OfferStage>(1);
+  const [offer, setOffer] = useState<OfferState<SharedResultContractV1 | undefined>>(() => openOffer(activePracticeSession?.sharedResult));
   const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
-  const [commerceState, setCommerceState] = useState<CommerceState>("ready");
+  const [commerceState, setCommerceState] = useState<CommercePresentationState>("ready");
+  const stage = offer.stage;
 
   const plans = useMemo((): { monthly: PurchasesPackage | null; annual: PurchasesPackage | null } => {
     const current = offerings?.current;
@@ -52,38 +60,53 @@ export default function Paywall() {
     else router.replace("/(tabs)");
   };
 
+  const navigateOffer = (event: "forward" | "back" | "dismiss"): void => {
+    const next = transitionOffer(offer, event);
+    if (next.isDismissed) leave();
+    else setOffer(next);
+  };
+
   const buy = async (): Promise<void> => {
     if (isPro) {
       router.replace({ pathname: "/purchase-success", params: moduleId ? { moduleId } : {} });
       return;
     }
     if (!selectedPackage || purchase.isPending) return;
-    setCommerceState("pending");
+    setCommerceState(transitionPurchase("ready", { type: "begin" }).state);
     tap("light");
     try {
       const result = await purchase.mutateAsync(selectedPackage);
-      if (result.status === "purchased") {
+      const next = result.status === "purchased"
+        ? transitionPurchase("pending", { type: "provider_returned", hasActivePro: true })
+        : result.status === "entitlement_delayed"
+          ? transitionPurchase("pending", { type: "provider_returned", hasActivePro: false })
+          : result.status === "pending"
+            ? transitionPurchase("pending", { type: "provider_pending" })
+            : transitionPurchase("pending", { type: "user_cancelled" });
+      setCommerceState(next.state);
+      if (next.shouldRouteToPurchased) {
         tap("success");
         router.replace({ pathname: "/purchase-success", params: moduleId ? { moduleId } : {} });
-      } else if (result.status === "pending") setCommerceState("pending");
-      else if (result.status === "entitlement_delayed") setCommerceState("entitlement_delayed");
-      else setCommerceState("cancelled");
+      }
     } catch (error) {
       safeLog("[paywall] purchase failed", errorShape(error));
-      setCommerceState("failed");
+      setCommerceState(transitionPurchase("pending", { type: "provider_error" }).state);
     }
   };
 
   const onRestore = async (): Promise<void> => {
     if (restore.isPending) return;
-    setCommerceState("restoring");
+    setCommerceState(transitionRestore("ready", { type: "begin" }).state);
     try {
       const restored = await restore.mutateAsync();
-      if (restored) router.replace({ pathname: "/purchase-success", params: moduleId ? { moduleId } : {} });
-      else setCommerceState("restore_empty");
+      const next = transitionRestore("restoring", { type: "provider_returned", hasActivePro: restored });
+      setCommerceState(next.state);
+      if (next.shouldRouteToPurchased) {
+        router.replace({ pathname: "/purchase-success", params: moduleId ? { moduleId } : {} });
+      }
     } catch (error) {
       safeLog("[paywall] restore failed", errorShape(error));
-      setCommerceState("failed");
+      setCommerceState(transitionRestore("restoring", { type: "provider_error" }).state);
     }
   };
 
@@ -95,7 +118,7 @@ export default function Paywall() {
     <View style={styles.root}>
       <Backdrop />
       <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
-        <PressCard onPress={leave} style={styles.iconButton} accessibilityLabel="Back"><ArrowLeft size={20} color={C.textSoft} /></PressCard>
+        <PressCard onPress={() => navigateOffer("back")} style={styles.iconButton} accessibilityLabel="Back"><ArrowLeft size={20} color={C.textSoft} /></PressCard>
         <Text style={styles.step}>OFFER · {stage} OF 3</Text>
         <PressCard onPress={() => void onRestore()} style={styles.restoreHit} accessibilityLabel="Restore purchase"><Text style={styles.restoreText}>Restore</Text></PressCard>
       </View>
@@ -119,7 +142,7 @@ export default function Paywall() {
       </ScrollView>
 
       <StateDock bottomInset={insets.bottom}>
-        {stage < 3 ? <PrimaryButton label="Continue" onPress={() => setStage((stage + 1) as OfferStage)} /> : (
+        {stage < 3 ? <PrimaryButton label="Continue" onPress={() => navigateOffer("forward")} /> : (
           <>
             <PrimaryButton
               label={commerceState === "pending" ? "Waiting for the store…" : terms?.trialDurationLabel ? `Start ${terms.trialDurationLabel} free trial` : terms ? `Continue · ${terms.priceString}` : "Plans unavailable"}
@@ -131,7 +154,7 @@ export default function Paywall() {
             ) : null}
           </>
         )}
-        <GhostButton label="Keep my free debrief for now" onPress={leave} style={styles.secondary} />
+        <GhostButton label="Keep my free debrief for now" onPress={() => navigateOffer("dismiss")} style={styles.secondary} />
       </StateDock>
     </View>
   );
@@ -145,7 +168,7 @@ function StageTwo({ trialDuration }: { trialDuration: string | null }) {
   return <Reveal><Eyebrow color={C.purple}>No surprise charge</Eyebrow><Text style={styles.title}>{trialDuration ? `Your store offers a ${trialDuration} trial.` : "Review the store terms before you decide."}</Text><Text style={styles.lede}>{trialDuration ? "The App Store or Google Play controls eligibility and renewal. BYSI will show only terms supplied for your account." : "A free trial is not currently confirmed for this account. The final screen shows the available provider terms without substituting an invented trial."}</Text><View style={styles.timeline}><TimelineRow active label="Today" detail={trialDuration ? "Trial begins after provider confirmation" : "You review the live offer"} /><TimelineRow label="Before renewal" detail="Manage or cancel through the verified purchase provider" /><TimelineRow label="Renewal" detail="The provider applies the terms shown at confirmation" last /></View></Reveal>;
 }
 
-function StageThree({ plans, billing, onBilling, terms, isLoading, unavailable, commerceState, onPrivacy }: { plans: { monthly: PurchasesPackage | null; annual: PurchasesPackage | null }; billing: "monthly" | "annual"; onBilling: (value: "monthly" | "annual") => void; terms: ReturnType<typeof storeProductSnapshot>; isLoading: boolean; unavailable: boolean; commerceState: CommerceState; onPrivacy: () => void }) {
+function StageThree({ plans, billing, onBilling, terms, isLoading, unavailable, commerceState, onPrivacy }: { plans: { monthly: PurchasesPackage | null; annual: PurchasesPackage | null }; billing: "monthly" | "annual"; onBilling: (value: "monthly" | "annual") => void; terms: ReturnType<typeof storeProductSnapshot>; isLoading: boolean; unavailable: boolean; commerceState: CommercePresentationState; onPrivacy: () => void }) {
   return <Reveal><Eyebrow color={C.purple}>Provider terms</Eyebrow><Text style={styles.title}>Choose with the live store details in view.</Text><Text style={styles.lede}>Access starts only after RevenueCat reports an active pro entitlement.</Text>{isLoading ? <ActivityIndicator color={C.purple} style={styles.loading} /> : unavailable ? <StatusCard state="failed" /> : <View style={styles.planList}>{plans.monthly ? <PlanChoice label="Monthly option" price={plans.monthly.product.priceString} selected={billing === "monthly"} onPress={() => onBilling("monthly")} /> : null}{plans.annual ? <PlanChoice label="Annual option" price={plans.annual.product.priceString} selected={billing === "annual"} onPress={() => onBilling("annual")} /> : null}</View>}<GlassCard style={styles.termsCard}><View style={styles.termRow}><Text style={styles.termLabel}>Price</Text><Text style={styles.termValue}>{terms?.priceString ?? "Unavailable"}</Text></View><View style={styles.termRow}><Text style={styles.termLabel}>Cadence</Text><Text style={styles.termValue}>{terms?.periodLabel ?? "Confirmed by provider"}</Text></View><View style={styles.termRow}><Text style={styles.termLabel}>Trial</Text><Text style={styles.termValue}>{terms?.trialDurationLabel ?? "No confirmed trial"}</Text></View></GlassCard>{commerceState !== "ready" ? <StatusCard state={commerceState} /> : null}<View style={styles.links}><PressCard onPress={() => void Linking.openURL("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")} accessibilityLabel="Terms"><Text style={styles.link}>Terms</Text></PressCard><Text style={styles.dot}>·</Text><PressCard onPress={onPrivacy} accessibilityLabel="Privacy"><Text style={styles.link}>Privacy in app</Text></PressCard></View></Reveal>;
 }
 
@@ -157,10 +180,11 @@ function TimelineRow({ label, detail, active = false, last = false }: { label: s
   return <View style={styles.timelineRow}><View style={styles.rail}><View style={[styles.railDot, active && styles.railDotOn]} />{!last ? <View style={styles.railLine} /> : null}</View><View style={styles.timelineCopy}><Text style={styles.timelineLabel}>{label}</Text><Text style={styles.timelineDetail}>{detail}</Text></View></View>;
 }
 
-function StatusCard({ state }: { state: CommerceState }) {
-  const copy: Record<CommerceState, string> = { ready: "Ready", pending: "Purchase pending. Access unlocks only after the provider confirms pro.", cancelled: "Purchase cancelled. Nothing was charged or unlocked by BYSI.", failed: "The store could not complete this request. Try again when the connection is ready.", entitlement_delayed: "The purchase returned, but pro is not active yet. Access remains locked while entitlement catches up.", restoring: "Checking this store account for an active entitlement…", restore_empty: "Restore completed, but no active pro entitlement was found." };
+function StatusCard({ state }: { state: CommercePresentationState }) {
+  const copy = commerceStatusMessage(state) ?? "Ready";
   const Icon = state === "restoring" || state === "pending" ? RefreshCw : state === "cancelled" ? Clock3 : AlertCircle;
-  return <View style={styles.status}><Icon size={17} color={state === "failed" ? C.clay : C.purple} /><Text style={styles.statusText}>{copy[state]}</Text></View>;
+  const isFailure = state === "failed" || state === "restore_failed";
+  return <View style={styles.status}><Icon size={17} color={isFailure ? C.clay : C.purple} /><Text style={styles.statusText}>{copy}</Text></View>;
 }
 
 function Unavailable({ title, body, onBack }: { title: string; body: string; onBack: () => void }) {
