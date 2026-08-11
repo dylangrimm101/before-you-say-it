@@ -357,25 +357,39 @@ export function createPilotDayRun(
   };
 }
 
-/** Persist a daily transition while preserving every confirmed attempt. */
-export function upsertPilotDayRun(session: ActivePracticeSession, incoming: PilotDayRun, now: number = Date.now()): ActivePracticeSession {
-  const runKey = incoming.practiceId ?? incoming.moduleId ?? String(incoming.day);
-  const existing = session.pilotRuns[runKey];
-  const protectedRun: PilotDayRun = existing ? {
+/** Merge one run without allowing stale snapshots to erase confirmed progress. */
+function protectPilotDayRun(existing: PilotDayRun, incoming: PilotDayRun): PilotDayRun {
+  const isStale = incoming.updatedAt < existing.updatedAt;
+  const hasRejectedNoteTombstone = existing.noteFit === "rejected";
+  return {
     ...incoming,
     ...(existing.attempt ? { attempt: existing.attempt } : {}),
     ...(existing.responseAttempt ? { responseAttempt: existing.responseAttempt } : {}),
     ...(existing.retryAttempt ? { retryAttempt: existing.retryAttempt } : {}),
+    ...(existing.scenarioContext ? { scenarioContext: existing.scenarioContext } : {}),
     ...(existing.counterpartTurn ? { counterpartTurn: existing.counterpartTurn } : {}),
     ...(existing.counterpartIdentity ? { counterpartIdentity: existing.counterpartIdentity } : {}),
     ...(existing.counterpartReactionId ? { counterpartReactionId: existing.counterpartReactionId } : {}),
     ...(existing.resolvedAudioId ? { resolvedAudioId: existing.resolvedAudioId } : {}),
     ...(existing.adamReactionId ? { adamReactionId: existing.adamReactionId } : {}),
     ...(existing.adamAudioId ? { adamAudioId: existing.adamAudioId } : {}),
+    ...(existing.coachedBehaviorId ? { coachedBehaviorId: existing.coachedBehaviorId } : {}),
     ...(existing.coachedSegment ? { coachedSegment: existing.coachedSegment } : {}),
     ...(existing.retryResetId ? { retryResetId: existing.retryResetId } : {}),
-    updatedAt: now,
-  } : { ...incoming, updatedAt: now };
+    ...(existing.comparison ? { comparison: existing.comparison } : {}),
+    ...(existing.completedAt ? { completedAt: existing.completedAt } : {}),
+    ...(isStale || existing.state === "complete" ? { state: existing.state } : {}),
+    ...(hasRejectedNoteTombstone ? { noteFit: "rejected" as const, coachNote: undefined } : {}),
+  };
+}
+
+/** Persist a daily transition while preserving every confirmed attempt. */
+export function upsertPilotDayRun(session: ActivePracticeSession, incoming: PilotDayRun, now: number = Date.now()): ActivePracticeSession {
+  const runKey = incoming.practiceId ?? incoming.moduleId ?? String(incoming.day);
+  const existing = session.pilotRuns[runKey];
+  const protectedRun: PilotDayRun = existing
+    ? { ...protectPilotDayRun(existing, incoming), updatedAt: now }
+    : { ...incoming, updatedAt: now };
   return {
     ...session,
     pilotRuns: { ...session.pilotRuns, [runKey]: protectedRun },
@@ -413,26 +427,19 @@ export function dayThirtyBaseline(session: ActivePracticeSession | null): Immuta
 /** Prevents later session updates from replacing confirmed records. */
 export function protectImmutablePracticeRecords(existing: ActivePracticeSession, incoming: ActivePracticeSession): ActivePracticeSession {
   if (existing.id !== incoming.id) return incoming;
-  const pilotRuns = Object.fromEntries(Object.entries(incoming.pilotRuns).map(([day, run]) => {
-    const old = existing.pilotRuns[day];
-    return [day, old ? {
-      ...run,
-      ...(old.attempt ? { attempt: old.attempt } : {}),
-      ...(old.responseAttempt ? { responseAttempt: old.responseAttempt } : {}),
-      ...(old.retryAttempt ? { retryAttempt: old.retryAttempt } : {}),
-      ...(old.counterpartTurn ? { counterpartTurn: old.counterpartTurn } : {}),
-      ...(old.counterpartIdentity ? { counterpartIdentity: old.counterpartIdentity } : {}),
-      ...(old.counterpartReactionId ? { counterpartReactionId: old.counterpartReactionId } : {}),
-      ...(old.resolvedAudioId ? { resolvedAudioId: old.resolvedAudioId } : {}),
-      ...(old.adamReactionId ? { adamReactionId: old.adamReactionId } : {}),
-      ...(old.adamAudioId ? { adamAudioId: old.adamAudioId } : {}),
-      ...(old.coachedSegment ? { coachedSegment: old.coachedSegment } : {}),
-      ...(old.retryResetId ? { retryResetId: old.retryResetId } : {}),
-    } : run];
+  const allRunKeys = new Set([...Object.keys(existing.pilotRuns), ...Object.keys(incoming.pilotRuns)]);
+  const pilotRuns = Object.fromEntries([...allRunKeys].map((runKey) => {
+    const old = existing.pilotRuns[runKey];
+    const next = incoming.pilotRuns[runKey];
+    if (!next) return [runKey, old];
+    return [runKey, old ? protectPilotDayRun(old, next) : next];
   }));
+  const isStale = incoming.updatedAt < existing.updatedAt;
   return {
     ...incoming,
     pilotRuns,
+    updatedAt: Math.max(existing.updatedAt, incoming.updatedAt),
+    ...(isStale ? { nextState: existing.nextState } : {}),
     ...(existing.attemptOne ? { attemptOne: existing.attemptOne } : {}),
     ...(existing.originalAdamResponse ? { originalAdamResponse: existing.originalAdamResponse } : {}),
     ...(existing.dayThirtyBaseline ? { dayThirtyBaseline: existing.dayThirtyBaseline } : {}),
