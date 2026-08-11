@@ -39,6 +39,7 @@ export const ONBOARDING_REACTIONS: readonly { id: ReactionPattern; label: string
 ];
 
 const DIFFICULTY: Difficulty = "steady";
+const QUESTION_STACK_LAYERS = [0, 1, 2] as const;
 
 function ConversationMark() {
   return (
@@ -291,7 +292,25 @@ export default function Onboarding() {
           <View style={styles.track}><View style={[styles.fill, { width: `${((step + 1) / totalSteps) * 100}%` }]} /></View>
         </View> : null}
 
-        <ScrollView style={[styles.scroller, step >= 0 && styles.questionSheet]} contentContainerStyle={[styles.scroll, step < 0 && styles.openingScroll, { paddingBottom: footerHeight + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
+        <View style={styles.questionDeck}>
+          {step > 0 ? QUESTION_STACK_LAYERS.slice(0, Math.min(step, QUESTION_STACK_LAYERS.length)).map((layer) => (
+            <View
+              key={layer}
+              pointerEvents="none"
+              style={[styles.stackedSheet, { top: layer * 8, zIndex: layer + 1 }]}
+            />
+          )) : null}
+          <ScrollView
+            style={[
+              styles.scroller,
+              step >= 0 && styles.questionSheet,
+              step > 0 && { marginTop: Math.min(step, QUESTION_STACK_LAYERS.length) * 8 },
+            ]}
+            contentContainerStyle={[styles.scroll, step < 0 && styles.openingScroll, { paddingBottom: footerHeight + 24 }]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
+          >
           {step === -1 ? <Reveal><View style={styles.opening}><ConversationMark /><Text style={styles.openingTitle}>Build the qualities of world-class communicators.</Text><Text style={styles.openingBody}>Learn to communicate with Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.</Text><PrimaryButton label="Build my communication skills" onPress={() => setStep(0)} style={styles.openingButton} /></View></Reveal> : null}
           {step === 0 ? <Reveal><Text style={styles.title}>What brought you here?</Text><Text style={styles.lede}>Choose the closest answer. Every path includes a real rehearsal before any recommendation.</Text><View style={styles.options}>{ENTRY_CHOICES.map((choice) => <Choice key={choice.id} title={choice.label} note={choice.note} selected={entryRoute === choice.id} onPress={() => chooseEntry(choice.id)} />)}</View></Reveal> : null}
 
@@ -309,7 +328,8 @@ export default function Onboarding() {
           {((isReal && step === 7) || (!isReal && step === 4)) ? <Reveal><Text style={styles.title}>How might they respond?</Text><Text style={styles.lede}>Choose the closest response style for this rehearsal.</Text><View style={styles.pills}>{ONBOARDING_REACTIONS.map((item) => <Pill key={item.id} label={item.label} selected={reaction === item.id} onPress={() => chooseReaction(item.id)} />)}</View></Reveal> : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
-        </ScrollView>
+          </ScrollView>
+        </View>
 
         {showsFooter ? <BlurView intensity={Platform.OS === "web" ? 0 : 30} tint="light" style={[styles.footer, { paddingBottom: insets.bottom + 18 }]} onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}><PrimaryButton label={building ? "Setting up your rehearsal…" : "Continue"} disabled={!canContinue || building} onPress={next} />{building ? <ActivityIndicator color={C.purple} style={styles.spinner} accessibilityLabel="Setting up your rehearsal" /> : null}</BlurView> : null}
       </KeyboardAvoidingView>
@@ -334,11 +354,11 @@ function Input({ value, onChangeText, placeholder, maxLength = 500, accessibilit
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 }, screenTint: { ...StyleSheet.absoluteFillObject }, scroller: { flex: 1 }, questionSheet: { backgroundColor: "#FCFBFD", borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, borderBottomWidth: 0, borderColor: "rgba(81,40,136,0.10)", overflow: "hidden" },
-  header: { paddingHorizontal: GUTTER, paddingBottom: 18, gap: 10 }, headerRow: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, backHit: { minWidth: 60, minHeight: 44, justifyContent: "center" }, backText: { fontFamily: font.semi, fontSize: 17, color: C.textSoft }, hidden: { color: "transparent" }, counter: { ...eyebrow, color: C.dim },
+  root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 }, screenTint: { ...StyleSheet.absoluteFillObject }, questionDeck: { flex: 1 }, scroller: { flex: 1, zIndex: 4 }, questionSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, borderBottomWidth: 0, borderColor: "rgba(81,40,136,0.12)", overflow: "hidden" }, stackedSheet: { position: "absolute", left: 0, right: 0, height: 54, backgroundColor: "#FAF8FC", borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, borderColor: "rgba(81,40,136,0.12)" },
+  header: { paddingHorizontal: GUTTER, paddingBottom: 18, gap: 10 }, headerRow: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, backHit: { minWidth: 60, minHeight: 44, justifyContent: "center" }, backText: { fontFamily: font.medium, fontSize: 17, color: "#454D57" }, hidden: { color: "transparent" }, counter: { ...eyebrow, color: "#626D79" },
   track: { height: 3, borderRadius: 2, backgroundColor: C.line, overflow: "hidden" }, fill: { height: 3, backgroundColor: C.purple },
-  scroll: { paddingHorizontal: GUTTER, paddingTop: 26 }, openingScroll: { flexGrow: 1, justifyContent: "center" }, opening: { alignItems: "center", gap: 18, paddingHorizontal: 10 }, mark: { width: 180, height: 92, marginBottom: 12 }, openingTitle: { fontFamily: font.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.7, color: C.text, textAlign: "center" }, openingBody: { ...T.body, color: C.textSoft, textAlign: "center", lineHeight: 27 }, openingButton: { width: "100%", marginTop: 18 }, title: { ...T.display }, lede: { ...T.body, color: C.textSoft, lineHeight: 27, marginTop: 12 }, options: { gap: 10, marginTop: 24 },
-  choice: { minHeight: 70, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, scenarioChoice: { minHeight: 112, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, choiceOn: { borderColor: C.purple }, choiceCopy: { flex: 1, zIndex: 1, gap: 4 }, contextLabel: { ...eyebrow, color: C.purple }, choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: C.text }, choiceNote: { ...T.caption }, choiceTextOn: { color: C.onAccent, zIndex: 1 },
+  scroll: { paddingHorizontal: GUTTER, paddingTop: 26 }, openingScroll: { flexGrow: 1, justifyContent: "center" }, opening: { alignItems: "center", gap: 18, paddingHorizontal: 10 }, mark: { width: 180, height: 92, marginBottom: 12 }, openingTitle: { fontFamily: font.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.7, color: C.text, textAlign: "center" }, openingBody: { ...T.body, color: C.textSoft, textAlign: "center", lineHeight: 27 }, openingButton: { width: "100%", marginTop: 18 }, title: { ...T.display, color: "#191C22" }, lede: { ...T.body, color: "#535C67", lineHeight: 27, marginTop: 12 }, options: { gap: 10, marginTop: 24 },
+  choice: { minHeight: 70, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: "rgba(23,26,31,0.12)", backgroundColor: "#F8F8F9", borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, scenarioChoice: { minHeight: 112, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: "rgba(23,26,31,0.12)", backgroundColor: "#F8F8F9", borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, choiceOn: { borderColor: C.purple }, choiceCopy: { flex: 1, zIndex: 1, gap: 4 }, contextLabel: { ...eyebrow, color: C.purple }, choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: "#20232A" }, choiceNote: { ...T.support, color: "#66717D" }, choiceTextOn: { color: C.onAccent, zIndex: 1 },
   pills: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 24 }, pill: { minHeight: 52, justifyContent: "center", paddingHorizontal: 20, borderRadius: radius.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, overflow: "hidden" }, pillOn: { borderColor: C.purple }, pillText: { fontFamily: font.semi, fontSize: 16, color: C.text, zIndex: 1 },
   ownLink: { minHeight: 48, alignItems: "center", justifyContent: "center", marginTop: 14, paddingHorizontal: 8 }, ownLinkText: { ...T.caption, color: C.purple, textAlign: "center", fontFamily: font.semi },
   input: { ...T.body, minHeight: 148, marginTop: 24, padding: 18, borderRadius: radius.lg, borderWidth: 1, borderColor: C.glassEdge, backgroundColor: C.surface, color: C.text, ...shadow.layer },
