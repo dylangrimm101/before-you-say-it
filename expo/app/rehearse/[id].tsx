@@ -712,7 +712,6 @@ function LegacyRehearse() {
           />
         </ScrollView>
         <StateDock bottomInset={insets.bottom}>
-          <Text style={styles.introHint}>Use your first instinct — not the perfect version.</Text>
           <PrimaryButton label="Start my rehearsal" onPress={() => setRehearsalStage("permission")} />
         </StateDock>
       </View>
@@ -1433,7 +1432,6 @@ const styles = StyleSheet.create({
   introHeader: { minHeight: 54, paddingHorizontal: GUTTER, justifyContent: "center" },
   backText: { ...T.support, fontFamily: font.medium, color: C.text },
   introScroll: { paddingHorizontal: GUTTER, paddingTop: 10 },
-  introHint: { ...T.caption, textAlign: "center", color: C.textSoft, marginBottom: 10 },
   permissionMeta: { ...eyebrow, position: "absolute", left: 0, right: 0, bottom: 17, textAlign: "center", color: C.dim },
   permissionBody: { flex: 1, paddingHorizontal: 34, alignItems: "center", justifyContent: "center", paddingBottom: 70 },
   permissionIcon: { width: 82, height: 82, borderRadius: 41, backgroundColor: C.purpleSoft, borderWidth: 1, borderColor: "rgba(81,40,136,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 24 },
