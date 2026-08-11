@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { Check, ChevronRight } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, useReducedMotion } from "@/components/ui";
@@ -35,6 +35,54 @@ const CARD_TINTS = ["#FFFFFF", "#FDFCFE", "#FBFAFD", "#F9F7FC"] as const;
 interface ActivityCopy {
   title: string;
   body: string;
+}
+
+interface DeckLayerProps {
+  children: React.ReactNode;
+  entrance: Animated.Value;
+  order: number;
+  scrollOffset: Animated.Value;
+}
+
+function pinnedTranslation(order: number, scrollOffset: Animated.Value): Animated.AnimatedInterpolation<number> {
+  const naturalTop = order * (TODAY_CARD_HEIGHT + TODAY_CARD_GAP);
+  const pinnedTop = order * TODAY_PIN_STEP;
+  const pinThreshold = naturalTop - pinnedTop;
+  if (pinThreshold === 0) {
+    return scrollOffset.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+      extrapolateLeft: "clamp",
+      extrapolateRight: "extend",
+    });
+  }
+  return scrollOffset.interpolate({
+    inputRange: [0, pinThreshold, pinThreshold + 1],
+    outputRange: [0, 0, 1],
+    extrapolateLeft: "clamp",
+    extrapolateRight: "extend",
+  });
+}
+
+function DeckLayer({ children, entrance, order, scrollOffset }: DeckLayerProps) {
+  return (
+    <Animated.View
+      style={[
+        styles.cardLayer,
+        {
+          zIndex: 10 + order * 10,
+          opacity: entrance,
+          transform: [
+            { translateY: pinnedTranslation(order, scrollOffset) },
+            { translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
+            { scale: entrance.interpolate({ inputRange: [0, 1], outputRange: [0.978, 1] }) },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
 }
 
 function activityCopy(key: TodayActivityKey, module: CurriculumModule, moduleDay: PilotModule | undefined): ActivityCopy {
@@ -109,6 +157,14 @@ export default function TodayScreen() {
   const activities = useMemo(() => todayActivityPresentation(activeRun?.state, Boolean(activeRun)), [activeRun]);
   const entrances = useRef<Animated.Value[]>(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
   const chartProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
+  const scrollOffset = useRef<Animated.Value>(new Animated.Value(0)).current;
+  const onDeckScroll = useMemo(
+    () => Animated.event(
+      [{ nativeEvent: { contentOffset: { y: scrollOffset } } }],
+      { useNativeDriver: true },
+    ),
+    [scrollOffset],
+  );
 
   useEffect(() => {
     if (isReduced) {
@@ -145,17 +201,25 @@ export default function TodayScreen() {
       <View style={styles.recentStrip} accessibilityLabel="Recent practice, seven days">
         {recentDays.map((day) => <View key={day.key} style={[styles.day, day.isToday && styles.dayToday]}><View style={[styles.dayDot, day.hasPractice && styles.dayDotDone, day.isToday && !day.hasPractice && styles.dayDotToday]}>{day.hasPractice ? <Check size={9} color={C.onAccent} strokeWidth={3} /> : null}</View><Text style={[styles.dayLabel, day.isToday && styles.dayLabelToday]}>{day.label}</Text></View>)}
       </View>
-      <ScrollView style={styles.deck} contentContainerStyle={[styles.deckContent, { paddingBottom: insets.bottom + 116 }]} stickyHeaderIndices={[0, 1, 2, 3, 4]} showsVerticalScrollIndicator={false} stickyHeaderHiddenOnScroll={false}>
-        <Animated.View style={[styles.cardLayer, { zIndex: 10, transform: [{ translateY: 0 }, { translateY: entrances[0].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }, { scale: entrances[0].interpolate({ inputRange: [0, 1], outputRange: [0.978, 1] }) }], opacity: entrances[0] }]}><IndexCard index={index} chartProgress={chartProgress} onDetails={openProgress} /></Animated.View>
+      <Animated.ScrollView
+        style={styles.deck}
+        contentContainerStyle={[styles.deckContent, { paddingBottom: insets.bottom + 116 }]}
+        onScroll={onDeckScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+      >
+        <DeckLayer entrance={entrances[0]} order={0} scrollOffset={scrollOffset}>
+          <IndexCard index={index} chartProgress={chartProgress} onDetails={openProgress} />
+        </DeckLayer>
         {TODAY_ACTIVITY_KEYS.map((key, activityIndex) => {
           const activity = activities[activityIndex];
           const order = activityIndex + 1;
           if (!activity) return null;
           const copy = recommended ? activityCopy(key, recommended, moduleDay) : { title: key === "lesson" ? "Your first lesson isn’t ready yet" : key === "review" ? "See what changed" : `${key[0]?.toUpperCase() ?? ""}${key.slice(1)}`, body: "This activity appears after an evidence-backed first focus is available." };
-          return <Animated.View key={key} style={[styles.cardLayer, { zIndex: 10 + order * 10, transform: [{ translateY: order * TODAY_PIN_STEP }, { translateY: entrances[order].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }, { scale: entrances[order].interpolate({ inputRange: [0, 1], outputRange: [0.978, 1] }) }], opacity: entrances[order] }]}><ActivityCard activity={activity} copy={copy} tint={CARD_TINTS[activityIndex]} onPress={openCurrentActivity} /></Animated.View>;
+          return <DeckLayer key={key} entrance={entrances[order]} order={order} scrollOffset={scrollOffset}><ActivityCard activity={activity} copy={copy} tint={CARD_TINTS[activityIndex]} onPress={openCurrentActivity} /></DeckLayer>;
         })}
         <Pressable onPress={openPath} accessibilityRole="button" accessibilityLabel="View your practice path" style={styles.pathLink}><Text style={styles.pathText}>View your path</Text><ChevronRight size={15} color={C.purple} /></Pressable>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
