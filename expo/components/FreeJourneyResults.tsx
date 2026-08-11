@@ -215,7 +215,10 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
               </PressCard>
               <PrimaryButton
                 label="Continue with my path"
-                onPress={() => router.push({ pathname: "/paywall", params: { gate: "recommended-path", source: "debrief", moduleId: result.first_focus?.recommended_module_id } })}
+                onPress={async () => {
+                  await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: "complete", updatedAt: Date.now() });
+                  router.push({ pathname: "/paywall", params: { gate: "recommended-path", source: "debrief", moduleId: result.first_focus?.recommended_module_id } });
+                }}
                 style={styles.continueButton}
               />
             </View>

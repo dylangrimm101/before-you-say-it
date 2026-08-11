@@ -52,6 +52,7 @@ const KEYS = {
   pilotProgress: "cc.pilotProgress.v1",
   anonymousUserId: "cc.anonymousUserId.v1",
   activePracticeSession: "cc.activePracticeSession.v1",
+  nativeJourneyStarted: "cc.nativeJourneyStarted.v1",
   /** Development-only entitlement override. Never read in a release build. */
   devPro: "cc.devpro.v1",
 } as const;
@@ -93,13 +94,14 @@ export const [StoreProvider, useStore] = createContextHook(() => {
   const [pilotProgress, setPilotProgress] = useState<PilotProgressEntry[]>([]);
   const [anonymousUserId, setAnonymousUserId] = useState<string>("");
   const [activePracticeSession, setActivePracticeSession] = useState<ActivePracticeSession | null>(null);
+  const [nativeJourneyStarted, setNativeJourneyStarted] = useState<boolean>(false);
   const [devPro, setDevPro] = useState<boolean>(false);
 
   useEffect(() => {
     let alive = true;
     const load = async () => {
       try {
-        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, anonymousId, practiceSession, dp] = await Promise.all([
+        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, anonymousId, practiceSession, journeyStarted, dp] = await Promise.all([
           AsyncStorage.getItem(KEYS.profile),
           AsyncStorage.getItem(KEYS.sessions),
           AsyncStorage.getItem(KEYS.sessionsLegacy),
@@ -112,11 +114,13 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           AsyncStorage.getItem(KEYS.pilotProgress),
           AsyncStorage.getItem(KEYS.anonymousUserId),
           AsyncStorage.getItem(KEYS.activePracticeSession),
+          AsyncStorage.getItem(KEYS.nativeJourneyStarted),
           __DEV__ ? AsyncStorage.getItem(KEYS.devPro) : Promise.resolve(null),
         ]);
         if (!alive) return;
 
         if (__DEV__ && dp === "1") setDevPro(true);
+        setNativeJourneyStarted(journeyStarted === "1");
         const stableAnonymousId = anonymousId?.trim() || newAnonymousUserId();
         setAnonymousUserId(stableAnonymousId);
         if (!anonymousId) await AsyncStorage.setItem(KEYS.anonymousUserId, stableAnonymousId);
@@ -268,6 +272,16 @@ export const [StoreProvider, useStore] = createContextHook(() => {
       );
       return next;
     });
+  }, []);
+
+  /** Marks that Entry routed this installation into the native acquisition journey. */
+  const beginNativeJourney = useCallback(async (): Promise<void> => {
+    setNativeJourneyStarted(true);
+    try {
+      await AsyncStorage.setItem(KEYS.nativeJourneyStarted, "1");
+    } catch (e) {
+      safeLog("[store] entry state save failed", errorShape(e));
+    }
   }, []);
 
   const saveProfile = useCallback(async (next: Profile) => {
@@ -462,6 +476,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     setMigrationNotice(false);
     setPilotProgress([]);
     setActivePracticeSession(null);
+    setNativeJourneyStarted(false);
     clearLiveSessionContent();
     cancelDailyReminder().catch(() => {});
     cancelChallengeNudge().catch(() => {});
@@ -479,6 +494,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         KEYS.consent,
         KEYS.pilotProgress,
         KEYS.activePracticeSession,
+        KEYS.nativeJourneyStarted,
         KEYS.anonymousUserId,
         KEYS.devPro,
       ]);
@@ -729,6 +745,8 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     modularDoneIds,
     anonymousUserId,
     activePracticeSession,
+    nativeJourneyStarted,
+    beginNativeJourney,
     saveActivePracticeSession,
     associateActivePracticeSessionWithUser,
     currentPilotDay,

@@ -1,495 +1,69 @@
-import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
-import { Bell, ChevronRight, Minus, RotateCcw, ShieldCheck, Trash2, TrendingDown, TrendingUp } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
-import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Check, ChevronRight, Circle, Settings, Target, Trash2 } from "lucide-react-native";
+import React, { useMemo } from "react";
+import { Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Backdrop, Eyebrow, Meter, PressCard, Reveal, tap } from "@/components/ui";
-import { DIFFICULTY } from "@/constants/scenarios";
-import { C, GUTTER, T, eyebrow, font, radius, shadow } from "@/constants/theme";
-import { overallOf, spokenLineCount } from "@/lib/progress";
+import { Backdrop, Eyebrow, GlassCard, Meter, PressCard, Reveal, tap } from "@/components/ui";
+import { CURRICULUM_MODULES, curriculumModule } from "@/constants/modules";
+import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
+import { SHARED_SIGNAL_KEYS, type SharedSignalKey } from "@/types/sharedProduct";
 import { useStore } from "@/providers/store";
 
-const AXES = [
-  { key: "clarity", label: "Clarity", tone: C.sage },
-  { key: "empathy", label: "Empathy", tone: "#4F6C8F" },
-  { key: "assertiveness", label: "Assertiveness", tone: C.purple },
-] as const;
+const SIGNAL_LABELS: Record<SharedSignalKey, string> = { clarity: "Clarity", specificity: "Specificity", steadiness: "Steadiness", listening: "Listening", boundaries: "Boundaries", repair: "Repair" };
 
-function formatTime(hour: number, minute: number): string {
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-function ReminderCard() {
-  const { reminder, setReminder } = useStore();
-  const [showPicker, setShowPicker] = useState<boolean>(false);
-
-  const enabled = reminder?.enabled ?? false;
-  const hour = reminder?.hour ?? 18;
-  const minute = reminder?.minute ?? 30;
-
-  const pickerValue = new Date();
-  pickerValue.setHours(hour, minute, 0, 0);
-
-  const denied = () => {
-    const msg = "Turn on notifications for Before You Say It in Settings to get your daily nudge.";
-    if (Platform.OS === "web") return;
-    Alert.alert("Notifications are off", msg);
-  };
-
-  const toggle = async (next: boolean) => {
-    tap("light");
-    const ok = await setReminder({ enabled: next, hour, minute });
-    if (!ok) denied();
-  };
-
-  const onTimeChange = async (event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === "android") setShowPicker(false);
-    if (event.type !== "set" || !date) return;
-    tap("light");
-    const ok = await setReminder({
-      enabled: true,
-      hour: date.getHours(),
-      minute: date.getMinutes(),
-    });
-    if (!ok) denied();
-  };
-
-  if (Platform.OS === "web") {
-    return (
-      <View style={styles.reminderCard}>
-        <View style={styles.reminderHead}>
-          <Bell size={16} color={C.amber} />
-          <Text style={styles.reminderTitle}>Daily reminder</Text>
-        </View>
-        <Text style={styles.reminderBody}>
-          Reminders work on your phone — open the app there to set one.
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.reminderCard}>
-      <View style={styles.reminderHead}>
-        <Bell size={16} color={C.amber} />
-        <Text style={styles.reminderTitle}>Daily reminder</Text>
-        <Switch
-          value={enabled}
-          onValueChange={toggle}
-          trackColor={{ false: C.surfaceHigh, true: `${C.amber}88` }}
-          thumbColor={enabled ? C.amber : C.dim}
-        />
-      </View>
-      <Text style={styles.reminderBody}>
-        {enabled
-          ? "A nudge to knock out your two-minute drill."
-          : "Get a nudge at your time of choice so the streak never slips."}
-      </Text>
-      {enabled ? (
-        <PressCard
-          onPress={() => {
-            tap("light");
-            setShowPicker((v) => !v);
-          }}
-        >
-          <View style={styles.timeRow}>
-            <Text style={[eyebrow, { color: C.dim }]}>Remind me at</Text>
-            <Text style={styles.timeValue}>{formatTime(hour, minute)}</Text>
-          </View>
-        </PressCard>
-      ) : null}
-      {enabled && (showPicker || Platform.OS === "ios") ? (
-        <DateTimePicker
-          value={pickerValue}
-          mode="time"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={onTimeChange}
-          themeVariant="light"
-          style={styles.picker}
-        />
-      ) : null}
-    </View>
-  );
-}
-
-export default function Progress() {
+export default function ProgressScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const {
-    completed,
-    averages,
-    streak,
-    deleteSession,
-    devProEnabled,
-    toggleDevPro,
-  } = useStore();
+  const { completed, pilotProgress, activePracticeSession, deleteSession, modularDoneIds } = useStore();
+  const result = activePracticeSession?.sharedResult;
+  const startingIndex = result?.starting_index;
+  const bySignal = useMemo(() => new Map(result?.signals.map((signal) => [signal.signal_key, signal]) ?? []), [result?.signals]);
+  const moduleNames = useMemo(() => CURRICULUM_MODULES.filter((module) => modularDoneIds.has(module.id)).map((module) => module.name), [modularDoneIds]);
 
-  /**
-   * Trend of overall scores: the most recent reps (up to 3) vs the reps
-   * just before them. Positive = improving. Null until 2+ completed reps.
-   */
-  const trend = useMemo(() => {
-    const overalls = completed.filter((s) => s.scores).map((s) => overallOf(s.scores));
-    if (overalls.length < 2) return null;
-    const window = Math.max(1, Math.min(3, Math.floor(overalls.length / 2)));
-    const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-    const recent = avg(overalls.slice(0, window));
-    const prior = avg(overalls.slice(window, window * 2));
-    return Math.round(recent - prior);
-  }, [completed]);
-
-  const confirmDeleteOne = (id: string, title: string) => {
-    tap("medium");
-    if (Platform.OS === "web") {
-      deleteSession(id);
-      return;
-    }
-    Alert.alert(
-      "Delete this session?",
-      `The record for “${title}” will be removed from this device.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => deleteSession(id) },
-      ],
-    );
+  const confirmDelete = (id: string, title: string): void => {
+    const remove = (): void => { void deleteSession(id); };
+    if (Platform.OS === "web") remove();
+    else Alert.alert("Delete this record?", `The saved record for “${title}” will be removed from this device.`, [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: remove }]);
   };
 
   return (
     <View style={styles.root}>
       <Backdrop />
-      <ScrollView
-        contentContainerStyle={{
-          paddingTop: insets.top + 22,
-          paddingHorizontal: GUTTER,
-          paddingBottom: 40,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Reveal index={0}>
-          <Eyebrow color={C.dim}>Your training</Eyebrow>
-          <Text style={styles.title}>
-            {completed.length === 0
-              ? "No reps logged yet."
-              : `${completed.length} rehearsal${completed.length === 1 ? "" : "s"} in the bank.`}
-          </Text>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 112 }]} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}><View style={styles.headerCopy}><Eyebrow color={C.dim}>Progress</Eyebrow><Text style={styles.title}>{pilotProgress.length === 0 ? "Your starting evidence, kept honest." : "Evidence from the practices you completed."}</Text></View><PressCard onPress={() => router.push("/settings")} style={styles.settingsButton} accessibilityLabel="Settings"><Settings size={20} color={C.textSoft} /></PressCard></View>
+
+        <Reveal index={1}>
+          <GlassCard style={styles.indexCard}>
+            <View style={styles.indexTop}><View><Text style={styles.cardLabel}>{pilotProgress.length === 0 ? "PARTIAL STARTING INDEX" : "CURRENT EVIDENCE VIEW"}</Text><Text style={styles.indexValue}>{startingIndex?.index_value ?? "—"}</Text></View><View style={styles.coverage}><Text style={styles.coverageValue}>{startingIndex?.observed_count ?? 0}</Text><Text style={styles.coverageLabel}>OF 6 SIGNALS{`\n`}OBSERVED</Text></View></View>
+            <Text style={styles.indexNote}>{startingIndex?.index_value === null || !startingIndex ? "There is not enough approved evidence for an Index value yet." : "This value averages observed signals only. Unobserved signals are not treated as zero."}</Text>
+          </GlassCard>
         </Reveal>
 
-        {averages ? (
-          <Reveal index={1}>
-            <View style={styles.card}>
-              <View style={styles.cardHead}>
-                <Text style={[eyebrow, { color: C.dim }]}>Average across all reps</Text>
-                {trend !== null ? (
-                  <View
-                    style={[
-                      styles.trendPill,
-                      {
-                        borderColor:
-                          trend > 0 ? `${C.sage}55` : trend < 0 ? `${C.clay}55` : C.lineStrong,
-                        backgroundColor:
-                          trend > 0
-                            ? "rgba(95,115,85,0.10)"
-                            : trend < 0
-                              ? "rgba(132,59,42,0.10)"
-                              : "transparent",
-                      },
-                    ]}
-                  >
-                    {trend > 0 ? (
-                      <TrendingUp size={13} color={C.sage} strokeWidth={2.4} />
-                    ) : trend < 0 ? (
-                      <TrendingDown size={13} color={C.clay} strokeWidth={2.4} />
-                    ) : (
-                      <Minus size={13} color={C.dim} strokeWidth={2.4} />
-                    )}
-                    <Text
-                      style={[
-                        styles.trendText,
-                        { color: trend > 0 ? C.sage : trend < 0 ? C.clay : C.dim },
-                      ]}
-                    >
-                      {trend > 0 ? `+${trend}` : trend < 0 ? `${trend}` : "even"}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              {trend !== null ? (
-                <Text style={styles.trendNote}>
-                  {trend > 0
-                    ? "Your recent reps score higher than the ones before."
-                    : trend < 0
-                      ? "Recent reps dipped a little — one focused rep turns it around."
-                      : "Holding steady across your recent reps."}
-                </Text>
-              ) : null}
-              <View style={{ marginTop: 18, gap: 16 }}>
-                {AXES.map((a, i) => (
-                  <View key={a.key}>
-                    <View style={styles.axisRow}>
-                      <Text style={styles.axisLabel}>{a.label}</Text>
-                      <Text style={[styles.axisValue, { color: a.tone }]}>
-                        {averages[a.key]}
-                      </Text>
-                    </View>
-                    <Meter value={averages[a.key]} tone={a.tone} delay={70 * i} />
-                  </View>
-                ))}
-              </View>
-            </View>
-          </Reveal>
-        ) : (
-          <Reveal index={1}>
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>Your scores appear here</Text>
-              <Text style={styles.emptyBody}>
-                Finish a rehearsal and you&apos;ll get feedback on clarity, empathy, and assertiveness — then watch them change over time. Delivery isn’t scored because audio isn’t analyzed.
-              </Text>
-            </View>
-          </Reveal>
-        )}
-
         <Reveal index={2}>
-          <ReminderCard />
+          <View style={styles.signalSection}><Text style={styles.sectionLabel}>SIGNAL COVERAGE</Text><Text style={styles.deliveryNote}>Delivery isn’t scored because audio isn’t analyzed.</Text>{SHARED_SIGNAL_KEYS.map((key) => { const signal = bySignal.get(key); const observed = signal?.observation_status === "observed" && signal.score !== null; return <View key={key} style={styles.signalRow}><View style={styles.signalHeading}>{observed ? <Check size={14} color={C.sage} strokeWidth={2.8} /> : <Circle size={14} color={C.track} />}<Text style={[styles.signalName, observed && styles.signalObserved]}>{SIGNAL_LABELS[key]}</Text><Text style={styles.signalValue}>{observed ? signal.score : "Not observed"}</Text></View>{observed ? <Meter value={signal.score ?? 0} tone={C.purple} height={5} /> : null}</View>; })}</View>
         </Reveal>
 
         <Reveal index={3}>
-          <View style={styles.practiceLine}>
-            <Text style={styles.practiceValue}>{streak}</Text>
-            <Text style={styles.practiceLabel}>{streak === 1 ? "day" : "days"} practiced in a row</Text>
-            <View style={styles.practiceDot} />
-            <Text style={styles.practiceValue}>{spokenLineCount(completed)}</Text>
-            <Text style={styles.practiceLabel}>lines spoken</Text>
-          </View>
+          <View style={styles.focusBlock}><Target size={19} color={C.purple} /><View style={styles.focusCopy}><Text style={styles.cardLabel}>FIRST FOCUS</Text><Text style={styles.focusTitle}>{result?.first_focus?.first_focus_label ?? "No evidence-backed focus yet"}</Text><Text style={styles.focusMeta}>{result?.first_focus ? curriculumModule(result.first_focus.recommended_module_id)?.name : "Complete the free rehearsal to establish a starting focus."}</Text></View></View>
         </Reveal>
 
-        {completed.length > 0 ? (
-          <>
-            <Reveal index={4}>
-              <Eyebrow color={C.dim} style={{ marginTop: 30, marginBottom: 8 }}>
-                History
-              </Eyebrow>
-            </Reveal>
-            {completed.map((s, i) => {
-              const avg = overallOf(s.scores);
-              const label = s.title ?? "A scenario you wrote";
-              return (
-                <Reveal key={s.id} index={5 + i}>
-                  <PressCard onPress={() => router.push(`/debrief/${s.id}`)}>
-                    <View style={styles.historyRow}>
-                      <View
-                        style={[
-                          styles.scoreBadge,
-                          { borderColor: avg >= 70 ? C.sage : avg >= 50 ? C.amber : C.clay },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.scoreBadgeText,
-                            { color: avg >= 70 ? C.sage : avg >= 50 ? C.amber : C.clay },
-                          ]}
-                        >
-                          {avg}
-                        </Text>
-                      </View>
-                      <View style={styles.flex}>
-                        <Text style={styles.historyTitle} numberOfLines={1}>
-                          {label}
-                        </Text>
-                        <Text style={styles.historyMeta}>
-                          {DIFFICULTY[s.difficulty].label} ·{" "}
-                          {new Date(s.endedAt ?? s.startedAt).toLocaleDateString()}
-                        </Text>
-                      </View>
-                      <PressCard
-                        onPress={() => confirmDeleteOne(s.id, label)}
-                        style={styles.deleteHit}
-                      >
-                        <Trash2 size={15} color={C.dim} />
-                      </PressCard>
-                      <ChevronRight size={18} color={C.dim} />
-                    </View>
-                  </PressCard>
-                </Reveal>
-              );
-            })}
-          </>
-        ) : null}
+        <Reveal index={4}>
+          <View style={styles.realProgress}><View style={styles.stat}><Text style={styles.statValue}>{completed.length}</Text><Text style={styles.statLabel}>REAL REHEARSALS</Text></View><View style={styles.statRule} /><View style={styles.stat}><Text style={styles.statValue}>{pilotProgress.length}</Text><Text style={styles.statLabel}>PAID PRACTICES</Text></View></View>
+        </Reveal>
 
-        <View style={styles.utilitySection}>
-          {__DEV__ ? (
-            <View style={styles.privacyRow}>
-              <ShieldCheck size={16} color={C.purpleLight} />
-              <View style={styles.flex}>
-                <Text style={styles.privacyLabel}>Unlock all days for testing</Text>
-                <Text style={styles.privacyBody}>
-                  Preview-only access to Days 1–8. This does not create a subscription.
-                </Text>
-              </View>
-              <Switch
-                value={devProEnabled}
-                onValueChange={(enabled: boolean) => {
-                  tap("light");
-                  toggleDevPro(enabled);
-                }}
-                trackColor={{ false: C.surfaceHigh, true: C.purpleLight }}
-                thumbColor={devProEnabled ? C.purple : C.dim}
-                accessibilityLabel="Unlock all days for testing"
-              />
-            </View>
-          ) : null}
+        {moduleNames.length > 0 ? <Reveal index={5}><Text style={styles.sectionLabel}>MODULES COMPLETED</Text><View style={styles.moduleList}>{moduleNames.map((name) => <View key={name} style={styles.moduleRow}><Check size={15} color={C.sage} /><Text style={styles.moduleName}>{name}</Text></View>)}</View></Reveal> : null}
 
-          <PressCard onPress={() => router.push("/onboarding")}>
-            <View style={styles.privacyRow}>
-              <RotateCcw size={16} color={C.purpleLight} />
-              <View style={styles.flex}>
-                <Text style={styles.privacyLabel}>Replay the welcome flow</Text>
-                <Text style={styles.privacyBody}>
-                  Walk through onboarding, then continue into a fresh rehearsal and debrief.
-                </Text>
-              </View>
-              <ChevronRight size={18} color={C.dim} />
-            </View>
-          </PressCard>
-
-          <PressCard onPress={() => router.push("/privacy")}>
-          <View style={styles.privacyRow}>
-            <ShieldCheck size={16} color={C.purpleLight} />
-            <View style={styles.flex}>
-              <Text style={styles.privacyLabel}>Privacy &amp; data</Text>
-              <Text style={styles.privacyBody}>
-                What is stored, what is sent, and how to delete it.
-              </Text>
-            </View>
-            <ChevronRight size={18} color={C.dim} />
-          </View>
-          </PressCard>
-        </View>
+        <Reveal index={6}><Text style={styles.sectionLabel}>SAVED REHEARSAL RECORDS</Text>{completed.length === 0 ? <View style={styles.empty}><Text style={styles.emptyTitle}>No completed records yet</Text><Text style={styles.emptyBody}>Progress appears only after a real rehearsal or paid practice is completed.</Text></View> : <View style={styles.history}>{completed.map((session) => { const label = session.title ?? "Your conversation"; return <View key={session.id} style={styles.historyRow}><PressCard onPress={() => router.push(`/debrief/${session.id}`)} containerStyle={styles.historyMain} accessibilityLabel={`Open ${label}`}><View style={styles.historyCopy}><Text style={styles.historyTitle}>{label}</Text><Text style={styles.historyMeta}>{new Date(session.endedAt ?? session.startedAt).toLocaleDateString()}</Text></View></PressCard><PressCard onPress={() => { tap("medium"); confirmDelete(session.id, label); }} style={styles.deleteHit} accessibilityLabel={`Delete ${label}`}><Trash2 size={16} color={C.dim} /></PressCard><ChevronRight size={18} color={C.dim} /></View>; })}</View>}</Reveal>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-  flex: { flex: 1 },
-  title: { ...T.display, marginTop: 8, marginBottom: 24 },
-  card: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: C.glassEdge,
-    backgroundColor: C.surface,
-    padding: 20,
-    ...shadow.layer,
-  },
-  cardHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  trendPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  trendText: { ...T.caption, fontFamily: font.semi },
-  trendNote: { ...T.caption, marginTop: 10 },
-  axisRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  axisLabel: { ...T.support, fontFamily: font.semi },
-  axisValue: { ...T.support, fontFamily: font.semi },
-  empty: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: C.lineStrong,
-    padding: 22,
-  },
-  emptyTitle: { ...T.title },
-  emptyBody: { ...T.support, marginTop: 8 },
-  reminderCard: {
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: C.glassEdge,
-    backgroundColor: C.surface,
-    padding: 18,
-    marginTop: 12,
-  },
-  reminderHead: { flexDirection: "row", alignItems: "center", gap: 10 },
-  reminderTitle: { ...T.support, flex: 1, fontFamily: font.semi, color: C.text },
-  reminderBody: { ...T.caption, marginTop: 10 },
-  timeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: `${C.amber}33`,
-  },
-  timeValue: { ...T.support, fontFamily: font.semi, color: C.purple },
-  picker: { alignSelf: "center", marginTop: 4 },
-  practiceLine: {
-    minHeight: 52,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 12,
-    paddingHorizontal: 4,
-  },
-  practiceValue: { ...T.support, fontFamily: font.semi, color: C.purple },
-  practiceLabel: T.caption,
-  practiceDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.dim, marginHorizontal: 4 },
-  historyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: C.line,
-  },
-  scoreBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scoreBadgeText: { ...T.caption, fontFamily: font.semi },
-  historyTitle: { ...T.support, fontFamily: font.semi, color: C.text },
-  historyMeta: { ...T.caption, marginTop: 3 },
-  // 44pt is the smallest reliable touch target, and this one sits between two
-  // other tappable areas in the same row.
-  deleteHit: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  utilitySection: { marginTop: 34, gap: 10 },
-  privacyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 13,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: C.glassEdge,
-    backgroundColor: C.surface,
-    padding: 17,
-  },
-  privacyLabel: { ...T.support, fontFamily: font.semi, color: C.text },
-  privacyBody: { ...T.caption, marginTop: 4 },
+  root: { flex: 1, backgroundColor: C.bg }, scroll: { paddingHorizontal: GUTTER }, header: { flexDirection: "row", alignItems: "flex-start", gap: 12 }, headerCopy: { flex: 1 }, title: { ...T.display, marginTop: 8 }, settingsButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.surface, alignItems: "center", justifyContent: "center" },
+  indexCard: { marginTop: 26, padding: 22 }, indexTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }, cardLabel: { ...eyebrow, color: C.purple }, indexValue: { fontFamily: font.semi, fontSize: 56, lineHeight: 62, color: C.purple, marginTop: 8 }, coverage: { alignItems: "flex-end" }, coverageValue: { fontFamily: font.semi, fontSize: 28, color: C.text }, coverageLabel: { ...eyebrow, color: C.dim, textAlign: "right", marginTop: 3, lineHeight: 15 }, indexNote: { ...T.caption, marginTop: 14, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  signalSection: { marginTop: 30 }, deliveryNote: { ...T.caption, marginBottom: 8 }, sectionLabel: { ...eyebrow, color: C.dim, marginTop: 30, marginBottom: 10 }, signalRow: { paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line }, signalHeading: { flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 7 }, signalName: { ...T.support, color: C.dim, flex: 1 }, signalObserved: { color: C.text, fontFamily: font.semi }, signalValue: { ...T.caption, color: C.purple },
+  focusBlock: { marginTop: 28, flexDirection: "row", gap: 13, backgroundColor: C.purpleSoft, borderRadius: radius.lg, padding: 19 }, focusCopy: { flex: 1 }, focusTitle: { ...T.title, fontSize: 18, lineHeight: 24, marginTop: 5 }, focusMeta: { ...T.caption, marginTop: 5 }, realProgress: { flexDirection: "row", alignItems: "stretch", marginTop: 24, paddingVertical: 18, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: C.line }, stat: { flex: 1, alignItems: "center" }, statValue: { fontFamily: font.semi, fontSize: 26, color: C.text }, statLabel: { ...eyebrow, color: C.dim, marginTop: 5 }, statRule: { width: StyleSheet.hairlineWidth, backgroundColor: C.line },
+  moduleList: { gap: 8 }, moduleRow: { flexDirection: "row", gap: 10, alignItems: "center", minHeight: 44 }, moduleName: { ...T.support, color: C.text }, empty: { padding: 20, borderRadius: radius.lg, borderWidth: 1, borderStyle: "dashed", borderColor: C.lineStrong }, emptyTitle: { ...T.title, fontSize: 18 }, emptyBody: { ...T.caption, marginTop: 6 }, history: { gap: 2 }, historyRow: { minHeight: 68, flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line }, historyMain: { flex: 1 }, historyCopy: { paddingVertical: 12 }, historyTitle: { ...T.support, fontFamily: font.semi, color: C.text }, historyMeta: { ...T.caption, marginTop: 3 }, deleteHit: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
 });

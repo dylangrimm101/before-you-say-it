@@ -23,7 +23,7 @@ const queryClient = new QueryClient();
 let hasPresentedLaunch = false;
 
 function RootLayoutNav() {
-  const { hydrated, profile, activePracticeSession, migrationNotice, dismissMigrationNotice } = useStore();
+  const { hydrated, profile, activePracticeSession, nativeJourneyStarted, migrationNotice, dismissMigrationNotice } = useStore();
   const router = useRouter();
   const segments = useSegments();
   const [showLaunch, setShowLaunch] = useState<boolean>(() => {
@@ -42,7 +42,14 @@ function RootLayoutNav() {
     SplashScreen.hideAsync().catch(() => {});
     const firstSegment = segments[0];
     const onboarding = firstSegment === "onboarding";
-    if (!profile && !onboarding) {
+    const entry = firstSegment === "entry";
+    const continuation = firstSegment === "continue-from-web";
+    const hasLocalJourney = Boolean(profile || activePracticeSession || nativeJourneyStarted);
+    if (!hasLocalJourney && !entry && !continuation) {
+      router.replace("/entry");
+      return;
+    }
+    if (hasLocalJourney && !profile && !activePracticeSession && !onboarding && !entry && !continuation) {
       router.replace("/onboarding");
       return;
     }
@@ -63,7 +70,7 @@ function RootLayoutNav() {
       };
       router.replace({ pathname: "/rehearse/[id]", params: sharedParams });
     }
-  }, [activePracticeSession, ready, profile, segments, router]);
+  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router]);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
 
@@ -78,6 +85,8 @@ function RootLayoutNav() {
         }}
       >
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="entry" options={{ animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="continue-from-web" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
         <Stack.Screen name="scenario/[id]" />
         <Stack.Screen name="rehearse/[id]" options={{ animation: "fade", gestureEnabled: false }} />
@@ -94,6 +103,7 @@ function RootLayoutNav() {
         <Stack.Screen name="custom" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
         <Stack.Screen name="paywall" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
         <Stack.Screen name="purchase-success" options={{ animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="settings" />
         <Stack.Screen name="privacy" />
         <Stack.Screen name="safety" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
       </Stack>

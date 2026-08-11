@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Check, ChevronRight, PenLine } from "lucide-react-native";
+import { Check, ChevronRight, LockKeyhole, PenLine, Sparkles } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,7 +13,7 @@ import type { CategoryId, Scenario } from "@/types/convo";
 export default function Library() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profile, customScenarios, completed } = useStore();
+  const { profile, customScenarios, completed, access, activePracticeSession } = useStore();
   const [active, setActive] = useState<CategoryId>(profile?.focus ?? "partner");
 
   const category = CATEGORIES.find((item) => item.id === active);
@@ -22,6 +22,15 @@ export default function Library() {
     const personal = customScenarios.filter((scenario) => scenario.category === active);
     return [...personal, ...authored];
   }, [active, customScenarios]);
+  const isLocked = access.entitlement !== "pro" && completed.length > 0;
+  const openCustom = (): void => {
+    if (isLocked) router.push({ pathname: "/paywall", params: { gate: "another-rehearsal" } });
+    else router.push("/custom");
+  };
+  const openScenario = (scenario: Scenario): void => {
+    if (isLocked) router.push({ pathname: "/paywall", params: { gate: "another-rehearsal" } });
+    else router.push(`/scenario/${scenario.id}`);
+  };
   const doneIds = useMemo<Set<string>>(
     () => new Set(completed.map((session) => session.scenarioId)),
     [completed],
@@ -41,13 +50,15 @@ export default function Library() {
           <Eyebrow>Scenarios</Eyebrow>
           <Text style={styles.display}>Practice the conversation before it happens.</Text>
           <Text style={styles.intro}>
-            Choose a starting point, then shape the counterpart and difficulty to fit your situation.
+            Filter by the relationship and context that matter, then enter a real briefing before you rehearse.
           </Text>
         </Reveal>
 
+        {activePracticeSession?.sharedResult ? <Reveal index={1}><PressCard onPress={() => isLocked ? router.push({ pathname: "/paywall", params: { gate: "another-rehearsal" } }) : router.push(`/scenario/${activePracticeSession.scenarioId}`)} accessibilityLabel="Continue with my conversation"><View style={styles.continueCard}><Sparkles size={19} color={C.purple} /><View style={styles.buildCopy}><Text style={styles.continueEyebrow}>CONTINUE WITH MY CONVERSATION</Text><Text style={styles.continueTitle}>{activePracticeSession.scenarioTitle ?? activePracticeSession.topic}</Text></View><ChevronRight size={20} color={C.purple} /></View></PressCard></Reveal> : null}
+
         <Reveal index={1}>
           <PressCard
-            onPress={() => router.push("/custom")}
+            onPress={openCustom}
             accessibilityLabel="Build a scenario from your situation"
           >
             <View style={styles.buildCard}>
@@ -102,7 +113,7 @@ export default function Library() {
             return (
               <Reveal key={scenario.id} index={3 + index}>
                 <PressCard
-                  onPress={() => router.push(`/scenario/${scenario.id}`)}
+                  onPress={() => openScenario(scenario)}
                   accessibilityLabel={`Open ${scenario.title}`}
                 >
                   <View style={styles.scenarioCard}>
@@ -121,7 +132,7 @@ export default function Library() {
                     <View style={styles.metaRow}>
                       <Text style={styles.meta}>{scenario.minutes} MIN PRACTICE</Text>
                       {scenario.isCustom ? <Text style={styles.personal}>YOUR SCENARIO</Text> : null}
-                      {isDone ? (
+                      {isLocked ? <View style={styles.trained}><LockKeyhole size={12} color={C.dim} /><Text style={[styles.trainedText, { color: C.dim }]}>PRO</Text></View> : isDone ? (
                         <View style={styles.trained}>
                           <Check size={12} color={C.sage} strokeWidth={2.2} />
                           <Text style={styles.trainedText}>PRACTICED</Text>
@@ -145,6 +156,9 @@ const styles = StyleSheet.create({
   header: { gap: 12, marginBottom: 24 },
   display: { ...T.display },
   intro: { ...T.support, maxWidth: 340 },
+  continueCard: { minHeight: 90, borderRadius: radius.lg, backgroundColor: C.surface, borderWidth: 1, borderColor: `${C.purple}33`, padding: 18, flexDirection: "row", alignItems: "center", gap: 13, marginBottom: 12 },
+  continueEyebrow: { ...eyebrow, color: C.purple },
+  continueTitle: { ...T.support, color: C.text, fontFamily: font.semi, marginTop: 5 },
   buildCard: {
     minHeight: 132,
     borderRadius: radius.lg,

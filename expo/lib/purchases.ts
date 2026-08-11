@@ -88,7 +88,7 @@ function requireSdk(): PurchasesModule {
   return sdk;
 }
 
-function hasPro(info: CustomerInfo | undefined): boolean {
+export function hasPro(info: CustomerInfo | undefined): boolean {
   return Boolean(info?.entitlements.active[PRO_ENTITLEMENT]);
 }
 
@@ -116,7 +116,7 @@ export function useOfferings() {
   });
 }
 
-type PurchaseOutcome = { status: "purchased" | "cancelled" | "pending" };
+export type PurchaseOutcome = { status: "purchased" | "cancelled" | "pending" | "entitlement_delayed" };
 
 /** Purchase a package. Cancel and pending states resolve (not reject). */
 export function usePurchasePackage() {
@@ -126,11 +126,11 @@ export function usePurchasePackage() {
       try {
         const { customerInfo } = await requireSdk().purchasePackage(pkg);
         queryClient.setQueryData(["rc", "customerInfo"], customerInfo);
-        return { status: "purchased" as const };
+        return { status: hasPro(customerInfo) ? "purchased" as const : "entitlement_delayed" as const };
       } catch (e) {
         const err = e as { userCancelled?: boolean; code?: string };
         if (err.userCancelled) return { status: "cancelled" as const };
-        if (err.code === "2" || err.code === "PAYMENT_PENDING") {
+        if (err.code === "20" || err.code === "PAYMENT_PENDING") {
           return { status: "pending" as const };
         }
         throw e;

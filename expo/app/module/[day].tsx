@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Mic, Pause, Play, Square, X } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, Eyebrow, GlassCard, GhostButton, MicControl, PrimaryButton, Reveal, StateDock, tap } from "@/components/ui";
@@ -217,6 +217,15 @@ export default function PilotModuleScreen() {
     }
   }, [activeCapture, day, dictation, persistLegacyDayOne, persistRun, run, setCaptureText]);
 
+  const openTypedFallback = useCallback(async (): Promise<void> => {
+    const reviewState: PilotModuleState = activeCapture === "opener" ? "confirm_attempt_transcript" : activeCapture === "response" ? "confirm_response_transcript" : "confirm_retry_transcript";
+    setError("");
+    if (day === 1) {
+      if (activeCapture === "retry") await persistLegacyDayOne({ nextState: "confirm_retry_transcript" });
+      setState(reviewState);
+    } else if (run) await persistRun(transitionPilotRun(run, reviewState));
+  }, [activeCapture, day, persistLegacyDayOne, persistRun, run]);
+
   const playAdam = useCallback(async (baseRun: PilotDayRun, confirmedAttempt: string): Promise<void> => {
     if (!module) return;
     const response = await nextPilotCounterpart(module, confirmedAttempt, baseRun.id);
@@ -403,7 +412,7 @@ export default function PilotModuleScreen() {
           {effectiveState === "attempt_comparison" ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><Text style={styles.title}>First attempt and retry</Text><GlassCard style={styles.card}><Text style={styles.cardText}>{day === 1 ? session?.comparison?.text : run?.comparison?.text}</Text></GlassCard><PrimaryButton label="Continue" onPress={showTransfer} style={styles.actionTop} /></Reveal> : null}
           {effectiveState === "transfer_cue" ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><Text style={styles.title}>{module.copy.transfer}</Text><PrimaryButton label={module.copy.finish_button} onPress={complete} style={styles.actionTop} /></Reveal> : null}
           {effectiveState === "complete" ? <Reveal><Eyebrow color={C.sage}>Practice complete</Eyebrow><Text style={styles.title}>You practiced the moment twice.</Text><PrimaryButton label="Back to curriculum" onPress={() => router.navigate("/(tabs)")} style={styles.actionTop} /></Reveal> : null}
-          {effectiveState === "microphone_error" ? <Reveal><Text style={styles.title}>{error || dictation.error}</Text><PrimaryButton label={activeCapture === "retry" ? "I’m ready to retry" : "I’m ready to speak"} onPress={() => startCapture(activeCapture)} style={styles.actionTop} /></Reveal> : null}
+          {effectiveState === "microphone_error" ? <Reveal><Eyebrow color={C.clay}>Microphone recovery</Eyebrow><Text style={styles.title}>{error || dictation.error}</Text><Text style={styles.lede}>Turn microphone access on in device Settings, try again, or type this turn instead. Nothing submits until you approve the transcript.</Text><PrimaryButton label="Open Settings" onPress={() => void Linking.openSettings()} style={styles.actionTop} /><GhostButton label="Try microphone again" onPress={() => startCapture(activeCapture)} style={styles.secondaryAction} /><GhostButton label="Type this turn instead" onPress={() => void openTypedFallback()} style={styles.secondaryAction} /></Reveal> : null}
         </ScrollView>
       </KeyboardAvoidingView>
       {speech.canReplay && !effectiveState.startsWith("listening") ? <StateDock bottomInset={insets.bottom} style={styles.voiceDock}><GhostButton label={speech.phase === "speaking" ? "Stop voice" : "Replay last voice"} onPress={() => speech.phase === "speaking" ? stopSpeech() : replaySpeech()} /></StateDock> : null}
@@ -439,11 +448,11 @@ function retryDirection(module: NonNullable<ReturnType<typeof pilotModule>>, run
 
 function Lesson({ line, index, total, onPlay, onContinue }: { line?: PilotAudioLine; index: number; total: number; onPlay: (line: PilotAudioLine) => void; onContinue: () => void }) {
   if (!line) return null;
-  return <Reveal><Eyebrow color={C.purple}>Hope · {index + 1} of {total}</Eyebrow><RoleCard role="Hope" text={line.text} onPlay={() => onPlay(line)} /><PrimaryButton label="Continue" onPress={onContinue} style={styles.actionTop} /></Reveal>;
+  return <Reveal><Eyebrow color={C.purple}>Lesson · {index + 1} of {total}</Eyebrow><View style={styles.lessonVisual}><View style={styles.lessonOrb}><Text style={styles.lessonNumber}>{index + 1}</Text></View><View style={styles.lessonLine} /><Text style={styles.lessonWord}>NOTICE</Text></View><Text style={styles.title}>{line.text}</Text><GhostButton label="Hear Hope explain it" onPress={() => onPlay(line)} style={styles.secondaryAction} /><PrimaryButton label="Continue" onPress={onContinue} style={styles.actionTop} /></Reveal>;
 }
 
 function Quiz({ quiz, onChoose }: { quiz: NonNullable<NonNullable<ReturnType<typeof pilotModule>>["copy"]["quiz"]>; onChoose: (choice: "A" | "B") => void }) {
-  return <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><Text style={styles.title}>{quiz.prompt}</Text><AudioOption label="A" line={quiz.option_a} onChoose={() => onChoose("A")} /><AudioOption label="B" line={quiz.option_b} onChoose={() => onChoose("B")} /></Reveal>;
+  return <Reveal><Eyebrow color={C.purple}>Short exercise</Eyebrow><Text style={styles.title}>{quiz.prompt}</Text><Text style={styles.lede}>Listen if it helps, then choose the response that best matches the lesson.</Text><AudioOption label="A" line={quiz.option_a} onChoose={() => onChoose("A")} /><AudioOption label="B" line={quiz.option_b} onChoose={() => onChoose("B")} /></Reveal>;
 }
 
 function AudioOption({ label, line, onChoose }: { label: "A" | "B"; line: PilotAudioLine; onChoose: () => void }) {
@@ -482,6 +491,7 @@ const styles = StyleSheet.create({
   actionTop: { marginTop: 24 }, secondaryAction: { marginTop: 10 }, card: { marginTop: 20, gap: 10 }, point: { ...T.support, color: C.text }, fieldLabel: { ...eyebrow, color: C.purple }, cardText: { ...T.body, color: C.text, lineHeight: 26 }, retry: { ...T.support, color: C.textSoft, marginTop: 8 },
   option: { marginTop: 16, gap: 14 }, optionActions: { flexDirection: "row", gap: 10, alignItems: "center" }, micRow: { alignItems: "center", gap: 12, marginTop: 28 }, listening: { alignItems: "center", paddingTop: 34, gap: 20 }, note: { ...T.support, textAlign: "center" }, or: { ...eyebrow, color: C.dim, textAlign: "center", marginVertical: 22 },
   transcriptInput: { ...T.body, minHeight: 150, borderWidth: 1, borderColor: C.glassEdge, borderRadius: radius.lg, backgroundColor: C.surface, padding: 18, color: C.text, textAlignVertical: "top", ...shadow.layer },
+  lessonVisual: { minHeight: 168, marginTop: 28, borderRadius: radius.lg, backgroundColor: C.purpleSoft, alignItems: "center", justifyContent: "center" }, lessonOrb: { width: 78, height: 78, borderRadius: 39, backgroundColor: C.purple, alignItems: "center", justifyContent: "center", ...shadow.hero }, lessonNumber: { fontFamily: font.semi, fontSize: 30, color: C.onAccent }, lessonLine: { width: 1, height: 22, backgroundColor: `${C.purple}55` }, lessonWord: { ...eyebrow, color: C.purple },
   busyCard: { alignItems: "center", gap: 12, marginTop: 60, padding: 24 }, roleHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, playButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.line, alignItems: "center", justifyContent: "center" },
   voiceDock: { backgroundColor: "transparent" }, missingButton: { width: 230, marginTop: 22 },
 });
