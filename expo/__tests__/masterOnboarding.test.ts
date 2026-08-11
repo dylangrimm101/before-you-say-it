@@ -174,7 +174,7 @@ describe("shared mobile rehearsal briefing and controls", () => {
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     const briefing = await Bun.file(`${import.meta.dir}/../components/RehearsalBriefing.tsx`).text();
     expect(rehearsal.match(/<RehearsalBriefing/g)?.length).toBe(1);
-    for (const copy of ["Your real conversation", "Practice scenario", "You want", "You expect", "Practice goal", "How would you start?"]) {
+    for (const copy of ["Your real conversation", "Practice scenario", "Start it the way you naturally would.", "Your first instinct", "Your goal"]) {
       expect(briefing).toContain(copy);
     }
     expect(briefing).not.toContain("See which skill should come first");
@@ -197,12 +197,16 @@ describe("shared mobile rehearsal briefing and controls", () => {
     expect(rehearsal).toContain('"Record your line"');
   });
 
-  test("keeps context compact and the mic in the initial fixed dock", async () => {
+  test("keeps briefing, permission, and ready capture as separate states", async () => {
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
-    expect(rehearsal).toContain("<StateDock bottomInset={insets.bottom}>");
-    expect(rehearsal.indexOf("<RehearsalBriefing")).toBeLessThan(rehearsal.lastIndexOf("<StateDock"));
-    expect(rehearsal).not.toContain("scene: { marginBottom: 28");
-    expect(rehearsal).toContain("minWidth: 0");
+    expect(rehearsal).toContain('type RehearsalStage = "briefing" | "permission" | "practice"');
+    expect(rehearsal).toContain('label="Start my rehearsal"');
+    expect(rehearsal).toContain('setRehearsalStage("permission")');
+    expect(rehearsal).toContain('label={permissionBusy ? "Checking microphone…" : "Allow microphone"}');
+    expect(rehearsal).toContain('activatePractice("voice")');
+    expect(rehearsal).toContain('activatePractice("text")');
+    expect(rehearsal).toContain('freeJourneyCheckpoint: "rehearsal"');
+    expect(rehearsal.indexOf('rehearsalStage === "briefing"')).toBeLessThan(rehearsal.indexOf('rehearsalStage === "permission"'));
   });
 
   test("announces recording state and labels playback, fallback, and exit controls", async () => {

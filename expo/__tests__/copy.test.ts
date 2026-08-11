@@ -160,11 +160,12 @@ describe("typing screens stay usable with the keyboard open", () => {
     expect(hook).toContain("if (overlap <= 0) return;");
   });
 
-  it("keeps onboarding copy clear of its measured action dock", async () => {
+  it("keeps onboarding copy inside a bounded card above its action dock", async () => {
     const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
-    expect(onboarding).toContain("const [footerHeight, setFooterHeight]");
-    expect(onboarding).toContain("paddingBottom: footerHeight + 24");
-    expect(onboarding).toContain("setFooterHeight(event.nativeEvent.layout.height)");
+    expect(onboarding).toContain("styles.questionDeck, { marginBottom: showsFooter ? 20 : insets.bottom + 20 }");
+    expect(onboarding).toContain("questionDeck: { flex: 1, position: \"relative\", marginHorizontal: 20 }");
+    expect(onboarding).toContain("questionCard: { position: \"absolute\", left: 0, right: 0, bottom: 0");
+    expect(onboarding).toContain("contentContainerStyle={styles.cardContent}");
   });
 
   it("keeps onboarding text entry multiline and keyboard-aware", async () => {

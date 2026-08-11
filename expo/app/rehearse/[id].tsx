@@ -107,6 +107,8 @@ function uid(): string {
  * control set for exactly that state. Anything not usable in a state is absent
  * rather than greyed, so a dead control is never sitting there inviting a tap.
  */
+type RehearsalStage = "briefing" | "permission" | "practice";
+
 type DockState =
   | "autoplay-blocked"
   | "complete"
@@ -225,6 +227,12 @@ function LegacyRehearse() {
   voiceOnRef.current = voiceOn;
   const dictation = useDictation();
   const cancelDictation = dictation.cancel;
+  const [rehearsalStage, setRehearsalStage] = useState<RehearsalStage>(() => {
+    if (params.entry !== "onboarding" || turns.length > 0) return "practice";
+    const checkpoint = activePracticeSession?.freeJourneyCheckpoint;
+    return checkpoint && checkpoint !== "briefing" ? "practice" : "briefing";
+  });
+  const [permissionBusy, setPermissionBusy] = useState<boolean>(false);
   const speech = useSpeech();
   const isReduced = useReducedMotion();
   const audioBusy = speech.phase === "speaking" || speech.phase === "generating";
@@ -488,6 +496,26 @@ function LegacyRehearse() {
     });
   }, []);
 
+  const activatePractice = useCallback((preferredMode: "voice" | "text" = "voice"): void => {
+    setMode(preferredMode);
+    setRehearsalStage("practice");
+    const currentSession = activePracticeSession;
+    if (params.entry === "onboarding" && currentSession && currentSession.id === params.practiceSessionId) {
+      saveActivePracticeSession({ ...currentSession, freeJourneyCheckpoint: "rehearsal", updatedAt: Date.now() }).catch((caught) => {
+        safeLog("[rehearse] checkpoint update failed", errorShape(caught));
+      });
+    }
+  }, [activePracticeSession, params.entry, params.practiceSessionId, saveActivePracticeSession]);
+
+  const requestMicrophoneAccess = useCallback(async (): Promise<void> => {
+    if (permissionBusy) return;
+    setPermissionBusy(true);
+    tap("light");
+    const granted = await dictation.requestPermission();
+    setPermissionBusy(false);
+    if (granted) activatePractice("voice");
+  }, [activatePractice, dictation, permissionBusy]);
+
   const analyzeApprovedTranscript = useCallback(async (approvedTurns: Turn[]) => {
     if (!scenario) return;
     const turns = approvedTurns;
@@ -664,6 +692,59 @@ function LegacyRehearse() {
     );
   }
 
+  if (rehearsalStage === "briefing") {
+    return (
+      <View style={styles.root}>
+        <Backdrop />
+        <View style={[styles.introHeader, { paddingTop: insets.top + 8 }]}>
+          <Pressable onPress={leave} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back to questions">
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={[styles.introScroll, { paddingBottom: insets.bottom + 150 }]} showsVerticalScrollIndicator={false}>
+          <RehearsalBriefing
+            entryRoute={activePracticeSession?.entryRoute}
+            counterpart={themName}
+            situation={scenario.situation}
+            desiredOutcome={outcome ?? scenario.goal}
+            expectedReaction={expectedReactionLabel(reaction ?? activePracticeSession?.expectedReaction ?? "not-sure")}
+            behavioralGoal={activePracticeSession?.behavioralGoal ?? "Say what you need clearly and ask for a concrete next step."}
+          />
+        </ScrollView>
+        <StateDock bottomInset={insets.bottom}>
+          <Text style={styles.introHint}>Use your first instinct — not the perfect version.</Text>
+          <PrimaryButton label="Start my rehearsal" onPress={() => setRehearsalStage("permission")} />
+        </StateDock>
+      </View>
+    );
+  }
+
+  if (rehearsalStage === "permission") {
+    const permissionDenied = dictation.status === "denied" || dictation.status === "error";
+    return (
+      <View style={styles.root}>
+        <Backdrop />
+        <View style={[styles.introHeader, { paddingTop: insets.top + 8 }]}>
+          <Pressable onPress={() => setRehearsalStage("briefing")} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back to rehearsal briefing">
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
+          <Text style={styles.permissionMeta}>FREE REHEARSAL</Text>
+        </View>
+        <View style={styles.permissionBody}>
+          <View style={styles.permissionIcon}><Mic size={30} color={C.purple} strokeWidth={1.7} /></View>
+          <Text style={styles.permissionTitle}>{permissionDenied ? "Microphone access is off." : "Practice out loud."}</Text>
+          <Text style={styles.permissionCopy}>{permissionDenied ? "Turn microphone access on in Settings, try again, or type your opening instead." : "Allow microphone access so you can say each line naturally. Recording only starts when you tap the mic, and every transcript is yours to review."}</Text>
+        </View>
+        <StateDock bottomInset={insets.bottom}>
+          {permissionDenied ? <PrimaryButton label="Open Settings" onPress={openMicrophoneSettings} /> : <PrimaryButton label={permissionBusy ? "Checking microphone…" : "Allow microphone"} onPress={() => void requestMicrophoneAccess()} disabled={permissionBusy} />}
+          <PressCard onPress={() => permissionDenied ? void requestMicrophoneAccess() : activatePractice("text")} accessibilityLabel={permissionDenied ? "Try microphone again" : "Type instead"}>
+            <Text style={styles.permissionSecondary}>{permissionDenied ? "Try again" : "Type instead"}</Text>
+          </PressCard>
+        </StateDock>
+      </View>
+    );
+  }
+
   if (reviewingTranscript) {
     const counterpartTurn = turns.find((turn) => turn.role === "them");
     return (
@@ -748,14 +829,11 @@ function LegacyRehearse() {
           keyboardShouldPersistTaps="handled"
         >
           {turns.length === 0 && initial.waitingForUserOpening ? (
-            <RehearsalBriefing
-              entryRoute={activePracticeSession?.entryRoute}
-              counterpart={themName}
-              situation={scenario.situation}
-              desiredOutcome={outcome ?? scenario.goal}
-              expectedReaction={expectedReactionLabel(reaction ?? activePracticeSession?.expectedReaction ?? "not-sure")}
-              behavioralGoal={activePracticeSession?.behavioralGoal ?? "Say what you need clearly and ask for a concrete next step."}
-            />
+            <View style={styles.readyIntro}>
+              <Text style={styles.readyEyebrow}>YOUR OPENING</Text>
+              <Text style={styles.readyTitle}>Start it the way you naturally would.</Text>
+              <Text style={styles.readySupport}>Use your first instinct. You can correct the transcript before anything is sent.</Text>
+            </View>
           ) : null}
 
           {turns.map((t) =>
@@ -1352,6 +1430,16 @@ const styles = StyleSheet.create({
   missingBody: { textAlign: "center", color: C.textSoft },
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
   deniedActions: { gap: 10 },
+  introHeader: { minHeight: 54, paddingHorizontal: GUTTER, justifyContent: "center" },
+  backText: { ...T.support, fontFamily: font.medium, color: C.text },
+  introScroll: { paddingHorizontal: GUTTER, paddingTop: 10 },
+  introHint: { ...T.caption, textAlign: "center", color: C.textSoft, marginBottom: 10 },
+  permissionMeta: { ...eyebrow, position: "absolute", left: 0, right: 0, bottom: 17, textAlign: "center", color: C.dim },
+  permissionBody: { flex: 1, paddingHorizontal: 34, alignItems: "center", justifyContent: "center", paddingBottom: 70 },
+  permissionIcon: { width: 82, height: 82, borderRadius: 41, backgroundColor: C.purpleSoft, borderWidth: 1, borderColor: "rgba(81,40,136,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 24 },
+  permissionTitle: { ...T.display, textAlign: "center", color: C.text },
+  permissionCopy: { ...T.support, textAlign: "center", color: C.textSoft, marginTop: 12, lineHeight: 24 },
+  permissionSecondary: { ...T.support, fontFamily: font.semi, textAlign: "center", color: C.purple, minHeight: 44, textAlignVertical: "center" },
 
   header: {
     paddingHorizontal: GUTTER,
@@ -1381,6 +1469,10 @@ const styles = StyleSheet.create({
   tensionLabel: { ...eyebrow, color: C.dim },
 
   transcript: { paddingHorizontal: GUTTER, paddingTop: 14, paddingBottom: 20 },
+  readyIntro: { paddingTop: 18, paddingBottom: 28 },
+  readyEyebrow: { ...eyebrow, color: C.purple, marginBottom: 10 },
+  readyTitle: { ...T.display, color: C.text, maxWidth: 330 },
+  readySupport: { ...T.support, color: C.textSoft, marginTop: 10, lineHeight: 23 },
   reviewScroll: { paddingHorizontal: GUTTER, gap: 12 },
   reviewEyebrow: { ...eyebrow, color: C.purple },
   reviewTitle: { ...T.display },

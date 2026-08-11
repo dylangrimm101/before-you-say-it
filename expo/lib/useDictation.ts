@@ -23,6 +23,7 @@ interface UseDictationReturn {
   error: string;
   /** Smoothed microphone energy normalized from silence (0) to loud speech (1). */
   level: number;
+  requestPermission: () => Promise<boolean>;
   start: () => Promise<void>;
   stop: () => Promise<string | null>;
   cancel: () => Promise<void>;
@@ -48,6 +49,25 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
     setStatus("idle");
     setError("");
     setLevel(0);
+  }, []);
+
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    setError("");
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        setStatus("denied");
+        setError("Microphone access is off.");
+        return false;
+      }
+      setStatus("idle");
+      return true;
+    } catch (caught) {
+      safeLog("[dictation] permission request failed", errorShape(caught));
+      setStatus("error");
+      setError("Could not check microphone access.");
+      return false;
+    }
   }, []);
 
   const start = useCallback(async (): Promise<void> => {
@@ -167,7 +187,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
     }
   }, [keepAudioAs]);
 
-  return { status, error, level, start, stop, cancel, reset };
+  return { status, error, level, requestPermission, start, stop, cancel, reset };
 }
 
 function isPermissionDenied(error: unknown): boolean {

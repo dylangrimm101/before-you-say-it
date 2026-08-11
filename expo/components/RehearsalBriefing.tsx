@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { ArrowDown, ArrowRight } from "lucide-react-native";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -14,7 +15,7 @@ interface RehearsalBriefingProps {
   behavioralGoal: string;
 }
 
-/** Shared, concrete context shown before the first turn of every onboarding rehearsal. */
+/** The standalone context review shown before microphone permission or capture. */
 export function RehearsalBriefing({
   entryRoute,
   counterpart,
@@ -27,45 +28,81 @@ export function RehearsalBriefing({
   const sourceLabel = entryRoute === "real_conversation" ? "Your real conversation" : "Practice scenario";
   return (
     <View style={styles.wrap} accessibilityLabel={`${sourceLabel}. Talking to ${counterpart}.`}>
-      <Text style={styles.source}>{sourceLabel}</Text>
-      <Text style={styles.counterpart}>{counterpart}</Text>
-      <Text style={styles.situation}>{situation}</Text>
-      <View style={styles.details}>
-        <Detail label="You want" value={desiredOutcome} />
-        <Detail label="You expect" value={expectedReaction} />
-        <Detail label="Practice goal" value={behavioralGoal} />
+      <Text style={styles.title}>Start it the way you naturally would.</Text>
+
+      <View style={styles.mapCard}>
+        <View style={styles.topRow}>
+          <MapBlock label="You" value="Your first instinct" />
+          <ArrowRight size={17} color={C.dim} strokeWidth={1.6} />
+          <MapBlock label={counterpart} value={situation} />
+        </View>
+
+        <View style={styles.downPath}>
+          <ArrowDown size={15} color={C.dim} strokeWidth={1.5} />
+          <ArrowDown size={15} color={C.dim} strokeWidth={1.5} />
+        </View>
+
+        <View style={styles.goalBlock}>
+          <Text style={styles.mapLabel}>Your goal</Text>
+          <Text style={styles.goalText}>{behavioralGoal}</Text>
+        </View>
+
+        <View style={styles.sequence} accessibilityLabel="You, then them, then you, then them">
+          {[
+            ["You", true],
+            ["Them", false],
+            ["You", true],
+            ["Them", false],
+          ].map(([label, active], index) => (
+            <React.Fragment key={`${label}-${index}`}>
+              <View style={[styles.sequencePill, active ? styles.sequencePillActive : null]}>
+                <Text style={[styles.sequenceText, active ? styles.sequenceTextActive : null]}>{label}</Text>
+              </View>
+              {index < 3 ? <Text style={styles.sequenceArrow}>›</Text> : null}
+            </React.Fragment>
+          ))}
+        </View>
       </View>
-      <Text style={styles.prompt}>How would you start?</Text>
-      <Text style={styles.trust}>You control when recording starts, and you can correct each turn before it is approved.</Text>
+
+      <Text style={styles.trust}>You control when recording starts, and you can correct the transcript before it is analyzed.</Text>
       <View style={styles.links}>
         <Pressable accessibilityRole="link" accessibilityLabel="Privacy and details" onPress={() => router.push("/privacy")}><Text style={styles.link}>Privacy &amp; details</Text></Pressable>
         <Pressable accessibilityRole="link" accessibilityLabel="This does not feel safe" onPress={() => router.push({ pathname: "/safety", params: { returnTo: "rehearsal" } })}><Text style={styles.safetyLink}>This doesn’t feel safe</Text></Pressable>
       </View>
+      <Text style={styles.contextNote} accessibilityElementsHidden>{sourceLabel} · {desiredOutcome} · {expectedReaction}</Text>
     </View>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function MapBlock({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.detail}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
+    <View style={styles.mapBlock}>
+      <Text style={styles.mapLabel} numberOfLines={1}>{label}</Text>
+      <Text style={styles.mapValue} numberOfLines={4}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 9 },
-  source: { ...eyebrow, alignSelf: "flex-start", color: C.purple, backgroundColor: C.purpleSoft, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
-  counterpart: { ...T.title, fontFamily: font.bold, color: C.text },
-  situation: { ...T.body, color: C.textSoft, lineHeight: 24 },
-  details: { gap: 7, paddingTop: 3 },
-  detail: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  label: { ...eyebrow, width: 82, paddingTop: 3, color: C.dim },
-  value: { ...T.caption, flex: 1, color: C.textSoft, lineHeight: 20 },
-  prompt: { ...T.title, marginTop: 5, color: C.text },
-  trust: { ...T.caption, color: C.textSoft, marginTop: 4 },
-  links: { flexDirection: "row", flexWrap: "wrap", gap: 18, paddingTop: 3 },
+  wrap: { gap: 16 },
+  title: { ...T.display, fontSize: 27, lineHeight: 32, color: C.text, maxWidth: 330 },
+  mapCard: { backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.glassEdge, borderRadius: radius.lg, padding: 18, gap: 12, shadowColor: "#241633", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.09, shadowRadius: 24, elevation: 3 },
+  topRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  mapBlock: { flex: 1, alignSelf: "stretch", minHeight: 116, borderRadius: radius.md, borderWidth: 1, borderColor: "rgba(81,40,136,0.16)", backgroundColor: "rgba(81,40,136,0.055)", padding: 14 },
+  mapLabel: { ...eyebrow, color: C.purple, marginBottom: 7 },
+  mapValue: { ...T.caption, fontFamily: font.medium, color: C.text, lineHeight: 20 },
+  downPath: { alignItems: "center", gap: 2, marginVertical: -3 },
+  goalBlock: { borderRadius: radius.md, borderWidth: 1, borderColor: "rgba(81,40,136,0.18)", backgroundColor: C.purpleSoft, paddingHorizontal: 14, paddingVertical: 13 },
+  goalText: { ...T.caption, fontFamily: font.medium, color: C.text, lineHeight: 20 },
+  sequence: { flexDirection: "row", alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, paddingTop: 11, gap: 5 },
+  sequencePill: { borderRadius: radius.pill, backgroundColor: "rgba(23,26,31,0.05)", paddingHorizontal: 10, paddingVertical: 4 },
+  sequencePillActive: { backgroundColor: C.purpleSoft },
+  sequenceText: { fontFamily: font.medium, fontSize: 10, color: C.dim },
+  sequenceTextActive: { color: C.purple },
+  sequenceArrow: { fontFamily: font.medium, fontSize: 14, color: C.textDim },
+  trust: { ...T.caption, color: C.textSoft, lineHeight: 21 },
+  links: { flexDirection: "row", flexWrap: "wrap", gap: 18, marginTop: -9 },
   link: { ...T.caption, fontFamily: font.semi, color: C.purple, minHeight: 44, textAlignVertical: "center" },
   safetyLink: { ...T.caption, fontFamily: font.semi, color: C.textSoft, minHeight: 44, textAlignVertical: "center" },
+  contextNote: { position: "absolute", width: 1, height: 1, opacity: 0 },
 });

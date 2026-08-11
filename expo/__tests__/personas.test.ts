@@ -313,13 +313,14 @@ describe("onboarding presents questions without a fictional coach header", () =>
     expect(source).not.toContain("Adam will play the conversation counterpart.");
   });
 
-  it("advances immediately after every tap-only onboarding answer", async () => {
+  it("confirms every tap-only answer before advancing the deck", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
-    expect(source).toContain("setStep(2)");
-    expect(source).toContain("setStep(3)");
-    expect(source).toContain("setStep(4)");
+    expect(source).toContain("confirmAndAdvance(2)");
+    expect(source).toContain("confirmAndAdvance(3)");
+    expect(source).toContain("confirmAndAdvance(4)");
+    expect(source).toContain("confirmAndAdvance(isReal ? 7 : 4)");
     expect(source).toContain("void finish(value)");
+    expect(source).toContain("SELECTION_CONFIRMATION_MS = 140");
     expect(source).toContain("const requiresContinue = isReal && step >= 1 && step <= 5");
-    expect(source).toContain("setStep(isReal ? 7 : 4)");
   });
 });
