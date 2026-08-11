@@ -144,7 +144,9 @@ describe("required exercised curriculum paths", () => {
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     expect(dictation).toContain('setError("Could not start the microphone.")');
     expect(dictation).toContain('setError("No recording was captured.")');
-    expect(dictation).toContain('setError("Could not transcribe that. Try again.")');
+    expect(dictation).toContain('"Voice transcription is temporarily unavailable. Type this turn instead."');
+    expect(dictation).toContain('"Could not transcribe that. Try again."');
+    expect(dictation).toContain("TranscriptionUnavailableError");
     expect(dictation).toContain('if (Platform.OS !== "web")');
     expect(dictation).toContain("await response.blob()");
     expect(dictation).toContain("reader.readAsDataURL(blob)");
@@ -154,6 +156,9 @@ describe("required exercised curriculum paths", () => {
     expect(rehearsal).toContain("Type instead");
     expect(rehearsal).toContain("openMicrophoneSettings");
     expect(rehearsal).toContain("retryMicrophone");
+    const ai = await Bun.file(`${import.meta.dir}/../lib/ai.ts`).text();
+    expect(ai).toContain('"ai-transcription-model-specification-version": "4"');
+    expect(ai).toContain("res.status === 402 || res.status === 429 || res.status >= 500");
   });
 
   test("playback interruption never blocks the rehearsal", async () => {

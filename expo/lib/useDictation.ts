@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 import { tap } from "@/components/ui";
-import { transcribeAudio } from "@/lib/ai";
+import { transcribeAudio, TranscriptionUnavailableError } from "@/lib/ai";
 import { keepBaselineAudio } from "@/lib/baselineAudio";
 import { errorShape, safeLog } from "@/lib/redact";
 
@@ -147,9 +147,14 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       tap("success");
       return text;
     } catch (e) {
-      safeLog("[dictation] stop or transcribe failed", errorShape(e));
+      safeLog("[dictation] stop or transcribe failed", {
+        ...errorShape(e),
+        ...(e instanceof TranscriptionUnavailableError ? { status: e.status } : {}),
+      });
       setStatus("error");
-      setError("Could not transcribe that. Try again.");
+      setError(e instanceof TranscriptionUnavailableError
+        ? "Voice transcription is temporarily unavailable. Type this turn instead."
+        : "Could not transcribe that. Try again.");
       return null;
     } finally {
       // The audio file is transient. It is only ever retained when the user
