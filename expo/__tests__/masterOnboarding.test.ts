@@ -80,15 +80,18 @@ describe("approved onboarding scenario source", () => {
 });
 
 describe("onboarding visual hierarchy", () => {
-  test("keeps a purple field behind a rounded white question sheet", async () => {
+  test("reuses the Today field, card geometry, stack spacing, and semantic colors", async () => {
     const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
+    expect(onboarding).toContain("<Backdrop />");
+    expect(onboarding).not.toContain("<LinearGradient");
     expect(onboarding).toContain("QUESTION_STACK_LAYERS.slice");
     expect(onboarding).toContain("styles.stackedSheet");
-    expect(onboarding).toContain('backgroundColor: "#FFFFFF"');
-    expect(onboarding).toContain("borderTopLeftRadius: 30");
-    expect(onboarding).toContain('["#EADCF7", "#D9C1EE", "#C7A8E3"]');
-    expect(onboarding).toContain('choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: "#20232A" }');
-    expect(onboarding).toContain('choiceNote: { ...T.support, color: "#66717D" }');
+    expect(onboarding).toContain("marginHorizontal: 20");
+    expect(onboarding).toContain("borderRadius: 28");
+    expect(onboarding).toContain("layer * 12");
+    expect(onboarding).toContain("backgroundColor: C.onAccent");
+    expect(onboarding).toContain("choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: C.text }");
+    expect(onboarding).toContain("choiceNote: { ...T.support, color: C.textSoft }");
   });
 });
 

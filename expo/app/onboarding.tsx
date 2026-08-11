@@ -1,5 +1,4 @@
 import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -258,16 +257,6 @@ export default function Onboarding() {
   return (
     <View style={styles.root}>
       <Backdrop />
-      <LinearGradient
-        colors={step === -1
-          ? ["#F7F2FC", "#EADFF6", "#DDC9EE"]
-          : ["#EADCF7", "#D9C1EE", "#C7A8E3"]}
-        locations={[0, 0.52, 1]}
-        start={{ x: 0.08, y: 0 }}
-        end={{ x: 0.92, y: 1 }}
-        style={styles.screenTint}
-        pointerEvents="none"
-      />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         {step >= 0 ? <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
           <View style={styles.headerRow}>
@@ -292,19 +281,19 @@ export default function Onboarding() {
           <View style={styles.track}><View style={[styles.fill, { width: `${((step + 1) / totalSteps) * 100}%` }]} /></View>
         </View> : null}
 
-        <View style={styles.questionDeck}>
+        <View style={[styles.questionDeck, step >= 0 && styles.questionDeckInset]}>
           {step > 0 ? QUESTION_STACK_LAYERS.slice(0, Math.min(step, QUESTION_STACK_LAYERS.length)).map((layer) => (
             <View
               key={layer}
               pointerEvents="none"
-              style={[styles.stackedSheet, { top: layer * 8, zIndex: layer + 1 }]}
+              style={[styles.stackedSheet, { top: layer * 12, zIndex: layer + 1 }]}
             />
           )) : null}
           <ScrollView
             style={[
               styles.scroller,
               step >= 0 && styles.questionSheet,
-              step > 0 && { marginTop: Math.min(step, QUESTION_STACK_LAYERS.length) * 8 },
+              step > 0 && { marginTop: Math.min(step, QUESTION_STACK_LAYERS.length) * 12 },
             ]}
             contentContainerStyle={[styles.scroll, step < 0 && styles.openingScroll, { paddingBottom: footerHeight + 24 }]}
             keyboardShouldPersistTaps="handled"
@@ -354,13 +343,13 @@ function Input({ value, onChangeText, placeholder, maxLength = 500, accessibilit
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 }, screenTint: { ...StyleSheet.absoluteFillObject }, questionDeck: { flex: 1 }, scroller: { flex: 1, zIndex: 4 }, questionSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, borderBottomWidth: 0, borderColor: "rgba(81,40,136,0.12)", overflow: "hidden" }, stackedSheet: { position: "absolute", left: 0, right: 0, height: 54, backgroundColor: "#FAF8FC", borderTopLeftRadius: 30, borderTopRightRadius: 30, borderWidth: 1, borderColor: "rgba(81,40,136,0.12)" },
-  header: { paddingHorizontal: GUTTER, paddingBottom: 18, gap: 10 }, headerRow: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, backHit: { minWidth: 60, minHeight: 44, justifyContent: "center" }, backText: { fontFamily: font.medium, fontSize: 17, color: "#454D57" }, hidden: { color: "transparent" }, counter: { ...eyebrow, color: "#626D79" },
+  root: { flex: 1, backgroundColor: "#EFEEF4" }, flex: { flex: 1 }, questionDeck: { flex: 1 }, questionDeckInset: { marginHorizontal: 20, marginBottom: 12 }, scroller: { flex: 1, zIndex: 4 }, questionSheet: { backgroundColor: C.onAccent, borderRadius: 28, borderWidth: 1, borderColor: C.line, overflow: "hidden", ...shadow.layer }, stackedSheet: { position: "absolute", left: 0, right: 0, height: 72, backgroundColor: "#FBFAFD", borderRadius: 28, borderWidth: 1, borderColor: C.line, ...shadow.layer },
+  header: { paddingHorizontal: GUTTER, paddingBottom: 18, gap: 10 }, headerRow: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, backHit: { minWidth: 60, minHeight: 44, justifyContent: "center" }, backText: { fontFamily: font.medium, fontSize: 17, color: C.textSoft }, hidden: { color: "transparent" }, counter: { ...eyebrow, color: C.dim },
   track: { height: 3, borderRadius: 2, backgroundColor: C.line, overflow: "hidden" }, fill: { height: 3, backgroundColor: C.purple },
-  scroll: { paddingHorizontal: GUTTER, paddingTop: 26 }, openingScroll: { flexGrow: 1, justifyContent: "center" }, opening: { alignItems: "center", gap: 18, paddingHorizontal: 10 }, mark: { width: 180, height: 92, marginBottom: 12 }, openingTitle: { fontFamily: font.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.7, color: C.text, textAlign: "center" }, openingBody: { ...T.body, color: C.textSoft, textAlign: "center", lineHeight: 27 }, openingButton: { width: "100%", marginTop: 18 }, title: { ...T.display, color: "#191C22" }, lede: { ...T.body, color: "#535C67", lineHeight: 27, marginTop: 12 }, options: { gap: 10, marginTop: 24 },
-  choice: { minHeight: 70, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: "rgba(23,26,31,0.12)", backgroundColor: "#F8F8F9", borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, scenarioChoice: { minHeight: 112, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: "rgba(23,26,31,0.12)", backgroundColor: "#F8F8F9", borderRadius: radius.lg, overflow: "hidden", ...shadow.layer }, choiceOn: { borderColor: C.purple }, choiceCopy: { flex: 1, zIndex: 1, gap: 4 }, contextLabel: { ...eyebrow, color: C.purple }, choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: "#20232A" }, choiceNote: { ...T.support, color: "#66717D" }, choiceTextOn: { color: C.onAccent, zIndex: 1 },
-  pills: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 24 }, pill: { minHeight: 52, justifyContent: "center", paddingHorizontal: 20, borderRadius: radius.pill, borderWidth: 1, borderColor: C.line, backgroundColor: C.surface, overflow: "hidden" }, pillOn: { borderColor: C.purple }, pillText: { fontFamily: font.semi, fontSize: 16, color: C.text, zIndex: 1 },
+  scroll: { paddingHorizontal: GUTTER, paddingTop: 26 }, openingScroll: { flexGrow: 1, justifyContent: "center" }, opening: { alignItems: "center", gap: 18, paddingHorizontal: 10 }, mark: { width: 180, height: 92, marginBottom: 12 }, openingTitle: { fontFamily: font.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.7, color: C.text, textAlign: "center" }, openingBody: { ...T.body, color: C.textSoft, textAlign: "center", lineHeight: 27 }, openingButton: { width: "100%", marginTop: 18 }, title: { ...T.display, color: C.text }, lede: { ...T.body, color: C.textSoft, lineHeight: 27, marginTop: 12 }, options: { gap: 10, marginTop: 24 },
+  choice: { minHeight: 70, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(23,26,31,0.035)", borderRadius: radius.lg, overflow: "hidden" }, scenarioChoice: { minHeight: 112, flexDirection: "row", alignItems: "center", padding: 16, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(23,26,31,0.035)", borderRadius: radius.lg, overflow: "hidden" }, choiceOn: { borderColor: C.purple }, choiceCopy: { flex: 1, zIndex: 1, gap: 4 }, contextLabel: { ...eyebrow, color: C.purple }, choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: C.text }, choiceNote: { ...T.support, color: C.textSoft }, choiceTextOn: { color: C.onAccent, zIndex: 1 },
+  pills: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 24 }, pill: { minHeight: 52, justifyContent: "center", paddingHorizontal: 20, borderRadius: radius.pill, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(23,26,31,0.035)", overflow: "hidden" }, pillOn: { borderColor: C.purple }, pillText: { fontFamily: font.semi, fontSize: 16, color: C.text, zIndex: 1 },
   ownLink: { minHeight: 48, alignItems: "center", justifyContent: "center", marginTop: 14, paddingHorizontal: 8 }, ownLinkText: { ...T.caption, color: C.purple, textAlign: "center", fontFamily: font.semi },
-  input: { ...T.body, minHeight: 148, marginTop: 24, padding: 18, borderRadius: radius.lg, borderWidth: 1, borderColor: C.glassEdge, backgroundColor: C.surface, color: C.text, ...shadow.layer },
+  input: { ...T.body, minHeight: 148, marginTop: 24, padding: 18, borderRadius: radius.lg, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(23,26,31,0.035)", color: C.text },
   error: { ...T.caption, color: C.clay, textAlign: "center", marginTop: 18 }, footer: { paddingHorizontal: GUTTER, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.barEdge, backgroundColor: Platform.OS === "web" ? C.barSolid : C.bar }, spinner: { marginTop: 8 },
 });
