@@ -59,10 +59,16 @@ function loadSdk(): PurchasesModule | null {
 }
 
 const apiKey = getRCToken();
-const sdk = apiKey ? loadSdk() : null;
+// Browser previews cannot complete App Store or Play Store purchases. Avoid
+// configuring RevenueCat there: its web telemetry retries blocked requests and
+// turns an unavailable analytics endpoint into noisy runtime error overlays.
+const isBillingPlatformSupported = Platform.OS !== "web";
+const sdk = apiKey && isBillingPlatformSupported ? loadSdk() : null;
 
 if (!apiKey) {
   safeLog("[purchases] missing RevenueCat API key — paywall disabled");
+} else if (!isBillingPlatformSupported) {
+  safeLog("[purchases] browser preview detected — billing disabled for this session");
 }
 
 let configured = false;
