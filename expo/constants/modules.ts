@@ -16,7 +16,7 @@ export interface CurriculumModule {
   block: 1 | 2 | 3 | 4;
   blockName: string;
   name: string;
-  practiceDay: number;
+  promise: string;
 }
 
 const BLOCKS = {
@@ -27,14 +27,14 @@ const BLOCKS = {
 } as const;
 
 export const CURRICULUM_MODULES: readonly CurriculumModule[] = [
-  { id: "get_to_the_point", number: 1, block: 1, blockName: BLOCKS[1], name: "Get to the Point", practiceDay: 6 },
-  { id: "make_a_clear_ask", number: 2, block: 1, blockName: BLOCKS[1], name: "Make a Clear Ask", practiceDay: 7 },
-  { id: "start_the_conversation", number: 3, block: 2, blockName: BLOCKS[2], name: "Start the Conversation", practiceDay: 2 },
-  { id: "listen_and_respond", number: 4, block: 2, blockName: BLOCKS[2], name: "Listen and Respond", practiceDay: 4 },
-  { id: "stay_clear_under_pushback", number: 5, block: 3, blockName: BLOCKS[3], name: "Stay Clear Under Pushback", practiceDay: 3 },
-  { id: "pause_say_no_boundary", number: 6, block: 3, blockName: BLOCKS[3], name: "Pause, Say No, or Set a Boundary", practiceDay: 5 },
-  { id: "repair_what_went_wrong", number: 7, block: 4, blockName: BLOCKS[4], name: "Repair What Went Wrong", practiceDay: 8 },
-  { id: "use_it_in_real_life", number: 8, block: 4, blockName: BLOCKS[4], name: "Use It in Real Life", practiceDay: 8 },
+  { id: "get_to_the_point", number: 1, block: 1, blockName: BLOCKS[1], name: "Get to the Point", promise: "Organize what you mean, identify the point that matters, and say it without burying it under explanations." },
+  { id: "make_a_clear_ask", number: 2, block: 1, blockName: BLOCKS[1], name: "Make a Clear Ask", promise: "Turn a vague need, frustration, or desired quality into something another person can actually answer." },
+  { id: "start_the_conversation", number: 3, block: 2, blockName: BLOCKS[2], name: "Start the Conversation", promise: "Bring something up clearly without ambushing, accusing, or delivering the entire case in the opening." },
+  { id: "listen_and_respond", number: 4, block: 2, blockName: BLOCKS[2], name: "Listen and Respond", promise: "Understand what was said without immediately fixing, defending, correcting, or abandoning your own point." },
+  { id: "stay_clear_under_pushback", number: 5, block: 3, blockName: BLOCKS[3], name: "Stay Clear Under Pushback", promise: "Keep the point when someone becomes defensive, minimizes, changes the subject, or pushes back." },
+  { id: "pause_say_no_boundary", number: 6, block: 3, blockName: BLOCKS[3], name: "Pause, Say No, or Set a Boundary", promise: "Slow or end a conversation cleanly, make a real boundary, and stop forcing immediate resolution." },
+  { id: "repair_what_went_wrong", number: 7, block: 4, blockName: BLOCKS[4], name: "Repair What Went Wrong", promise: "Own what was said or done badly without erasing the issue that still needs attention." },
+  { id: "use_it_in_real_life", number: 8, block: 4, blockName: BLOCKS[4], name: "Use It in Real Life", promise: "Combine the skills, prepare for a real conversation, review what happened, and build a personal playbook." },
 ] as const;
 
 export const RECURRING_PROBLEMS: readonly { label: string; moduleId: ModuleId }[] = [
@@ -58,14 +58,22 @@ export const DESIRED_SKILLS: readonly { label: string; moduleId: ModuleId }[] = 
 ] as const;
 
 const BY_ID = new Map<ModuleId, CurriculumModule>(CURRICULUM_MODULES.map((module) => [module.id, module]));
-const BY_DAY = new Map<number, CurriculumModule>(CURRICULUM_MODULES.map((module) => [module.practiceDay, module]));
+const LEGACY_MODULE_BY_DAY: Readonly<Record<number, ModuleId>> = {
+  2: "get_to_the_point",
+  3: "stay_clear_under_pushback",
+  4: "pause_say_no_boundary",
+  5: "get_to_the_point",
+  6: "get_to_the_point",
+  7: "make_a_clear_ask",
+  8: "start_the_conversation",
+};
 
 export function curriculumModule(id: ModuleId | string | null | undefined): CurriculumModule | undefined {
   return id ? BY_ID.get(id as ModuleId) : undefined;
 }
 
 export function curriculumModuleForDay(day: number): CurriculumModule | undefined {
-  return BY_DAY.get(day);
+  return curriculumModule(LEGACY_MODULE_BY_DAY[day]);
 }
 
 export function isModuleId(value: unknown): value is ModuleId {
@@ -77,7 +85,6 @@ export function moduleRouteValue(moduleId: ModuleId): string {
 }
 
 export function practiceDayForRoute(value: string): number | null {
-  if (isModuleId(value)) return curriculumModule(value)?.practiceDay ?? null;
   const day = Number(value);
   return Number.isInteger(day) && day >= 1 && day <= 8 ? day : null;
 }

@@ -284,7 +284,10 @@ describe("shared Days 2–8 run persistence", () => {
     const run = createPilotDayRun(activeSession(), 2, 300);
     expect(transitionPilotRun(run, "complete", 310)).toBe(run);
     const retried = preservePilotAttempt(run, "retry", "Can we decide Tuesday?", 320);
-    const completed = transitionPilotRun(retried, "complete", 330);
+    expect(transitionPilotRun(retried, "complete", 330)).toBe(retried);
+    const reviewed = { ...retried, state: "attempt_comparison" as const, comparison: { behaviorId: "conversation_job", text: "First attempt: used six words. Retry: used five words.", criterionChanged: true } };
+    expect(transitionPilotRun(reviewed, "complete", 340)).toBe(reviewed);
+    const completed = transitionPilotRun(transitionPilotRun(reviewed, "transfer_cue", 350), "complete", 360);
     expect(completed.state).toBe("complete");
     expect(transitionPilotRun(completed, "module_preview", 400)).toBe(completed);
     expect(transitionPilotRun(completed, "complete", 500)).toBe(completed);

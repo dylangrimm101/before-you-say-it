@@ -16,7 +16,7 @@ export const PILOT_NEUTRAL_COACH_FALLBACK = "I couldn't turn that into a clear, 
 export const PILOT_RETRY_INVITATION = "Try that same moment again." as const;
 
 const BY_DAY = new Map<number, PilotModule>(PILOT_MODULES.map((module) => [module.day, module]));
-const BANNED_COACHING = /\b(?:score|scored|percent|percentage|great job|excellent work|amazing|beautifully|pivotal|crucial|transformative|groundbreaking|delve|underscore|foster|showcase|additionally|moreover|furthermore|notably|ultimately|at its core|what really matters|the real question is|let's dive in|i hope this helps|let me know if|personality|attachment|trauma|diagnos\w*|confiden\w*|anxi\w*|calm\w*|motive|relationship|will agree|will understand|will respond|future outcome)\b/i;
+const BANNED_COACHING = /\b(?:score|scored|percent|percentage|great job|excellent work|amazing|beautifully|pivotal|crucial|transformative|groundbreaking|delve|underscore|foster|showcase|additionally|moreover|furthermore|notably|ultimately|at its core|what really matters|the real question is|let's dive in|i hope this helps|let me know if|personality|attachment|trauma|diagnos\w*|confiden\w*|anxi\w*|calm\w*|emotion\w*|sincere|sincerity|nervous(?:-system)?|fight|flight|freeze|motive|relationship|will agree|will understand|will respond|future outcome)\b/i;
 
 /** The authored V3 pilot module for a day. */
 export function pilotModule(day: number): PilotModule | undefined {
@@ -124,10 +124,16 @@ export function neutralPilotCoachResponse(module: PilotModule): PilotCoachRespon
 
 /** Deterministic comparison limited to one selected behavior and 36 words. */
 export function comparePilotAttempts(behaviorId: PilotBehaviorId, before: string, after: string): PilotComparison {
-  const changed = normalize(before) !== normalize(after);
+  const normalizedBefore = normalize(before);
+  const normalizedAfter = normalize(after);
+  const changed = normalizedBefore !== normalizedAfter;
+  const beforeWords = wordCount(normalizedBefore);
+  const afterWords = wordCount(normalizedAfter);
+  const beforeSentences = sentenceCount(normalizedBefore);
+  const afterSentences = sentenceCount(normalizedAfter);
   const text = changed
-    ? "First attempt: the selected move used the original wording. Retry: the wording changed while the same coached behavior stayed in focus."
-    : "First attempt: the selected move used this wording. Retry: you kept the same wording and the same coached behavior.";
+    ? `First attempt: used ${beforeWords} words in ${beforeSentences} ${beforeSentences === 1 ? "sentence" : "sentences"}. Retry: used ${afterWords} words in ${afterSentences} ${afterSentences === 1 ? "sentence" : "sentences"}.`
+    : `First attempt: used ${beforeWords} words in ${beforeSentences} ${beforeSentences === 1 ? "sentence" : "sentences"}. Retry: held the same observable wording.`;
   return { behaviorId, text, criterionChanged: changed };
 }
 
@@ -167,8 +173,15 @@ export function validatePilotComparison(value: PilotComparison, coachedBehaviorI
   const errors: string[] = [];
   if (value.behaviorId !== coachedBehaviorId) errors.push("comparison behavior changed");
   if (wordCount(value.text) > 36) errors.push("comparison exceeds 36 words");
+  if (!/^First attempt: .+ Retry: .+/.test(value.text)) errors.push("comparison is not concrete");
+  if (/wording changed/i.test(value.text)) errors.push("comparison is generic");
   if (BANNED_COACHING.test(value.text) || /[%!]/.test(value.text)) errors.push("prohibited comparison claim or style");
   return errors;
+}
+
+function sentenceCount(value: string): number {
+  if (!value.trim()) return 0;
+  return Math.max(1, value.split(/[.!?]+/).filter((part) => part.trim()).length);
 }
 
 function normalize(value: string): string {

@@ -1,15 +1,16 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Check, Mic, Play, RotateCcw, Square, Volume2, X } from "lucide-react-native";
+import { Check, ChevronRight, LockKeyhole, Mic, Play, RotateCcw, Square, Volume2, X } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
-import { Backdrop, Eyebrow, GlassCard, GhostButton, MicControl, PrimaryButton, Reveal, StateDock, tap } from "@/components/ui";
+import { Backdrop, Eyebrow, GlassCard, GhostButton, MicControl, PressCard, PrimaryButton, Reveal, StateDock, tap } from "@/components/ui";
 import { C, GUTTER, T, eyebrow, font, radius, shadow } from "@/constants/theme";
 import { curriculumModule, isModuleId, practiceDayForRoute, type ModuleId } from "@/constants/modules";
 import { evaluatePilotAttempt, nextPilotCounterpart } from "@/lib/ai";
 import { canContinuePilot } from "@/lib/access";
+import { DEFAULT_CURRICULUM_VISIBILITY, reviewPracticeRuntime, visiblePracticesForModule } from "@/lib/modularCurriculum";
 import { microphoneRecoveryPresentation } from "@/lib/nativeCommerce";
 import { paidActivityForState } from "@/lib/paidProduct";
 import {
@@ -33,7 +34,7 @@ import {
 import { useDictation } from "@/lib/useDictation";
 import { replaySpeech, resetSpeech, speakPilotAudio, stopSpeech, useSpeech } from "@/lib/voice";
 import { useStore } from "@/providers/store";
-import type { PilotAttemptKind, PilotAudioLine, PilotCoachResponse, PilotDayRun, PilotModuleState } from "@/types/pilotCurriculum";
+import type { PilotAttemptKind, PilotAudioLine, PilotCoachResponse, PilotDayRun, PilotModule, PilotModuleState } from "@/types/pilotCurriculum";
 
 const DAY_ONE_RECOVERY_HEADING = "We couldn’t recover your first attempt";
 const DAY_ONE_RECOVERY_BODY = "Choose another conversation to continue your practice.";
@@ -42,16 +43,19 @@ const RETRY_INVITATION = "Try that same moment again.";
 export default function PilotModuleScreen() {
   const params = useLocalSearchParams<{ day: string }>();
   const routeValue = String(params.day);
-  const moduleId: ModuleId | null = isModuleId(routeValue) ? routeValue : null;
+  const routeModuleId: ModuleId | null = isModuleId(routeValue) ? routeValue : null;
+  const reviewDefinition = reviewPracticeRuntime(routeValue);
+  const moduleId: ModuleId | null = reviewDefinition?.identity.moduleId ?? routeModuleId;
   const curriculum = curriculumModule(moduleId);
-  const day = practiceDayForRoute(routeValue) ?? Number.NaN;
-  const module = pilotModule(day);
+  const day = reviewDefinition?.module.day ?? practiceDayForRoute(routeValue) ?? Number.NaN;
+  const module = reviewDefinition?.module ?? pilotModule(day);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
     access,
     anonymousUserId,
     pilotDoneDays,
+    completedPracticeIds,
     markPilotDayDone,
     activePracticeSession,
     saveActivePracticeSession,
@@ -61,7 +65,7 @@ export default function PilotModuleScreen() {
   const responseDictation = useDictation();
   const retryDictation = useDictation();
   const [session, setSession] = useState<ActivePracticeSession | null>(activePracticeSession);
-  const initialRun = useMemo(() => session && module ? createPilotDayRun(session, module.day, Date.now(), moduleId ?? undefined) : null, [module, moduleId, session]);
+  const initialRun = useMemo(() => session && module ? createPilotDayRun(session, module.day, Date.now(), moduleId ?? undefined, module.practice_id, module.content_version) : null, [module, moduleId, session]);
   const [run, setRun] = useState<PilotDayRun | null>(initialRun);
   const [state, setState] = useState<PilotModuleState>(day === 1 ? dayOneScreenState(activePracticeSession) : initialRun?.state ?? "module_preview");
   const [lessonIndex, setLessonIndex] = useState<number>(initialRun?.lessonIndex ?? 0);
@@ -74,12 +78,14 @@ export default function PilotModuleScreen() {
   const [hasReplayedDayOneAdam, setHasReplayedDayOneAdam] = useState<boolean>(false);
   const isMuted = false;
   const [error, setError] = useState<string>("");
+  const counterpartLabel = session?.counterpartDisplayLabel ?? session?.counterpart ?? (session?.counterpartRelationship ? `Your ${session.counterpartRelationship.toLowerCase()}` : "Practice partner");
+  const responseTarget = counterpartLabel.replace(/^Your /, "your ");
 
   useEffect(() => {
     if (!activePracticeSession || activePracticeSession.id === session?.id) return;
     setSession(activePracticeSession);
     if (module) {
-      const restored = createPilotDayRun(activePracticeSession, module.day, Date.now(), moduleId ?? undefined);
+      const restored = createPilotDayRun(activePracticeSession, module.day, Date.now(), moduleId ?? undefined, module.practice_id, module.content_version);
       setRun(restored);
       if (day !== 1) setState(restored.state);
     }
@@ -119,8 +125,9 @@ export default function PilotModuleScreen() {
 
   const ensureSessionAndRun = useCallback(async (): Promise<{ base: ActivePracticeSession; run: PilotDayRun } | null> => {
     if (!module) return null;
-    const base = session ?? createPresetPracticeSession(anonymousUserId);
-    const next = createPilotDayRun(base, module.day, Date.now(), moduleId ?? undefined);
+    const createdBase = createPresetPracticeSession(anonymousUserId);
+    const base = session ?? (module.review_only ? { ...createdBase, counterpart: "Practice partner", counterpartDisplayLabel: "Practice partner" } : createdBase);
+    const next = createPilotDayRun(base, module.day, Date.now(), moduleId ?? undefined, module.practice_id, module.content_version);
     if (!session) {
       setSession(base);
       await saveActivePracticeSession(base);
@@ -195,12 +202,20 @@ export default function PilotModuleScreen() {
 
   const startRehearsal = useCallback(async (): Promise<void> => {
     if (!module || !run) return;
-    if (module.day === 4 || module.day === 5) {
+    if (module.counterpart_first || module.day === 4 || module.day === 5) {
       try {
         const response = await nextPilotCounterpart(module, "", run.id);
         const line = module.practice.adam_line;
         if (!line || !response.spokenText) return;
-        const withCounterpart = { ...transitionPilotRun(run, "adam_response"), adamReactionId: response.reactionId, adamAudioId: response.audioId ?? line.audio_id };
+        const withCounterpart = {
+          ...transitionPilotRun(run, "adam_response"),
+          counterpartTurn: { id: line.audio_id, text: line.text, source: "authored" as const },
+          counterpartIdentity: counterpartLabel,
+          counterpartReactionId: response.reactionId,
+          resolvedAudioId: response.audioId ?? line.audio_id,
+          adamReactionId: response.reactionId,
+          adamAudioId: response.audioId ?? line.audio_id,
+        };
         await persistRun(withCounterpart);
         const playback = await speakPilotAudio(line, { muted: isMuted });
         if (playback === "failed" || playback === "empty") {
@@ -217,7 +232,7 @@ export default function PilotModuleScreen() {
     }
     setActiveCapture("opener");
     await persistRun(transitionPilotRun(run, "ready_for_attempt"));
-  }, [isMuted, module, persistRun, run]);
+  }, [counterpartLabel, isMuted, module, persistRun, run]);
 
   const startCapture = useCallback(async (kind: PilotAttemptKind): Promise<void> => {
     await stopSpeech();
@@ -258,13 +273,17 @@ export default function PilotModuleScreen() {
       await persistRun(transitionPilotRun(baseRun, "network_error"));
       return;
     }
-    const line = module.day === 8
+    const line = (module.practice.approved_pushback_bank?.length ?? 0) > 0
       ? (module.practice.approved_pushback_bank ?? []).find((item) => item.audio_id === response.audioId)
       : module.practice.adam_line;
-    if (!line || !response.spokenText) throw new Error("Approved Adam audio is unavailable");
+    if (!line || !response.spokenText) throw new Error("Authored counterpart audio is unavailable");
     const withAdam: PilotDayRun = {
       ...baseRun,
       state: "adam_response",
+      counterpartTurn: { id: line.audio_id, text: line.text, source: "authored" },
+      counterpartIdentity: counterpartLabel,
+      counterpartReactionId: response.reactionId,
+      resolvedAudioId: line.audio_id,
       adamReactionId: response.reactionId,
       adamAudioId: line.audio_id,
       updatedAt: Date.now(),
@@ -277,7 +296,7 @@ export default function PilotModuleScreen() {
       return;
     }
     await persistRun(transitionPilotRun(withAdam, "ready_for_response"));
-  }, [isMuted, module, persistRun]);
+  }, [counterpartLabel, isMuted, module, persistRun]);
 
   const confirmAttempt = useCallback(async (): Promise<void> => {
     if (!run || attemptText.trim().length < 2) return;
@@ -310,6 +329,7 @@ export default function PilotModuleScreen() {
       coachNote: result.note,
       retryInstruction: result.retryInstruction ?? module.retry.direction,
       coachedBehaviorId,
+      coachedSegment: module.practice_id === "stc_mild_pushback" && result.evidenceQuote && preserved.attempt?.transcript.includes(result.evidenceQuote) ? "opener" : "pushback_response",
       updatedAt: Date.now(),
     };
     await persistRun(withCoach);
@@ -317,15 +337,25 @@ export default function PilotModuleScreen() {
 
   const beginRetry = useCallback(async (): Promise<void> => {
     if (!module || !run) return;
-    if (pilotRetrySegment(module.day, run.coachedBehaviorId) === "opener") {
+    if (retrySegmentForRun(module, run) === "opener") {
       setActiveCapture("retry");
-      await persistRun(transitionPilotRun(run, "ready_for_retry"));
+      await persistRun(transitionPilotRun({ ...run, retryResetId: run.retryResetId ?? `${run.id}-pre-opener-reset` }, "ready_for_retry"));
       return;
     }
     const adamLine = adamLineForRun(run, module);
     if (adamLine) await speakPilotAudio(adamLine, { muted: isMuted });
     setActiveCapture("retry");
     await persistRun(transitionPilotRun(run, "ready_for_retry"));
+  }, [isMuted, module, persistRun, run]);
+
+  const acceptDayThreeNote = useCallback(async (): Promise<void> => {
+    if (!module || !run) return;
+    const accepted = { ...run, noteFit: "accepted" as const };
+    const line = adamLineForRun(accepted, module);
+    await persistRun(accepted);
+    if (line) await speakPilotAudio(line, { muted: isMuted });
+    setActiveCapture("retry");
+    await persistRun(transitionPilotRun(accepted, "ready_for_retry"));
   }, [isMuted, module, persistRun, run]);
 
   const rejectDayThreeNote = useCallback(async (): Promise<void> => {
@@ -353,9 +383,9 @@ export default function PilotModuleScreen() {
     if (!run) return;
     const preserved = preservePilotAttempt(run, "retry", retryText);
     const behavior = preserved.coachedBehaviorId ?? module.primary_behavior_id;
-    const original = pilotRetrySegment(module.day, behavior) === "opener" ? preserved.attempt?.transcript ?? "" : preserved.responseAttempt?.transcript ?? "";
+    const original = retrySegmentForRun(module, preserved) === "opener" ? preserved.attempt?.transcript ?? "" : preserved.responseAttempt?.transcript ?? "";
     const comparison = comparePilotAttempts(behavior, original, preserved.retryAttempt?.transcript ?? retryText);
-    if (pilotRetrySegment(module.day, behavior) === "opener") {
+    if (retrySegmentForRun(module, preserved) === "opener") {
       const line = adamLineForRun(preserved, module);
       if (line) await speakPilotAudio(line, { muted: isMuted });
       await persistRun({ ...preserved, comparison, state: "play_adam_after_opener_retry", updatedAt: Date.now() });
@@ -387,9 +417,13 @@ export default function PilotModuleScreen() {
     tap("success");
   }, [day, markPilotDayDone, module, moduleId, persistLegacyDayOne, persistRun, run, session?.attemptTwo]);
 
-  if (!module) return <Missing title="That practice day isn't available." onBack={() => router.navigate("/(tabs)")} />;
-  if (!moduleId && !isPilotModuleUnlocked(day, pilotDoneDays)) return <Missing title="That legacy practice is not available yet." onBack={() => router.navigate("/(tabs)")} />;
   const decision = canContinuePilot(access);
+  if (routeModuleId) {
+    if (!decision.allowed) return <Missing title="This practice module is part of the paid program." action="See the program" onBack={() => router.replace({ pathname: "/paywall", params: { gate: decision.gate ?? "program", moduleId: routeModuleId } })} />;
+    return <ModulePracticeList moduleId={routeModuleId} completedPracticeIds={completedPracticeIds} onBack={() => router.navigate("/(tabs)")} onOpen={(practiceId) => router.push({ pathname: "/module/[day]", params: { day: practiceId } })} />;
+  }
+  if (!module) return <Missing title="That practice isn't available." onBack={() => router.navigate("/(tabs)")} />;
+  if (!moduleId && !isPilotModuleUnlocked(day, pilotDoneDays)) return <Missing title="That legacy practice is not available yet." onBack={() => router.navigate("/(tabs)")} />;
   // Development preview access is folded into `access`; release behavior reaches
   // Pro only through the existing RevenueCat entitlement.
   if (!decision.allowed) {
@@ -400,9 +434,7 @@ export default function PilotModuleScreen() {
   const effectiveState = day === 1 && state === "module_preview" && session?.nextState === "complete" ? "complete" : state;
   const microphoneRecovery = microphoneRecoveryPresentation();
   const adamLine = day === 1 ? null : adamLineForRun(run, module);
-  const counterpartLabel = session?.counterpartDisplayLabel ?? session?.counterpart ?? (session?.counterpartRelationship ? `Your ${session.counterpartRelationship.toLowerCase()}` : "Practice partner");
-  const responseTarget = counterpartLabel.replace(/^Your /, "your ");
-  const retrySegment = pilotRetrySegment(module.day, run?.coachedBehaviorId);
+  const retrySegment = retrySegmentForRun(module, run);
   const paidComparison = pilotComparisonPresentation(run ?? undefined, adamLine, retrySegment);
   const dayOneComparison = session?.attemptOne && session.attemptTwo && session.originalAdamResponse && session.comparison ? {
     counterpartTurnId: session.originalAdamResponse.id,
@@ -448,7 +480,7 @@ export default function PilotModuleScreen() {
           {effectiveState === "preset_scenario" && module.copy.scenario ? <RehearsalBriefing heading={module.copy.scenario.heading} title={module.copy.scenario.title ?? curriculum?.name ?? module.copy.heading} context={run?.scenarioMode === "carried_context" && session?.scenarioSource === "user_supplied" && session.topic ? session.topic : contextualizeCounterpart(module.copy.scenario.scenario, counterpartLabel)} target={contextualizeCounterpart(module.copy.scenario.user_job, counterpartLabel)} pressure={contextualizeCounterpart(module.practice.adam_line?.text ?? module.practice.approved_pushback_bank?.[0]?.text ?? "The counterpart will respond with realistic pressure.", counterpartLabel)} counterpart={counterpartLabel} onStart={startRehearsal} onUseMine={chooseCarriedContext} useMineLabel={session?.scenarioSource === "user_supplied" ? "Use my saved conversation" : "Build from my situation"} /> : null}
 
           {effectiveState === "ready_for_attempt" ? <AttemptReady prompt={module.copy.scenario?.attempt_prompt ?? module.copy.scenario?.user_job ?? ""} value={attemptText} onChange={setAttemptText} onStart={() => startCapture("opener")} onReview={() => run && persistRun(transitionPilotRun(run, "confirm_attempt_transcript"))} button="I’m ready to speak" /> : null}
-          {effectiveState === "ready_for_response" ? <><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><AttemptReady prompt={`Respond to ${responseTarget}`} value={responseText} onChange={setResponseText} onStart={() => startCapture("response")} onReview={() => run && persistRun(transitionPilotRun(run, "confirm_response_transcript"))} button="I’m ready to speak" /></> : null}
+          {effectiveState === "ready_for_response" ? <><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><AttemptReady prompt={module.copy.scenario?.response_prompt ?? `Respond to ${responseTarget}`} value={responseText} onChange={setResponseText} onStart={() => startCapture("response")} onReview={() => run && persistRun(transitionPilotRun(run, "confirm_response_transcript"))} button="I’m ready to speak" /></> : null}
           {effectiveState === "ready_for_retry" ? <><CounterpartContext role={counterpartLabel} line={day === 1 && session?.originalAdamResponse ? { audio_id: session.originalAdamResponse.resolvedAudioId, voice_key: "adam_counterpart", text: session.originalAdamResponse.text } : adamLine} onPlay={day === 1 && session?.originalAdamResponse ? () => speakPilotAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }, { muted: isMuted }) : adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><AttemptReady prompt={retryDirection(module, run, session)} value={retryText} onChange={setRetryText} onStart={() => startCapture("retry")} onReview={async () => { if (day === 1) { await persistLegacyDayOne({ nextState: "confirm_retry_transcript" }); setState("confirm_retry_transcript"); } else if (run) await persistRun(transitionPilotRun(run, "confirm_retry_transcript")); }} button="I’m ready to retry" /></> : null}
 
           {effectiveState === "listening_attempt" || effectiveState === "listening_response" || effectiveState === "listening_retry" ? <Listening level={dictation.level} onStop={stopCapture} /> : null}
@@ -460,7 +492,7 @@ export default function PilotModuleScreen() {
           {effectiveState === "adam_response" && day === 1 && session?.originalAdamResponse ? <Reveal><Text style={styles.title}>Listen once more, then try your part again.</Text><RoleCard role={counterpartLabel} text={session.originalAdamResponse.text} onPlay={async () => { const outcome = await speakPilotAudio({ audio_id: session.originalAdamResponse?.id ?? `${session.id}-adam-response-1`, voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }); if (outcome !== "failed" && outcome !== "empty") setHasReplayedDayOneAdam(true); }} /><PrimaryButton label="I’m ready to retry" disabled={!hasReplayedDayOneAdam} onPress={async () => { await persistLegacyDayOne({ nextState: "spoken_retry" }); setActiveCapture("retry"); setState("ready_for_retry"); }} style={styles.actionTop} /></Reveal> : null}
 
           {effectiveState === "hope_coaching" && day !== 1 && activeCoach ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><CoachCard coach={activeCoach} /><PrimaryButton label="I’m ready to retry" onPress={beginRetry} style={styles.actionTop} /></Reveal> : null}
-          {effectiveState === "day3_note_check" && activeCoach ? <Reveal><CoachCard coach={activeCoach} /><Text style={styles.title}>Does that fit what happened?</Text><PrimaryButton label="Yes, that fits" onPress={async () => { if (run) await persistRun({ ...run, noteFit: "accepted" }); await beginRetry(); }} style={styles.actionTop} /><GhostButton label="Not quite" onPress={rejectDayThreeNote} style={styles.secondaryAction} /></Reveal> : null}
+          {effectiveState === "day3_note_check" && activeCoach ? <Reveal><CoachCard coach={activeCoach} /><Text style={styles.title}>Does that fit what happened?</Text><PrimaryButton label="Yes, that fits" onPress={acceptDayThreeNote} style={styles.actionTop} /><GhostButton label="Not quite" onPress={rejectDayThreeNote} style={styles.secondaryAction} /></Reveal> : null}
           {effectiveState === "day3_neutral_retry" ? <Reveal><Text style={styles.title}>Try that same moment again.</Text><PrimaryButton label="I’m ready to retry" onPress={beginRetry} style={styles.actionTop} /></Reveal> : null}
           {busy ? <View style={styles.busyCard}><ActivityIndicator color={C.purple} /><Text style={styles.cardText}>Hope is checking one moment</Text></View> : null}
 
@@ -482,6 +514,19 @@ export default function PilotModuleScreen() {
   );
 }
 
+function ModulePracticeList({ moduleId, completedPracticeIds, onBack, onOpen }: { moduleId: ModuleId; completedPracticeIds: ReadonlySet<string>; onBack: () => void; onOpen: (practiceId: string) => void }) {
+  const insets = useSafeAreaInsets();
+  const module = curriculumModule(moduleId);
+  const practices = visiblePracticesForModule(moduleId, DEFAULT_CURRICULUM_VISIBILITY);
+  if (!module) return null;
+  return <View style={styles.root}><Backdrop /><View style={[styles.header, { paddingTop: insets.top + 8 }]}><Pressable onPress={onBack} style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Back to Today"><X size={21} color={C.textSoft} /></Pressable><View style={styles.headerCopy}><Text style={styles.headerTitle}>Internal review</Text><Text style={styles.headerMeta}>{module.name}</Text></View><View style={styles.iconButton} /></View><ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 48 }]} showsVerticalScrollIndicator={false}><Reveal><StatusPill label="Review curriculum · not for production" tone="amber" /><Text style={styles.title}>{module.name}</Text><Text style={styles.lede}>{module.promise}</Text></Reveal>{practices.length === 0 ? <Reveal index={1}><ProductCard><Text style={styles.cardText}>No launch-eligible practices are available.</Text></ProductCard></Reveal> : <View style={styles.practiceInventory}>{practices.map((practice, index) => {
+    const isRunnable = practice.runtimeStatus === "runnable";
+    const isComplete = completedPracticeIds.has(practice.practiceId);
+    const label = isComplete ? "Completed · revisitable" : isRunnable ? "Review practice" : practice.runtimeStatus === "gated" ? "Gated · not runnable" : "Mechanically blocked · not runnable";
+    return <Reveal key={practice.practiceId} index={index + 1}><PressCard disabled={!isRunnable} onPress={() => onOpen(practice.practiceId)} accessibilityLabel={`${practice.title}. ${label}`}><View style={[styles.practiceRow, !isRunnable && styles.practiceRowBlocked]}><View style={[styles.practiceMarker, isComplete && styles.practiceMarkerDone]}>{isComplete ? <Check size={13} color={C.onAccent} /> : !isRunnable ? <LockKeyhole size={14} color={C.dim} /> : <Text style={styles.practiceNumber}>{practice.order}</Text>}</View><View style={styles.rowCopy}><Text style={[styles.practiceTitle, !isRunnable && styles.rowTitleLocked]}>{practice.title}</Text><StatusPill label={label} tone={isComplete ? "green" : isRunnable ? "purple" : "neutral"} /></View>{isRunnable ? <ChevronRight size={18} color={C.purple} /> : null}</View></PressCard></Reveal>;
+  })}</View>}</ScrollView></View>;
+}
+
 function dayOneScreenState(session: ActivePracticeSession | null): PilotModuleState {
   if (!session || session.nextState === "awaiting_onboarding_baseline") return "module_preview";
   const states: Record<Exclude<ActivePracticeSession["nextState"], "awaiting_onboarding_baseline">, PilotModuleState> = {
@@ -496,8 +541,8 @@ function dayOneScreenState(session: ActivePracticeSession | null): PilotModuleSt
   return states[session.nextState];
 }
 
-function adamLineForRun(run: PilotDayRun | null, module: NonNullable<ReturnType<typeof pilotModule>>): PilotAudioLine | null {
-  if (module.day !== 8) return module.practice.adam_line ?? null;
+function adamLineForRun(run: PilotDayRun | null, module: PilotModule): PilotAudioLine | null {
+  if ((module.practice.approved_pushback_bank?.length ?? 0) === 0) return module.practice.adam_line ?? null;
   if (run?.adamAudioId) return (module.practice.approved_pushback_bank ?? []).find((line) => line.audio_id === run.adamAudioId) ?? null;
   return run ? selectDay8Pushback(run.id, module) : null;
 }
@@ -506,7 +551,11 @@ function contextualizeCounterpart(value: string, counterpartLabel: string): stri
   return value.replace(/\bAdam\b/g, counterpartLabel);
 }
 
-function retryDirection(module: NonNullable<ReturnType<typeof pilotModule>>, run: PilotDayRun | null, session: ActivePracticeSession | null): string {
+function retrySegmentForRun(module: PilotModule, run: PilotDayRun | null): "opener" | "pushback_response" {
+  return run?.coachedSegment ?? pilotRetrySegment(module.day, run?.coachedBehaviorId);
+}
+
+function retryDirection(module: PilotModule, run: PilotDayRun | null, session: ActivePracticeSession | null): string {
   if (module.day === 1) return "Try the same moment again in your own words.";
   if (module.day === 8) return pilotRetrySegment(module.day, run?.coachedBehaviorId) === "opener" ? module.retry.opener_direction ?? module.retry.direction : module.retry.response_direction ?? module.retry.direction;
   return run?.retryInstruction ?? session?.retryInstruction ?? module.retry.direction;
@@ -592,4 +641,12 @@ const styles = StyleSheet.create({
   comparisonPair: { flexDirection: "row", gap: 10, marginTop: 12 }, comparisonAttempt: { flex: 1, padding: 16 }, comparisonText: { fontFamily: font.regular, fontSize: 14, lineHeight: 21, color: C.text }, differenceCard: { marginTop: 10, backgroundColor: "rgba(255,255,255,0.82)" },
   busyCard: { alignItems: "center", gap: 12, marginTop: 60, padding: 24 }, comparisonRule: { height: StyleSheet.hairlineWidth, backgroundColor: C.line, marginVertical: 6 }, roleHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, playButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.line, alignItems: "center", justifyContent: "center" },
   voiceDock: { backgroundColor: "transparent" }, missingButton: { width: 230, marginTop: 22 },
+  practiceInventory: { marginTop: 24, gap: 10 },
+  practiceRow: { minHeight: 76, borderRadius: radius.md, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(255,255,255,0.78)", padding: 14, flexDirection: "row", alignItems: "center", gap: 12 },
+  practiceRowBlocked: { opacity: 0.64 },
+  practiceMarker: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: C.lineStrong, alignItems: "center", justifyContent: "center" },
+  practiceMarkerDone: { backgroundColor: C.purple, borderColor: C.purple },
+  practiceNumber: { fontFamily: font.semi, fontSize: 11, color: C.dim },
+  practiceTitle: { ...T.support, fontFamily: font.semi, color: C.text, marginBottom: 7 },
+  rowCopy: { flex: 1 }, rowTitleLocked: { color: C.dim },
 });

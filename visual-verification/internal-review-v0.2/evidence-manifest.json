@@ -1,0 +1,43 @@
+{
+  "evidence_version": "2026-08-11.1-review",
+  "baseline": "3bed2b05dab5bbdd5ecb37a8643ffeeacf6deba1",
+  "evidence_kind": "route-mounted deterministic state sheets; not a physical click-through",
+  "production_visible": false,
+  "route_source_sha256": "7ebc92b50d1c7a1980fe7dad4daff849fa91f61197391ed9055045e6358c0b56",
+  "curriculum_payload_sha256": "f7fdc29b284bee0cad7ea15ea0af341b3bcfcec9c5ce335a9fae57cf84869fe4",
+  "registry_payload_sha256": "f23e8de87591fb64a4759f7930787cd4d769d71938b80f48f6cca621d4aa521f",
+  "routes": [
+    "/internal-review-evidence?sheet=path",
+    "/internal-review-evidence?sheet=get_to_the_point",
+    "/internal-review-evidence?sheet=make_a_clear_ask",
+    "/internal-review-evidence?sheet=start_the_conversation",
+    "/internal-review-evidence?sheet=listen_and_respond",
+    "/internal-review-evidence?sheet=stay_clear_under_pushback",
+    "/internal-review-evidence?sheet=pause_say_no_boundary",
+    "/internal-review-evidence?sheet=repair_what_went_wrong",
+    "/internal-review-evidence?sheet=use_it_in_real_life",
+    "/internal-review-evidence?sheet=states",
+    "/internal-review-evidence?sheet=specials",
+    "/internal-review-evidence?sheet=continuity",
+    "/internal-review-evidence?sheet=inventory",
+    "/internal-review-evidence?sheet=persistence"
+  ],
+  "coverage": [
+    "eight truthful Path cards",
+    "all module practice lists and package ordering",
+    "Lesson, Practice, Rehearsal, transcript review, counterpart, Hope, retry, comparison, completion, and interrupted states",
+    "Day 3 rejection and neutral retry",
+    "Day 4 modeled pause without a duration claim",
+    "Day 7 constraint and counteroffer",
+    "both Day 8 retry branches",
+    "Priya and Sam continuity",
+    "gated and blocked non-runnable inventory",
+    "representative restart checkpoints",
+    "Progress unchanged by migration",
+    "production visibility failing closed"
+  ],
+  "limitations": [
+    "Provider, microphone, recording, playback, interruption, TTS, and native-device behavior require separate end-to-end QA.",
+    "These URLs render deterministic state sheets in explicit internal-review mode and are not claimed as physical interaction recordings."
+  ]
+}

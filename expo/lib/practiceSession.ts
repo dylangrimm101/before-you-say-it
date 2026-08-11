@@ -331,15 +331,24 @@ export function preserveDayOneRetry(session: ActivePracticeSession, transcript: 
 }
 
 /** Create or recover one config-driven daily run. */
-export function createPilotDayRun(session: ActivePracticeSession, day: number, now: number = Date.now(), moduleId?: ModuleId): PilotDayRun {
-  const runKey = moduleId ?? String(day);
+export function createPilotDayRun(
+  session: ActivePracticeSession,
+  day: number,
+  now: number = Date.now(),
+  moduleId?: ModuleId,
+  practiceId?: string,
+  contentVersion?: string,
+): PilotDayRun {
+  const runKey = practiceId ?? moduleId ?? String(day);
   const existing = session.pilotRuns[runKey];
   if (existing) return existing;
   return {
-    id: `${session.id}-${moduleId ?? `day-${day}`}`,
+    id: `${session.id}-${practiceId ?? moduleId ?? `day-${day}`}`,
     ...(moduleId ? { moduleId } : {}),
+    ...(practiceId ? { practiceId } : {}),
+    ...(contentVersion ? { contentVersion } : {}),
     day,
-    curriculumVersion: PILOT_PROGRAM.curriculum_version,
+    curriculumVersion: practiceId ? "2026-08-11.1-review" : PILOT_PROGRAM.curriculum_version,
     state: "module_preview",
     scenarioMode: "preset",
     lessonIndex: 0,
@@ -350,13 +359,21 @@ export function createPilotDayRun(session: ActivePracticeSession, day: number, n
 
 /** Persist a daily transition while preserving every confirmed attempt. */
 export function upsertPilotDayRun(session: ActivePracticeSession, incoming: PilotDayRun, now: number = Date.now()): ActivePracticeSession {
-  const runKey = incoming.moduleId ?? String(incoming.day);
+  const runKey = incoming.practiceId ?? incoming.moduleId ?? String(incoming.day);
   const existing = session.pilotRuns[runKey];
   const protectedRun: PilotDayRun = existing ? {
     ...incoming,
     ...(existing.attempt ? { attempt: existing.attempt } : {}),
     ...(existing.responseAttempt ? { responseAttempt: existing.responseAttempt } : {}),
     ...(existing.retryAttempt ? { retryAttempt: existing.retryAttempt } : {}),
+    ...(existing.counterpartTurn ? { counterpartTurn: existing.counterpartTurn } : {}),
+    ...(existing.counterpartIdentity ? { counterpartIdentity: existing.counterpartIdentity } : {}),
+    ...(existing.counterpartReactionId ? { counterpartReactionId: existing.counterpartReactionId } : {}),
+    ...(existing.resolvedAudioId ? { resolvedAudioId: existing.resolvedAudioId } : {}),
+    ...(existing.adamReactionId ? { adamReactionId: existing.adamReactionId } : {}),
+    ...(existing.adamAudioId ? { adamAudioId: existing.adamAudioId } : {}),
+    ...(existing.coachedSegment ? { coachedSegment: existing.coachedSegment } : {}),
+    ...(existing.retryResetId ? { retryResetId: existing.retryResetId } : {}),
     updatedAt: now,
   } : { ...incoming, updatedAt: now };
   return {
@@ -382,7 +399,7 @@ export function preservePilotAttempt(run: PilotDayRun, kind: PilotAttemptKind, t
 
 /** Persist a state transition without allowing completion before a retry. */
 export function transitionPilotRun(run: PilotDayRun, state: PilotModuleState, now: number = Date.now()): PilotDayRun {
-  if (state === "complete" && !run.retryAttempt) return run;
+  if (state === "complete" && (!run.retryAttempt || run.state !== "transfer_cue")) return run;
   if (run.state === "complete") return run;
   return { ...run, state, ...(state === "complete" ? { completedAt: run.completedAt ?? now } : {}), updatedAt: now };
 }
@@ -403,6 +420,14 @@ export function protectImmutablePracticeRecords(existing: ActivePracticeSession,
       ...(old.attempt ? { attempt: old.attempt } : {}),
       ...(old.responseAttempt ? { responseAttempt: old.responseAttempt } : {}),
       ...(old.retryAttempt ? { retryAttempt: old.retryAttempt } : {}),
+      ...(old.counterpartTurn ? { counterpartTurn: old.counterpartTurn } : {}),
+      ...(old.counterpartIdentity ? { counterpartIdentity: old.counterpartIdentity } : {}),
+      ...(old.counterpartReactionId ? { counterpartReactionId: old.counterpartReactionId } : {}),
+      ...(old.resolvedAudioId ? { resolvedAudioId: old.resolvedAudioId } : {}),
+      ...(old.adamReactionId ? { adamReactionId: old.adamReactionId } : {}),
+      ...(old.adamAudioId ? { adamAudioId: old.adamAudioId } : {}),
+      ...(old.coachedSegment ? { coachedSegment: old.coachedSegment } : {}),
+      ...(old.retryResetId ? { retryResetId: old.retryResetId } : {}),
     } : run];
   }));
   return {

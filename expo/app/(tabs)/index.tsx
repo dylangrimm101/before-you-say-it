@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Backdrop, useReducedMotion } from "@/components/ui";
 import { curriculumModule, type CurriculumModule } from "@/constants/modules";
 import { C, GUTTER, eyebrow, font, radius, shadow, T } from "@/constants/theme";
-import { pilotModule } from "@/lib/pilotCurriculum";
+import { nextReviewPractice, reviewPracticeRuntime } from "@/lib/modularCurriculum";
 import {
   TODAY_ACTIVITY_KEYS,
   TODAY_CARD_GAP,
@@ -27,6 +27,7 @@ import {
   type TodayIndexPresentation,
 } from "@/lib/today";
 import { useStore } from "@/providers/store";
+import type { PilotModule } from "@/types/pilotCurriculum";
 
 const SIGNALS = ["Clarity", "Specificity", "Listening", "Steadiness", "Boundaries", "Repair"] as const;
 const SIGNAL_COLORS = ["#512888", "#6B4E9E", "#8571B0", "#9E8CC2", "#B3A4D0", "#C7BCDE"] as const;
@@ -36,7 +37,7 @@ interface ActivityCopy {
   body: string;
 }
 
-function activityCopy(key: TodayActivityKey, module: CurriculumModule, moduleDay: ReturnType<typeof pilotModule>): ActivityCopy {
+function activityCopy(key: TodayActivityKey, module: CurriculumModule, moduleDay: PilotModule | undefined): ActivityCopy {
   if (key === "lesson") return { title: module.name, body: moduleDay?.copy.body ?? "Learn the move behind your first focus." };
   if (key === "practice") return { title: "Practice the distinction", body: moduleDay?.copy.quiz?.prompt ?? "Choose the response that keeps the communication move visible." };
   if (key === "rehearsal") return { title: moduleDay?.copy.scenario?.heading ?? "Use it under pressure", body: moduleDay?.copy.scenario?.user_job ?? "Try the move against realistic pushback, then repeat the moment once." };
@@ -97,11 +98,12 @@ export default function TodayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isReduced = useReducedMotion();
-  const { access, activityDays, activePracticeSession } = useStore();
+  const { access, activityDays, activePracticeSession, completedPracticeIds } = useStore();
   const moduleId = todayRecommendedModuleId(activePracticeSession);
   const recommended = curriculumModule(moduleId);
-  const activeRun = moduleId ? activePracticeSession?.pilotRuns[moduleId] : undefined;
-  const moduleDay = recommended ? pilotModule(recommended.practiceDay) : undefined;
+  const activeRun = moduleId ? Object.values(activePracticeSession?.pilotRuns ?? {}).find((run) => run.moduleId === moduleId && run.state !== "complete") : undefined;
+  const nextPractice = moduleId ? nextReviewPractice(moduleId, completedPracticeIds) : undefined;
+  const moduleDay = reviewPracticeRuntime(activeRun?.practiceId ?? nextPractice?.practiceId ?? "")?.module;
   const index = useMemo<TodayIndexPresentation>(() => todayIndexPresentation(activePracticeSession?.sharedResult), [activePracticeSession?.sharedResult]);
   const recentDays = useMemo(() => todayRecentPractice(activityDays, new Date()), [activityDays]);
   const activities = useMemo(() => todayActivityPresentation(activeRun?.state, Boolean(activeRun)), [activeRun]);

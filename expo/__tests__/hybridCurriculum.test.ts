@@ -66,7 +66,7 @@ describe("hybrid onboarding curriculum contract", () => {
   test("routes module identifiers into the reused daily practice engine", () => {
     CURRICULUM_MODULES.forEach((module) => {
       expect(curriculumModule(module.id)?.name).toBe(module.name);
-      expect(practiceDayForRoute(module.id)).toBe(module.practiceDay);
+      expect(practiceDayForRoute(module.id)).toBeNull();
     });
   });
 

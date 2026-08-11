@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PaidHeader, ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
 import { Backdrop, PressCard, Reveal } from "@/components/ui";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
+import { DEFAULT_CURRICULUM_VISIBILITY } from "@/lib/modularCurriculum";
 import { pathPresentation, type PathModulePresentation } from "@/lib/paidProduct";
 import { useStore } from "@/providers/store";
 
@@ -38,12 +39,13 @@ export default function PathScreen() {
 }
 
 function statusLabel(status: PathModulePresentation["status"]): string {
-  if (status === "recommended") return "Recommended start";
-  if (status === "current") return "Current module";
-  if (status === "completed") return "Completed";
-  if (status === "interrupted") return "Continue checkpoint";
+  const reviewPrefix = DEFAULT_CURRICULUM_VISIBILITY === "internal_review" ? "Internal review · " : "";
+  if (status === "recommended") return `${reviewPrefix}Recommended start`;
+  if (status === "current") return `${reviewPrefix}Current module`;
+  if (status === "completed") return `${reviewPrefix}Completed`;
+  if (status === "interrupted") return `${reviewPrefix}Continue checkpoint`;
   if (status === "locked") return "Requires Pro";
-  return "Available";
+  return `${reviewPrefix}Available`;
 }
 
 const styles = StyleSheet.create({

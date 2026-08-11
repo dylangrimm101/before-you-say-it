@@ -79,7 +79,7 @@ describe("remaining native acquisition and paid experience", () => {
     const todayLogic = await source("lib/today.ts");
     const purchased = await source("app/purchase-success.tsx");
     expect(todayLogic).toContain("session?.sharedResult?.first_focus?.recommended_module_id ?? null");
-    expect(today).toContain("activePracticeSession?.pilotRuns[moduleId]");
+    expect(today).toContain("run.moduleId === moduleId");
     expect(today).toContain("todayActivityPresentation(activeRun?.state");
     expect(purchased).toContain("Start my first practice");
   });

@@ -1,6 +1,6 @@
 import type { CategoryId, Difficulty, ReactionPattern } from "@/types/convo";
 
-export type PilotBehaviorId =
+export type KnownPilotBehaviorId =
   | "baseline_integrity"
   | "conversation_job"
   | "timing_scope_channel"
@@ -12,9 +12,12 @@ export type PilotBehaviorId =
   | "integrated_opener"
   | "pushback_response";
 
+/** Stable curriculum behavior identity; review records extend the original V3 set. */
+export type PilotBehaviorId = KnownPilotBehaviorId | (string & {});
+
 export interface PilotAudioLine {
   audio_id: string;
-  voice_key: "hope_teacher" | "adam_counterpart";
+  voice_key: "hope_teacher" | "adam_counterpart" | "contextual_counterpart";
   text: string;
   leading_pause_ms?: number;
 }
@@ -70,11 +73,18 @@ export interface PilotCopy {
 }
 
 export interface PilotModule {
+  /** Compatibility field for the original day-addressed engine; never a calendar gate. */
   day: number;
+  legacy_day?: number;
+  practice_id?: string;
+  content_version?: string;
+  module_id?: import("@/constants/modules").ModuleId;
+  review_only?: boolean;
+  counterpart_first?: boolean;
   phase_id: string;
   title: string;
   primary_behavior_id: PilotBehaviorId;
-  duration_minutes: [number, number];
+  duration_minutes?: [number, number];
   preserve_uncoached_attempt: boolean;
   copy: PilotCopy;
   practice: PilotPractice;
@@ -96,6 +106,11 @@ export interface PilotProgressEntry {
   curriculumVersion: string;
   /** Modular destination. Legacy day-only records are migrated additively. */
   moduleId?: import("@/constants/modules").ModuleId;
+  /** Stable practice identity; absent only on preserved legacy or ambiguous history. */
+  practiceId?: string;
+  contentVersion?: string;
+  evidenceTags?: string[];
+  legacyClassification?: "practice_completion" | "prerequisite_practice_evidence" | "ambiguous_module_history";
   day: number;
   behaviorId: PilotBehaviorId;
   date: string;
@@ -167,6 +182,8 @@ export interface ScenarioCounterpartTurn {
 export interface PilotDayRun {
   id: string;
   moduleId?: import("@/constants/modules").ModuleId;
+  practiceId?: string;
+  contentVersion?: string;
   day: number;
   curriculumVersion: string;
   state: PilotModuleState;
@@ -174,6 +191,9 @@ export interface PilotDayRun {
   /** Present only when a scenario enters this canonical paid-practice run. */
   scenarioContext?: ScenarioPracticeContext;
   counterpartTurn?: ScenarioCounterpartTurn;
+  counterpartIdentity?: string;
+  counterpartReactionId?: string;
+  resolvedAudioId?: string;
   lessonIndex: number;
   quizChoice?: "A" | "B";
   attempt?: PilotAttemptRecord;
@@ -182,6 +202,8 @@ export interface PilotDayRun {
   adamReactionId?: string;
   adamAudioId?: string;
   coachedBehaviorId?: PilotBehaviorId;
+  coachedSegment?: "opener" | "pushback_response";
+  retryResetId?: string;
   coachNote?: string;
   retryInstruction?: string;
   noteFit?: "accepted" | "rejected";

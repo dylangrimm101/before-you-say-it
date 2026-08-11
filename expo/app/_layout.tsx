@@ -110,6 +110,7 @@ function RootLayoutNav() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="privacy" />
         <Stack.Screen name="safety" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
+        <Stack.Screen name="internal-review-evidence" options={{ animation: "fade" }} />
       </Stack>
       <MigrationNotice visible={migrationNotice} onDismiss={dismissMigrationNotice} />
       {showLaunch ? <LaunchExperience onFinish={finishLaunch} /> : null}

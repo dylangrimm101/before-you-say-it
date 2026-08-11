@@ -85,9 +85,10 @@ export function pathPresentation(
 ): readonly PathModulePresentation[] {
   const recommendedId = session?.sharedResult?.first_focus?.recommended_module_id;
   return CURRICULUM_MODULES.map((module) => {
-    const run = session?.pilotRuns[module.id];
+    const moduleRuns = Object.values(session?.pilotRuns ?? {}).filter((run) => run.moduleId === module.id);
+    const run = moduleRuns.find((candidate) => candidate.state !== "complete");
     let status: PathModuleStatus;
-    if (completedModuleIds.has(module.id) || run?.state === "complete") status = "completed";
+    if (completedModuleIds.has(module.id)) status = "completed";
     else if (run && run.state !== "module_preview") status = "interrupted";
     else if (run) status = "current";
     else if (module.id === recommendedId) status = "recommended";

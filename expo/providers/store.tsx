@@ -3,7 +3,7 @@ import createContextHook from "@nkzw/create-context-hook";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CHALLENGE_TOTAL_DAYS } from "@/constants/challenge";
-import { curriculumModuleForDay, isModuleId, type ModuleId } from "@/constants/modules";
+import { CURRICULUM_MODULES, isModuleId, type ModuleId } from "@/constants/modules";
 import { SCENARIOS } from "@/constants/scenarios";
 import type { AccessState, Entitlement } from "@/lib/access";
 import { deleteAllBaselineAudio, deleteBaselineAudio } from "@/lib/baselineAudio";
@@ -15,6 +15,8 @@ import {
   type ConsentState,
 } from "@/lib/consent";
 import { clearLiveSessionContent } from "@/lib/ephemeral";
+import { completedReviewPracticeIds, migrateLegacyPilotProgress } from "@/lib/curriculumMigration";
+import { REVIEW_CURRICULUM_VERSION, isInternalReviewModuleComplete } from "@/lib/modularCurriculum";
 import {
   activityDayKeys,
   averageScores,
@@ -208,17 +210,14 @@ export const [StoreProvider, useStore] = createContextHook(() => {
             const valid = parsed.filter((entry): entry is PilotProgressEntry => {
               if (!entry || typeof entry !== "object") return false;
               const value = entry as Partial<PilotProgressEntry>;
-              return value.curriculumVersion === PILOT_PROGRAM.curriculum_version
+              return typeof value.curriculumVersion === "string"
                 && (value.moduleId === undefined || isModuleId(value.moduleId))
                 && Number.isInteger(value.day)
                 && typeof value.behaviorId === "string"
                 && typeof value.date === "string"
                 && typeof value.completedAt === "number";
             });
-            const migrated = valid.map((entry): PilotProgressEntry => {
-              const mappedModuleId = entry.moduleId ?? curriculumModuleForDay(entry.day)?.id;
-              return mappedModuleId ? { ...entry, moduleId: mappedModuleId } : entry;
-            });
+            const migrated = migrateLegacyPilotProgress(valid);
             setPilotProgress(migrated);
             if (JSON.stringify(valid) !== JSON.stringify(migrated)) {
               await AsyncStorage.setItem(KEYS.pilotProgress, JSON.stringify(migrated));
@@ -576,15 +575,17 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     let snapshot: PilotProgressEntry[] = [];
     let changed = false;
     setPilotProgress((previous) => {
-      if (previous.some((entry) => moduleId ? entry.moduleId === moduleId : entry.day === module.day)) {
+      const stableModuleId = module.module_id ?? moduleId;
+      if (previous.some((entry) => module.practice_id ? entry.practiceId === module.practice_id : stableModuleId ? entry.moduleId === stableModuleId && !entry.practiceId : entry.day === module.day)) {
         snapshot = previous;
         return previous;
       }
       changed = true;
       const completedAt = Date.now();
       snapshot = [...previous, {
-        curriculumVersion: PILOT_PROGRAM.curriculum_version,
-        ...(moduleId ? { moduleId } : {}),
+        curriculumVersion: module.practice_id ? REVIEW_CURRICULUM_VERSION : PILOT_PROGRAM.curriculum_version,
+        ...(stableModuleId ? { moduleId: stableModuleId } : {}),
+        ...(module.practice_id ? { practiceId: module.practice_id, contentVersion: module.content_version, legacyClassification: "practice_completion" as const } : {}),
         day: module.day,
         behaviorId: module.primary_behavior_id,
         date: dayKey(completedAt),
@@ -600,9 +601,11 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     }
   }, []);
 
+  const completedPracticeIds = useMemo(() => completedReviewPracticeIds(pilotProgress), [pilotProgress]);
+
   const modularDoneIds = useMemo(
-    () => new Set(pilotProgress.map((entry) => entry.moduleId).filter((id): id is ModuleId => Boolean(id))),
-    [pilotProgress],
+    () => new Set(CURRICULUM_MODULES.filter((module) => isInternalReviewModuleComplete(module.id, completedPracticeIds)).map((module) => module.id)),
+    [completedPracticeIds],
   );
 
   const todayDrillDone = useMemo(
@@ -778,6 +781,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     saveScoredPracticeRecord,
     pilotDoneDays,
     modularDoneIds,
+    completedPracticeIds,
     anonymousUserId,
     activePracticeSession,
     activeScenarioRun,
