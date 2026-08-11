@@ -52,6 +52,7 @@ export interface TodayMotionSpec {
 const LESSON_STATES: readonly PilotModuleState[] = ["module_preview", "hope_lesson"];
 const PRACTICE_STATES: readonly PilotModuleState[] = ["quiz", "quiz_feedback", "preset_scenario"];
 const REVIEW_STATES: readonly PilotModuleState[] = ["attempt_comparison", "transfer_cue", "complete"];
+const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 function localDayKey(date: Date): string {
   const year = date.getFullYear();
@@ -80,18 +81,22 @@ export function todayIndexPresentation(result: SharedResultContractV1 | undefine
   };
 }
 
-/** Builds a neutral seven-day observation strip from real persisted activity dates. */
+/** Builds the current Monday-to-Sunday week from real persisted activity dates. */
 export function todayRecentPractice(activityDays: ReadonlySet<string>, now: Date): TodayRecentDay[] {
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Array.from({ length: 7 }, (_, index): TodayRecentDay => {
-    const offset = index - 6;
-    const date = new Date(start);
-    date.setDate(start.getDate() + offset);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysSinceMonday = (today.getDay() + 6) % 7;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - daysSinceMonday);
+  const todayKey = localDayKey(today);
+
+  return WEEKDAY_LABELS.map((label, index): TodayRecentDay => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
     const key = localDayKey(date);
     return {
       key,
-      label: new Intl.DateTimeFormat("en", { weekday: "short" }).format(date).slice(0, 3),
-      isToday: offset === 0,
+      label,
+      isToday: key === todayKey,
       hasPractice: activityDays.has(key),
     };
   });

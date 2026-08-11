@@ -122,11 +122,23 @@ describe("truthful Today state", () => {
     expect(todayIndexPresentation(result(null, 0))).toEqual({ kind: "insufficient", value: null, observedCount: 0, totalSignalCount: 6, focus: "Return to one answerable request", chartValues: [] });
   });
 
-  test("recent practice marks only persisted activity dates", () => {
-    const days = todayRecentPractice(new Set(["2026-08-08", "2026-08-10"]), new Date(2026, 7, 11, 12));
-    expect(days.map((day) => [day.key, day.hasPractice])).toEqual([
-      ["2026-08-05", false], ["2026-08-06", false], ["2026-08-07", false], ["2026-08-08", true], ["2026-08-09", false], ["2026-08-10", true], ["2026-08-11", false],
+  test("shows the current week Monday through Sunday and marks only persisted activity dates", () => {
+    const days = todayRecentPractice(new Set(["2026-08-10", "2026-08-15"]), new Date(2026, 7, 11, 12));
+    expect(days.map((day) => [day.label, day.key, day.hasPractice, day.isToday])).toEqual([
+      ["Mon", "2026-08-10", true, false],
+      ["Tue", "2026-08-11", false, true],
+      ["Wed", "2026-08-12", false, false],
+      ["Thu", "2026-08-13", false, false],
+      ["Fri", "2026-08-14", false, false],
+      ["Sat", "2026-08-15", true, false],
+      ["Sun", "2026-08-16", false, false],
     ]);
+  });
+
+  test("keeps Sunday last while highlighting it as today", () => {
+    const days = todayRecentPractice(new Set<string>(), new Date(2026, 7, 16, 12));
+    expect(days.map((day) => day.label)).toEqual(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+    expect(days.findIndex((day) => day.isToday)).toBe(6);
   });
 
   test("recommended module comes only from the persisted first focus", () => {
