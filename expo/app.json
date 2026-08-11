@@ -26,6 +26,9 @@
       }
     },
     "android": {
+      "permissions": [
+        "RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#512888"
@@ -52,7 +55,12 @@
         }
       ],
       "expo-web-browser",
-      "expo-av"
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

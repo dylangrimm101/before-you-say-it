@@ -1,6 +1,7 @@
 import { Audio } from "expo-av";
 import { File } from "expo-file-system";
 import { useCallback, useRef, useState } from "react";
+import { Platform } from "react-native";
 
 import { tap } from "@/components/ui";
 import { transcribeAudio } from "@/lib/ai";
@@ -40,6 +41,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   const [error, setError] = useState<string>("");
   const [level, setLevel] = useState<number>(0);
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const operationRef = useRef<boolean>(false);
 
   const reset = useCallback(() => {
     recordingRef.current = null;
@@ -48,7 +50,9 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
     setLevel(0);
   }, []);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (): Promise<void> => {
+    if (operationRef.current || recordingRef.current) return;
+    operationRef.current = true;
     setError("");
     try {
       const permission = await Audio.requestPermissionsAsync();
@@ -86,15 +90,23 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       }
       setStatus("error");
       setError("Could not start the microphone.");
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+    } finally {
+      operationRef.current = false;
     }
   }, []);
 
   const cancel = useCallback(async (): Promise<void> => {
+    if (operationRef.current) return;
+    operationRef.current = true;
     const recording = recordingRef.current;
     recordingRef.current = null;
     setLevel(0);
     setStatus("idle");
-    if (!recording) return;
+    if (!recording) {
+      operationRef.current = false;
+      return;
+    }
     let uri: string | null = null;
     try {
       await recording.stopAndUnloadAsync();
@@ -104,12 +116,16 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       safeLog("[dictation] cancel failed", errorShape(e));
     } finally {
       if (uri) await discard(uri);
+      operationRef.current = false;
     }
   }, []);
 
   const stop = useCallback(async (): Promise<string | null> => {
+    if (operationRef.current) return null;
     const recording = recordingRef.current;
     if (!recording) return null;
+    operationRef.current = true;
+    recordingRef.current = null;
 
     setStatus("transcribing");
     setLevel(0);
@@ -118,7 +134,6 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       await recording.stopAndUnloadAsync();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       uri = recording.getURI();
-      recordingRef.current = null;
 
       if (!uri) {
         setStatus("error");
@@ -126,9 +141,8 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         return null;
       }
 
-      const file = new File(uri);
-      const encoded = await file.base64();
-      const text = await transcribeAudio(encoded, file.type || "audio/mp4");
+      const payload = await readAudioPayload(uri);
+      const text = await transcribeAudio(payload.base64, payload.mediaType);
       setStatus("idle");
       tap("success");
       return text;
@@ -144,6 +158,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         if (keepAudioAs) await keepBaselineAudio(keepAudioAs, uri);
         await discard(uri);
       }
+      operationRef.current = false;
     }
   }, [keepAudioAs]);
 
@@ -158,9 +173,48 @@ function isPermissionDenied(error: unknown): boolean {
   return name === "notallowederror" || name === "securityerror" || message.includes("permission denied") || message.includes("not allowed");
 }
 
+interface AudioPayload {
+  base64: string;
+  mediaType: string;
+}
+
+/** Read native files and browser blob URLs without assuming they share a filesystem. */
+async function readAudioPayload(uri: string): Promise<AudioPayload> {
+  if (Platform.OS !== "web") {
+    const file = new File(uri);
+    return { base64: await file.base64(), mediaType: file.type || "audio/mp4" };
+  }
+
+  const response = await fetch(uri);
+  if (!response.ok) throw new Error("Recorded audio could not be read");
+  const blob = await response.blob();
+  const dataUrl = await blobDataUrl(blob);
+  const separator = dataUrl.indexOf(",");
+  if (separator < 0) throw new Error("Recorded audio could not be encoded");
+  return {
+    base64: dataUrl.slice(separator + 1),
+    mediaType: blob.type || "audio/webm",
+  };
+}
+
+function blobDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("Recorded audio could not be encoded"));
+    reader.onload = () => typeof reader.result === "string"
+      ? resolve(reader.result)
+      : reject(new Error("Recorded audio could not be encoded"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 /** Delete a temporary recording, ignoring the case where it is already gone. */
 async function discard(uri: string): Promise<void> {
   try {
+    if (Platform.OS === "web") {
+      URL.revokeObjectURL(uri);
+      return;
+    }
     const file = new File(uri);
     if (file.exists) file.delete();
   } catch (e) {

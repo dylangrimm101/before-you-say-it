@@ -145,6 +145,10 @@ describe("required exercised curriculum paths", () => {
     expect(dictation).toContain('setError("Could not start the microphone.")');
     expect(dictation).toContain('setError("No recording was captured.")');
     expect(dictation).toContain('setError("Could not transcribe that. Try again.")');
+    expect(dictation).toContain('if (Platform.OS !== "web")');
+    expect(dictation).toContain("await response.blob()");
+    expect(dictation).toContain("reader.readAsDataURL(blob)");
+    expect(dictation).toContain("URL.revokeObjectURL(uri)");
     expect(rehearsal).toContain('dockState === "mic-blocked"');
     expect(rehearsal).toContain('dockState === "mic-error"');
     expect(rehearsal).toContain("Type instead");
