@@ -25,7 +25,7 @@ import {
 } from "@/lib/progress";
 import { useIsPro } from "@/lib/purchases";
 import { errorShape, safeLog } from "@/lib/redact";
-import { cancelChallengeNudge, cancelDailyReminder, requestReminderPermission, scheduleDailyReminder, syncChallengeNudge } from "@/lib/reminders";
+import { cancelChallengeNudge, cancelDailyReminder, requestReminderPermission, syncChallengeNudge } from "@/lib/reminders";
 import { capRecords, migrateSessions } from "@/lib/sessionMigration";
 import {
   associatePracticeSessionUser,
@@ -33,7 +33,7 @@ import {
   protectImmutablePracticeRecords,
   type ActivePracticeSession,
 } from "@/lib/practiceSession";
-import type { ChallengeLogEntry, DrillResult, FreezeState, Profile, ReminderSetting, Scenario, Session } from "@/types/convo";
+import type { ChallengeLogEntry, DrillResult, FreezeState, Profile, Scenario, Session } from "@/types/convo";
 import type { SessionRecord } from "@/types/privacy";
 import { PILOT_PROGRAM, currentPilotDay as deriveCurrentPilotDay } from "@/lib/pilotCurriculum";
 import type { PilotModule, PilotProgressEntry } from "@/types/pilotCurriculum";
@@ -86,7 +86,6 @@ export const [StoreProvider, useStore] = createContextHook(() => {
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [customScenarios, setCustomScenarios] = useState<Scenario[]>([]);
   const [drillLog, setDrillLog] = useState<DrillResult[]>([]);
-  const [reminder, setReminderState] = useState<ReminderSetting | null>(null);
   const [challengeLog, setChallengeLog] = useState<ChallengeLogEntry[]>([]);
   const [freeze, setFreeze] = useState<FreezeState>(DEFAULT_FREEZE);
   const [consent, setConsent] = useState<ConsentState>(DEFAULT_CONSENT);
@@ -183,7 +182,10 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         }
 
         if (d) setDrillLog(JSON.parse(d) as DrillResult[]);
-        if (r) setReminderState(JSON.parse(r) as ReminderSetting);
+        if (r) {
+          await cancelDailyReminder();
+          await AsyncStorage.removeItem(KEYS.reminder);
+        }
         if (ch) setChallengeLog(JSON.parse(ch) as ChallengeLogEntry[]);
         if (f) setFreeze(JSON.parse(f) as FreezeState);
         setConsent(storedConsent);
@@ -440,28 +442,6 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     requestReminderPermission().catch(() => {});
   }, []);
 
-  /**
-   * Enable/update or disable the daily drill reminder. Handles the
-   * notification permission prompt and (re)scheduling. Returns false when
-   * the user denied notification permission.
-   */
-  const setReminder = useCallback(async (next: ReminderSetting): Promise<boolean> => {
-    if (next.enabled) {
-      const granted = await requestReminderPermission();
-      if (!granted) return false;
-      await scheduleDailyReminder(next.hour, next.minute);
-    } else {
-      await cancelDailyReminder();
-    }
-    setReminderState(next);
-    try {
-      await AsyncStorage.setItem(KEYS.reminder, JSON.stringify(next));
-    } catch (e) {
-      safeLog("[store] reminder save failed", errorShape(e));
-    }
-    return true;
-  }, []);
-
   /** Wipe everything this app has stored on the device. */
   const reset = useCallback(async () => {
     setProfile(null);
@@ -469,7 +449,6 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     setSessions([]);
     setCustomScenarios([]);
     setDrillLog([]);
-    setReminderState(null);
     setChallengeLog([]);
     setFreeze(DEFAULT_FREEZE);
     setConsent(DEFAULT_CONSENT);
@@ -734,8 +713,6 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     entitlement,
     devProEnabled: devPro,
     toggleDevPro,
-    reminder,
-    setReminder,
     challengeLog,
     challengeDoneDays,
     currentChallengeDay,

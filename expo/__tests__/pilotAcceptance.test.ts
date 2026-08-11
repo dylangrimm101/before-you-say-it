@@ -89,7 +89,7 @@ describe("required exercised curriculum paths", () => {
     const day5 = pilotModule(5)!;
     expect(day5.practice.adam_line?.text).toBe("What actually happened this week?");
     expect(day5.copy.scenario?.attempt_prompt).toBeUndefined();
-    expect(day5.copy.scenario?.response_prompt).toBe("Tell him what happened this week in a sentence or two. Stop before you say what it means about him.");
+    expect(day5.copy.scenario?.response_prompt).toBe("Say what happened this week in a sentence or two. Stop before assigning meaning to the other person.");
   });
 
   test("Day 7 preserves who, what, and when while allowing refusal or an alternative", () => {

@@ -131,6 +131,32 @@ export function comparePilotAttempts(behaviorId: PilotBehaviorId, before: string
   return { behaviorId, text, criterionChanged: changed };
 }
 
+export interface PilotComparisonPresentation {
+  counterpartTurnId: string;
+  counterpartText: string;
+  firstAttempt: string;
+  retry: string;
+  evidenceLinkedDifference: string;
+}
+
+/** Produces a complete comparison only when both approved attempts share one persisted counterpart turn. */
+export function pilotComparisonPresentation(
+  run: PilotDayRun | undefined,
+  counterpartLine: PilotAudioLine | null,
+  segment: "opener" | "pushback_response",
+): PilotComparisonPresentation | null {
+  if (!run?.comparison || !run.retryAttempt || !counterpartLine || run.adamAudioId !== counterpartLine.audio_id) return null;
+  const first = segment === "opener" ? run.attempt : run.responseAttempt;
+  if (!first) return null;
+  return {
+    counterpartTurnId: counterpartLine.audio_id,
+    counterpartText: counterpartLine.text,
+    firstAttempt: first.transcript,
+    retry: run.retryAttempt.transcript,
+    evidenceLinkedDifference: run.comparison.text,
+  };
+}
+
 /** A completion transition is valid only after an immutable retry exists. */
 export function canCompletePilotRun(run: PilotDayRun | undefined): boolean {
   return Boolean(run?.retryAttempt && run.state === "transfer_cue");

@@ -68,7 +68,8 @@ describe("remaining native acquisition and paid experience", () => {
     expect(continuity).toContain("result?.starting_index?.index_value");
     expect(continuity).toContain("result?.starting_index?.observed_count");
     expect(continuity).toContain("result?.first_focus?.first_focus_label");
-    expect(purchased).toContain("No history was added by purchase");
+    expect(purchased).toContain("Paid-practice history begins now. No practice record was fabricated by purchase.");
+    expect(purchased).not.toContain("saved rehearsal record");
     expect(purchased).not.toContain("7 practices");
     expect(purchased).not.toContain("streak");
   });

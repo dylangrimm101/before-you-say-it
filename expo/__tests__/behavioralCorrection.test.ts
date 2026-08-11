@@ -7,6 +7,7 @@ import {
   type PurchaseProvider,
 } from "@/lib/commerce";
 import {
+  commerceActionPresentation,
   commerceStatusMessage,
   microphoneRecoveryPresentation,
   openOffer,
@@ -193,7 +194,8 @@ describe("Purchased continuity view model", () => {
       observedCount: 3,
       firstFocusLabel: "State the ask before explaining",
       moduleId: "make_a_clear_ask",
-      savedHistoryCount: 0,
+      hasPersonalizedStart: true,
+      recoveryDestination: null,
       completedPracticeCount: 0,
     });
     expect(continuity).not.toHaveProperty("streak");
@@ -208,7 +210,8 @@ describe("Purchased continuity view model", () => {
       observedCount: 0,
       firstFocusLabel: null,
       moduleId: null,
-      savedHistoryCount: 0,
+      hasPersonalizedStart: false,
+      recoveryDestination: "/debrief/rehearsal-1",
       completedPracticeCount: 0,
     });
     expect(continuity).not.toHaveProperty("streak");
@@ -218,6 +221,33 @@ describe("Purchased continuity view model", () => {
 });
 
 describe("visible interaction view models", () => {
+  test("pending, restoring, delayed, restored Pro, and existing Pro never expose a priced purchase CTA", () => {
+    const price = "Continue · $5.00";
+    const cases = [
+      commerceActionPresentation("pending", false, price),
+      commerceActionPresentation("restoring", false, price),
+      commerceActionPresentation("entitlement_delayed", false, price),
+      commerceActionPresentation("restore_succeeded", true, price),
+      commerceActionPresentation("ready", true, price),
+    ];
+    expect(cases.every((value) => !value.showsPricedPurchase && !value.primaryLabel.includes("$5.00"))).toBe(true);
+    expect(cases.map((value) => value.primaryLabel)).toEqual([
+      "Waiting for the store…",
+      "Checking your store account…",
+      "Check access again",
+      "Continue to my practice",
+      "Continue to my practice",
+    ]);
+    expect(cases[0]?.isRestoreDisabled).toBe(true);
+    expect(cases[1]?.isRestoreDisabled).toBe(true);
+  });
+
+  test("cancelled and failed can retry while an empty restore may still show the provider purchase", () => {
+    expect(commerceActionPresentation("cancelled", false, "Continue · $5.00").primaryLabel).toBe("Try again");
+    expect(commerceActionPresentation("failed", false, "Continue · $5.00").primaryLabel).toBe("Try again");
+    expect(commerceActionPresentation("restore_empty", false, "Continue · $5.00").showsPricedPurchase).toBe(true);
+  });
+
   test("purchase and restore branches expose distinct visible status copy", () => {
     expect(["pending", "cancelled", "failed", "entitlement_delayed"].map((state) => commerceStatusMessage(state as "pending" | "cancelled" | "failed" | "entitlement_delayed"))).toEqual([
       "Purchase pending. Access unlocks only after the provider confirms pro.",

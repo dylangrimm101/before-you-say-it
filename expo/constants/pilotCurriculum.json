@@ -113,7 +113,7 @@
           "scenario": "You’re explaining why the bedtime split has to change.",
           "user_job": "Say what’s wrong with the current split. A sentence or two.",
           "attempt_prompt": "Say what’s wrong with the current split. A sentence or two.",
-          "response_prompt": "Answer him the way you’d actually answer."
+          "response_prompt": "Respond to the pushback the way you’d actually respond."
         },
         "transfer": "Listen for the first thing you do after pushback. You may start talking faster or reach back for older examples.",
         "finish_button": "Finish Day 3"
@@ -207,7 +207,7 @@
           "heading": "Tonight’s rep",
           "scenario": "You want to tell Adam what this week has actually looked like.",
           "user_job": "Answer Adam with one current event, then stop.",
-          "response_prompt": "Tell him what happened this week in a sentence or two. Stop before you say what it means about him."
+          "response_prompt": "Say what happened this week in a sentence or two. Stop before assigning meaning to the other person."
         },
         "transfer": "Prepare one current example for the real conversation. Don’t build a historical case file.",
         "finish_button": "Finish Day 5"

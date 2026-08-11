@@ -327,7 +327,8 @@ describe("the debrief only claims what it can measure", () => {
     expect(source).not.toContain('key: "composure"');
     expect(source).not.toContain('label: "Stayed steady"');
     expect(source).not.toContain('label: "Composure"');
-    expect(source).toContain("Delivery isn’t scored because audio isn’t analyzed.");
+    expect(source).not.toMatch(/Delivery|seventh signal/i);
+    expect(source).toContain("progressEvidencePresentation(result)");
   });
 
   it("keeps third-person phrasing out of the roleplay instructions", async () => {

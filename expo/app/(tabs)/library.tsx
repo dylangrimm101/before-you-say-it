@@ -132,7 +132,7 @@ export default function Library() {
                       {scenario.goal}
                     </Text>
                     <View style={styles.metaRow}>
-                      <Text style={styles.meta}>{scenario.minutes} MIN PRACTICE</Text>
+                      <Text style={styles.meta}>{scenario.category.toUpperCase()}</Text>
                       {scenario.isCustom ? <Text style={styles.personal}>YOUR SCENARIO</Text> : null}
                       {isLocked ? <View style={styles.trained}><LockKeyhole size={12} color={C.dim} /><Text style={[styles.trainedText, { color: C.dim }]}>PRO</Text></View> : isDone ? (
                         <View style={styles.trained}>

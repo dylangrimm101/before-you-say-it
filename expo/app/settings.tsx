@@ -1,8 +1,8 @@
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
-import { Bell, ChevronRight, CreditCard, HelpCircle, LockKeyhole, Mic2, RefreshCw, Scale, ShieldCheck, UserRound } from "lucide-react-native";
+import { ChevronRight, CreditCard, HelpCircle, LockKeyhole, Mic2, RefreshCw, Scale, ShieldCheck, UserRound } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
-import { Alert, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, Eyebrow, PressCard, Reveal } from "@/components/ui";
@@ -15,16 +15,11 @@ import { useStore } from "@/providers/store";
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { reminder, setReminder, entitlement } = useStore();
+  const { entitlement } = useStore();
   const customer = useCustomerInfo();
   const restore = useRestorePurchases();
   const [restoreMessage, setRestoreMessage] = useState<string>("");
   const subscription = useMemo(() => subscriptionSnapshot(customer.data, PRO_ENTITLEMENT), [customer.data]);
-
-  const toggleReminder = async (enabled: boolean): Promise<void> => {
-    const ok = await setReminder({ enabled, hour: reminder?.hour ?? 18, minute: reminder?.minute ?? 30 });
-    if (!ok && Platform.OS !== "web") Alert.alert("Notifications are off", "Allow notifications in device Settings to use reminders.");
-  };
 
   const restorePurchase = async (): Promise<void> => {
     setRestoreMessage("Checking your store account…");
@@ -63,7 +58,7 @@ export default function SettingsScreen() {
 
         <Reveal><Eyebrow color={C.dim}>Account</Eyebrow><SettingsRow icon={<UserRound size={18} color={C.purple} />} title="Account status" detail="Not signed in · local device journey" onPress={() => router.push("/continue-from-web")} /><Text style={styles.sectionNote}>Authentication and web activation are not connected in this build. No separate identity is created here.</Text></Reveal>
 
-        <Reveal index={1}><Eyebrow color={C.dim} style={styles.sectionHeading}>Permissions & reminders</Eyebrow><SettingsRow icon={<Mic2 size={18} color={C.purple} />} title="Microphone permission" detail="Open device settings to review access" onPress={() => void Linking.openSettings()} /><View style={styles.toggleRow}><View style={styles.rowIcon}><Bell size={18} color={C.purple} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>Practice reminders</Text><Text style={styles.rowDetail}>{reminder?.enabled ? "Enabled at your saved local time" : "Off"}</Text></View><Switch value={reminder?.enabled ?? false} onValueChange={(value) => void toggleReminder(value)} trackColor={{ false: C.track, true: C.purpleLight }} thumbColor={reminder?.enabled ? C.purple : C.dim} accessibilityLabel="Practice reminders" /></View></Reveal>
+        <Reveal index={1}><Eyebrow color={C.dim} style={styles.sectionHeading}>Permissions</Eyebrow><SettingsRow icon={<Mic2 size={18} color={C.purple} />} title="Microphone permission" detail="Open device settings to review access" onPress={() => void Linking.openSettings()} /></Reveal>
 
         <Reveal index={2}><Eyebrow color={C.dim} style={styles.sectionHeading}>Subscription</Eyebrow><View style={styles.statusCard}><CreditCard size={19} color={entitlement === "pro" ? C.sage : C.dim} /><View style={styles.rowCopy}><Text style={styles.rowTitle}>{entitlement === "pro" ? "Pro active" : "No active subscription"}</Text><Text style={styles.rowDetail}>{subscription ? `${providerLabel(subscription.provider)}${subscription.willRenew === false ? " · does not renew" : ""}` : "Provider not verified"}</Text></View></View><SettingsRow icon={<RefreshCw size={18} color={C.purple} />} title={restore.isPending ? "Restoring…" : "Restore purchases"} detail="Check this App Store or Google Play account" onPress={() => void restorePurchase()} /><SettingsRow icon={<CreditCard size={18} color={C.purple} />} title="Billing and cancellation" detail={subscription?.managementURL && subscription.provider !== "unknown" ? `Manage with ${providerLabel(subscription.provider)}` : "Available only when the provider is verified"} onPress={() => void manage()} />{restoreMessage ? <Text style={styles.message}>{restoreMessage}</Text> : null}</Reveal>
 
@@ -81,5 +76,5 @@ function SettingsRow({ icon, title, detail, onPress }: { icon: React.ReactNode; 
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, scroll: { paddingHorizontal: GUTTER }, header: { minHeight: 50, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }, back: { width: 54, height: 44, justifyContent: "center" }, backText: { ...T.support, color: C.purple, fontFamily: font.semi }, headerTitle: { ...T.title, fontSize: 18 }, sectionHeading: { marginTop: 30, marginBottom: 8 }, sectionNote: { ...T.caption, marginTop: 8, paddingHorizontal: 4 },
-  row: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line }, toggleRow: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line }, rowIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.purpleSoft, alignItems: "center", justifyContent: "center" }, rowCopy: { flex: 1 }, rowTitle: { ...T.support, fontFamily: font.semi, color: C.text }, rowDetail: { ...T.caption, marginTop: 3 }, statusCard: { minHeight: 78, padding: 16, borderRadius: radius.lg, backgroundColor: C.surface, borderWidth: 1, borderColor: C.glassEdge, flexDirection: "row", alignItems: "center", gap: 13, marginBottom: 4 }, message: { ...T.caption, color: C.purple, marginTop: 10, paddingHorizontal: 4 }, version: { alignItems: "center", marginTop: 34 }, versionLabel: { ...eyebrow, color: C.dim }, versionValue: { ...T.caption, marginTop: 6 },
+  row: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line }, rowIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: C.purpleSoft, alignItems: "center", justifyContent: "center" }, rowCopy: { flex: 1 }, rowTitle: { ...T.support, fontFamily: font.semi, color: C.text }, rowDetail: { ...T.caption, marginTop: 3 }, statusCard: { minHeight: 78, padding: 16, borderRadius: radius.lg, backgroundColor: C.surface, borderWidth: 1, borderColor: C.glassEdge, flexDirection: "row", alignItems: "center", gap: 13, marginBottom: 4 }, message: { ...T.caption, color: C.purple, marginTop: 10, paddingHorizontal: 4 }, version: { alignItems: "center", marginTop: 34 }, versionLabel: { ...eyebrow, color: C.dim }, versionValue: { ...T.caption, marginTop: 6 },
 });

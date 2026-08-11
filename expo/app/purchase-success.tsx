@@ -1,11 +1,11 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { Check, RefreshCw, Sparkles } from "lucide-react-native";
 import React from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, Eyebrow, GlassCard, GhostButton, PrimaryButton, Reveal, StateDock } from "@/components/ui";
-import { curriculumModule, isModuleId, type ModuleId } from "@/constants/modules";
+import { curriculumModule, type ModuleId } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { purchasedContinuity } from "@/lib/nativeCommerce";
 import { useCustomerInfo, useIsPro } from "@/lib/purchases";
@@ -14,15 +14,20 @@ import { useStore } from "@/providers/store";
 export default function PurchaseSuccess() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ moduleId?: string }>();
   const { activePracticeSession, sessions, pilotProgress } = useStore();
   const isPro = useIsPro();
   const customer = useCustomerInfo();
   const result = activePracticeSession?.sharedResult;
   const continuity = purchasedContinuity(result, sessions.length, pilotProgress.length);
-  const requestedModule: ModuleId | null = isModuleId(params.moduleId) ? params.moduleId : null;
-  const moduleId: ModuleId | null = continuity.moduleId ?? requestedModule;
+  const moduleId: ModuleId | null = continuity.moduleId;
   const module = curriculumModule(moduleId);
+  const openNextStep = (): void => {
+    if (moduleId) {
+      router.replace({ pathname: "/module/[day]", params: { day: moduleId } });
+      return;
+    }
+    if (continuity.recoveryDestination) router.replace(continuity.recoveryDestination as never);
+  };
 
   if (!isPro) {
     return (
@@ -41,7 +46,7 @@ export default function PurchaseSuccess() {
     <View style={styles.root}>
       <Backdrop />
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 42, paddingBottom: insets.bottom + 170 }]} showsVerticalScrollIndicator={false}>
-        <Reveal><View style={styles.check}><Check size={27} color={C.onAccent} strokeWidth={2.8} /></View><Eyebrow color={C.sage} style={styles.confirmed}>Subscription active · Purchased</Eyebrow><Text style={styles.title}>Your first practice is ready.</Text><Text style={styles.body}>Your rehearsal, Starting Index, and first focus carried over. Nothing to redo.</Text></Reveal>
+        <Reveal><View style={styles.check}><Check size={27} color={C.onAccent} strokeWidth={2.8} /></View><Eyebrow color={C.sage} style={styles.confirmed}>Subscription active · Purchased</Eyebrow><Text style={styles.title}>{continuity.hasPersonalizedStart ? "Your first practice is ready." : "One short starting step comes next."}</Text><Text style={styles.body}>{continuity.hasPersonalizedStart ? "Your free rehearsal result, Starting Index, and first focus carried over. Nothing to redo." : "Your purchase is active and your completed free work is preserved. We need one evidence-backed focus before choosing a paid module."}</Text></Reveal>
         <Reveal index={1}>
           <GlassCard style={styles.continuity}>
             <Text style={styles.cardLabel}>YOUR CARRIED-OVER START</Text>
@@ -50,9 +55,9 @@ export default function PurchaseSuccess() {
             <View style={styles.focusRow}><Sparkles size={18} color={C.purple} /><View style={styles.focusCopy}><Text style={styles.focusLabel}>FIRST FOCUS · Recommended starting module</Text><Text style={styles.focusValue}>{continuity.firstFocusLabel ?? "Your first focus is not available yet."}</Text></View></View>
           </GlassCard>
         </Reveal>
-        <Reveal index={2}><View style={styles.truth}><Text style={styles.truthTitle}>A clean start</Text><Text style={styles.truthBody}>{continuity.savedHistoryCount} saved rehearsal record{continuity.savedHistoryCount === 1 ? "" : "s"} · {continuity.completedPracticeCount} paid practice{continuity.completedPracticeCount === 1 ? "" : "s"} completed. No history was added by purchase.</Text></View></Reveal>
+        <Reveal index={2}><View style={styles.truth}><Text style={styles.truthTitle}>{continuity.hasPersonalizedStart ? "Your free result is preserved" : "No repurchase needed"}</Text><Text style={styles.truthBody}>{continuity.hasPersonalizedStart ? "Paid-practice history begins now. No practice record was fabricated by purchase." : "Return to your existing result for the missing focus step. You will not be asked to buy again or repeat approved free work."}</Text></View></Reveal>
       </ScrollView>
-      <StateDock bottomInset={insets.bottom}><PrimaryButton label="Start my first practice" disabled={!moduleId} onPress={() => moduleId && router.replace({ pathname: "/module/[day]", params: { day: moduleId } })} /><Text style={styles.moduleNote}>{module ? `Begins with ${module.name}` : "Your recommendation needs another look before practice can begin."}</Text></StateDock>
+      <StateDock bottomInset={insets.bottom}><PrimaryButton label={continuity.hasPersonalizedStart ? "Start my first practice" : "Complete my starting step"} disabled={!moduleId && !continuity.recoveryDestination} onPress={openNextStep} /><Text style={styles.moduleNote}>{module ? `Begins with ${module.name}` : "Uses your preserved result to establish an evidence-backed first focus."}</Text></StateDock>
     </View>
   );
 }

@@ -77,6 +77,38 @@ export function transitionRestore(current: RestoreState, event: RestoreEvent): R
 
 export type CommercePresentationState = PurchaseState | RestoreState;
 
+export interface CommerceActionPresentation {
+  primaryLabel: string;
+  primaryAction: "purchase" | "check_access" | "continue" | "none";
+  isPrimaryDisabled: boolean;
+  isRestoreDisabled: boolean;
+  showsPricedPurchase: boolean;
+}
+
+/** Derives every visible commerce action so non-purchasable states cannot retain a priced CTA. */
+export function commerceActionPresentation(
+  state: CommercePresentationState,
+  hasActivePro: boolean,
+  purchaseLabel: string,
+): CommerceActionPresentation {
+  if (hasActivePro || state === "purchased" || state === "restore_succeeded") {
+    return { primaryLabel: "Continue to my practice", primaryAction: "continue", isPrimaryDisabled: false, isRestoreDisabled: true, showsPricedPurchase: false };
+  }
+  if (state === "pending") {
+    return { primaryLabel: "Waiting for the store…", primaryAction: "none", isPrimaryDisabled: true, isRestoreDisabled: true, showsPricedPurchase: false };
+  }
+  if (state === "restoring") {
+    return { primaryLabel: "Checking your store account…", primaryAction: "none", isPrimaryDisabled: true, isRestoreDisabled: true, showsPricedPurchase: false };
+  }
+  if (state === "entitlement_delayed") {
+    return { primaryLabel: "Check access again", primaryAction: "check_access", isPrimaryDisabled: false, isRestoreDisabled: false, showsPricedPurchase: false };
+  }
+  if (state === "cancelled" || state === "failed") {
+    return { primaryLabel: "Try again", primaryAction: "purchase", isPrimaryDisabled: false, isRestoreDisabled: false, showsPricedPurchase: false };
+  }
+  return { primaryLabel: purchaseLabel, primaryAction: "purchase", isPrimaryDisabled: false, isRestoreDisabled: false, showsPricedPurchase: true };
+}
+
 /** Visible status copy derived from executable commerce state. */
 export function commerceStatusMessage(state: CommercePresentationState): string | null {
   const messages: Record<CommercePresentationState, string | null> = {
@@ -99,22 +131,26 @@ export interface PurchasedContinuity {
   observedCount: number;
   firstFocusLabel: string | null;
   moduleId: ModuleId | null;
-  savedHistoryCount: number;
+  hasPersonalizedStart: boolean;
+  recoveryDestination: string | null;
   completedPracticeCount: number;
 }
 
 /** Builds Purchased copy exclusively from earned result and real persisted counts. */
 export function purchasedContinuity(
   result: SharedResultContractV1 | undefined,
-  savedHistoryCount: number,
+  _savedHistoryCount: number,
   completedPracticeCount: number,
 ): PurchasedContinuity {
+  const moduleId = result?.first_focus?.recommended_module_id ?? null;
+  const hasPersonalizedStart = moduleId !== null;
   return {
     indexValue: result?.starting_index?.index_value ?? null,
     observedCount: result?.starting_index?.observed_count ?? 0,
     firstFocusLabel: result?.first_focus?.first_focus_label ?? null,
-    moduleId: result?.first_focus?.recommended_module_id ?? null,
-    savedHistoryCount,
+    moduleId,
+    hasPersonalizedStart,
+    recoveryDestination: hasPersonalizedStart || !result?.rehearsal_id ? null : `/debrief/${result.rehearsal_id}`,
     completedPracticeCount,
   };
 }

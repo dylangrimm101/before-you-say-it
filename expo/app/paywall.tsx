@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AlertCircle, ArrowLeft, Check, Clock3, RefreshCw, ShieldCheck } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PurchasesPackage } from "react-native-purchases";
@@ -10,6 +10,7 @@ import { curriculumModule, isModuleId, type ModuleId } from "@/constants/modules
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { storeProductSnapshot } from "@/lib/commerce";
 import {
+  commerceActionPresentation,
   commerceStatusMessage,
   openOffer,
   transitionOffer,
@@ -19,7 +20,7 @@ import {
   type OfferState,
 } from "@/lib/nativeCommerce";
 import { errorShape, safeLog } from "@/lib/redact";
-import { useIsPro, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
+import { useCustomerInfo, useIsPro, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
 import { useStore } from "@/providers/store";
 import type { SharedResultContractV1 } from "@/types/sharedProduct";
 
@@ -41,6 +42,7 @@ export default function Paywall() {
   const { data: offerings, isLoading, error: offeringsError } = useOfferings();
   const purchase = usePurchasePackage();
   const restore = useRestorePurchases();
+  const customer = useCustomerInfo();
   const [offer, setOffer] = useState<OfferState<SharedResultContractV1 | undefined>>(() => openOffer(activePracticeSession?.sharedResult));
   const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
   const [commerceState, setCommerceState] = useState<CommercePresentationState>("ready");
@@ -52,8 +54,16 @@ export default function Paywall() {
   }, [offerings]);
   const selectedPackage = billing === "annual" ? plans.annual ?? plans.monthly : plans.monthly ?? plans.annual;
   const terms = storeProductSnapshot(selectedPackage?.product);
+  const purchaseLabel = terms?.trialDurationLabel ? `Start ${terms.trialDurationLabel} free trial` : terms ? `Continue · ${terms.priceString}` : "Plans unavailable";
+  const actions = commerceActionPresentation(commerceState, isPro, purchaseLabel);
   const hasCompleteEarnedResult = Boolean(activePracticeSession?.sharedResult?.pressure_moment && activePracticeSession.sharedResult.practice_shift && activePracticeSession.sharedResult.starting_index && activePracticeSession.sharedResult.first_focus);
   const earnedOfferBlocked = params.source === "debrief" && !hasCompleteEarnedResult;
+
+  useEffect(() => {
+    if (!isPro || commerceState !== "ready") return;
+    if (moduleId) router.replace({ pathname: "/module/[day]", params: { day: moduleId } });
+    else router.replace("/(tabs)");
+  }, [commerceState, isPro, moduleId, router]);
 
   const leave = (): void => {
     if (router.canGoBack()) router.back();
@@ -95,7 +105,7 @@ export default function Paywall() {
   };
 
   const onRestore = async (): Promise<void> => {
-    if (restore.isPending) return;
+    if (restore.isPending || purchase.isPending || actions.isRestoreDisabled) return;
     setCommerceState(transitionRestore("ready", { type: "begin" }).state);
     try {
       const restored = await restore.mutateAsync();
@@ -110,6 +120,18 @@ export default function Paywall() {
     }
   };
 
+  const onPrimaryAction = async (): Promise<void> => {
+    if (actions.primaryAction === "continue") {
+      router.replace({ pathname: "/purchase-success", params: moduleId ? { moduleId } : {} });
+      return;
+    }
+    if (actions.primaryAction === "check_access") {
+      await customer.refetch();
+      return;
+    }
+    if (actions.primaryAction === "purchase") await buy();
+  };
+
   if (earnedOfferBlocked) {
     return <Unavailable title="Finish your free result first." body="Your offer appears after Pressure Moment, Practice Shift, Starting Index, and practice path are complete." onBack={leave} />;
   }
@@ -120,7 +142,7 @@ export default function Paywall() {
       <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
         <PressCard onPress={() => navigateOffer("back")} style={styles.iconButton} accessibilityLabel="Back"><ArrowLeft size={20} color={C.textSoft} /></PressCard>
         <Text style={styles.step}>OFFER · {stage} OF 3</Text>
-        <PressCard onPress={() => void onRestore()} style={styles.restoreHit} accessibilityLabel="Restore purchase"><Text style={styles.restoreText}>Restore</Text></PressCard>
+        <PressCard onPress={() => void onRestore()} disabled={actions.isRestoreDisabled} style={styles.restoreHit} accessibilityLabel="Restore purchase"><Text style={[styles.restoreText, actions.isRestoreDisabled && styles.disabledText]}>Restore</Text></PressCard>
       </View>
       <View style={styles.progress}>{([1, 2, 3] as const).map((value) => <View key={value} style={[styles.progressPart, value <= stage && styles.progressOn]} />)}</View>
 
@@ -145,9 +167,9 @@ export default function Paywall() {
         {stage < 3 ? <PrimaryButton label="Continue" onPress={() => navigateOffer("forward")} /> : (
           <>
             <PrimaryButton
-              label={commerceState === "pending" ? "Waiting for the store…" : terms?.trialDurationLabel ? `Start ${terms.trialDurationLabel} free trial` : terms ? `Continue · ${terms.priceString}` : "Plans unavailable"}
-              onPress={() => void buy()}
-              disabled={!isPro && (!selectedPackage || purchase.isPending || commerceState === "pending")}
+              label={actions.primaryLabel}
+              onPress={() => void onPrimaryAction()}
+              disabled={actions.isPrimaryDisabled || (actions.primaryAction === "purchase" && !selectedPackage)}
             />
             {__DEV__ && !devProEnabled ? (
               <><GhostButton label="Unlock all modules for testing" onPress={async () => { if (!__DEV__) return; await toggleDevPro(true); router.replace("/(tabs)"); }} style={styles.devButton} /><Text style={styles.devNote}>Preview only · no purchase or subscription</Text></>
@@ -199,5 +221,5 @@ const styles = StyleSheet.create({
   timeline: { marginTop: 34 }, timelineRow: { flexDirection: "row", minHeight: 82 }, rail: { width: 20, alignItems: "center" }, railDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: C.track, borderWidth: 2, borderColor: C.bg }, railDotOn: { width: 14, height: 14, borderRadius: 7, backgroundColor: C.purple }, railLine: { width: 1, flex: 1, backgroundColor: C.lineStrong }, timelineCopy: { flex: 1, paddingLeft: 10, paddingBottom: 20 }, timelineLabel: { ...T.support, fontFamily: font.semi, color: C.text }, timelineDetail: { ...T.caption, marginTop: 4 },
   loading: { marginTop: 50 }, planList: { gap: 10, marginTop: 24 }, plan: { minHeight: 74, borderRadius: radius.md, borderWidth: 1, borderColor: C.glassEdge, backgroundColor: C.surface, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, planSelected: { borderColor: C.purple, backgroundColor: C.purpleSoft }, planLabel: { ...T.support, fontFamily: font.semi, color: C.text }, planPrice: { ...T.caption, marginTop: 4 },
   termsCard: { marginTop: 18, padding: 18, gap: 12 }, termRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 }, termLabel: { ...T.caption }, termValue: { ...T.caption, fontFamily: font.semi, color: C.text, textAlign: "right", flex: 1 }, status: { marginTop: 16, padding: 14, borderRadius: radius.md, backgroundColor: C.surface, flexDirection: "row", alignItems: "flex-start", gap: 10 }, statusText: { ...T.caption, color: C.text, flex: 1 },
-  links: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, marginTop: 16 }, link: { ...T.caption, color: C.purple, textDecorationLine: "underline", paddingVertical: 10 }, dot: { ...T.caption }, devButton: { marginTop: 8 }, devNote: { ...T.caption, color: C.purple, textAlign: "center", marginTop: 4 }, secondary: { marginTop: 8 },
+  links: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, marginTop: 16 }, link: { ...T.caption, color: C.purple, textDecorationLine: "underline", paddingVertical: 10 }, dot: { ...T.caption }, disabledText: { color: C.dim }, devButton: { marginTop: 8 }, devNote: { ...T.caption, color: C.purple, textAlign: "center", marginTop: 4 }, secondary: { marginTop: 8 },
 });

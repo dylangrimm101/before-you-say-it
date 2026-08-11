@@ -31,8 +31,6 @@ import { useStore } from "@/providers/store";
 const SIGNALS = ["Clarity", "Specificity", "Listening", "Steadiness", "Boundaries", "Repair"] as const;
 const SIGNAL_COLORS = ["#512888", "#6B4E9E", "#8571B0", "#9E8CC2", "#B3A4D0", "#C7BCDE"] as const;
 const CARD_TINTS = ["#FFFFFF", "#FDFCFE", "#FBFAFD", "#F9F7FC"] as const;
-const ACTIVITY_MINUTES: Record<TodayActivityKey, string> = { lesson: "2 min", practice: "2 min", rehearsal: "4 min", review: "1 min" };
-
 interface ActivityCopy {
   title: string;
   body: string;
@@ -85,7 +83,7 @@ function ActivityCard({ activity, copy, tint, onPress }: { activity: TodayActivi
   return (
     <View style={[styles.card, { backgroundColor: tint }, isCurrent && styles.cardCurrent]} accessibilityLabel={`${activity.key}. ${activity.state}. ${copy.title}`}>
       <View style={styles.cardTopRow}>
-        <View style={styles.activityMeta}><Text style={[styles.activityKind, isCurrent && styles.activityKindCurrent]}>{activity.key}</Text><Text style={styles.activityMinutes}>· {ACTIVITY_MINUTES[activity.key]}</Text></View>
+        <View style={styles.activityMeta}><Text style={[styles.activityKind, isCurrent && styles.activityKindCurrent]}>{activity.key}</Text></View>
         {isCompleted ? <View style={styles.check}><Check size={12} color={C.onAccent} strokeWidth={3} /></View> : null}
       </View>
       <Text numberOfLines={2} style={[styles.activityTitle, !isCurrent && styles.activityTitleQuiet]}>{copy.title}</Text>
@@ -175,7 +173,7 @@ const styles = StyleSheet.create({
   indexPills: { flexDirection: "row", gap: 5, paddingBottom: 5 }, pill: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: "rgba(23,26,31,0.05)", borderWidth: 1, borderColor: C.line }, pillText: { fontFamily: font.semi, fontSize: 10, color: C.textSoft },
   chartArea: { flex: 1, minHeight: 0, marginTop: 5, gap: 5 }, chart: { flex: 1, minHeight: 0, flexDirection: "row", alignItems: "flex-end", gap: 6 }, chartTrack: { flex: 1, height: "100%", borderRadius: 5, backgroundColor: "rgba(81,40,136,0.07)", overflow: "hidden", justifyContent: "flex-end" }, chartBar: { width: "100%", borderRadius: 5, backgroundColor: "rgba(81,40,136,0.24)", transformOrigin: "bottom" }, chartBarCurrent: { backgroundColor: C.purple }, chartCaption: { fontFamily: font.medium, fontSize: 10, lineHeight: 12, color: C.dim },
   indexFooter: { paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, gap: 6 }, signalLegend: { flexDirection: "row", flexWrap: "wrap", rowGap: 5 }, signalItem: { width: "33.333%", flexDirection: "row", alignItems: "center", gap: 5 }, signalMark: { width: 7, height: 7, borderRadius: 2 }, signalLabel: { fontFamily: font.medium, fontSize: 10, color: C.textSoft }, focus: { fontFamily: font.regular, fontSize: 11, lineHeight: 15, color: C.textSoft }, focusKey: { fontFamily: font.semi, fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: C.purple },
-  activityMeta: { flexDirection: "row", alignItems: "center", gap: 5 }, activityKind: { fontFamily: font.semi, fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase", color: C.dim }, activityKindCurrent: { color: C.purple }, activityMinutes: { fontFamily: font.semi, fontSize: 10, letterSpacing: 1.2, textTransform: "uppercase", color: C.dim }, check: { width: 19, height: 19, borderRadius: 10, backgroundColor: C.purple, alignItems: "center", justifyContent: "center" },
+  activityMeta: { flexDirection: "row", alignItems: "center", gap: 5 }, activityKind: { fontFamily: font.semi, fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase", color: C.dim }, activityKindCurrent: { color: C.purple }, check: { width: 19, height: 19, borderRadius: 10, backgroundColor: C.purple, alignItems: "center", justifyContent: "center" },
   activityTitle: { fontFamily: font.bold, fontSize: 20, lineHeight: 25, letterSpacing: -0.25, color: C.text, marginTop: 10 }, activityTitleQuiet: { color: C.textSoft }, activityBody: { ...T.support, fontSize: 14, lineHeight: 20, color: C.textSoft, flex: 1, marginTop: 9 }, activityBodyQuiet: { color: C.dim },
   primaryAction: { height: 52, borderRadius: radius.pill, backgroundColor: C.purple, alignItems: "center", justifyContent: "center", ...shadow.hero }, primaryActionPressed: { backgroundColor: C.purplePressed, transform: [{ scale: 0.985 }] }, primaryActionText: { fontFamily: font.semi, fontSize: 16, color: C.onAccent },
   quietState: { height: 52, borderRadius: radius.pill, borderWidth: 1, borderColor: C.line, alignItems: "center", justifyContent: "center" }, quietStateText: { fontFamily: font.semi, fontSize: 14, color: C.dim },

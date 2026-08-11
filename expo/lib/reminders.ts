@@ -45,7 +45,7 @@ export async function scheduleDailyReminder(hour: number, minute: number): Promi
     identifier: REMINDER_ID,
     content: {
       title: "Time for today's rep",
-      body: "Two minutes of drills keeps the streak alive. Say it here first.",
+      body: "Your next practice is ready when you are.",
       sound: true,
     },
     trigger: {
@@ -80,7 +80,7 @@ export async function cancelChallengeNudge(): Promise<void> {
 const NUDGE_LINES: { title: string; body: string }[] = [
   {
     title: "Day {day} is still open",
-    body: "Two minutes before dinner. Say it here before you say it there.",
+    body: "Say it here before you say it there.",
   },
   {
     title: "Your streak is on the line",
