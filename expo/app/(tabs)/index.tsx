@@ -1,90 +1,183 @@
 import { useRouter } from "expo-router";
-import { ArrowRight, BookOpen, Check, ChevronRight, Circle, Settings, Sparkles, Target } from "lucide-react-native";
-import React, { useCallback, useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Check, ChevronRight } from "lucide-react-native";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Backdrop, Eyebrow, GlassCard, HeroSurface, PressCard, Reveal } from "@/components/ui";
-import { CURRICULUM_MODULES, curriculumModule, type CurriculumModule, type ModuleId } from "@/constants/modules";
-import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
+import { Backdrop, useReducedMotion } from "@/components/ui";
+import { curriculumModule, type CurriculumModule } from "@/constants/modules";
+import { C, GUTTER, eyebrow, font, radius, shadow, T } from "@/constants/theme";
+import { pilotModule } from "@/lib/pilotCurriculum";
+import {
+  TODAY_ACTIVITY_KEYS,
+  TODAY_CARD_GAP,
+  TODAY_CARD_HEIGHT,
+  TODAY_CARD_PADDING,
+  TODAY_CARD_RADIUS,
+  TODAY_CHART_DURATION_MS,
+  TODAY_ENTRANCE_DURATION_MS,
+  TODAY_ENTRANCE_STAGGER_MS,
+  TODAY_PIN_STEP,
+  todayActivityPresentation,
+  todayIndexPresentation,
+  todayRecentPractice,
+  todayRecommendedModuleId,
+  type TodayActivityKey,
+  type TodayActivityPresentation,
+  type TodayIndexPresentation,
+} from "@/lib/today";
 import { useStore } from "@/providers/store";
-import type { PilotModuleState } from "@/types/pilotCurriculum";
 
-const PRACTICE_STEPS: readonly { key: string; label: string; states: readonly PilotModuleState[] }[] = [
-  { key: "lesson", label: "Lesson", states: ["module_preview", "hope_lesson"] },
-  { key: "exercise", label: "Exercise", states: ["quiz", "quiz_feedback", "preset_scenario"] },
-  { key: "rehearsal", label: "Spoken rehearsal", states: ["ready_for_attempt", "listening_attempt", "confirm_attempt_transcript", "adam_response", "ready_for_response", "listening_response", "confirm_response_transcript"] },
-  { key: "retry", label: "Focused retry", states: ["hope_coaching", "day3_note_check", "day3_neutral_retry", "ready_for_retry", "listening_retry", "confirm_retry_transcript", "play_adam_after_opener_retry"] },
-  { key: "review", label: "Review", states: ["attempt_comparison", "transfer_cue", "complete"] },
-];
+const SIGNALS = ["Clarity", "Specificity", "Listening", "Steadiness", "Boundaries", "Repair"] as const;
+const SIGNAL_COLORS = ["#512888", "#6B4E9E", "#8571B0", "#9E8CC2", "#B3A4D0", "#C7BCDE"] as const;
+const CARD_TINTS = ["#FFFFFF", "#FDFCFE", "#FBFAFD", "#F9F7FC"] as const;
+const ACTIVITY_MINUTES: Record<TodayActivityKey, string> = { lesson: "2 min", practice: "2 min", rehearsal: "4 min", review: "1 min" };
+
+interface ActivityCopy {
+  title: string;
+  body: string;
+}
+
+function activityCopy(key: TodayActivityKey, module: CurriculumModule, moduleDay: ReturnType<typeof pilotModule>): ActivityCopy {
+  if (key === "lesson") return { title: module.name, body: moduleDay?.copy.body ?? "Learn the move behind your first focus." };
+  if (key === "practice") return { title: "Practice the distinction", body: moduleDay?.copy.quiz?.prompt ?? "Choose the response that keeps the communication move visible." };
+  if (key === "rehearsal") return { title: moduleDay?.copy.scenario?.heading ?? "Use it under pressure", body: moduleDay?.copy.scenario?.user_job ?? "Try the move against realistic pushback, then repeat the moment once." };
+  return { title: "See what changed", body: moduleDay?.copy.transfer ?? "Compare your responses and carry one adjustment forward." };
+}
+
+function IndexCard({ index, chartProgress, onDetails }: { index: TodayIndexPresentation; chartProgress: Animated.Value; onDetails: () => void }) {
+  const chartSlots = Array.from({ length: 7 }, (_, slot) => {
+    const valueIndex = slot - (7 - index.chartValues.length);
+    return valueIndex >= 0 ? index.chartValues[valueIndex] ?? null : null;
+  });
+  const valueLabel = index.kind === "insufficient" ? "—" : String(index.value);
+  const statusLabel = index.kind === "overall" ? "Overall Index" : index.kind === "partial" ? "Partial Index" : "Insufficient evidence";
+
+  return (
+    <View style={styles.card} accessibilityLabel={`${statusLabel}. ${index.value ?? "No Index value"}. ${index.observedCount} of 6 signals observed.`}>
+      <View style={styles.cardTopRow}>
+        <Text style={styles.cardEyebrow}>Communication Index</Text>
+        <Pressable onPress={onDetails} accessibilityRole="button" accessibilityLabel="Communication Index details" hitSlop={12}>
+          <View style={styles.detailsRow}><Text style={styles.details}>Details</Text><ChevronRight size={12} color={C.purple} /></View>
+        </Pressable>
+      </View>
+      <View style={styles.indexHeading}>
+        <View style={styles.indexValueRow}><Text style={styles.indexValue}>{valueLabel}</Text>{index.value !== null ? <Text style={styles.outOf}>/ 100</Text> : null}</View>
+        <View style={styles.indexPills}><View style={styles.pill}><Text style={styles.pillText}>{statusLabel}</Text></View><View style={styles.pill}><Text style={styles.pillText}>{index.observedCount} of 6</Text></View></View>
+      </View>
+      <View style={styles.chartArea}>
+        <View style={styles.chart} accessibilityRole="image" accessibilityLabel={index.chartValues.length === 0 ? "No scored practice values yet" : `Scored practice history. ${index.chartValues.join(", ")} on a zero to one hundred scale.`}>
+          {chartSlots.map((value, slot) => <View key={slot} style={styles.chartTrack}>{value === null ? null : <Animated.View style={[styles.chartBar, slot === 6 && styles.chartBarCurrent, { height: `${value}%`, transform: [{ scaleY: chartProgress }] }]} />}</View>)}
+        </View>
+        <Text style={styles.chartCaption}>{index.chartValues.length === 0 ? "No scored practice history yet · 0–100" : `Scored practice history · ${index.chartValues.length} of 7 · 0–100`}</Text>
+      </View>
+      <View style={styles.indexFooter}>
+        <View style={styles.signalLegend}>{SIGNALS.map((label, indexValue) => <View key={label} style={styles.signalItem}><View style={[styles.signalMark, { backgroundColor: SIGNAL_COLORS[indexValue] }]} /><Text style={styles.signalLabel}>{label}</Text></View>)}</View>
+        <Text numberOfLines={2} style={styles.focus}><Text style={styles.focusKey}>Focus · </Text>{index.focus ?? "Complete an approved rehearsal to establish an evidence-backed focus."}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ActivityCard({ activity, copy, tint, onPress }: { activity: TodayActivityPresentation; copy: ActivityCopy; tint: string; onPress: () => void }) {
+  const isCurrent = activity.state === "current";
+  const isCompleted = activity.state === "completed";
+  return (
+    <View style={[styles.card, { backgroundColor: tint }, isCurrent && styles.cardCurrent]} accessibilityLabel={`${activity.key}. ${activity.state}. ${copy.title}`}>
+      <View style={styles.cardTopRow}>
+        <View style={styles.activityMeta}><Text style={[styles.activityKind, isCurrent && styles.activityKindCurrent]}>{activity.key}</Text><Text style={styles.activityMinutes}>· {ACTIVITY_MINUTES[activity.key]}</Text></View>
+        {isCompleted ? <View style={styles.check}><Check size={12} color={C.onAccent} strokeWidth={3} /></View> : null}
+      </View>
+      <Text numberOfLines={2} style={[styles.activityTitle, !isCurrent && styles.activityTitleQuiet]}>{copy.title}</Text>
+      <Text numberOfLines={3} style={[styles.activityBody, !isCurrent && styles.activityBodyQuiet]}>{copy.body}</Text>
+      {isCurrent && activity.ctaLabel ? <Pressable onPress={onPress} style={({ pressed }) => [styles.primaryAction, pressed && styles.primaryActionPressed]} accessibilityRole="button" accessibilityLabel={activity.ctaLabel}><Text style={styles.primaryActionText}>{activity.ctaLabel}</Text></Pressable> : <View style={styles.quietState}><Text style={styles.quietStateText}>{isCompleted ? "Complete · Review" : "Up next"}</Text></View>}
+    </View>
+  );
+}
 
 export default function TodayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { modularDoneIds, access, activePracticeSession, pilotProgress } = useStore();
-  const recommendedId: ModuleId = activePracticeSession?.sharedResult?.first_focus?.recommended_module_id ?? activePracticeSession?.recommendation?.moduleId ?? "get_to_the_point";
-  const recommended = curriculumModule(recommendedId) ?? CURRICULUM_MODULES[0];
-  const activeRun = activePracticeSession?.pilotRuns[recommendedId];
-  const currentState: PilotModuleState = activeRun?.state ?? (activePracticeSession?.nextState === "complete" ? "complete" : "module_preview");
-  const currentStepIndex = Math.max(0, PRACTICE_STEPS.findIndex((step) => step.states.includes(currentState)));
-  const completedCount = modularDoneIds.size;
-  const isNewBuyer = access.entitlement === "pro" && pilotProgress.length === 0;
+  const isReduced = useReducedMotion();
+  const { access, activityDays, activePracticeSession } = useStore();
+  const moduleId = todayRecommendedModuleId(activePracticeSession);
+  const recommended = curriculumModule(moduleId);
+  const activeRun = moduleId ? activePracticeSession?.pilotRuns[moduleId] : undefined;
+  const moduleDay = recommended ? pilotModule(recommended.practiceDay) : undefined;
+  const index = useMemo<TodayIndexPresentation>(() => todayIndexPresentation(activePracticeSession?.sharedResult), [activePracticeSession?.sharedResult]);
+  const recentDays = useMemo(() => todayRecentPractice(activityDays, new Date()), [activityDays]);
+  const activities = useMemo(() => todayActivityPresentation(activeRun?.state, Boolean(activeRun)), [activeRun]);
+  const entrances = useRef<Animated.Value[]>(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
+  const chartProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
 
-  const nextModules = useMemo<CurriculumModule[]>(() => CURRICULUM_MODULES.filter((module) => module.id !== recommendedId).slice(0, 3), [recommendedId]);
-
-  const openRecommended = useCallback((): void => {
-    if (access.entitlement !== "pro") {
-      router.push({ pathname: "/paywall", params: { gate: "program", moduleId: recommendedId } });
+  useEffect(() => {
+    if (isReduced) {
+      entrances.forEach((value) => value.setValue(1));
+      chartProgress.setValue(1);
       return;
     }
-    router.push({ pathname: "/module/[day]", params: { day: recommendedId } });
-  }, [access.entitlement, recommendedId, router]);
+    entrances.forEach((value) => value.setValue(0));
+    chartProgress.setValue(0);
+    const cards = Animated.parallel(entrances.map((value, order) => Animated.timing(value, { toValue: 1, duration: TODAY_ENTRANCE_DURATION_MS, delay: order * TODAY_ENTRANCE_STAGGER_MS, easing: Easing.bezier(0.22, 0.9, 0.28, 1), useNativeDriver: true })));
+    const chart = Animated.timing(chartProgress, { toValue: 1, duration: TODAY_CHART_DURATION_MS, delay: 300, easing: Easing.bezier(0.22, 0.9, 0.28, 1), useNativeDriver: true });
+    Animated.parallel([cards, chart]).start();
+    return () => { cards.stop(); chart.stop(); };
+  }, [chartProgress, entrances, isReduced]);
+
+  const openCurrentActivity = useCallback((): void => {
+    if (!moduleId) { router.push("/(tabs)/progress"); return; }
+    if (access.entitlement !== "pro") { router.push({ pathname: "/paywall", params: { gate: "program", moduleId } }); return; }
+    router.push({ pathname: "/module/[day]", params: { day: moduleId } });
+  }, [access.entitlement, moduleId, router]);
+
+  const openPath = useCallback((): void => { router.push("/(tabs)/progress"); }, [router]);
 
   return (
     <View style={styles.root}>
       <Backdrop />
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 112 }]} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}><View><Eyebrow color={C.dim}>Today</Eyebrow><Text style={styles.title}>{isNewBuyer ? "Your first practice starts here." : activeRun && currentState !== "complete" ? "Pick up where you left off." : "Practice the move you need next."}</Text></View><PressCard onPress={() => router.push("/settings")} style={styles.settingsButton} accessibilityLabel="Settings"><Settings size={20} color={C.textSoft} /></PressCard></View>
-
-        <Reveal index={1}>
-          <PressCard onPress={openRecommended} accessibilityLabel={`Open recommended practice ${recommended.name}`}>
-            <HeroSurface style={styles.hero}>
-              <View style={styles.heroTop}><Sparkles size={18} color={C.onAccent} /><Text style={styles.heroEyebrow}>{isNewBuyer ? "FIRST PERSONALIZED PRACTICE" : "RECOMMENDED START"}</Text></View>
-              <Text style={styles.heroTitle}>{recommended.name}</Text>
-              <Text style={styles.heroBody}>{activePracticeSession?.sharedResult?.first_focus?.first_focus_label ?? activePracticeSession?.recommendation?.immediateAction ?? "A focused practice chosen from your current path."} Your rehearsal selected this starting point from what you approved.</Text>
-              <View style={styles.heroAction}><Text style={styles.heroActionText}>{access.entitlement === "pro" ? activeRun ? "Continue practice" : "Start practice" : "See my practice path"}</Text><ArrowRight size={18} color={C.text} /></View>
-            </HeroSurface>
-          </PressCard>
-        </Reveal>
-
-        <Reveal index={2}>
-          <View style={styles.why}><Target size={18} color={C.purple} /><View style={styles.whyCopy}><Text style={styles.whyLabel}>WHY THIS PRACTICE</Text><Text style={styles.whyText}>It follows the first focus from your approved rehearsal—not a generic daily assignment.</Text></View></View>
-        </Reveal>
-
-        <Reveal index={3}>
-          <GlassCard style={styles.sequence}>
-            <View style={styles.sectionHead}><Text style={styles.sectionLabel}>TODAY’S BOUNDED SEQUENCE</Text><Text style={styles.sectionMeta}>{Math.min(currentStepIndex + 1, PRACTICE_STEPS.length)} of {PRACTICE_STEPS.length}</Text></View>
-            {PRACTICE_STEPS.map((step, index) => {
-              const done = currentState === "complete" || index < currentStepIndex;
-              const active = currentState !== "complete" && index === currentStepIndex;
-              return <View key={step.key} style={styles.stepRow}>{done ? <View style={styles.doneIcon}><Check size={12} color={C.onAccent} strokeWidth={3} /></View> : active ? <View style={styles.activeIcon}><Circle size={12} color={C.purple} fill={C.purple} /></View> : <Circle size={22} color={C.track} />}<Text style={[styles.stepText, active && styles.stepActive, done && styles.stepDone]}>{step.label}</Text>{active ? <Text style={styles.now}>NOW</Text> : null}</View>;
-            })}
-          </GlassCard>
-        </Reveal>
-
-        <Reveal index={4}>
-          <View style={styles.progressLine}><BookOpen size={17} color={C.sage} /><Text style={styles.progressText}>{completedCount === 0 ? "No paid practices completed yet. Nothing locks when you miss a day." : `${completedCount} of ${CURRICULUM_MODULES.length} module practices completed. Nothing locks when you miss a day.`}</Text></View>
-        </Reveal>
-
-        {completedCount > 0 ? <Reveal index={5}><Text style={styles.browseLabel}>CONTINUE EXPLORING</Text><View style={styles.nextList}>{nextModules.map((module) => <PressCard key={module.id} onPress={() => router.push({ pathname: "/module/[day]", params: { day: module.id } })} accessibilityLabel={`Open ${module.name}`}><View style={styles.moduleRow}><View style={styles.moduleNumber}><Text style={styles.moduleNumberText}>{module.number}</Text></View><Text style={styles.moduleName}>{module.name}</Text><ChevronRight size={18} color={C.dim} /></View></PressCard>)}</View></Reveal> : null}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}><Text style={styles.todayTitle}>Today</Text></View>
+      <View style={styles.recentStrip} accessibilityLabel="Recent practice, seven days">
+        {recentDays.map((day) => <View key={day.key} style={[styles.day, day.isToday && styles.dayToday]}><View style={[styles.dayDot, day.hasPractice && styles.dayDotDone, day.isToday && !day.hasPractice && styles.dayDotToday]}>{day.hasPractice ? <Check size={9} color={C.onAccent} strokeWidth={3} /> : null}</View><Text style={[styles.dayLabel, day.isToday && styles.dayLabelToday]}>{day.label}</Text></View>)}
+      </View>
+      <ScrollView style={styles.deck} contentContainerStyle={[styles.deckContent, { paddingBottom: insets.bottom + 116 }]} stickyHeaderIndices={[0, 1, 2, 3, 4]} showsVerticalScrollIndicator={false} stickyHeaderHiddenOnScroll={false}>
+        <Animated.View style={[styles.cardLayer, { zIndex: 10, transform: [{ translateY: 0 }, { translateY: entrances[0].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }, { scale: entrances[0].interpolate({ inputRange: [0, 1], outputRange: [0.978, 1] }) }], opacity: entrances[0] }]}><IndexCard index={index} chartProgress={chartProgress} onDetails={openPath} /></Animated.View>
+        {TODAY_ACTIVITY_KEYS.map((key, activityIndex) => {
+          const activity = activities[activityIndex];
+          const order = activityIndex + 1;
+          if (!activity) return null;
+          const copy = recommended ? activityCopy(key, recommended, moduleDay) : { title: key === "lesson" ? "Your first lesson isn’t ready yet" : key === "review" ? "See what changed" : `${key[0]?.toUpperCase() ?? ""}${key.slice(1)}`, body: "This activity appears after an evidence-backed first focus is available." };
+          return <Animated.View key={key} style={[styles.cardLayer, { zIndex: 10 + order * 10, transform: [{ translateY: order * TODAY_PIN_STEP }, { translateY: entrances[order].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }, { scale: entrances[order].interpolate({ inputRange: [0, 1], outputRange: [0.978, 1] }) }], opacity: entrances[order] }]}><ActivityCard activity={activity} copy={copy} tint={CARD_TINTS[activityIndex]} onPress={openCurrentActivity} /></Animated.View>;
+        })}
+        <Pressable onPress={openPath} accessibilityRole="button" accessibilityLabel="View your practice path" style={styles.pathLink}><Text style={styles.pathText}>View your path</Text><ChevronRight size={15} color={C.purple} /></Pressable>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg }, scroll: { paddingHorizontal: GUTTER }, header: { flexDirection: "row", alignItems: "flex-start", gap: 12 }, title: { ...T.display, marginTop: 8, flex: 1 }, settingsButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.surface, alignItems: "center", justifyContent: "center" },
-  hero: { marginTop: 26 }, heroTop: { flexDirection: "row", alignItems: "center", gap: 8 }, heroEyebrow: { ...eyebrow, color: "rgba(255,255,255,0.76)" }, heroTitle: { fontFamily: font.semi, fontSize: 29, lineHeight: 35, color: C.onAccent, marginTop: 18 }, heroBody: { ...T.support, color: "rgba(255,255,255,0.82)", marginTop: 10 }, heroAction: { minHeight: 52, borderRadius: radius.pill, backgroundColor: C.onAccent, marginTop: 22, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 }, heroActionText: { fontFamily: font.semi, fontSize: 15, color: C.text },
-  why: { flexDirection: "row", gap: 12, marginTop: 24, paddingHorizontal: 4 }, whyCopy: { flex: 1 }, whyLabel: { ...eyebrow, color: C.purple }, whyText: { ...T.caption, color: C.text, marginTop: 5 }, sequence: { marginTop: 24, padding: 20 }, sectionHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 }, sectionLabel: { ...eyebrow, color: C.dim }, sectionMeta: { ...T.caption, fontFamily: font.semi, color: C.purple }, stepRow: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line }, doneIcon: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.sage, alignItems: "center", justifyContent: "center" }, activeIcon: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.purpleSoft, alignItems: "center", justifyContent: "center" }, stepText: { ...T.support, flex: 1, color: C.dim }, stepActive: { color: C.text, fontFamily: font.semi }, stepDone: { color: C.sage }, now: { ...eyebrow, color: C.purple },
-  progressLine: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 18, paddingHorizontal: 4 }, progressText: { ...T.caption, color: C.textSoft }, browseLabel: { ...eyebrow, color: C.dim, marginTop: 32, marginBottom: 10 }, nextList: { gap: 9 }, moduleRow: { minHeight: 76, borderRadius: radius.md, backgroundColor: C.surface, borderWidth: 1, borderColor: C.glassEdge, padding: 13, flexDirection: "row", alignItems: "center", gap: 12 }, moduleNumber: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.purpleSoft, alignItems: "center", justifyContent: "center" }, moduleNumberText: { fontFamily: font.semi, color: C.purple }, moduleName: { ...T.support, fontFamily: font.semi, color: C.text, flex: 1 },
+  root: { flex: 1, backgroundColor: "#EFEEF4" },
+  header: { paddingHorizontal: GUTTER, paddingBottom: 10 },
+  todayTitle: { fontFamily: font.bold, fontSize: 28, lineHeight: 32, letterSpacing: -0.5, color: C.text },
+  recentStrip: { flexDirection: "row", gap: 6, paddingHorizontal: GUTTER, paddingBottom: 14 },
+  day: { flex: 1, minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(255,255,255,0.55)", alignItems: "center", justifyContent: "center", gap: 5 },
+  dayToday: { borderColor: "rgba(81,40,136,0.34)", backgroundColor: C.purpleSoft },
+  dayDot: { width: 15, height: 15, borderRadius: 8, borderWidth: 1.5, borderColor: "rgba(23,26,31,0.18)", alignItems: "center", justifyContent: "center" },
+  dayDotDone: { backgroundColor: C.purple, borderColor: C.purple }, dayDotToday: { borderColor: "rgba(81,40,136,0.5)" },
+  dayLabel: { fontFamily: font.semi, fontSize: 10, lineHeight: 12, letterSpacing: 0.6, textTransform: "uppercase", color: C.dim }, dayLabelToday: { color: C.purple },
+  deck: { flex: 1 }, deckContent: { paddingHorizontal: 20, isolation: "isolate" },
+  cardLayer: { paddingBottom: TODAY_CARD_GAP },
+  card: { height: TODAY_CARD_HEIGHT, borderRadius: TODAY_CARD_RADIUS, padding: TODAY_CARD_PADDING, backgroundColor: C.onAccent, borderWidth: 1, borderColor: C.line, ...shadow.layer },
+  cardCurrent: { borderColor: "rgba(81,40,136,0.22)", shadowColor: C.purple, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.14, shadowRadius: 26, elevation: 8 },
+  cardTopRow: { minHeight: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  cardEyebrow: { ...eyebrow, color: C.dim }, detailsRow: { flexDirection: "row", alignItems: "center", gap: 1 }, details: { fontFamily: font.semi, fontSize: 12, color: C.purple },
+  indexHeading: { minHeight: 54, marginTop: 5, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
+  indexValueRow: { flexDirection: "row", alignItems: "flex-end", gap: 5 }, indexValue: { fontFamily: font.bold, fontSize: 46, lineHeight: 49, letterSpacing: -1.5, color: C.purple }, outOf: { fontFamily: font.regular, fontSize: 14, color: C.dim, paddingBottom: 6 },
+  indexPills: { flexDirection: "row", gap: 5, paddingBottom: 5 }, pill: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: "rgba(23,26,31,0.05)", borderWidth: 1, borderColor: C.line }, pillText: { fontFamily: font.semi, fontSize: 10, color: C.textSoft },
+  chartArea: { flex: 1, minHeight: 0, marginTop: 5, gap: 5 }, chart: { flex: 1, minHeight: 0, flexDirection: "row", alignItems: "flex-end", gap: 6 }, chartTrack: { flex: 1, height: "100%", borderRadius: 5, backgroundColor: "rgba(81,40,136,0.07)", overflow: "hidden", justifyContent: "flex-end" }, chartBar: { width: "100%", borderRadius: 5, backgroundColor: "rgba(81,40,136,0.24)", transformOrigin: "bottom" }, chartBarCurrent: { backgroundColor: C.purple }, chartCaption: { fontFamily: font.medium, fontSize: 10, lineHeight: 12, color: C.dim },
+  indexFooter: { paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, gap: 6 }, signalLegend: { flexDirection: "row", flexWrap: "wrap", rowGap: 5 }, signalItem: { width: "33.333%", flexDirection: "row", alignItems: "center", gap: 5 }, signalMark: { width: 7, height: 7, borderRadius: 2 }, signalLabel: { fontFamily: font.medium, fontSize: 10, color: C.textSoft }, focus: { fontFamily: font.regular, fontSize: 11, lineHeight: 15, color: C.textSoft }, focusKey: { fontFamily: font.semi, fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: C.purple },
+  activityMeta: { flexDirection: "row", alignItems: "center", gap: 5 }, activityKind: { fontFamily: font.semi, fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase", color: C.dim }, activityKindCurrent: { color: C.purple }, activityMinutes: { fontFamily: font.semi, fontSize: 10, letterSpacing: 1.2, textTransform: "uppercase", color: C.dim }, check: { width: 19, height: 19, borderRadius: 10, backgroundColor: C.purple, alignItems: "center", justifyContent: "center" },
+  activityTitle: { fontFamily: font.bold, fontSize: 20, lineHeight: 25, letterSpacing: -0.25, color: C.text, marginTop: 10 }, activityTitleQuiet: { color: C.textSoft }, activityBody: { ...T.support, fontSize: 14, lineHeight: 20, color: C.textSoft, flex: 1, marginTop: 9 }, activityBodyQuiet: { color: C.dim },
+  primaryAction: { height: 52, borderRadius: radius.pill, backgroundColor: C.purple, alignItems: "center", justifyContent: "center", ...shadow.hero }, primaryActionPressed: { backgroundColor: C.purplePressed, transform: [{ scale: 0.985 }] }, primaryActionText: { fontFamily: font.semi, fontSize: 16, color: C.onAccent },
+  quietState: { height: 52, borderRadius: radius.pill, borderWidth: 1, borderColor: C.line, alignItems: "center", justifyContent: "center" }, quietStateText: { fontFamily: font.semi, fontSize: 14, color: C.dim },
+  pathLink: { minHeight: 52, paddingTop: 14, paddingBottom: 320, flexDirection: "row", alignItems: "flex-start", justifyContent: "center", gap: 3 }, pathText: { fontFamily: font.semi, fontSize: 14, color: C.purple },
 });

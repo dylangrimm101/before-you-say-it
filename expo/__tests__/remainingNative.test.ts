@@ -75,10 +75,11 @@ describe("remaining native acquisition and paid experience", () => {
 
   test("first practice and Today derive from first focus and real checkpoints", async () => {
     const today = await source("app/(tabs)/index.tsx");
+    const todayLogic = await source("lib/today.ts");
     const purchased = await source("app/purchase-success.tsx");
-    expect(today).toContain("sharedResult?.first_focus?.recommended_module_id");
-    expect(today).toContain("activePracticeSession?.pilotRuns[recommendedId]");
-    expect(today).toContain("pilotProgress.length === 0");
+    expect(todayLogic).toContain("session?.sharedResult?.first_focus?.recommended_module_id ?? null");
+    expect(today).toContain("activePracticeSession?.pilotRuns[moduleId]");
+    expect(today).toContain("todayActivityPresentation(activeRun?.state");
     expect(purchased).toContain("Start my first practice");
   });
 

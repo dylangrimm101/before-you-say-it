@@ -222,10 +222,10 @@ describe("pressable cards claim the width they are supposed to", () => {
     }
   });
 
-  it("gives every modular curriculum row a real touch target", async () => {
+  it("gives the current Today activity a real touch target", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text();
-    expect(source).toContain("minHeight: 76");
-    expect(source).toContain("accessibilityLabel={`Open ${module.name}`}");
+    expect(source).toContain("primaryAction: { height: 52");
+    expect(source).toContain("accessibilityLabel={activity.ctaLabel}");
   });
 
   it("keeps every tap target at least 44pt", async () => {

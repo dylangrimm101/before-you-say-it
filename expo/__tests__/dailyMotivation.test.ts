@@ -18,17 +18,19 @@ describe("daily dashboard motivation", () => {
     expect(dailyMotivation(today)).not.toBe(dailyMotivation(tomorrow));
   });
 
-  test("the migrated dashboard leads with the evidence-based module recommendation", async () => {
-    const dashboard = await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text();
-    expect(dashboard).toContain("RECOMMENDED START");
-    expect(dashboard).toContain("Your rehearsal selected this starting point");
-    expect(dashboard).toContain("CURRICULUM_MODULES");
+  test("Today leads with the evidence-backed module and locked activity hierarchy", async () => {
+    const today = await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text();
+    expect(today).toContain("todayRecommendedModuleId");
+    expect(today).toContain("Communication Index");
+    expect(today).toContain("TODAY_ACTIVITY_KEYS");
+    expect(today).toContain("View your path");
   });
 
-  test("does not use missed-day pressure or sequential lockouts", async () => {
-    const dashboard = (await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text()).toLowerCase();
-    expect(dashboard).toContain("nothing locks when you miss a day");
-    expect(dashboard).not.toContain("keep the streak");
-    expect(dashboard).not.toContain("locked");
+  test("does not use missed-day pressure, a giant recommendation card, or fixture history", async () => {
+    const today = (await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text()).toLowerCase();
+    expect(today).not.toContain("keep the streak");
+    expect(today).not.toContain("recommended start");
+    expect(today).not.toContain("heroSurface".toLowerCase());
+    expect(today).not.toContain("58, 61, 57, 63, 60, 62, 62");
   });
 });
