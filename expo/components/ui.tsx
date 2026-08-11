@@ -18,8 +18,8 @@ import {
 import Svg, {
   Circle,
   Defs,
-  Ellipse,
   RadialGradient,
+  Rect,
   Stop,
 } from "react-native-svg";
 
@@ -77,31 +77,33 @@ export function tap(style: "light" | "medium" | "heavy" | "success" = "light"): 
  * below. Every glass layer in the app reads against this, so it is the one
  * surface that is always on screen.
  *
- * Modelled with overlapping ellipses that fade to fully transparent, which is
- * how the design's stacked `radial-gradient`s behave.
+ * Each stop fades through the same RGB with `stopOpacity`, avoiding the grey
+ * contamination produced by the `transparent` keyword. SVG paints in document
+ * order, so the CSS layers are reversed: bottom first and top highlight last.
  */
-export function Backdrop() {
+export function Backdrop(): React.JSX.Element {
+  const svgPaintOrder = [...FIELD_GLOWS].reverse();
+
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: C.bg }]} pointerEvents="none">
-      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
         <Defs>
-          {FIELD_GLOWS.map((g, i) => (
-            <RadialGradient key={`d${i}`} id={`glow${i}`} cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={g.color} stopOpacity={1} />
-              <Stop offset="0.58" stopColor={g.color} stopOpacity={0.35} />
-              <Stop offset="1" stopColor={g.color} stopOpacity={0} />
+          {svgPaintOrder.map((glow) => (
+            <RadialGradient
+              key={glow.id}
+              id={`field-${glow.id}`}
+              cx={glow.cx}
+              cy={glow.cy}
+              rx={glow.rx}
+              ry={glow.ry}
+            >
+              <Stop offset="0%" stopColor={glow.color} stopOpacity={1} />
+              <Stop offset={glow.fadeAt} stopColor={glow.color} stopOpacity={0} />
             </RadialGradient>
           ))}
         </Defs>
-        {FIELD_GLOWS.map((g, i) => (
-          <Ellipse
-            key={`e${i}`}
-            cx={g.x * 100}
-            cy={g.y * 100}
-            rx={g.rx * 50}
-            ry={g.ry * 50}
-            fill={`url(#glow${i})`}
-          />
+        {svgPaintOrder.map((glow) => (
+          <Rect key={glow.id} width="100%" height="100%" fill={`url(#field-${glow.id})`} />
         ))}
       </Svg>
     </View>

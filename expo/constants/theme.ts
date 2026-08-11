@@ -10,10 +10,10 @@ import { Platform } from "react-native";
  */
 export const C = {
   /** Field — base tone under the three radial glows in `Backdrop`. */
-  bg: "#F2F2F6",
-  /** Glow stops, in the order they are painted over `bg`. */
+  bg: "#EFEEF4",
+  /** Glow stops, in CSS stack order from topmost to bottommost. */
   glowTop: "#FDFDFE",
-  glowRight: "#DFDCEC",
+  glowRight: "#E4E0F0",
   glowBottom: "#DED5EA",
   /** Deepest corner of the field — the tone the violet settles to. */
   fieldDeep: "#DEDCE8",
@@ -89,14 +89,14 @@ export const HERO_GRADIENT = [
 ] as const;
 
 /**
- * The field is three radial glows over `C.bg`, not a linear ramp. Each entry is
- * `[centreX, centreY, radiusX, radiusY]` as a fraction of the screen, matching
- * the design's `radial-gradient(... at x y)` stack in paint order.
+ * The field is three radial glows over `C.bg`, not a linear ramp. Values are
+ * percentages of the full painted box. Entries remain in CSS stack order
+ * (topmost first); `Backdrop` reverses them for SVG document-order painting.
  */
 export const FIELD_GLOWS = [
-  { color: C.glowTop, x: 0.15, y: 0, rx: 1.25, ry: 0.75 },
-  { color: C.glowRight, x: 1, y: 0.18, rx: 1.15, ry: 0.7 },
-  { color: C.glowBottom, x: 0.55, y: 1.05, rx: 1.4, ry: 0.85 },
+  { id: "top", color: C.glowTop, cx: "15%", cy: "0%", rx: "125%", ry: "75%", fadeAt: "55%" },
+  { id: "right", color: C.glowRight, cx: "100%", cy: "18%", rx: "115%", ry: "70%", fadeAt: "62%" },
+  { id: "bottom", color: C.glowBottom, cx: "55%", cy: "105%", rx: "140%", ry: "85%", fadeAt: "58%" },
 ] as const;
 
 /**

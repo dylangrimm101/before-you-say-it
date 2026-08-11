@@ -225,7 +225,7 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#EFEEF4" },
+  root: { flex: 1, backgroundColor: C.bg },
   header: { paddingHorizontal: GUTTER, paddingBottom: 10 },
   todayTitle: { fontFamily: font.bold, fontSize: 28, lineHeight: 32, letterSpacing: -0.5, color: C.text },
   recentStrip: { flexDirection: "row", gap: 6, paddingHorizontal: GUTTER, paddingBottom: 14 },
