@@ -125,10 +125,16 @@ export default function TodayScreen() {
   const openCurrentActivity = useCallback((): void => {
     if (!moduleId) { router.push("/(tabs)/progress"); return; }
     if (access.entitlement !== "pro") { router.push({ pathname: "/paywall", params: { gate: "program", moduleId } }); return; }
+    const current = activities.find((activity) => activity.state === "current");
+    if (current?.isInterrupted) {
+      router.push({ pathname: "/interrupted/[moduleId]", params: { moduleId } });
+      return;
+    }
     router.push({ pathname: "/module/[day]", params: { day: moduleId } });
-  }, [access.entitlement, moduleId, router]);
+  }, [access.entitlement, activities, moduleId, router]);
 
-  const openPath = useCallback((): void => { router.push("/(tabs)/progress"); }, [router]);
+  const openPath = useCallback((): void => { router.push("/path"); }, [router]);
+  const openProgress = useCallback((): void => { router.push("/(tabs)/progress"); }, [router]);
 
   return (
     <View style={styles.root}>
@@ -138,7 +144,7 @@ export default function TodayScreen() {
         {recentDays.map((day) => <View key={day.key} style={[styles.day, day.isToday && styles.dayToday]}><View style={[styles.dayDot, day.hasPractice && styles.dayDotDone, day.isToday && !day.hasPractice && styles.dayDotToday]}>{day.hasPractice ? <Check size={9} color={C.onAccent} strokeWidth={3} /> : null}</View><Text style={[styles.dayLabel, day.isToday && styles.dayLabelToday]}>{day.label}</Text></View>)}
       </View>
       <ScrollView style={styles.deck} contentContainerStyle={[styles.deckContent, { paddingBottom: insets.bottom + 116 }]} stickyHeaderIndices={[0, 1, 2, 3, 4]} showsVerticalScrollIndicator={false} stickyHeaderHiddenOnScroll={false}>
-        <Animated.View style={[styles.cardLayer, { zIndex: 10, transform: [{ translateY: 0 }, { translateY: entrances[0].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }, { scale: entrances[0].interpolate({ inputRange: [0, 1], outputRange: [0.978, 1] }) }], opacity: entrances[0] }]}><IndexCard index={index} chartProgress={chartProgress} onDetails={openPath} /></Animated.View>
+        <Animated.View style={[styles.cardLayer, { zIndex: 10, transform: [{ translateY: 0 }, { translateY: entrances[0].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }, { scale: entrances[0].interpolate({ inputRange: [0, 1], outputRange: [0.978, 1] }) }], opacity: entrances[0] }]}><IndexCard index={index} chartProgress={chartProgress} onDetails={openProgress} /></Animated.View>
         {TODAY_ACTIVITY_KEYS.map((key, activityIndex) => {
           const activity = activities[activityIndex];
           const order = activityIndex + 1;

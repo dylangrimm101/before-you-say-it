@@ -124,7 +124,10 @@ export type PilotModuleState =
   | "transfer_cue"
   | "complete"
   | "microphone_error"
+  | "no_speech"
   | "transcription_error"
+  | "playback_error"
+  | "network_error"
   | "model_error";
 
 export type PilotAttemptKind = "opener" | "response" | "retry";

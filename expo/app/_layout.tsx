@@ -103,6 +103,10 @@ function RootLayoutNav() {
         <Stack.Screen name="custom" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
         <Stack.Screen name="paywall" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
         <Stack.Screen name="purchase-success" options={{ animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="path" />
+        <Stack.Screen name="interrupted/[moduleId]" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="progress/dimension/[signal]" />
+        <Stack.Screen name="progress/how-it-works" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="privacy" />
         <Stack.Screen name="safety" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
