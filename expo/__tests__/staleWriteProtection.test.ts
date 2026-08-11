@@ -209,6 +209,109 @@ describe("adversarial stale and interleaved persistence", () => {
     expect(restored.pilotRuns.scp_notice_pressure_move?.coachNote).toBeUndefined();
   });
 
+  test("keeps an accepted Day 3 observation through an older rejected snapshot and restart", () => {
+    const session = createPresetPracticeSession("anon-day-3-accepted", 100);
+    const base = createPilotDayRun(
+      session,
+      103,
+      200,
+      "stay_clear_under_pushback",
+      "scp_notice_pressure_move",
+      "0.1-review",
+    );
+    const accepted: PilotDayRun = {
+      ...base,
+      state: "ready_for_retry",
+      noteFit: "accepted",
+      coachNote: "You named the pressure move without guessing intent.",
+      retryInstruction: "Name the pressure, then return to your boundary.",
+      updatedAt: 250,
+    };
+    const persisted: ActivePracticeSession = {
+      ...session,
+      pilotRuns: { scp_notice_pressure_move: accepted },
+      updatedAt: 250,
+    };
+    const stale: ActivePracticeSession = {
+      ...persisted,
+      pilotRuns: {
+        scp_notice_pressure_move: {
+          ...accepted,
+          state: "day3_neutral_retry",
+          noteFit: "rejected",
+          coachNote: undefined,
+          retryInstruction: "Replacement instruction from an older snapshot.",
+          updatedAt: 220,
+        },
+      },
+      updatedAt: 220,
+    };
+
+    const restored = roundTrip(protectImmutablePracticeRecords(persisted, stale));
+    expect(restored.pilotRuns.scp_notice_pressure_move?.noteFit).toBe("accepted");
+    expect(restored.pilotRuns.scp_notice_pressure_move?.coachNote).toBe(
+      "You named the pressure move without guessing intent.",
+    );
+    expect(restored.pilotRuns.scp_notice_pressure_move?.retryInstruction).toBe(
+      "Name the pressure, then return to your boundary.",
+    );
+    expect(restored.pilotRuns.scp_notice_pressure_move?.state).toBe("ready_for_retry");
+  });
+
+  test("keeps a newer non-complete post-counterpart checkpoint through a stale capture snapshot", () => {
+    const session = createPresetPracticeSession("anon-interrupted-checkpoint", 100);
+    const laterRun: PilotDayRun = {
+      ...completedRun(session),
+      state: "attempt_comparison",
+      completedAt: undefined,
+      updatedAt: 245,
+    };
+    const persisted: ActivePracticeSession = {
+      ...session,
+      pilotRuns: { [PRACTICE_ID]: laterRun },
+      updatedAt: 245,
+    };
+    const staleRun: PilotDayRun = {
+      ...laterRun,
+      state: "listening_attempt",
+      scenarioContext: {
+        ...laterRun.scenarioContext!,
+        counterpartId: "replacement-counterpart",
+        counterpartName: "Replacement",
+        counterpartLabel: "Replacement · reopened selection",
+      },
+      counterpartTurn: { id: "replacement-turn", text: "A different turn", source: "provider" },
+      counterpartIdentity: "Replacement",
+      counterpartReactionId: "replacement-reaction",
+      resolvedAudioId: "replacement-audio",
+      adamReactionId: "replacement-reaction",
+      adamAudioId: "replacement-audio",
+      coachedBehaviorId: "replacement-behavior",
+      coachedSegment: "opener",
+      retryResetId: "replacement-reset",
+      updatedAt: 210,
+    };
+    const stale: ActivePracticeSession = {
+      ...persisted,
+      pilotRuns: { [PRACTICE_ID]: staleRun },
+      updatedAt: 210,
+    };
+
+    const restored = roundTrip(protectImmutablePracticeRecords(persisted, stale));
+    const run = restored.pilotRuns[PRACTICE_ID]!;
+    expect(run.state).toBe("attempt_comparison");
+    expect(run.scenarioContext).toEqual(laterRun.scenarioContext);
+    expect(run.counterpartTurn).toEqual(laterRun.counterpartTurn);
+    expect(run.counterpartIdentity).toBe(laterRun.counterpartIdentity);
+    expect(run.counterpartReactionId).toBe(laterRun.counterpartReactionId);
+    expect(run.resolvedAudioId).toBe(laterRun.resolvedAudioId);
+    expect(run.adamReactionId).toBe(laterRun.adamReactionId);
+    expect(run.adamAudioId).toBe(laterRun.adamAudioId);
+    expect(run.coachedBehaviorId).toBe(laterRun.coachedBehaviorId);
+    expect(run.coachedSegment).toBe(laterRun.coachedSegment);
+    expect(run.retryResetId).toBe(laterRun.retryResetId);
+  });
+
   test("is idempotent, preserves unrelated practices, and creates no scored Progress records", () => {
     const existing = persistedSession();
     const once = protectImmutablePracticeRecords(existing, staleSession(existing));

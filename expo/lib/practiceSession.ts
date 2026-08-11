@@ -379,6 +379,11 @@ function protectPilotDayRun(existing: PilotDayRun, incoming: PilotDayRun): Pilot
     ...(existing.comparison ? { comparison: existing.comparison } : {}),
     ...(existing.completedAt ? { completedAt: existing.completedAt } : {}),
     ...(isStale || existing.state === "complete" ? { state: existing.state } : {}),
+    ...(isStale ? {
+      noteFit: existing.noteFit,
+      coachNote: existing.coachNote,
+      retryInstruction: existing.retryInstruction,
+    } : {}),
     ...(hasRejectedNoteTombstone ? { noteFit: "rejected" as const, coachNote: undefined } : {}),
   };
 }
@@ -388,7 +393,7 @@ export function upsertPilotDayRun(session: ActivePracticeSession, incoming: Pilo
   const runKey = incoming.practiceId ?? incoming.moduleId ?? String(incoming.day);
   const existing = session.pilotRuns[runKey];
   const protectedRun: PilotDayRun = existing
-    ? { ...protectPilotDayRun(existing, incoming), updatedAt: now }
+    ? protectPilotDayRun(existing, { ...incoming, updatedAt: now })
     : { ...incoming, updatedAt: now };
   return {
     ...session,
