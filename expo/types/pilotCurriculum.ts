@@ -1,3 +1,5 @@
+import type { CategoryId, Difficulty, ReactionPattern } from "@/types/convo";
+
 export type PilotBehaviorId =
   | "baseline_integrity"
   | "conversation_job"
@@ -140,6 +142,28 @@ export interface PilotAttemptRecord {
   confirmedAt: number;
 }
 
+/** Immutable scenario identity carried by the canonical paid-practice run. */
+export interface ScenarioPracticeContext {
+  scenarioId: string;
+  category: CategoryId;
+  title: string;
+  situation: string;
+  objective: string;
+  difficulty: Difficulty;
+  reaction: ReactionPattern;
+  counterpartId: string;
+  counterpartName: string;
+  counterpartLabel: string;
+  counterpartRole: string;
+}
+
+/** One authored or provider-generated pressure turn reused for the retry. */
+export interface ScenarioCounterpartTurn {
+  id: string;
+  text: string;
+  source: "provider" | "authored";
+}
+
 export interface PilotDayRun {
   id: string;
   moduleId?: import("@/constants/modules").ModuleId;
@@ -147,6 +171,9 @@ export interface PilotDayRun {
   curriculumVersion: string;
   state: PilotModuleState;
   scenarioMode: "preset" | "carried_context";
+  /** Present only when a scenario enters this canonical paid-practice run. */
+  scenarioContext?: ScenarioPracticeContext;
+  counterpartTurn?: ScenarioCounterpartTurn;
   lessonIndex: number;
   quizChoice?: "A" | "B";
   attempt?: PilotAttemptRecord;

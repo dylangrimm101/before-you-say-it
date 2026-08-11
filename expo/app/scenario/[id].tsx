@@ -16,8 +16,9 @@ import {
 import { CATEGORIES, DIFFICULTY } from "@/constants/scenarios";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { canStartRehearsal } from "@/lib/access";
+import { createScenarioPracticeRun } from "@/lib/scenarioPractice";
 import { useStore } from "@/providers/store";
-import type { Difficulty } from "@/types/convo";
+import type { Difficulty, ReactionPattern } from "@/types/convo";
 
 const LEVELS: Difficulty[] = ["gentle", "steady", "challenging"];
 
@@ -26,10 +27,11 @@ export default function ScenarioBrief() {
     id: string;
     level?: Difficulty;
     challengeDay?: string;
+    reaction?: ReactionPattern;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { findScenario, profile, access } = useStore();
+  const { findScenario, profile, access, saveActiveScenarioRun } = useStore();
   const [level, setLevel] = useState<Difficulty>(
     (params.level as Difficulty) ?? "steady",
   );
@@ -52,7 +54,7 @@ export default function ScenarioBrief() {
   const category = CATEGORIES.find((item) => item.id === scenario.category);
   const accent = category?.accent ?? C.purple;
 
-  const start = (): void => {
+  const start = async (): Promise<void> => {
     const decision = canStartRehearsal(access);
     if (!decision.allowed) {
       router.push({
@@ -62,12 +64,20 @@ export default function ScenarioBrief() {
       return;
     }
 
+    const runId = `scenario-${scenario.id}-${Date.now().toString(36)}`;
+    await saveActiveScenarioRun(createScenarioPracticeRun(
+      scenario,
+      level,
+      params.reaction ?? profile?.reaction ?? "not-sure",
+      runId,
+    ));
     router.push({
       pathname: "/rehearse/[id]",
       params: {
         id: scenario.id,
         difficulty: level,
-        reaction: profile?.reaction ?? "not-sure",
+        reaction: params.reaction ?? profile?.reaction ?? "not-sure",
+        scenarioRunId: runId,
         ...(params.challengeDay ? { challengeDay: params.challengeDay } : {}),
       },
     });
@@ -174,7 +184,7 @@ export default function ScenarioBrief() {
       </ScrollView>
 
       <StateDock bottomInset={insets.bottom}>
-        <PrimaryButton label="Start the rehearsal" onPress={start} />
+        <PrimaryButton label="Start the rehearsal" onPress={() => void start()} />
       </StateDock>
     </View>
   );

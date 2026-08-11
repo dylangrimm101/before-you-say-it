@@ -32,6 +32,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RehearsalBriefing } from "@/components/RehearsalBriefing";
+import { ScenarioPaidPractice } from "@/components/ScenarioPaidPractice";
 import {
   Backdrop,
   Meter,
@@ -120,7 +121,17 @@ type DockState =
   | "ready"
   | "text";
 
-export default function Rehearse() {
+export default function RehearseRoute() {
+  const params = useLocalSearchParams<{ id: string; entry?: "onboarding"; scenarioRunId?: string }>();
+  const { findScenario } = useStore();
+  const scenario = findScenario(String(params.id));
+  if (params.entry !== "onboarding" && scenario) {
+    return <ScenarioPaidPractice scenario={scenario} requestedRunId={params.scenarioRunId} />;
+  }
+  return <LegacyRehearse />;
+}
+
+function LegacyRehearse() {
   const params = useLocalSearchParams<{
     id: string;
     difficulty?: Difficulty;
