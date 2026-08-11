@@ -25,6 +25,7 @@ import {
 } from "@/lib/progress";
 import { useIsPro } from "@/lib/purchases";
 import { errorShape, safeLog } from "@/lib/redact";
+import { appendScoredPracticeRecord, normalizeScoredPracticeHistory, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
 import { cancelChallengeNudge, cancelDailyReminder, requestReminderPermission, syncChallengeNudge } from "@/lib/reminders";
 import { capRecords, migrateSessions } from "@/lib/sessionMigration";
 import {
@@ -50,6 +51,7 @@ const KEYS = {
   freeze: "cc.freeze.v1",
   consent: "cc.consent.v1",
   pilotProgress: "cc.pilotProgress.v1",
+  scoredPracticeHistory: "cc.scoredPracticeHistory.v1",
   anonymousUserId: "cc.anonymousUserId.v1",
   activePracticeSession: "cc.activePracticeSession.v1",
   nativeJourneyStarted: "cc.nativeJourneyStarted.v1",
@@ -91,6 +93,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
   const [consent, setConsent] = useState<ConsentState>(DEFAULT_CONSENT);
   const [migrationNotice, setMigrationNotice] = useState<boolean>(false);
   const [pilotProgress, setPilotProgress] = useState<PilotProgressEntry[]>([]);
+  const [scoredPracticeHistory, setScoredPracticeHistory] = useState<ScoredPracticeRecord[]>([]);
   const [anonymousUserId, setAnonymousUserId] = useState<string>("");
   const [activePracticeSession, setActivePracticeSession] = useState<ActivePracticeSession | null>(null);
   const [nativeJourneyStarted, setNativeJourneyStarted] = useState<boolean>(false);
@@ -100,7 +103,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     let alive = true;
     const load = async () => {
       try {
-        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, anonymousId, practiceSession, journeyStarted, dp] = await Promise.all([
+        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, journeyStarted, dp] = await Promise.all([
           AsyncStorage.getItem(KEYS.profile),
           AsyncStorage.getItem(KEYS.sessions),
           AsyncStorage.getItem(KEYS.sessionsLegacy),
@@ -111,6 +114,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           AsyncStorage.getItem(KEYS.freeze),
           AsyncStorage.getItem(KEYS.consent),
           AsyncStorage.getItem(KEYS.pilotProgress),
+          AsyncStorage.getItem(KEYS.scoredPracticeHistory),
           AsyncStorage.getItem(KEYS.anonymousUserId),
           AsyncStorage.getItem(KEYS.activePracticeSession),
           AsyncStorage.getItem(KEYS.nativeJourneyStarted),
@@ -210,6 +214,15 @@ export const [StoreProvider, useStore] = createContextHook(() => {
             if (JSON.stringify(valid) !== JSON.stringify(migrated)) {
               await AsyncStorage.setItem(KEYS.pilotProgress, JSON.stringify(migrated));
             }
+          }
+        }
+        if (scoredHistory) {
+          const parsedHistory = JSON.parse(scoredHistory) as unknown;
+          const normalizedHistory = normalizeScoredPracticeHistory(parsedHistory);
+          setScoredPracticeHistory(normalizedHistory);
+          if (JSON.stringify(parsedHistory) !== JSON.stringify(normalizedHistory)) {
+            if (normalizedHistory.length > 0) await AsyncStorage.setItem(KEYS.scoredPracticeHistory, JSON.stringify(normalizedHistory));
+            else await AsyncStorage.removeItem(KEYS.scoredPracticeHistory);
           }
         }
         setMigrationNotice(needsMigrationNotice(storedConsent, removedContent));
@@ -442,6 +455,24 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     requestReminderPermission().catch(() => {});
   }, []);
 
+  /** Persists one immutable scored result; duplicate rehearsal IDs are idempotent. */
+  const saveScoredPracticeRecord = useCallback(async (record: ScoredPracticeRecord | null): Promise<void> => {
+    if (!record) return;
+    let snapshot: ScoredPracticeRecord[] = [];
+    let changed = false;
+    setScoredPracticeHistory((previous) => {
+      snapshot = appendScoredPracticeRecord(previous, record);
+      changed = snapshot.length !== previous.length;
+      return snapshot;
+    });
+    if (!changed) return;
+    try {
+      await AsyncStorage.setItem(KEYS.scoredPracticeHistory, JSON.stringify(snapshot));
+    } catch (e) {
+      safeLog("[store] scored practice save failed", errorShape(e));
+    }
+  }, []);
+
   /** Wipe everything this app has stored on the device. */
   const reset = useCallback(async () => {
     setProfile(null);
@@ -454,6 +485,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     setConsent(DEFAULT_CONSENT);
     setMigrationNotice(false);
     setPilotProgress([]);
+    setScoredPracticeHistory([]);
     setActivePracticeSession(null);
     setNativeJourneyStarted(false);
     clearLiveSessionContent();
@@ -472,6 +504,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         KEYS.freeze,
         KEYS.consent,
         KEYS.pilotProgress,
+        KEYS.scoredPracticeHistory,
         KEYS.activePracticeSession,
         KEYS.nativeJourneyStarted,
         KEYS.anonymousUserId,
@@ -718,6 +751,8 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     currentChallengeDay,
     markChallengeDayDone,
     pilotProgress,
+    scoredPracticeHistory,
+    saveScoredPracticeRecord,
     pilotDoneDays,
     modularDoneIds,
     anonymousUserId,

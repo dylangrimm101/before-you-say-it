@@ -66,6 +66,7 @@ import { approvedUserTurn, buildFreeJourneyResult, recognizerEndState, shouldGen
 import { setLiveSessionContent } from "@/lib/ephemeral";
 import { preserveFreeRehearsalArtifact } from "@/lib/practiceSession";
 import { errorShape, safeLog } from "@/lib/redact";
+import { createScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
 import {
   initialRehearsalState,
   renderCounterpartMessage,
@@ -139,6 +140,7 @@ export default function Rehearse() {
     access,
     activePracticeSession,
     saveActivePracticeSession,
+    saveScoredPracticeRecord,
   } = useStore();
   const challengeDay = params.challengeDay ? Number(params.challengeDay) : null;
 
@@ -232,6 +234,7 @@ export default function Rehearse() {
    */
   // The onboarding rehearsal is always the same concise two-turn experience,
   // even when a preview build has Pro access enabled for testing later flows.
+  const isPaidScenario = params.entry !== "onboarding";
   const turnCap = params.entry === "onboarding"
     ? FREE_REHEARSAL_USER_TURNS
     : rehearsalTurnCap(access.entitlement);
@@ -525,7 +528,16 @@ export default function Rehearse() {
           freeJourneyCheckpoint: "pressure_moment" as const,
           updatedAt: Date.now(),
         };
-        await saveActivePracticeSession({ ...withRecommendation, sharedResult: buildFreeJourneyResult(withRecommendation, debrief) });
+        const completedAt = Date.now();
+        const sharedResult = buildFreeJourneyResult(withRecommendation, debrief);
+        await saveActivePracticeSession({ ...withRecommendation, sharedResult });
+        const approvedTextByTurnId = new Map(approvedTurns.map((turn) => [turn.id, turn.text]));
+        await saveScoredPracticeRecord(createScoredPracticeRecord(sharedResult, {
+          completedAt,
+          scenarioId: scenario.id,
+          scenarioTitle: scenario.isCustom ? "Your conversation" : scenario.title,
+          approvedTextByTurnId,
+        }));
       }
 
       const record: SessionRecord = {
@@ -544,7 +556,7 @@ export default function Rehearse() {
       safeLog("[rehearse] debrief failed", errorShape(caught));
       failConversionBuild(id);
     }
-  }, [scenario, difficulty, reaction, outcome, upsertSession, router, challengeDay, markChallengeDayDone, persona, themName, params.entry, activePracticeSession, saveActivePracticeSession]);
+  }, [scenario, difficulty, reaction, outcome, upsertSession, router, challengeDay, markChallengeDayDone, persona, themName, params.entry, activePracticeSession, saveActivePracticeSession, saveScoredPracticeRecord]);
 
   const openTranscriptReview = useCallback((): void => {
     const userTurns = turns.filter((turn) => turn.role === "user");
@@ -688,7 +700,7 @@ export default function Rehearse() {
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerCenter}>
-            <Text style={[eyebrow, styles.headerMeta]}>{turnCap !== null ? "FREE REHEARSAL" : "LIVE REHEARSAL"}</Text>
+            <Text style={[eyebrow, styles.headerMeta]}>{isPaidScenario ? "SCENARIO REHEARSAL" : "FREE REHEARSAL"}</Text>
             <Text style={styles.headerName} numberOfLines={1}>{themName}</Text>
           </View>
           <PressCard onPress={leave} disabled={closing} accessibilityLabel="End rehearsal">
@@ -737,13 +749,14 @@ export default function Rehearse() {
 
           {turns.map((t) =>
             t.role === "user" ? (
-              <Line key={t.id} mine text={t.text} speaker="You" />
+              <Line key={t.id} mine text={t.text} speaker="You" paidMode={isPaidScenario} />
             ) : (
               <View key={t.id}>
                 <Line
                   text={t.text}
                   speaker={themName}
                   counterpart={themName}
+                  paidMode={isPaidScenario}
                 />
                 {t.nudge ? <Nudge text={t.nudge} /> : null}
               </View>
@@ -756,6 +769,7 @@ export default function Rehearse() {
               speaker={themName}
               counterpart={themName}
               streaming
+              paidMode={isPaidScenario}
             />
           ) : null}
           {thinking ? (
@@ -1180,12 +1194,14 @@ function Line({
   speaker,
   counterpart,
   streaming = false,
+  paidMode = false,
 }: {
   text: string;
   mine?: boolean;
   speaker: string;
   counterpart?: string;
   streaming?: boolean;
+  paidMode?: boolean;
 }) {
   // Counterpart text always goes through the renderer, so beats read as natural
   // sentences and no transport artifact can reach the screen.
@@ -1213,6 +1229,7 @@ function Line({
     <Animated.View
       style={[
         mine ? styles.mineWrap : styles.themWrap,
+        paidMode ? (mine ? styles.paidMineWrap : styles.paidThemWrap) : null,
         mine
           ? {
               opacity: arrival,
@@ -1365,6 +1382,8 @@ const styles = StyleSheet.create({
 
   themWrap: { marginBottom: 22 },
   mineWrap: { marginBottom: 22 },
+  paidThemWrap: { borderRadius: radius.lg, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(255,255,255,0.78)", padding: 18 },
+  paidMineWrap: { borderRadius: radius.lg, borderWidth: 1, borderColor: "rgba(81,40,136,0.14)", backgroundColor: C.purpleSoft, padding: 16, marginLeft: 26 },
   speaker: { ...eyebrow, color: C.dim, marginBottom: 7 },
   /** The counterpart reads largest — it is the thing to react to. */
   themText: { ...T.title, fontSize: 20, lineHeight: 30, fontFamily: font.medium },

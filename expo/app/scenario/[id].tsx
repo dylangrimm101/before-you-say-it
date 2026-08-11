@@ -1,13 +1,12 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Check, Target, UserRound } from "lucide-react-native";
+import { Check, Target, UserRound } from "lucide-react-native";
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { PaidHeader, ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
 import {
   Backdrop,
-  Eyebrow,
-  GlassCard,
   PressCard,
   PrimaryButton,
   Reveal,
@@ -85,43 +84,37 @@ export default function ScenarioBrief() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <PressCard
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-        >
-          <ArrowLeft size={22} color={C.textSoft} strokeWidth={1.7} />
-        </PressCard>
+        <PaidHeader title="Scenario briefing" onBack={() => router.back()} />
 
         <Reveal index={0}>
-          <Eyebrow color={accent}>{category?.label ?? "Rehearsal"}</Eyebrow>
+          <StatusPill label={category?.label ?? "Rehearsal"} tone="purple" />
           <Text style={styles.title}>{scenario.title}</Text>
         </Reveal>
 
         <Reveal index={1}>
-          <GlassCard style={styles.detailCard}>
+          <ProductCard accent style={styles.detailCard}>
             <View style={styles.cardHeading}>
               <UserRound size={20} color={accent} strokeWidth={1.7} />
               <Text style={styles.cardEyebrow}>You’ll be talking to</Text>
             </View>
             <Text style={styles.counterpart}>{scenario.counterpart}</Text>
             <Text style={styles.situation}>{scenario.situation}</Text>
-          </GlassCard>
+          </ProductCard>
         </Reveal>
 
         <Reveal index={2}>
-          <GlassCard style={styles.detailCard}>
+          <ProductCard accent style={styles.detailCard}>
             <View style={styles.cardHeading}>
               <Target size={20} color={accent} strokeWidth={1.7} />
               <Text style={styles.cardEyebrow}>Your objective</Text>
             </View>
             <Text style={styles.goal}>{scenario.goal}</Text>
-          </GlassCard>
+          </ProductCard>
         </Reveal>
 
         <Reveal index={3}>
           <View style={styles.difficultyHeading}>
-            <Eyebrow>Practice difficulty</Eyebrow>
+            <SectionLabel>Practice difficulty</SectionLabel>
             <Text style={styles.difficultySupport}>
               Choose how much resistance you want from {scenario.counterpart}.
             </Text>
@@ -199,17 +192,6 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: GUTTER,
     paddingBottom: 32,
-  },
-  backButton: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    borderColor: C.glassEdge,
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: "center",
-    marginBottom: 24,
-    width: 44,
   },
   title: {
     ...T.display,
