@@ -79,26 +79,53 @@ describe("approved onboarding scenario source", () => {
   });
 });
 
-describe("onboarding visual hierarchy", () => {
-  test("reuses the Today field, card geometry, stack spacing, and semantic colors", async () => {
+describe("onboarding question deck", () => {
+  test("keeps every visited question mounted as a contained 12 px pinned stack", async () => {
     const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
     expect(onboarding).toContain("<Backdrop />");
     expect(onboarding).not.toContain("<LinearGradient");
-    expect(onboarding).toContain("QUESTION_STACK_LAYERS.slice");
-    expect(onboarding).toContain("styles.stackedSheet");
-    expect(onboarding).toContain("marginHorizontal: 20");
-    expect(onboarding).toContain("borderRadius: 28");
-    expect(onboarding).toContain("layer * 12");
-    expect(onboarding).toContain("backgroundColor: C.onAccent");
-    expect(onboarding).toContain("choiceTitle: { fontFamily: font.semi, fontSize: 17, lineHeight: 23, color: C.text }");
-    expect(onboarding).toContain("choiceNote: { ...T.support, color: C.textSoft }");
+    expect(onboarding).toContain("Array.from({ length: step + 1 }");
+    expect(onboarding).toContain("top: 6 + cardStep * 12");
+    expect(onboarding).toContain("zIndex: (cardStep + 1) * 10");
+    expect(onboarding).toContain('questionDeck: { flex: 1, position: "relative", marginHorizontal: 20 }');
+    expect(onboarding).toContain('questionCard: { position: "absolute", left: 0, right: 0, bottom: 0, borderRadius: 28');
+    expect(onboarding).toContain('borderColor: "rgba(81,40,136,0.16)"');
+    expect(onboarding).toContain('boxShadow: "0 1px 2px rgba(40,26,66,0.05), 0 10px 26px rgba(40,26,66,0.10), 0 30px 60px rgba(40,26,66,0.10)"');
+    expect(onboarding).toContain('aria-hidden={disabled}');
+    expect(onboarding).toContain('importantForAccessibility={disabled ? "no-hide-descendants" : "auto"}');
+    expect(onboarding).toContain("scrollEnabled={!disabled}");
+  });
+
+  test("uses compact card type and explicit circular selection markers", async () => {
+    const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
+    expect(onboarding).toContain('cardEyebrow: { ...eyebrow, color: C.dim');
+    expect(onboarding).toContain('fontSize: 25, lineHeight: 30, letterSpacing: -0.45');
+    expect(onboarding).toContain('fontSize: 14, lineHeight: 21, color: C.textSoft');
+    expect(onboarding).toContain('fontSize: 15, lineHeight: 20.25, color: C.text');
+    expect(onboarding).toContain('borderRadius: 16');
+    expect(onboarding).toContain('width: 19, height: 19, borderRadius: 10, borderWidth: 1.5');
+    expect(onboarding).toContain('<Text style={styles.markerCheck}>✓</Text>');
+    expect(onboarding).not.toContain("<SelectionWipe");
+  });
+
+  test("confirms selections before reversible deck motion and honors reduced motion", async () => {
+    const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
+    expect(onboarding).toContain("const DECK_DURATION = 430");
+    expect(onboarding).toContain("const SELECTION_CONFIRMATION_MS = 140");
+    expect(onboarding).toContain("Easing.bezier(0.22, 0.9, 0.28, 1)");
+    expect(onboarding).toContain('direction: "forward"');
+    expect(onboarding).toContain('direction: "back"');
+    expect(onboarding).toContain("screenHeight * 0.92");
+    expect(onboarding).toContain("screenHeight * 0.96");
+    expect(onboarding).toContain("outputRange: [1, 0.988]");
+    expect(onboarding).toContain("isReduced ? 0 : SELECTION_CONFIRMATION_MS");
   });
 });
 
 describe("three entrances converge into the shared context and engine", () => {
   test("real conversation bypasses the picker and preserves supplied context", async () => {
     const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
-    expect(onboarding).toContain("!isReal && step === 2");
+    expect(onboarding).toContain("!isReal && cardStep === 2");
     expect(onboarding).toContain("scenarioSource: approved ? \"approved_authored\" : \"user_supplied\"");
     expect(onboarding).toContain("counterpart: selectedCounterpart");
     expect(onboarding).toContain("situation: description");
