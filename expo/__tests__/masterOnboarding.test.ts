@@ -1,14 +1,16 @@
 import { describe, expect, test } from "bun:test";
 
+import { DESIRED_SHIFTS, DESIRED_SKILLS, PRESSURE_CONDITIONS, RECURRING_PROBLEMS } from "@/constants/modules";
 import {
   APPROVED_ONBOARDING_SCENARIOS,
+  approvedScenarioForContext,
   behavioralGoal,
   expectedReactionLabel,
   personaForContext,
   scenarioFromApproved,
 } from "@/constants/onboardingScenarios";
-import { normalizePracticeSession, preserveFreeRehearsalArtifact } from "@/lib/practiceSession";
-import type { Turn } from "@/types/convo";
+import { createOnboardingPracticeSession, normalizePracticeSession, preserveFreeRehearsalArtifact } from "@/lib/practiceSession";
+import type { ReactionPattern, Scenario, Turn } from "@/types/convo";
 
 const expectedContexts = ["Work", "Partner or co-parent", "Family member", "Friend"];
 
@@ -92,6 +94,11 @@ describe("bounded native onboarding deck", () => {
     for (const reset of ["setModuleId(null)", "setSelectionLabel(\"\")", "setFocus(null)", "setReaction(null)", "setSituation(\"\")", "setOutcome(\"\")"]) {
       expect(onboarding).toContain(reset);
     }
+    expect(onboarding).toContain('setModuleId(nextModuleId); setSelectionLabel(label); setReaction(null); setFocus(null)');
+    expect(onboarding).toContain('setSituation(\"\"); setOutcome(\"\"); setReaction(null)');
+    expect(onboarding).toContain('setSituation(value); setOutcome(\"\"); setReaction(null)');
+    expect(onboarding).toContain('setOutcome(value); setReaction(null)');
+    expect(onboarding).toContain('animateTo(Math.max(0, step - 1), "back")');
   });
 });
 
@@ -124,6 +131,123 @@ describe("the three entry routes use the web question graph", () => {
   test("keeps route goals observable and behavioral", () => {
     expect(behavioralGoal("desired_skill", "get_to_the_point")).toBe("Organize your thoughts and get to the point.");
     expect(expectedReactionLabel("turns-back")).toContain("turn it back");
+  });
+});
+
+describe("complete onboarding route walkthroughs", () => {
+  test("Route A carries context, situation, outcome, reaction, and Hope into rehearsal", () => {
+    const situation = "My friend keeps postponing repayment, and I need to ask for a firm date.";
+    const outcome = "Say the request clearly";
+    const persona = personaForContext("friends");
+    const scenario: Scenario = {
+      id: "onboarding-route-a",
+      category: "friends",
+      title: "Your conversation",
+      counterpart: "Hope",
+      situation,
+      persona: "Play the learner’s friend in this exact in-person situation.",
+      goal: outcome,
+      opensWith: "user",
+      openingLine: "",
+      minutes: 5,
+      isCustom: true,
+      counterpartGender: "woman",
+    };
+
+    const session = createOnboardingPracticeSession("route-a-session", "anon-a", scenario, outcome, "turns-back", 100, {
+      entryRoute: "real_conversation",
+      scenarioSource: "user_supplied",
+      scenarioTitle: scenario.title,
+      counterpartRelationship: "Friend",
+      counterpartDisplayLabel: scenario.counterpart,
+      behavioralGoal: behavioralGoal("real_conversation", undefined, outcome),
+      persona,
+    });
+
+    expect(session).toMatchObject({
+      scenarioId: "onboarding-route-a",
+      category: "friends",
+      topic: situation,
+      usefulOutcome: outcome,
+      expectedReaction: "turns-back",
+      entryRoute: "real_conversation",
+      scenarioSource: "user_supplied",
+      counterpartRelationship: "Friend",
+      counterpartDisplayLabel: "Hope",
+      behavioralGoal: outcome,
+      persona: "woman-hope",
+      freeJourneyCheckpoint: "briefing",
+    });
+  });
+
+  test("Route B carries the revised shift and Family authored scenario into rehearsal", () => {
+    const problem = RECURRING_PROBLEMS.find((item) => item.moduleId === "start_the_conversation")!;
+    const shift = DESIRED_SHIFTS.find((item) => item.moduleId === "stay_clear_under_pushback")!;
+    const approved = approvedScenarioForContext("family")!;
+    const persona = personaForContext("family");
+    const scenario = scenarioFromApproved(approved, persona);
+    const session = createOnboardingPracticeSession("route-b-session", "anon-b", scenario, approved.desiredOutcome, "not-sure", 200, {
+      entryRoute: "recurring_problem",
+      provisionalModuleId: shift.moduleId,
+      selectionLabel: shift.label,
+      scenarioSource: "approved_authored",
+      scenarioTitle: scenario.title,
+      counterpartRelationship: approved.counterpartRelationship,
+      counterpartDisplayLabel: scenario.counterpart,
+      behavioralGoal: behavioralGoal("recurring_problem", shift.moduleId),
+      persona,
+    });
+
+    expect(problem.label).toContain("starting hard conversations");
+    expect(session).toMatchObject({
+      scenarioId: "approved-family-comments",
+      category: "family",
+      expectedReaction: "not-sure",
+      entryRoute: "recurring_problem",
+      provisionalModuleId: "stay_clear_under_pushback",
+      selectionLabel: "Stay with my point after pushback",
+      scenarioSource: "approved_authored",
+      counterpartRelationship: "Sister",
+      counterpartDisplayLabel: "Hope",
+      behavioralGoal: "Stay with the point after pushback.",
+      persona: "woman-hope",
+      freeJourneyCheckpoint: "briefing",
+    });
+  });
+
+  test("Route C carries the chosen skill, pressure reaction, and Work authored scenario into rehearsal", () => {
+    const skill = DESIRED_SKILLS.find((item) => item.moduleId === "get_to_the_point")!;
+    const pressure = PRESSURE_CONDITIONS.find((item) => item.reaction === "turns-back")!;
+    const approved = approvedScenarioForContext("work")!;
+    const persona = personaForContext("work");
+    const scenario = scenarioFromApproved(approved, persona);
+    const reaction = pressure.reaction as ReactionPattern;
+    const session = createOnboardingPracticeSession("route-c-session", "anon-c", scenario, approved.desiredOutcome, reaction, 300, {
+      entryRoute: "desired_skill",
+      provisionalModuleId: skill.moduleId,
+      selectionLabel: pressure.label,
+      scenarioSource: "approved_authored",
+      scenarioTitle: scenario.title,
+      counterpartRelationship: approved.counterpartRelationship,
+      counterpartDisplayLabel: scenario.counterpart,
+      behavioralGoal: behavioralGoal("desired_skill", skill.moduleId),
+      persona,
+    });
+
+    expect(session).toMatchObject({
+      scenarioId: "approved-work-combative",
+      category: "work",
+      expectedReaction: "turns-back",
+      entryRoute: "desired_skill",
+      provisionalModuleId: "get_to_the_point",
+      selectionLabel: "They turn the issue back on me",
+      scenarioSource: "approved_authored",
+      counterpartRelationship: "Work colleague",
+      counterpartDisplayLabel: "Adam",
+      behavioralGoal: "Organize your thoughts and get to the point.",
+      persona: "man-adam",
+      freeJourneyCheckpoint: "briefing",
+    });
   });
 });
 
