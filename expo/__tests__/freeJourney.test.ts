@@ -298,13 +298,16 @@ describe("Claude Design free journey contract", () => {
     expect(source).toContain('accessibilityLabel="How BYSI read this"');
   });
 
-  test("the approved opening framing and CTA remain byte-for-byte present", async () => {
-    const source = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
-    expect(source).toContain("Build the qualities of world-class communicators.");
-    expect(source).toContain("Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.");
-    expect(source).toContain('label="Build my communication skills"');
-    expect(source).toContain("<ConversationMark />");
-    expect(source).toContain('accessibilityLabel="Two people having a conversation"');
-    expect(source).not.toContain("<Text style={styles.markText}>BYSI</Text>");
+  test("the approved opening framing is the first account gateway", async () => {
+    const entry = await Bun.file(`${import.meta.dir}/../app/entry.tsx`).text();
+    const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
+    expect(entry).toContain("Build the qualities of world-class communicators.");
+    expect(entry).toContain("Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.");
+    expect(entry).toContain('label="Sign up now"');
+    expect(entry).toContain('label="Log in"');
+    expect(entry).toContain("<ConversationMark />");
+    expect(entry).toContain('accessibilityLabel="Two people having a conversation"');
+    expect(onboarding).toContain("useState<number>(0)");
+    expect(entry).not.toContain("<Text style={styles.markText}>BYSI</Text>");
   });
 });

@@ -6,24 +6,33 @@ import { calculatePartialStartingIndex, type SharedSignalV1 } from "@/types/shar
 const source = async (relative: string): Promise<string> => Bun.file(`${import.meta.dir}/../${relative}`).text();
 
 describe("remaining native acquisition and paid experience", () => {
-  test("fresh installations route to Entry and the primary action begins the frozen onboarding", async () => {
+  test("fresh installations see the world-class communication gateway before onboarding", async () => {
     const layout = await source("app/_layout.tsx");
     const entry = await source("app/entry.tsx");
+    const onboarding = await source("app/onboarding.tsx");
     expect(layout).toContain('router.replace("/entry")');
     expect(layout).toContain("!hasLocalJourney");
-    expect(entry).toContain("Start my free rehearsal");
+    expect(entry).toContain("Build the qualities of world-class communicators.");
+    expect(entry).toContain('label="Sign up now"');
+    expect(entry).toContain('label="Log in"');
     expect(entry).toContain("await beginNativeJourney()");
     expect(entry).toContain('router.replace("/onboarding")');
+    expect(onboarding).toContain("useState<number>(0)");
   });
 
-  test("locally resumable people bypass Entry while account continuation remains truthful", async () => {
+  test("existing web customers authenticate and reconnect their paid identity", async () => {
     const layout = await source("app/_layout.tsx");
     const continuation = await source("app/continue-from-web.tsx");
-    expect(layout).toContain("profile || activePracticeSession || nativeJourneyStarted");
+    const auth = await source("providers/auth.tsx");
+    const purchases = await source("lib/purchases.ts");
+    expect(layout).toContain("user || profile || activePracticeSession || nativeJourneyStarted");
     expect(layout).toContain("activePracticeSession?.sharedResult");
-    expect(continuation).toContain("not connected yet");
-    expect(continuation).toContain("No identity was created");
-    expect(continuation).not.toContain("signIn(");
+    expect(layout).toContain("<AuthProvider>");
+    expect(continuation).toContain("Use the same account you used on the web");
+    expect(continuation).toContain("await login(email, password)");
+    expect(auth).toContain("supabase.auth.signInWithPassword");
+    expect(auth).toContain("identifyPurchasesUser");
+    expect(purchases).toContain("sdk.logIn(normalizedUserId)");
   });
 
   test("an existing entitlement continues through the current access source of truth", async () => {

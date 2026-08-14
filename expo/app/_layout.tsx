@@ -11,6 +11,7 @@ import { LaunchExperience } from "@/components/LaunchExperience";
 import { MigrationNotice } from "@/components/MigrationNotice";
 import { C, FONT_ASSETS } from "@/constants/theme";
 import "@/lib/purchases";
+import { AuthProvider, useAuth } from "@/providers/auth";
 import { StoreProvider, useStore } from "@/providers/store";
 
 // Expo Go does not always have a splash screen registered for the current view
@@ -24,6 +25,7 @@ let hasPresentedLaunch = false;
 
 function RootLayoutNav() {
   const { hydrated, profile, activePracticeSession, nativeJourneyStarted, migrationNotice, dismissMigrationNotice } = useStore();
+  const { isAuthLoading, user } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const [showLaunch, setShowLaunch] = useState<boolean>(() => {
@@ -35,7 +37,7 @@ function RootLayoutNav() {
   // A missing font file must not keep the app on a blank screen, so a load
   // failure falls through to the system face rather than blocking startup.
   const [fontsLoaded, fontError] = useFonts(FONT_ASSETS);
-  const ready = hydrated && (fontsLoaded || fontError !== null);
+  const ready = hydrated && !isAuthLoading && (fontsLoaded || fontError !== null);
 
   useEffect(() => {
     if (!ready) return;
@@ -44,12 +46,12 @@ function RootLayoutNav() {
     const onboarding = firstSegment === "onboarding";
     const entry = firstSegment === "entry";
     const continuation = firstSegment === "continue-from-web";
-    const hasLocalJourney = Boolean(profile || activePracticeSession || nativeJourneyStarted);
+    const hasLocalJourney = Boolean(user || profile || activePracticeSession || nativeJourneyStarted);
     if (!hasLocalJourney && !entry && !continuation) {
       router.replace("/entry");
       return;
     }
-    if (hasLocalJourney && !profile && !activePracticeSession && !onboarding && !entry && !continuation) {
+    if (!user && hasLocalJourney && !profile && !activePracticeSession && !onboarding && !entry && !continuation) {
       router.replace("/onboarding");
       return;
     }
@@ -70,7 +72,7 @@ function RootLayoutNav() {
       };
       router.replace({ pathname: "/rehearse/[id]", params: sharedParams });
     }
-  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router]);
+  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user]);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
 
@@ -121,11 +123,13 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreProvider>
-        <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }}>
-          <RootLayoutNav />
-        </GestureHandlerRootView>
-      </StoreProvider>
+      <AuthProvider>
+        <StoreProvider>
+          <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }}>
+            <RootLayoutNav />
+          </GestureHandlerRootView>
+        </StoreProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

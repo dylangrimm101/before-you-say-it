@@ -1,19 +1,34 @@
 import { useRouter } from "expo-router";
-import { ArrowRight, MessageCircleMore, Sparkles } from "lucide-react-native";
 import React, { useCallback } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Circle, Path, Rect } from "react-native-svg";
 
-import { Backdrop, Eyebrow, GhostButton, HeroSurface, PrimaryButton, Reveal } from "@/components/ui";
-import { C, GUTTER, T, font, radius } from "@/constants/theme";
+import { Backdrop, GhostButton, PrimaryButton, Reveal } from "@/components/ui";
+import { C, GUTTER, T, font } from "@/constants/theme";
 import { useStore } from "@/providers/store";
 
-export default function EntryScreen() {
+function ConversationMark(): React.JSX.Element {
+  return (
+    <View style={styles.mark} accessibilityRole="image" accessibilityLabel="Two people having a conversation">
+      <Svg width="100%" height="100%" viewBox="0 0 180 92">
+        <Circle cx="40" cy="27" r="20" fill={C.purple} />
+        <Path d="M5 88c1.8-24 15.2-36 35-36s33.2 12 35 36H5Z" fill={C.purple} />
+        <Circle cx="140" cy="27" r="20" fill={C.purple} />
+        <Path d="M105 88c1.8-24 15.2-36 35-36s33.2 12 35 36h-70Z" fill={C.purple} />
+        <Rect x="68" y="4" width="44" height="38" rx="11" fill={C.purple} />
+        <Path d="M87 39h17L98 55Z" fill={C.purple} />
+      </Svg>
+    </View>
+  );
+}
+
+export default function EntryScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { beginNativeJourney } = useStore();
 
-  const start = useCallback(async (): Promise<void> => {
+  const signUp = useCallback(async (): Promise<void> => {
     await beginNativeJourney();
     router.replace("/onboarding");
   }, [beginNativeJourney, router]);
@@ -21,51 +36,29 @@ export default function EntryScreen() {
   return (
     <View style={styles.root}>
       <Backdrop />
-      <View style={[styles.content, { paddingTop: insets.top + 42, paddingBottom: insets.bottom + 22 }]}>
-        <Reveal>
-          <View style={styles.mark}><MessageCircleMore size={27} color={C.onAccent} strokeWidth={1.8} /></View>
-          <Eyebrow color={C.purple} style={styles.eyebrow}>Before You Say It</Eyebrow>
-          <Text style={styles.title}>Practice the conversation before it happens.</Text>
-          <Text style={styles.lede}>One private rehearsal. One moment to notice. One clear place to begin.</Text>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 34, paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
+        <Reveal style={styles.content}>
+          <ConversationMark />
+          <Text style={styles.title}>Build the qualities of world-class communicators.</Text>
+          <Text style={styles.body}>Learn to communicate with Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.</Text>
+          <View style={styles.actions}>
+            <PrimaryButton label="Sign up now" onPress={signUp} />
+            <GhostButton label="Log in" onPress={() => router.push("/continue-from-web")} />
+          </View>
+          <Text style={styles.accountNote}>Already have an account or paid on the web? Log in to connect your access.</Text>
         </Reveal>
-
-        <Reveal index={1} style={styles.heroWrap}>
-          <HeroSurface style={styles.hero}>
-            <View style={styles.heroTop}><Sparkles size={18} color="rgba(255,255,255,0.86)" /><Text style={styles.heroLabel}>YOUR FIRST REHEARSAL</Text></View>
-            <Text style={styles.heroTitle}>Bring the conversation that is already on your mind.</Text>
-            <View style={styles.heroRule} />
-            <Text style={styles.heroBody}>No account required to start. You approve every word before feedback.</Text>
-            <ArrowRight size={22} color={C.onAccent} style={styles.arrow} />
-          </HeroSurface>
-        </Reveal>
-
-        <View style={styles.spacer} />
-        <Reveal index={2}>
-          <PrimaryButton label="Start my free rehearsal" onPress={start} />
-          <GhostButton label="Sign in or continue from web" onPress={() => router.push("/continue-from-web")} style={styles.secondary} />
-          <Text style={styles.trust}>Your free rehearsal stays on this device. Account continuation is not available in this build yet.</Text>
-        </Reveal>
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  content: { flex: 1, paddingHorizontal: GUTTER },
-  mark: { width: 52, height: 52, borderRadius: 18, backgroundColor: C.purple, alignItems: "center", justifyContent: "center" },
-  eyebrow: { marginTop: 24 },
-  title: { ...T.display, fontSize: 38, lineHeight: 43, letterSpacing: -1, marginTop: 10, maxWidth: 350 },
-  lede: { ...T.body, color: C.textSoft, marginTop: 16, maxWidth: 330 },
-  heroWrap: { marginTop: 30 },
-  hero: { borderRadius: radius.lg },
-  heroTop: { flexDirection: "row", alignItems: "center", gap: 8 },
-  heroLabel: { fontFamily: font.semi, fontSize: 11, letterSpacing: 1.6, color: "rgba(255,255,255,0.76)" },
-  heroTitle: { fontFamily: font.semi, fontSize: 22, lineHeight: 29, color: C.onAccent, marginTop: 18 },
-  heroRule: { height: StyleSheet.hairlineWidth, backgroundColor: "rgba(255,255,255,0.24)", marginVertical: 18 },
-  heroBody: { ...T.support, color: "rgba(255,255,255,0.82)", paddingRight: 28 },
-  arrow: { alignSelf: "flex-end", marginTop: 12 },
-  spacer: { flex: 1, minHeight: 24 },
-  secondary: { marginTop: 10 },
-  trust: { ...T.caption, textAlign: "center", marginTop: 12, paddingHorizontal: 10 },
+  scroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: GUTTER },
+  content: { alignItems: "center", paddingHorizontal: 10 },
+  mark: { width: 180, height: 92, marginBottom: 38 },
+  title: { fontFamily: font.bold, fontSize: 32, lineHeight: 38, letterSpacing: -0.7, color: C.text, textAlign: "center" },
+  body: { ...T.body, color: C.textSoft, textAlign: "center", lineHeight: 27, marginTop: 18 },
+  actions: { width: "100%", gap: 10, marginTop: 42 },
+  accountNote: { ...T.caption, textAlign: "center", marginTop: 14, paddingHorizontal: 12 },
 });

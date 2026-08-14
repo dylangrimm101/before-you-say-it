@@ -19,6 +19,7 @@ type PurchasesModule = {
   getOfferings: () => Promise<PurchasesOfferings>;
   purchasePackage: (pkg: PurchasesPackage) => Promise<{ customerInfo: CustomerInfo }>;
   restorePurchases: () => Promise<CustomerInfo>;
+  logIn: (appUserID: string) => Promise<{ customerInfo: CustomerInfo; created: boolean }>;
 };
 
 /**
@@ -97,6 +98,19 @@ function requireSdk(): PurchasesModule {
 
 export function hasPro(info: CustomerInfo | undefined): boolean {
   return hasActiveEntitlement(info, PRO_ENTITLEMENT);
+}
+
+/** Associates the authenticated web identity with RevenueCat so web entitlements can be restored. */
+export async function identifyPurchasesUser(userId: string): Promise<CustomerInfo | null> {
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId || !sdk || !configured) return null;
+  try {
+    const result = await sdk.logIn(normalizedUserId);
+    return result.customerInfo;
+  } catch (error) {
+    safeLog("[purchases] account association failed", errorShape(error));
+    return null;
+  }
 }
 
 export function useCustomerInfo() {
