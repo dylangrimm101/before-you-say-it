@@ -114,7 +114,7 @@ type DockState =
   | "autoplay-blocked"
   | "complete"
   | "composing"
-  | "connection-lost"
+  | "response-unavailable"
   | "mic-blocked"
   | "mic-error"
   | "playback-failed"
@@ -648,7 +648,7 @@ function LegacyRehearse() {
     if (pending.length > 0) return "composing";
     if (thinking) return "waiting";
     if (audioBusy) return "speaking";
-    if (canRetry) return "connection-lost";
+    if (canRetry) return "response-unavailable";
     if (speech.phase === "blocked") return "autoplay-blocked";
     if (speech.phase === "failed") return "playback-failed";
     if (hasReachedTurnCap) return "complete";
@@ -903,7 +903,7 @@ function LegacyRehearse() {
           </View>
           {dock.help ? <Text style={styles.dockHelp}>{dock.help}</Text> : null}
 
-          {dockState === "connection-lost" ? (
+          {dockState === "response-unavailable" ? (
             <View style={styles.recoveryRow}>
               <PressCard
                 onPress={retryTurn}
@@ -1217,7 +1217,7 @@ const DOCK_TONE: Record<DockState, string> = {
   "autoplay-blocked": C.amber,
   complete: C.purple,
   composing: C.purple,
-  "connection-lost": C.clay,
+  "response-unavailable": C.clay,
   "mic-blocked": C.clay,
   "mic-error": C.amber,
   "playback-failed": C.amber,
@@ -1259,9 +1259,9 @@ const DOCK_COPY: Record<
     label: "Composing",
     help: "Edit it if we misheard. Nothing is sent until you tap Send it.",
   }),
-  "connection-lost": (_them, _counterpart, h) => ({
-    label: "Connection lost",
-    help: h.dictation ?? "Your line is safe. Retry when you're ready.",
+  "response-unavailable": (_them, _counterpart, h) => ({
+    label: "Response unavailable",
+    help: h.dictation ?? "Your line is safe. The practice service didn't answer, so you can retry without saying it again.",
   }),
   "mic-blocked": () => ({
     label: "Microphone access is off.",

@@ -20,6 +20,18 @@ describe("remaining native acquisition and paid experience", () => {
     expect(onboarding).toContain("useState<number>(0)");
   });
 
+  test("rehearsal replies use cross-provider failover and honest recovery copy", async () => {
+    const ai = await source("lib/ai.ts");
+    const rehearsal = await source("app/rehearse/[id].tsx");
+    expect(ai).toContain("ROLEPLAY_FALLBACK_MODELS");
+    expect(ai).toContain('"google/gemini-3.5-flash-lite"');
+    expect(ai).toContain('"openai/gpt-5-mini"');
+    expect(ai).toContain("{ models: ROLEPLAY_FALLBACK_MODELS }");
+    expect(rehearsal).toContain('label: "Response unavailable"');
+    expect(rehearsal).not.toContain('label: "Connection lost"');
+    expect(rehearsal).toContain("retry without saying it again");
+  });
+
   test("existing web customers authenticate and reconnect their paid identity", async () => {
     const layout = await source("app/_layout.tsx");
     const continuation = await source("app/continue-from-web.tsx");

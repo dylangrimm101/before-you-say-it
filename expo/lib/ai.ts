@@ -19,6 +19,11 @@ const KEY = process.env.EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY ?? "";
 
 /** Fast, expressive model for live in-character replies. */
 const ROLEPLAY_MODEL = "google/gemini-3.6-flash";
+/** Cross-provider fallbacks keep a live turn moving through a model/provider outage. */
+const ROLEPLAY_FALLBACK_MODELS: readonly string[] = [
+  "google/gemini-3.5-flash-lite",
+  "openai/gpt-5-mini",
+];
 /** Careful reasoner for the structured post-session debrief. */
 const DEBRIEF_MODEL = "anthropic/claude-sonnet-5";
 
@@ -68,6 +73,7 @@ async function chatRaw(
     },
     body: JSON.stringify({
       model,
+      ...(model === ROLEPLAY_MODEL ? { models: ROLEPLAY_FALLBACK_MODELS } : {}),
       messages,
       temperature: 0.9,
       max_tokens: maxTokens,
