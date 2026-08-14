@@ -58,7 +58,7 @@ describe("hybrid onboarding curriculum contract", () => {
   });
 
   test("maps both diagnosis entry routes into module hypotheses", () => {
-    expect(RECURRING_PROBLEMS).toHaveLength(7);
+    expect(RECURRING_PROBLEMS).toHaveLength(8);
     expect(DESIRED_SKILLS).toHaveLength(7);
     [...RECURRING_PROBLEMS, ...DESIRED_SKILLS].forEach((option) => expect(isModuleId(option.moduleId)).toBe(true));
   });

@@ -38,8 +38,8 @@ describe("uninterrupted practice routing", () => {
   it("falls back locally instead of resetting intake when generation fails", async () => {
     const source = await onboarding();
     expect(source).toContain("draft = await buildCustomScenario");
-    expect(source).toContain("draft = fallbackCustomScenario(description, selectedFocus, form)");
-    expect(source.indexOf("fallbackCustomScenario(description, selectedFocus, form)")).toBeLessThan(
+    expect(source).toContain("draft = fallbackCustomScenario(situation.trim(), selectedFocus, form)");
+    expect(source.indexOf("fallbackCustomScenario(situation.trim(), selectedFocus, form)")).toBeLessThan(
       source.indexOf("router.replace({"),
     );
   });

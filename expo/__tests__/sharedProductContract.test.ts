@@ -346,6 +346,7 @@ describe("native compatibility and hydration", () => {
       contract_version: 1,
       rehearsal_id: session.id,
       pressure_moment: null,
+      rewrite: null,
       practice_shift: null,
       signals: [],
       starting_index: null,

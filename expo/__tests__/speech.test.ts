@@ -207,14 +207,14 @@ describe("the mic tap never doubles as a stop control", () => {
 });
 
 describe("a free rehearsal waits for the user after its fixed exchange", () => {
-  it("recognizes completion after the approved response under pressure", async () => {
+  it("recognizes completion only after the counterpart close", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     expect(source).toContain('const turnCap = params.entry === "onboarding"');
     expect(source).toContain("? FREE_REHEARSAL_USER_TURNS");
     expect(source).toContain(": rehearsalTurnCap(access.entitlement);");
     expect(source).toContain("const hasReachedTurnCap = turnCap !== null && myTurnCount >= turnCap;");
     expect(source).toContain("const isRepReadyForAnalysis =");
-    expect(source).toContain('turns[turns.length - 1]?.role === "user"');
+    expect(source).toContain('turns[turns.length - 1]?.role === "them"');
     expect(source).toContain("shouldGeneratePushback(turns)");
   });
 

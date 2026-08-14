@@ -13,6 +13,7 @@ const turns: Turn[] = [
   { id: "opening", role: "user", text: "Can we decide who owns Tuesday pickup?" },
   { id: "pushback", role: "them", text: "Why are you making this a big deal?" },
   { id: "response", role: "user", text: "I hear that. Can you take Tuesday pickup?" },
+  { id: "close", role: "them", text: "I’m not agreeing yet. What would taking Tuesday actually involve?" },
 ];
 
 const debrief: Debrief = {
@@ -58,9 +59,10 @@ describe("Claude Design free journey contract", () => {
     expect(invalidated.freeJourneyCheckpoint).toBe("briefing");
   });
 
-  test("user-first flow creates pushback only after the opening approval", () => {
+  test("user-first flow gives both approved learner turns a counterpart response", () => {
     expect(shouldGeneratePushback([])).toBe(true);
-    expect(shouldGeneratePushback([turns[0]!, turns[1]!])).toBe(false);
+    expect(shouldGeneratePushback([turns[0]!, turns[1]!])).toBe(true);
+    expect(shouldGeneratePushback(turns)).toBe(false);
   });
 
   test("recognizer onend never submits", () => {
@@ -78,6 +80,8 @@ describe("Claude Design free journey contract", () => {
     expect(result.pressure_moment?.opening_turn_id).toBe(transcript.turns[0]?.id);
     expect(result.pressure_moment?.pushback_turn_id).toBe(transcript.turns[1]?.id);
     expect(result.pressure_moment?.pressure_response_turn_id).toBe(transcript.turns[2]?.id);
+    expect(result.rewrite?.original_ask).toBe(transcript.turns[0]?.approved_text);
+    expect(result.rewrite?.clearer_version).toBeTruthy();
     expect(result.practice_shift?.current_pattern_steps).toHaveLength(3);
     expect(result.practice_shift?.practice_target_steps.length).toBeGreaterThan(1);
     expect(result.practice_shift?.caveat).toBe("A practice target, not a result you’ve already achieved.");

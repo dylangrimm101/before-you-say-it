@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { SCENARIOS } from "@/constants/scenarios";
+import { counterpartLinePassesQuality } from "@/lib/ai";
 import {
   containsRawArtifacts,
   counterpartInSentence,
@@ -19,6 +20,18 @@ import {
 import type { Scenario, Turn } from "@/types/convo";
 
 const JORDAN = "Jordan — your partner";
+
+describe("acquisition counterpart quality gate", () => {
+  it("rejects unsupported channel leakage", () => {
+    expect(counterpartLinePassesQuality("Just text me about it later.", "pushback")).toBe(false);
+    expect(counterpartLinePassesQuality("We can discuss that here, but I still disagree.", "pushback")).toBe(true);
+  });
+
+  it("rejects easy-agreement closes while allowing unresolved clarification", () => {
+    expect(counterpartLinePassesQuality("You’re right. I’ll do that.", "close")).toBe(false);
+    expect(counterpartLinePassesQuality("I’m not agreeing yet. What exactly are you asking me to change?", "close")).toBe(true);
+  });
+});
 
 function scenario(patch: Partial<Scenario> = {}): Scenario {
   return {

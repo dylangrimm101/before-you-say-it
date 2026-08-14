@@ -19,7 +19,7 @@ import {
 } from "@/types/sharedProduct";
 
 export const FREE_JOURNEY_CHECKPOINTS: readonly FreeJourneyCheckpoint[] = [
-  "briefing", "rehearsal", "transcript_review", "generating", "pressure_moment", "practice_shift", "starting_index", "complete",
+  "briefing", "rehearsal", "transcript_review", "generating", "pressure_moment", "rewrite", "practice_shift", "starting_index", "complete",
 ];
 
 /** Removes every value derived after an upstream intake answer changes. */
@@ -34,16 +34,16 @@ export function validFreeJourneyCheckpoint(session: ActivePracticeSession): Free
     const requested = session.freeJourneyCheckpoint ?? "pressure_moment";
     return FREE_JOURNEY_CHECKPOINTS.includes(requested) ? requested : "pressure_moment";
   }
-  if (session.freeRehearsalCompletedAt && session.freeRehearsalTurns?.length === 3) return "generating";
+  if (session.freeRehearsalCompletedAt && session.freeRehearsalTurns?.length === 4) return "generating";
   const roles = session.freeRehearsalTurns?.map((turn) => turn.role).join(",") ?? "";
-  if (roles === "user,them,user") return "transcript_review";
+  if (roles === "user,them,user,them") return "transcript_review";
   if (session.freeRehearsalTurns?.length) return "rehearsal";
   return session.freeJourneyCheckpoint === "rehearsal" ? "rehearsal" : "briefing";
 }
 
-/** The second approved user turn ends capture; only the opening creates pushback. */
+/** Each of the two approved learner turns receives one counterpart turn. */
 export function shouldGeneratePushback(turnsBeforeApproval: readonly Turn[]): boolean {
-  return turnsBeforeApproval.filter((turn) => turn.role === "user").length === 0;
+  return turnsBeforeApproval.filter((turn) => turn.role === "user").length < 2;
 }
 
 /** Recognizer completion only creates reviewable text and can never approve or submit it. */
@@ -118,6 +118,10 @@ export function buildFreeJourneyResult(session: ActivePracticeSession, debrief: 
     contract_version: SHARED_PRODUCT_CONTRACT_VERSION,
     rehearsal_id: session.id,
     pressure_moment: pressureMoment,
+    rewrite: {
+      original_ask: opening.approved_text,
+      clearer_version: debrief.script[0]?.trim() || `What I’m asking for is this: ${session.usefulOutcome}`,
+    },
     practice_shift: practiceShift,
     signals,
     starting_index: { ...calculatePartialStartingIndex(signals), index_version: STARTING_INDEX_VERSION },

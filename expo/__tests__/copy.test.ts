@@ -171,7 +171,7 @@ describe("typing screens stay usable with the keyboard open", () => {
   it("keeps onboarding text entry multiline and keyboard-aware", async () => {
     const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
     expect(onboarding).toContain("<KeyboardAvoidingView");
-    expect(onboarding).toContain("multiline maxLength={maxLength}");
+    expect(onboarding).toContain("multiline maxLength={500}");
     expect(onboarding).toContain('keyboardDismissMode="interactive"');
   });
 

@@ -205,7 +205,7 @@ function LegacyRehearse() {
     if (persistedTurnsRef.current === serializedTurns) return;
     persistedTurnsRef.current = serializedTurns;
     const roles = turns.map((turn) => turn.role).join(",");
-    saveActivePracticeSession({ ...currentSession, freeRehearsalTurns: turns, freeJourneyCheckpoint: roles === "user,them,user" ? "transcript_review" : "rehearsal", updatedAt: Date.now() }).catch(() => {});
+    saveActivePracticeSession({ ...currentSession, freeRehearsalTurns: turns, freeJourneyCheckpoint: roles === "user,them,user,them" ? "transcript_review" : "rehearsal", updatedAt: Date.now() }).catch(() => {});
   }, [activePracticeSession, params.entry, params.practiceSessionId, saveActivePracticeSession, turns]);
   const [thinking, setThinking] = useState<boolean>(false);
   const [draft, setDraft] = useState<string>("");
@@ -264,7 +264,7 @@ function LegacyRehearse() {
     hasReachedTurnCap &&
     !thinking &&
     stream.length === 0 &&
-    turns[turns.length - 1]?.role === "user";
+    turns[turns.length - 1]?.role === "them";
 
   const reveal = useCallback((full: string, nudge: string) => {
     const commit = (): void => {
@@ -755,7 +755,7 @@ function LegacyRehearse() {
   }
 
   if (reviewingTranscript) {
-    const counterpartTurn = turns.find((turn) => turn.role === "them");
+    const counterpartTurns = turns.filter((turn) => turn.role === "them");
     return (
       <View style={styles.root}>
         <Backdrop />
@@ -767,9 +767,11 @@ function LegacyRehearse() {
             <Text style={styles.reviewLabel}>Your opening</Text>
             <TextInput value={reviewDrafts.opening} onChangeText={(opening) => setReviewDrafts((current) => ({ ...current, opening }))} multiline style={styles.reviewInput} accessibilityLabel="Edit your opening" />
             <Text style={styles.reviewLabel}>{themName}</Text>
-            <View style={styles.counterpartReview}><Text style={styles.counterpartReviewText}>{counterpartTurn?.text ?? ""}</Text></View>
+            <View style={styles.counterpartReview}><Text style={styles.counterpartReviewText}>{counterpartTurns[0]?.text ?? ""}</Text></View>
             <Text style={styles.reviewLabel}>Your response under pressure</Text>
             <TextInput value={reviewDrafts.response} onChangeText={(response) => setReviewDrafts((current) => ({ ...current, response }))} multiline style={styles.reviewInput} accessibilityLabel="Edit your response under pressure" />
+            <Text style={styles.reviewLabel}>{themName}’s close</Text>
+            <View style={styles.counterpartReview}><Text style={styles.counterpartReviewText}>{counterpartTurns[1]?.text ?? ""}</Text></View>
           </ScrollView>
           <StateDock bottomInset={insets.bottom}>
             <PrimaryButton label="Approve transcript" onPress={approveTranscript} disabled={!reviewDrafts.opening.trim() || !reviewDrafts.response.trim() || closing} />
@@ -837,11 +839,16 @@ function LegacyRehearse() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          <View style={styles.readyIntro}>
+            <Text style={styles.readyEyebrow}>SITUATION YOU’RE OPENING FOR</Text>
+            <Text style={styles.readySupport}>{scenario.situation}</Text>
+            <Text style={styles.readySupport}>Goal: {outcome ?? scenario.goal}</Text>
+          </View>
           {turns.length === 0 && initial.waitingForUserOpening ? (
             <View style={styles.readyIntro}>
-              <Text style={styles.readyEyebrow}>YOUR OPENING</Text>
-              <Text style={styles.readyTitle}>Start it the way you naturally would.</Text>
-              <Text style={styles.readySupport}>Use your first instinct. You can correct the transcript before anything is sent.</Text>
+              <Text style={styles.readyEyebrow}>YOUR TURN</Text>
+              <Text style={styles.readyTitle}>You start. What do you say?</Text>
+              <Text style={styles.readySupport}>You can correct the transcript before anything is sent.</Text>
             </View>
           ) : null}
 
@@ -1271,7 +1278,7 @@ const DOCK_COPY: Record<
   waiting: (them) => ({ label: them, help: `${them} is thinking…` }),
   speaking: (them, _counterpart, h) => ({
     label: them,
-    help: h.generating ? `Preparing ${them.toLowerCase()}'s voice…` : `${them} is speaking.`,
+    help: h.generating ? `${them} is thinking…` : `${them} is speaking.`,
   }),
   listening: () => ({ label: "Listening", help: "Tap again when you've finished the line." }),
   text: () => ({ label: "Your turn", help: "Return adds a line — it never sends." }),

@@ -126,7 +126,7 @@ describe("event-driven plan build", () => {
 describe("conversion paywall", () => {
   test("preserves the free debrief and sells spoken repetition", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/paywall.tsx`).text();
-    expect(source).toContain("Your recommended practice path");
+    expect(source).toContain("Your practice plan");
     expect(source).toContain("Keep my free debrief for now");
     expect(source).toContain("One evidence-linked adjustment, then the same moment again.");
   });

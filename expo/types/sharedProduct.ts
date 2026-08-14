@@ -68,6 +68,11 @@ export interface PressureMomentV1 {
   confidence_statement: string;
 }
 
+export interface RewriteV1 {
+  original_ask: string;
+  clearer_version: string;
+}
+
 export interface PracticeShiftV1 {
   practice_shift_version: typeof PRACTICE_SHIFT_VERSION;
   headline: string;
@@ -109,6 +114,7 @@ export interface SharedResultContractV1 {
   contract_version: typeof SHARED_PRODUCT_CONTRACT_VERSION;
   rehearsal_id: string;
   pressure_moment: PressureMomentV1 | null;
+  rewrite?: RewriteV1 | null;
   practice_shift: PracticeShiftV1 | null;
   signals: SharedSignalV1[];
   starting_index: PartialStartingIndexV1 | null;
@@ -344,6 +350,7 @@ export function emptySharedResult(rehearsalId: string): SharedResultContractV1 {
     contract_version: SHARED_PRODUCT_CONTRACT_VERSION,
     rehearsal_id: requireString(rehearsalId, "result.rehearsal_id"),
     pressure_moment: null,
+    rewrite: null,
     practice_shift: null,
     signals: [],
     starting_index: null,

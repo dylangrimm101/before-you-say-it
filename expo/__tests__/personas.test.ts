@@ -134,7 +134,8 @@ describe("the gender actually reaches the model", () => {
   it("carries the selected voice through the onboarding route handoff", async () => {
     const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
-    expect(onboarding).toContain('entry: "onboarding",\n          persona,');
+    expect(onboarding).toContain('entry: "onboarding", persona, practiceSessionId');
+    expect(onboarding).toContain("const persona = personaForContext(selectedFocus)");
     expect(rehearsal).toContain('params.entry === "onboarding" && isPersonaVoice(params.persona)');
     expect(rehearsal).toContain("voiceForRehearsal(");
   });
@@ -172,22 +173,17 @@ describe("the gender actually reaches the model", () => {
     expect(source).not.toContain("EXAVITQu4vr4xnSDxMaL");
   });
 
-  it("uses Hope's approved expressive ElevenLabs configuration", async () => {
+  it("uses the approved ElevenLabs v3 configuration for Hope and Adam", async () => {
     const source = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
-    expect(source).toContain('"woman-hope": "eleven_multilingual_v2"');
-    expect(source).toContain("model_id: TTS_MODEL[persona]");
-    expect(source).toContain("voice_settings: VOICE_SETTINGS[persona]");
-    expect(source).toContain(
-      '"woman-hope": {\n    speed: 1,\n    stability: 0.5,\n    similarity_boost: 0.75,\n    style: 0,\n    use_speaker_boost: true',
-    );
-  });
-
-  it("uses Adam's approved expressive ElevenLabs configuration", async () => {
-    const source = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
-    expect(source).toContain('"man-adam": "eleven_multilingual_v2"');
-    expect(source).toContain(
-      '"man-adam": {\n    speed: 1,\n    stability: 0.75,\n    similarity_boost: 0.75,\n    style: 0.4,\n    use_speaker_boost: true',
-    );
+    expect(source).toContain('"woman-hope": "eleven_v3"');
+    expect(source).toContain('"man-adam": "eleven_v3"');
+    expect(source).toContain("speed: 0.97");
+    expect(source).toContain("stability: 0.58");
+    expect(source).toContain("similarity_boost: 0.75");
+    expect(source).toContain("style: 0.05");
+    expect(source).toContain("use_speaker_boost: false");
+    expect(source).toContain('request("mp3_44100_192")');
+    expect(source).toContain('request("mp3_44100_128")');
   });
 });
 
@@ -302,25 +298,23 @@ describe("onboarding presents questions without a fictional coach header", () =>
     expect(source).toContain("I know what I want to get better at");
   });
 
-  it("keeps setup questions direct and lets the learner choose the onboarding counterpart voice", async () => {
+  it("keeps setup questions direct and assigns the approved context voice", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
     expect(source).not.toContain("CoachPrompt");
     expect(source).not.toContain("coachAvatar");
-    expect(source).toContain("Choose the rehearsal voice");
-    expect(source).toContain("PERSONAS.map");
-    expect(source).toContain("choosePersona(item.id)");
-    expect(source).toContain("selected={persona === item.id}");
-    expect(source).not.toContain("Adam will play the conversation counterpart.");
+    expect(source).not.toContain("Choose the rehearsal voice");
+    expect(source).toContain("personaForContext(selectedFocus)");
+    expect(source).toContain('const counterpart = persona === "man-adam" ? "Adam" : "Hope"');
   });
 
-  it("confirms every tap-only answer before advancing the deck", async () => {
+  it("confirms every tap-only answer before advancing or finishing", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
     expect(source).toContain("confirmAndAdvance(2)");
     expect(source).toContain("confirmAndAdvance(3)");
     expect(source).toContain("confirmAndAdvance(4)");
-    expect(source).toContain("confirmAndAdvance(isReal ? 7 : 4)");
-    expect(source).toContain("void finish(value)");
+    expect(source).toContain("void finish(value, reaction");
+    expect(source).toContain("void finish(focus, value)");
     expect(source).toContain("SELECTION_CONFIRMATION_MS = 140");
-    expect(source).toContain("const requiresContinue = isReal && step >= 1 && step <= 5");
+    expect(source).toContain("const showsFooter = (isReal && step === 2) || building");
   });
 });

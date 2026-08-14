@@ -23,8 +23,8 @@ const KEY = process.env.EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY ?? "";
 
 /** Both voices use the expressive model auditioned and approved in ElevenLabs. */
 const TTS_MODEL: Record<PersonaVoice, string> = {
-  "woman-hope": "eleven_multilingual_v2",
-  "man-adam": "eleven_multilingual_v2",
+  "woman-hope": "eleven_v3",
+  "man-adam": "eleven_v3",
 };
 
 interface VoiceSettings {
@@ -36,21 +36,17 @@ interface VoiceSettings {
 }
 
 /** Explicitly mirrors each voice's approved ElevenLabs controls. */
+const APPROVED_VOICE_SETTINGS: VoiceSettings = {
+  speed: 0.97,
+  stability: 0.58,
+  similarity_boost: 0.75,
+  style: 0.05,
+  use_speaker_boost: false,
+};
+
 const VOICE_SETTINGS: Record<PersonaVoice, VoiceSettings> = {
-  "woman-hope": {
-    speed: 1,
-    stability: 0.5,
-    similarity_boost: 0.75,
-    style: 0,
-    use_speaker_boost: true,
-  },
-  "man-adam": {
-    speed: 1,
-    stability: 0.75,
-    similarity_boost: 0.75,
-    style: 0.4,
-    use_speaker_boost: true,
-  },
+  "woman-hope": APPROVED_VOICE_SETTINGS,
+  "man-adam": APPROVED_VOICE_SETTINGS,
 };
 
 /** A single frame of silence, used only to unlock playback from a real tap. */
@@ -152,18 +148,18 @@ export async function unlockAudioPlayback(): Promise<boolean> {
 
 async function fetchSpeechDataUri(text: string, persona: PersonaVoice): Promise<string> {
   if (__DEV__) console.log(`[voice] tts_request persona=${persona}`);
-  const res = await fetch(
-    `${BASE}/v2/elevenlabs/v1/text-to-speech/${voiceIdFor(persona)}?output_format=mp3_44100_128`,
+  const request = async (format: "mp3_44100_192" | "mp3_44100_128"): Promise<Response> => fetch(
+    `${BASE}/v2/elevenlabs/v1/text-to-speech/${voiceIdFor(persona)}?output_format=${format}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
-      body: JSON.stringify({
-        text,
-        model_id: TTS_MODEL[persona],
-        voice_settings: VOICE_SETTINGS[persona],
-      }),
+      body: JSON.stringify({ text, model_id: TTS_MODEL[persona], voice_settings: VOICE_SETTINGS[persona] }),
     },
   );
+  let res = await request("mp3_44100_192");
+  if (!res.ok && (res.status === 400 || res.status === 402 || res.status === 422)) {
+    res = await request("mp3_44100_128");
+  }
   if (!res.ok) throw new Error(`Voice request failed (${res.status})`);
 
   const blob = await res.blob();

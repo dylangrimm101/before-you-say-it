@@ -38,23 +38,44 @@ export const CURRICULUM_MODULES: readonly CurriculumModule[] = [
 ] as const;
 
 export const RECURRING_PROBLEMS: readonly { label: string; moduleId: ModuleId }[] = [
-  { label: "I say too much and lose the point", moduleId: "get_to_the_point" },
-  { label: "My requests come out vague or indirect", moduleId: "make_a_clear_ask" },
+  { label: "I struggle to organize my thoughts or get to the point", moduleId: "get_to_the_point" },
+  { label: "I know what I mean, but my requests come out vague", moduleId: "make_a_clear_ask" },
   { label: "I put off starting hard conversations", moduleId: "start_the_conversation" },
-  { label: "I struggle to listen and answer what was said", moduleId: "listen_and_respond" },
-  { label: "Pushback makes me lose what I meant to say", moduleId: "stay_clear_under_pushback" },
-  { label: "I say yes when I need a pause, no, or boundary", moduleId: "pause_say_no_boundary" },
+  { label: "I react before I have really heard the other person", moduleId: "listen_and_respond" },
+  { label: "I lose my point when someone pushes back", moduleId: "stay_clear_under_pushback" },
+  { label: "I agree when I need to pause, say no, or set a limit", moduleId: "pause_say_no_boundary" },
   { label: "I need to repair conversations that went wrong", moduleId: "repair_what_went_wrong" },
+  { label: "I’m not sure. Help me work it out", moduleId: "use_it_in_real_life" },
 ] as const;
 
 export const DESIRED_SKILLS: readonly { label: string; moduleId: ModuleId }[] = [
-  { label: "Say the main point clearly", moduleId: "get_to_the_point" },
-  { label: "Make a request someone can answer", moduleId: "make_a_clear_ask" },
-  { label: "Open a difficult conversation", moduleId: "start_the_conversation" },
-  { label: "Listen and respond without losing myself", moduleId: "listen_and_respond" },
+  { label: "Organize my thoughts and get to the point", moduleId: "get_to_the_point" },
+  { label: "Say what I need or make a clear request", moduleId: "make_a_clear_ask" },
+  { label: "Start a difficult conversation", moduleId: "start_the_conversation" },
+  { label: "Listen and respond without losing my own point", moduleId: "listen_and_respond" },
   { label: "Stay clear when someone pushes back", moduleId: "stay_clear_under_pushback" },
   { label: "Pause, say no, or set a boundary", moduleId: "pause_say_no_boundary" },
   { label: "Repair what happened and try again", moduleId: "repair_what_went_wrong" },
+] as const;
+
+export const DESIRED_SHIFTS: readonly { label: string; moduleId: ModuleId }[] = [
+  { label: "Get to the point sooner", moduleId: "get_to_the_point" },
+  { label: "Say what I need more clearly", moduleId: "make_a_clear_ask" },
+  { label: "Bring it up instead of avoiding it", moduleId: "start_the_conversation" },
+  { label: "Hear their concern before responding", moduleId: "listen_and_respond" },
+  { label: "Stay with my point after pushback", moduleId: "stay_clear_under_pushback" },
+  { label: "Set a limit without escalating", moduleId: "pause_say_no_boundary" },
+  { label: "Repair the conversation and try again", moduleId: "repair_what_went_wrong" },
+] as const;
+
+export const PRESSURE_CONDITIONS: readonly { label: string; reaction: string }[] = [
+  { label: "They push back or challenge me", reaction: "defensive" },
+  { label: "They minimize what I’m saying", reaction: "minimizes" },
+  { label: "They shut down or avoid the issue", reaction: "quiet" },
+  { label: "They turn the issue back on me", reaction: "turns-back" },
+  { label: "They agree in the moment, but nothing changes", reaction: "agrees-without-changing" },
+  { label: "I get flustered and lose my point", reaction: "defensive" },
+  { label: "I’m not sure. Surprise me", reaction: "not-sure" },
 ] as const;
 
 const BY_ID = new Map<ModuleId, CurriculumModule>(CURRICULUM_MODULES.map((module) => [module.id, module]));

@@ -111,8 +111,30 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
           ) : null}
         </ScrollView>
         <StateDock bottomInset={insets.bottom}>
-          <PrimaryButton label="See what to practice" onPress={() => void move("practice_shift")} />
+          <PrimaryButton label="Show what changes with practice" onPress={() => void move("rewrite")} />
+          <Text style={styles.dockPromise}>See your same ask rewritten as one specific request you could actually say.</Text>
         </StateDock>
+      </View>
+    );
+  }
+
+  if (checkpoint === "rewrite") {
+    const rewrite = result.rewrite ?? { original_ask: byId.get(result.pressure_moment.opening_turn_id) ?? "", clearer_version: session.recommendation?.immediateAction ?? result.practice_shift.practice_target_steps[1] ?? "" };
+    return (
+      <View style={styles.root}>
+        <Backdrop />
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 150 }]}>
+          <PressCard onPress={() => void move("pressure_moment")} accessibilityLabel="Back to Pressure Moment"><Text style={styles.back}>Back</Text></PressCard>
+          <Text style={styles.eyebrow}>YOUR WORDS, MADE USABLE</Text>
+          <Text style={styles.title}>Here’s what practice is helping you say</Text>
+          <View style={styles.rewriteCard}>
+            <Detail label="Your original ask" text={`“${rewrite.original_ask}”`} />
+            <View style={styles.rewriteDivider} />
+            <Detail label="A clearer version" text={`“${rewrite.clearer_version}”`} />
+          </View>
+          <Text style={styles.observation}>Practice is what makes this version come out when they push back. That is what the practice plan trains.</Text>
+        </ScrollView>
+        <StateDock bottomInset={insets.bottom}><PrimaryButton label="See the practice plan" onPress={() => void move("practice_shift")} /></StateDock>
       </View>
     );
   }
@@ -122,10 +144,10 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
       <View style={styles.root}>
         <Backdrop />
         <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 150 }]}>
-          <PressCard onPress={() => void move("pressure_moment")} accessibilityLabel="Back to Pressure Moment">
+          <PressCard onPress={() => void move("rewrite")} accessibilityLabel="Back to clearer version">
             <Text style={styles.back}>Back</Text>
           </PressCard>
-          <Text style={styles.eyebrow}>YOUR NEXT MOVE</Text>
+          <Text style={styles.eyebrow}>YOUR PRACTICE SHIFT</Text>
           <Text style={styles.title}>{result.practice_shift.headline}</Text>
           <ShiftComparison shift={result.practice_shift} />
           <View style={styles.goal}>
@@ -251,9 +273,9 @@ function Detail({ label, text }: { label: string; text: string }) {
 function ShiftComparison({ shift }: { shift: PracticeShiftV1 }) {
   return (
     <View style={styles.comparison}>
-      <ShiftColumn label="CURRENT PATTERN" steps={shift.current_pattern_steps} tone={C.amber} />
+      <ShiftColumn label="WITHOUT PRACTICE" steps={shift.current_pattern_steps} tone={C.amber} />
       <View style={styles.divider} />
-      <ShiftColumn label="PRACTICE TARGET" steps={shift.practice_target_steps} tone={C.purple} />
+      <ShiftColumn label="WITH BYSI PRACTICE" steps={shift.practice_target_steps} tone={C.purple} />
     </View>
   );
 }
@@ -308,6 +330,9 @@ const styles = StyleSheet.create({
   pushLabel: { color: C.amber },
   quote: { ...T.support, color: C.text },
   observation: { ...T.support, color: C.textSoft },
+  dockPromise: { ...T.caption, color: C.textSoft, textAlign: "center" },
+  rewriteCard: { backgroundColor: C.elevated, borderRadius: 24, padding: 20, gap: 16, ...shadow.layer },
+  rewriteDivider: { height: 1, backgroundColor: C.line },
   disclosure: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6 },
   disclosureText: { ...T.caption, color: C.purple, fontFamily: font.semi },
   details: { gap: 13, paddingLeft: 13, borderLeftWidth: 2, borderLeftColor: `${C.purple}3D` },

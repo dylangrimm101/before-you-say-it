@@ -108,9 +108,13 @@ function extractJson<T>(raw: string): T | null {
   }
 }
 
+type AcquisitionCounterpartTurn = "pushback" | "close";
+
 function rolePrompt(
   scenario: Scenario,
   difficulty: Difficulty,
+  turn: AcquisitionCounterpartTurn,
+  avoidRepeating: string[],
   reaction?: ReactionPattern,
   outcome?: string,
   persona?: PersonaVoice,
@@ -133,6 +137,10 @@ function rolePrompt(
     // voice the user is actually hearing.
     persona ? genderPromptLine(genderFor(persona)) : "",
     `YOUR CURRENT STANCE (${d.label}): ${d.behaviour}`,
+    `TURN TO GENERATE: ${turn}`,
+    `OUTPUT VERSION: bysi-rehearsal-turn-v1-2026-08-12`,
+    `VARIATION SEED: ${scenario.id}-${turn}-${avoidRepeating.length}`,
+    avoidRepeating.length > 0 ? `AVOID REPEATING: ${avoidRepeating.join(" | ")}` : "",
     reactionLine,
     outcomeLine,
     ``,
@@ -141,15 +149,18 @@ function rolePrompt(
     `- NEVER use British, Irish, or Australian words or idioms. Banned examples: mate, bloke, cheers, reckon, brilliant, lovely, proper, whilst, keen on, fancy, sod, bugger, chuffed, gutted, take the mick, have a go, sorted, dodgy, bloody, innit, mum, flat, holiday (meaning vacation), queue, rubbish, uni, telly, bin, quid, fortnight, straight away.`,
     `- Use American equivalents instead: buddy/man/dude, awesome, really, while, into, mom, apartment, vacation, line, trash, college, TV, right away.`,
     `- Speak only as your character. Never coach, never narrate, never mention AI or practice.`,
-    `- Keep every reply to 1-3 short spoken sentences. Real people interrupt themselves and trail off.`,
+    `- Keep every reply to 1-2 short spoken sentences and approximately 38 words maximum.`,
+    `- This rehearsal is in person unless the situation explicitly says it is remote. Never introduce texting, messages, DMs, chat, a phone call, FaceTime, Zoom, email, or another channel.`,
+    `- On the pushback turn, do not begin with “I hear you,” “You’re right,” “That’s fair,” “Okay,” or “I get that.” Start with credible resistance specific to this situation.`,
+    `- On the close turn, remain unresolved. Do not apologize, agree, commit, solve the issue, own the solution, or give the learner a clean win. You may ask for one specific clarification while keeping resistance.`,
     `- You may open a reply with one short physical beat in parentheses, e.g. "(sighs)". At most one.`,
     `- React to what was actually just said. Reward specificity, calm and ownership by softening a little. Punish vagueness, blame and over-apologizing by staying stuck.`,
     `- Never resolve everything at once. Real change is incremental.`,
     `- Never become abusive, sexual, or use slurs. No self-harm content. If the user raises a genuine crisis or danger, drop the roleplay and gently tell them to reach real-world support.`,
     ``,
     `Reply ONLY with minified JSON in exactly this shape:`,
-    `{"reply":"what your character says","tension":0-100,"nudge":"optional <=90 char coaching tip for the user, or empty string"}`,
-    `"tension" is how charged the room is right now. "nudge" should be present only when the user just made a real mistake or missed a clear opening — otherwise use "".`,
+    `{"mode":"rehearsal","outputVersion":"bysi-rehearsal-turn-v1-2026-08-12","turn":"${turn}","role":"${persona === "man-adam" ? "adam" : "hope"}","reply":"counterpart speech only","tension":0-100,"nudge":"","safety":"ok"}`,
+    `Return counterpart speech only. Never expose coaching in the nudge field.`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -159,6 +170,16 @@ export interface CounterpartTurn {
   reply: string;
   tension: number;
   nudge: string;
+}
+
+const CHANNEL_LEAKAGE = /\b(?:text(?:ed|ing)?|message(?:d|s|ing)?|dm(?:s|ed|ing)?|chat(?:ted|ting)?|phone call|call(?:ed|ing)?|facetime|zoom|email(?:ed|ing)?|video call)\b/i;
+const EASY_CLOSE = /\b(?:you(?:'|’)re right|i agree|i(?:'|’)m sorry|i apologize|i(?:'|’)ll do that|i will do that|consider it done|we have a deal|that sounds fair)\b/i;
+
+/** Rejects unsupported channel changes and unrealistically easy final agreement. */
+export function counterpartLinePassesQuality(line: string, turn: AcquisitionCounterpartTurn): boolean {
+  if (CHANNEL_LEAKAGE.test(line)) return false;
+  if (turn === "pushback" && /^(?:i hear you|you(?:'|’)re right|that(?:'|’)s fair|okay|i get that)\b/i.test(line.trim())) return false;
+  return turn !== "close" || !EASY_CLOSE.test(line);
 }
 
 /** Raised when the counterpart's line could not be produced cleanly. */
@@ -195,6 +216,8 @@ export async function nextCounterpartTurn(
   outcome?: string,
   persona?: PersonaVoice,
 ): Promise<CounterpartTurn> {
+  const turn: AcquisitionCounterpartTurn = turns.filter((item) => item.role === "user").length >= 2 ? "close" : "pushback";
+  const avoidRepeating = turns.filter((item) => item.role === "them").map((item) => renderCounterpartMessage(item.text, scenario.counterpart).body);
   const history: ChatMessage[] = turns.map((t) => ({
     role: t.role === "user" ? "user" : "assistant",
     content:
@@ -204,7 +227,7 @@ export async function nextCounterpartTurn(
   }));
 
   const messages: ChatMessage[] = [
-    { role: "system", content: rolePrompt(scenario, difficulty, reaction, outcome, persona) },
+    { role: "system", content: rolePrompt(scenario, difficulty, turn, avoidRepeating, reaction, outcome, persona) },
     ...history,
   ];
 
@@ -228,7 +251,13 @@ export async function nextCounterpartTurn(
     }
 
     const parsed = parseCounterpartPayload(result.content);
-    if (parsed.ok) return parsed.value;
+    if (parsed.ok && counterpartLinePassesQuality(parsed.value.reply, turn)) return { ...parsed.value, nudge: "" };
+    if (parsed.ok) {
+      lastReason = "request-failed";
+      safeLog("[ai] counterpart quality gate rejected line", { attempt, turn });
+      messages.push({ role: "user", content: `That ${turn} failed the channel/resistance quality gate. Return a different in-person line that stays unresolved.` });
+      continue;
+    }
 
     lastReason = parsed.reason;
     safeLog("[ai] counterpart reply rejected", { attempt, reason: parsed.reason });

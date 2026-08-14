@@ -17,7 +17,7 @@ export type DayOneLearningState =
   | "complete";
 
 export type PracticeSessionState = "awaiting_onboarding_baseline" | DayOneLearningState;
-export type FreeJourneyCheckpoint = "briefing" | "rehearsal" | "transcript_review" | "generating" | "pressure_moment" | "practice_shift" | "starting_index" | "complete";
+export type FreeJourneyCheckpoint = "briefing" | "rehearsal" | "transcript_review" | "generating" | "pressure_moment" | "rewrite" | "practice_shift" | "starting_index" | "complete";
 
 export interface ImmutablePracticeAttempt {
   id: string;
