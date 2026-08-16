@@ -58,6 +58,7 @@ const listeners = new Set<(s: SpeechSnapshot) => void>();
 let token = 0;
 let lastUtterance: Utterance | null = null;
 let currentPlayer: AudioPlayer | null = null;
+let currentPlaybackCleanup: (() => void) | null = null;
 let webUnlocked = false;
 let webEl: HTMLAudioElement | null = null;
 const webStaticCache = new Map<string, string>();
@@ -222,7 +223,10 @@ async function prepareStaticSource(dataUri: string, audioId: string): Promise<st
 
 async function teardownSound(): Promise<void> {
   const player = currentPlayer;
+  const cleanup = currentPlaybackCleanup;
   currentPlayer = null;
+  currentPlaybackCleanup = null;
+  cleanup?.();
   if (!player) return;
   try {
     player.pause();
@@ -360,34 +364,77 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
     return "empty";
   }
 
-  let hasLoggedStart = false;
+  let hasStarted = false;
+  let isSettled = false;
+  let removeStatusListener: (() => void) | null = null;
+  let terminalTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const settlePlayback = (status: "completed" | "timed_out"): void => {
+    if (isSettled) return;
+    isSettled = true;
+    if (terminalTimer) clearTimeout(terminalTimer);
+    removeStatusListener?.();
+    if (currentPlaybackCleanup === cleanupTracking) currentPlaybackCleanup = null;
+    if (currentPlayer === player) currentPlayer = null;
+    try {
+      player.remove();
+    } catch {
+      // Already released by an explicit stop or a newer playback request.
+    }
+    if (id !== token) return;
+    safeLog("[evidence] BYSI TTS playback completed", {
+      platform: Platform.OS,
+      role,
+      status,
+    });
+    publish({ phase: "idle" });
+  };
+
+  const armTerminalTimer = (durationSeconds: number): void => {
+    if (terminalTimer) clearTimeout(terminalTimer);
+    // Native completion events can be dropped after a recording-session switch.
+    // Duration plus a short grace period prevents the UI from claiming Hope or
+    // Adam is still speaking forever. Unknown durations get a bounded fallback.
+    const timeoutMs = Number.isFinite(durationSeconds) && durationSeconds > 0
+      ? Math.min(Math.max((durationSeconds + 3) * 1000, 5000), 90000)
+      : 45000;
+    terminalTimer = setTimeout(() => settlePlayback("timed_out"), timeoutMs);
+  };
+
+  const cleanupTracking = (): void => {
+    if (terminalTimer) clearTimeout(terminalTimer);
+    removeStatusListener?.();
+    isSettled = true;
+  };
+
   const subscription = player.addListener("playbackStatusUpdate", (status) => {
-    if (status.playing && !hasLoggedStart) {
-      hasLoggedStart = true;
+    if (status.playing && !hasStarted) {
+      hasStarted = true;
+      armTerminalTimer(status.duration);
       safeLog("[evidence] BYSI TTS playback started", {
         platform: Platform.OS,
         role,
         status: "playing",
       });
     }
-    if (!status.didJustFinish) return;
-    subscription.remove();
-    if (currentPlayer !== player) {
-      player.remove();
-      return;
-    }
-    currentPlayer = null;
-    player.remove();
-    if (id === token) {
-      safeLog("[evidence] BYSI TTS playback completed", {
-        platform: Platform.OS,
-        role,
-        status: "completed",
-      });
-      publish({ phase: "idle" });
-    }
+    const reachedEnd =
+      hasStarted &&
+      status.isLoaded &&
+      !status.playing &&
+      !status.isBuffering &&
+      status.duration > 0 &&
+      status.currentTime >= Math.max(0, status.duration - 0.25);
+    if (status.didJustFinish || reachedEnd) settlePlayback("completed");
   });
-  player.play();
+  removeStatusListener = (): void => subscription.remove();
+  currentPlaybackCleanup = cleanupTracking;
+  armTerminalTimer(player.currentStatus.duration);
+  try {
+    player.play();
+  } catch (error) {
+    settlePlayback("timed_out");
+    throw error;
+  }
   publish({ phase: "speaking" });
   return "played";
 }

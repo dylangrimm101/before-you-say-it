@@ -430,6 +430,14 @@ describe("data URIs are never handed to native playback", () => {
     expect(source).toContain("BYSI TTS playback started");
   });
 
+  it("always releases the speaking UI when native completion events are missed", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
+    expect(source).toContain("status.didJustFinish || reachedEnd");
+    expect(source).toContain('settlePlayback("timed_out")');
+    expect(source).toContain('publish({ phase: "idle" })');
+    expect(source).toContain("currentPlaybackCleanup");
+  });
+
   it("speaks only counterpart text through the user-owned BYSI TTS endpoint", async () => {
     const voice = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
