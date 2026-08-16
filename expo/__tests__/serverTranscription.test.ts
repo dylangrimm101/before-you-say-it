@@ -54,16 +54,17 @@ describe("server-side recording transcription", () => {
     expect(dictation).not.toContain("base64");
   });
 
-  test("Hope, Adam, debrief, and coaching generation remain Claude-backed", async () => {
+  test("Hope, Adam, debrief, and coaching use the user-owned Claude-backed BYSI endpoint", async () => {
     const ai = await Bun.file(`${expoRoot}/lib/ai.ts`).text();
-    expect(ai).toContain('const ROLEPLAY_MODEL = "anthropic/claude-sonnet-5"');
-    expect(ai).toContain('const DEBRIEF_MODEL = "anthropic/claude-sonnet-5"');
-    expect(ai).toContain('"anthropic/claude-haiku-4.5"');
+    expect(ai).toContain('"https://beforeyousayit.app/api/generate"');
+    expect(ai).toContain('type: "rehearsal_turn"');
+    expect(ai).toContain('type: "free_rehearsal_result"');
     expect(ai).toContain("nextCounterpartTurn");
     expect(ai).toContain("generateDebrief");
     expect(ai).toContain("evaluatePilotAttempt");
-    expect(ai).not.toContain('"google/gemini');
-    expect(ai).not.toContain('"openai/gpt');
+    expect(ai).not.toContain("EXPO_PUBLIC_TOOLKIT_URL");
+    expect(ai).not.toContain("EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY");
+    expect(ai).not.toContain("/v2/vercel/v1/chat/completions");
     expect(ai).not.toContain("OPENAI_API_KEY");
     expect(ai).not.toContain("ANTHROPIC_API_KEY");
   });

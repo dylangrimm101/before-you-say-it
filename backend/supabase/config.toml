@@ -1,0 +1,6 @@
+project_id = "spvksnddzyvycfoefrcf"
+
+[functions.transcribe]
+enabled = true
+verify_jwt = false
+entrypoint = "../functions/transcribe/index.ts"

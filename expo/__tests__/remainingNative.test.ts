@@ -20,15 +20,17 @@ describe("remaining native acquisition and paid experience", () => {
     expect(onboarding).toContain("useState<number>(0)");
   });
 
-  test("rehearsal replies stay on Claude with Anthropic-only failover and honest recovery copy", async () => {
+  test("rehearsal replies use the user-owned BYSI Claude endpoint with honest recovery copy", async () => {
     const ai = await source("lib/ai.ts");
     const rehearsal = await source("app/rehearse/[id].tsx");
-    expect(ai).toContain("ROLEPLAY_FALLBACK_MODELS");
-    expect(ai).toContain('const ROLEPLAY_MODEL = "anthropic/claude-sonnet-5"');
-    expect(ai).toContain('"anthropic/claude-haiku-4.5"');
-    expect(ai).not.toContain('"google/gemini');
-    expect(ai).not.toContain('"openai/gpt');
-    expect(ai).toContain("{ models: ROLEPLAY_FALLBACK_MODELS }");
+    expect(ai).toContain('"https://beforeyousayit.app/api/generate"');
+    expect(ai).toContain('type: "rehearsal_turn"');
+    expect(ai).toContain('type: "free_rehearsal_result"');
+    expect(ai).not.toContain("EXPO_PUBLIC_TOOLKIT_URL");
+    expect(ai).not.toContain("EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY");
+    expect(ai).not.toContain("/v2/vercel/v1/chat/completions");
+    expect(ai).not.toContain("OPENAI_API_KEY");
+    expect(ai).not.toContain("ANTHROPIC_API_KEY");
     expect(rehearsal).toContain('label: "Response unavailable"');
     expect(rehearsal).not.toContain('label: "Connection lost"');
     expect(rehearsal).toContain("retry without saying it again");
