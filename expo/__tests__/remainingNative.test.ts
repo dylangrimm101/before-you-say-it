@@ -45,12 +45,16 @@ describe("remaining native acquisition and paid experience", () => {
     expect(results).toContain("You stayed in the room. Now make the ask hold.");
     expect(results).toContain("Where it stalls:");
     expect(results).toContain("Here’s what practice is helping you say");
-    expect(results).toContain("Your thoughts and feelings are valid and deserve to be heard.");
-    expect(results).toContain("Practicing your communication skills builds the confidence to find the right words when pressure shows up.");
+    expect(results).toContain(">Practice Shift</Text>");
+    expect(results).toContain("Practice helps the clearer version stay available when pressure shows up.");
+    expect(results).toContain("currentSteps={result.practice_shift.current_pattern_steps}");
+    expect(results).toContain("targetSteps={result.practice_shift.practice_target_steps}");
     expect(results).toContain('label="Start 7-Day free trial"');
     expect(results.indexOf('label="Show what changes with practice"')).toBeLessThan(results.indexOf("Here’s what practice is helping you say"));
-    expect(results.indexOf("Here’s what practice is helping you say")).toBeLessThan(results.indexOf("Your thoughts and feelings are valid"));
-    expect(results.indexOf("Your thoughts and feelings are valid")).toBeLessThan(results.indexOf('label="Start 7-Day free trial"'));
+    expect(results.indexOf("Here’s what practice is helping you say")).toBeLessThan(results.indexOf(">Practice Shift</Text>"));
+    expect(results.indexOf(">Practice Shift</Text>")).toBeLessThan(results.indexOf('label="Start 7-Day free trial"'));
+    expect(results).toContain('storedCheckpoint === "generating"');
+    expect(results).toContain('screen: checkpoint === "pressure_moment" ? "communication-baseline" : checkpoint');
   });
 
   test("existing web customers authenticate and reconnect their paid identity", async () => {
