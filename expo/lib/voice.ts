@@ -1,4 +1,4 @@
-import { Audio } from "expo-av";
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 
@@ -57,7 +57,7 @@ const listeners = new Set<(s: SpeechSnapshot) => void>();
  */
 let token = 0;
 let lastUtterance: Utterance | null = null;
-let currentSound: Audio.Sound | null = null;
+let currentPlayer: AudioPlayer | null = null;
 let webUnlocked = false;
 let webEl: HTMLAudioElement | null = null;
 const webStaticCache = new Map<string, string>();
@@ -221,18 +221,18 @@ async function prepareStaticSource(dataUri: string, audioId: string): Promise<st
 }
 
 async function teardownSound(): Promise<void> {
-  const sound = currentSound;
-  currentSound = null;
-  if (!sound) return;
+  const player = currentPlayer;
+  currentPlayer = null;
+  if (!player) return;
   try {
-    await sound.stopAsync();
+    player.pause();
   } catch {
     // Not playing.
   }
   try {
-    await sound.unloadAsync();
+    player.remove();
   } catch {
-    // Already unloaded.
+    // Already released.
   }
 }
 
@@ -302,33 +302,51 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
   }
 
   await teardownSound();
-  await Audio.setAudioModeAsync({
-    allowsRecordingIOS: false,
-    playsInSilentModeIOS: true,
-    shouldDuckAndroid: true,
+  // Recording and playback use the same Expo Audio session. Explicitly leave
+  // recording mode before every line so iOS routes the reply to the speaker
+  // instead of retaining the receiver route after the second recording.
+  await setAudioModeAsync({
+    allowsRecording: false,
+    playsInSilentMode: true,
+    interruptionMode: "duckOthers",
+    shouldRouteThroughEarpiece: false,
   });
-  const { sound } = await Audio.Sound.createAsync({ uri: source }, { shouldPlay: true });
-  if (id !== token) {
-    await sound.unloadAsync().catch(() => {});
-    return "empty";
-  }
-  currentSound = sound;
-  publish({ phase: "speaking" });
-  sound.setOnPlaybackStatusUpdate((status) => {
-    if (!status.isLoaded || !status.didJustFinish) return;
-    sound.unloadAsync().catch(() => {});
-    if (currentSound === sound) {
-      currentSound = null;
-      if (id === token) {
-        safeLog("[evidence] BYSI TTS playback completed", {
-          platform: Platform.OS,
-          role: lastUtterance ? roleForPersona(lastUtterance.persona) : "unknown",
-          status: "completed",
-        });
-        publish({ phase: "idle" });
-      }
+  if (id !== token) return "empty";
+
+  const role = lastUtterance ? roleForPersona(lastUtterance.persona) : "unknown";
+  const player = createAudioPlayer({ uri: source }, {
+    downloadFirst: true,
+    keepAudioSessionActive: true,
+    updateInterval: 100,
+  });
+  player.volume = 1;
+  player.muted = false;
+  const subscription = player.addListener("playbackStatusUpdate", (status) => {
+    if (!status.didJustFinish) return;
+    subscription.remove();
+    if (currentPlayer !== player) {
+      player.remove();
+      return;
+    }
+    currentPlayer = null;
+    player.remove();
+    if (id === token) {
+      safeLog("[evidence] BYSI TTS playback completed", {
+        platform: Platform.OS,
+        role,
+        status: "completed",
+      });
+      publish({ phase: "idle" });
     }
   });
+  if (id !== token) {
+    subscription.remove();
+    player.remove();
+    return "empty";
+  }
+  currentPlayer = player;
+  player.play();
+  publish({ phase: "speaking" });
   return "played";
 }
 

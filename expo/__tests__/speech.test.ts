@@ -418,6 +418,15 @@ describe("data URIs are never handed to native playback", () => {
     expect(source).toContain("export async function resetSpeech");
   });
 
+  it("resets the shared recording session to speaker playback before every native reply", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
+    expect(source).toContain('from "expo-audio"');
+    expect(source).not.toContain('from "expo-av"');
+    expect(source).toContain("allowsRecording: false");
+    expect(source).toContain("shouldRouteThroughEarpiece: false");
+    expect(source).toContain("createAudioPlayer");
+  });
+
   it("speaks only counterpart text through the user-owned BYSI TTS endpoint", async () => {
     const voice = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
