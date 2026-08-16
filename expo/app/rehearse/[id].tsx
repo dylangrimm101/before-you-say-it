@@ -265,6 +265,32 @@ function LegacyRehearse() {
     !thinking &&
     stream.length === 0 &&
     turns[turns.length - 1]?.role === "them";
+  const latestRole = turns[turns.length - 1]?.role;
+  const turnTask = useMemo((): { step: string; prompt: string } => {
+    if (isRepReadyForAnalysis) {
+      return {
+        step: "REHEARSAL COMPLETE",
+        prompt: params.entry === "onboarding"
+          ? "Your two spoken turns are ready to review."
+          : "Your spoken rehearsal is ready to review.",
+      };
+    }
+    if (params.entry !== "onboarding") {
+      return latestRole === "user"
+        ? { step: `TURN ${myTurnCount}`, prompt: `${themName} is responding…` }
+        : { step: "YOUR TURN", prompt: myTurnCount === 0 ? "You start. What do you say?" : "What do you say now?" };
+    }
+    if (myTurnCount >= 2) {
+      return { step: "TURN 2 OF 2", prompt: `${themName} is responding…` };
+    }
+    if (myTurnCount === 1 && latestRole === "them") {
+      return { step: "TURN 2 OF 2", prompt: "They’ve pushed back. What do you say now?" };
+    }
+    if (myTurnCount === 1) {
+      return { step: "TURN 1 OF 2", prompt: `${themName} is responding…` };
+    }
+    return { step: "TURN 1 OF 2", prompt: "You start. What do you say?" };
+  }, [isRepReadyForAnalysis, latestRole, myTurnCount, params.entry, themName]);
 
   const reveal = useCallback((full: string, nudge: string) => {
     const commit = (): void => {
@@ -839,29 +865,26 @@ function LegacyRehearse() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.readyIntro}>
-            <Text style={styles.readyEyebrow}>SITUATION YOU’RE OPENING FOR</Text>
-            <Text style={styles.readySupport}>{scenario.situation}</Text>
-            <Text style={styles.readySupport}>Goal: {outcome ?? scenario.goal}</Text>
+          <View style={styles.threadContext}>
+            <Text style={styles.threadContextLabel}>IN-PERSON REHEARSAL</Text>
+            <Text style={styles.threadContextText}>{scenario.situation}</Text>
           </View>
           {turns.length === 0 && initial.waitingForUserOpening ? (
-            <View style={styles.readyIntro}>
-              <Text style={styles.readyEyebrow}>YOUR TURN</Text>
-              <Text style={styles.readyTitle}>You start. What do you say?</Text>
-              <Text style={styles.readySupport}>You can correct the transcript before anything is sent.</Text>
+            <View style={styles.emptyThread}>
+              <Text style={styles.emptyThreadTitle}>The conversation starts with you.</Text>
+              <Text style={styles.emptyThreadSupport}>Speak as if {themName} is right in front of you. Your confirmed words will appear here.</Text>
             </View>
           ) : null}
 
           {turns.map((t) =>
             t.role === "user" ? (
-              <Line key={t.id} mine text={t.text} speaker="You" paidMode={isPaidScenario} />
+              <Line key={t.id} mine text={t.text} speaker="You" />
             ) : (
               <View key={t.id}>
                 <Line
                   text={t.text}
                   speaker={themName}
                   counterpart={themName}
-                  paidMode={isPaidScenario}
                 />
                 {t.nudge ? <Nudge text={t.nudge} /> : null}
               </View>
@@ -874,13 +897,15 @@ function LegacyRehearse() {
               speaker={themName}
               counterpart={themName}
               streaming
-              paidMode={isPaidScenario}
             />
           ) : null}
-          {thinking ? (
-            <View style={styles.themWrap}>
+          {(thinking || (audioBusy && stream.length === 0)) ? (
+            <View style={styles.themWrap} accessibilityLiveRegion="polite">
               <Text style={styles.speaker}>{themName}</Text>
-              <Thinking />
+              <View style={[styles.bubble, styles.themBubble, styles.activityBubble]}>
+                <Thinking />
+                <Text style={styles.activityText}>{speech.phase === "speaking" ? `${themName} is speaking…` : `${themName} is thinking…`}</Text>
+              </View>
             </View>
           ) : null}
 
@@ -892,6 +917,10 @@ function LegacyRehearse() {
         </ScrollView>
 
         <StateDock bottomInset={insets.bottom}>
+          <View style={styles.turnTask} accessibilityLiveRegion="polite" accessibilityRole="text">
+            <Text style={styles.turnTaskStep}>{turnTask.step}</Text>
+            <Text style={styles.turnTaskPrompt}>{turnTask.prompt}</Text>
+          </View>
           <View style={styles.dockHead} accessibilityLiveRegion="polite" accessibilityRole="text">
             <View
               style={[
@@ -1005,6 +1034,7 @@ function LegacyRehearse() {
             </View>
           ) : dockState === "composing" ? (
             <View style={styles.composeWrap}>
+              <Text style={styles.composeLabel}>EDIT TRANSCRIPT</Text>
               <TextInput
                 value={pending}
                 onChangeText={setPending}
@@ -1023,7 +1053,7 @@ function LegacyRehearse() {
                   containerStyle={styles.flexOne}
                 >
                   <View style={styles.secondaryBtn}>
-                    <Text style={styles.secondaryText}>Say it again</Text>
+                    <Text style={styles.secondaryText}>Re-record</Text>
                   </View>
                 </PressCard>
                 <PressCard
@@ -1044,7 +1074,7 @@ function LegacyRehearse() {
                         pending.trim().length === 0 ? styles.analyzeTextWaiting : null,
                       ]}
                     >
-                      Send it
+                      {myTurnCount === 0 ? "Use opener" : "Use reply"}
                     </Text>
                   </View>
                 </PressCard>
@@ -1290,25 +1320,19 @@ const DOCK_COPY: Record<
   }),
 };
 
-/**
- * A spoken line. Weight and size mark who is speaking — the counterpart reads
- * larger and heavier, the user's own words sit quieter — so no container is
- * needed to tell them apart.
- */
+/** A confirmed spoken line, presented with familiar thread alignment. */
 function Line({
   text,
   mine,
   speaker,
   counterpart,
   streaming = false,
-  paidMode = false,
 }: {
   text: string;
   mine?: boolean;
   speaker: string;
   counterpart?: string;
   streaming?: boolean;
-  paidMode?: boolean;
 }) {
   // Counterpart text always goes through the renderer, so beats read as natural
   // sentences and no transport artifact can reach the screen.
@@ -1316,9 +1340,9 @@ function Line({
     ? { beatLine: null, body: text }
     : renderCounterpartMessage(text, counterpart ?? speaker);
   const isReduced = useReducedMotion();
-  const arrival = useRef(new Animated.Value(mine && !isReduced ? 0 : 1)).current;
+  const arrival = useRef(new Animated.Value(isReduced ? 1 : 0)).current;
   useEffect(() => {
-    if (!mine || isReduced) {
+    if (isReduced) {
       arrival.setValue(1);
       return;
     }
@@ -1330,33 +1354,33 @@ function Line({
     });
     animation.start();
     return () => animation.stop();
-  }, [arrival, isReduced, mine]);
+  }, [arrival, isReduced]);
   if (!mine && beatLine === null && body.length === 0) return null;
   return (
     <Animated.View
       style={[
         mine ? styles.mineWrap : styles.themWrap,
-        paidMode ? (mine ? styles.paidMineWrap : styles.paidThemWrap) : null,
-        mine
-          ? {
-              opacity: arrival,
-              transform: [
-                { translateY: arrival.interpolate({ inputRange: [0, 1], outputRange: [72, 0] }) },
-                { scale: arrival.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) },
-              ],
-            }
-          : null,
+        {
+          opacity: arrival,
+          transform: [
+            { translateX: arrival.interpolate({ inputRange: [0, 1], outputRange: [mine ? 18 : -18, 0] }) },
+            { translateY: arrival.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) },
+            { scale: arrival.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) },
+          ],
+        },
       ]}
     >
-      <Text style={styles.speaker}>{speaker}</Text>
-      {beatLine ? <Text style={styles.beat}>{beatLine}</Text> : null}
-      {body.length > 0 ? (
-        streaming ? (
-          <FadingWords text={body} />
-        ) : (
-          <Text style={mine ? styles.mineText : styles.themText}>{body}</Text>
-        )
-      ) : null}
+      <Text style={[styles.speaker, mine ? styles.mineSpeaker : null]}>{speaker}</Text>
+      <View style={[styles.bubble, mine ? styles.mineBubble : styles.themBubble]}>
+        {beatLine ? <Text style={[styles.beat, mine ? styles.mineBeat : null]}>{beatLine}</Text> : null}
+        {body.length > 0 ? (
+          streaming ? (
+            <FadingWords text={body} />
+          ) : (
+            <Text style={mine ? styles.mineText : styles.themText}>{body}</Text>
+          )
+        ) : null}
+      </View>
     </Animated.View>
   );
 }
@@ -1485,11 +1509,13 @@ const styles = StyleSheet.create({
   },
   tensionLabel: { ...eyebrow, color: C.dim },
 
-  transcript: { paddingHorizontal: GUTTER, paddingTop: 14, paddingBottom: 20 },
-  readyIntro: { paddingTop: 18, paddingBottom: 28 },
-  readyEyebrow: { ...eyebrow, color: C.purple, marginBottom: 10 },
-  readyTitle: { ...T.display, color: C.text, maxWidth: 330 },
-  readySupport: { ...T.support, color: C.textSoft, marginTop: 10, lineHeight: 23 },
+  transcript: { paddingHorizontal: GUTTER, paddingTop: 14, paddingBottom: 24 },
+  threadContext: { alignSelf: "center", maxWidth: 330, paddingHorizontal: 16, paddingVertical: 12, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.48)", borderWidth: 1, borderColor: C.glassEdge, marginBottom: 26 },
+  threadContextLabel: { ...eyebrow, color: C.purple, textAlign: "center", marginBottom: 5 },
+  threadContextText: { ...T.caption, color: C.textSoft, textAlign: "center", lineHeight: 19 },
+  emptyThread: { alignItems: "center", paddingHorizontal: 22, paddingVertical: 28 },
+  emptyThreadTitle: { ...T.title, color: C.text, textAlign: "center" },
+  emptyThreadSupport: { ...T.support, color: C.textSoft, textAlign: "center", marginTop: 9, lineHeight: 22 },
   reviewScroll: { paddingHorizontal: GUTTER, gap: 12 },
   reviewEyebrow: { ...eyebrow, color: C.purple },
   reviewTitle: { ...T.display },
@@ -1500,16 +1526,19 @@ const styles = StyleSheet.create({
   counterpartReviewText: { ...T.body, color: C.text },
   reviewBack: { ...T.support, color: C.purple, textAlign: "center", paddingVertical: 12, fontFamily: font.semi },
 
-  themWrap: { marginBottom: 22 },
-  mineWrap: { marginBottom: 22 },
-  paidThemWrap: { borderRadius: radius.lg, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(255,255,255,0.78)", padding: 18 },
-  paidMineWrap: { borderRadius: radius.lg, borderWidth: 1, borderColor: "rgba(81,40,136,0.14)", backgroundColor: C.purpleSoft, padding: 16, marginLeft: 26 },
-  speaker: { ...eyebrow, color: C.dim, marginBottom: 7 },
-  /** The counterpart reads largest — it is the thing to react to. */
-  themText: { ...T.title, fontSize: 20, lineHeight: 30, fontFamily: font.medium },
-  /** The user's own line sits quieter, in body ink. */
-  mineText: { ...T.body, color: C.textSoft },
-  beat: { ...T.caption, fontStyle: "italic", marginBottom: 6 },
+  themWrap: { alignSelf: "flex-start", alignItems: "flex-start", maxWidth: "84%", marginBottom: 16 },
+  mineWrap: { alignSelf: "flex-end", alignItems: "flex-end", maxWidth: "84%", marginBottom: 16 },
+  speaker: { ...eyebrow, color: C.dim, marginBottom: 6, marginHorizontal: 5 },
+  mineSpeaker: { textAlign: "right" },
+  bubble: { paddingHorizontal: 16, paddingVertical: 12, minHeight: 44 },
+  themBubble: { backgroundColor: "rgba(255,255,255,0.88)", borderWidth: 1, borderColor: C.glassEdge, borderRadius: 20, borderTopLeftRadius: 6, shadowColor: "#241633", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.07, shadowRadius: 14, elevation: 2 },
+  mineBubble: { backgroundColor: C.purple, borderRadius: 20, borderTopRightRadius: 6, shadowColor: C.purple, shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 3 },
+  themText: { ...T.body, color: C.text, lineHeight: 24 },
+  mineText: { ...T.body, color: C.onAccent, lineHeight: 24 },
+  beat: { ...T.caption, color: C.textDim, fontStyle: "italic", marginBottom: 5 },
+  mineBeat: { color: "rgba(255,255,255,0.76)" },
+  activityBubble: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
+  activityText: { ...T.caption, color: C.textSoft },
   nudge: {
     borderLeftWidth: 2,
     borderLeftColor: C.amber,
@@ -1521,6 +1550,9 @@ const styles = StyleSheet.create({
 
   errorBox: { gap: 10, marginBottom: 20 },
   errorText: { ...T.caption, color: C.clay },
+  turnTask: { backgroundColor: C.purpleSoft, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 11 },
+  turnTaskStep: { ...eyebrow, color: C.purple, marginBottom: 4 },
+  turnTaskPrompt: { ...T.support, fontFamily: font.semi, color: C.text, lineHeight: 21 },
   dockHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   dockDot: { width: 6, height: 6, borderRadius: 3 },
   dockLabel: { color: C.dim },
@@ -1579,6 +1611,7 @@ const styles = StyleSheet.create({
   recoveryRow: { marginTop: 12 },
   speakingActions: { gap: 10, marginTop: 12 },
   composeWrap: { gap: 12, marginTop: 10 },
+  composeLabel: { ...eyebrow, color: C.purple },
   composeInput: {
     ...T.body,
     backgroundColor: C.surfaceHigh,

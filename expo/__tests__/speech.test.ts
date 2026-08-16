@@ -206,6 +206,48 @@ describe("the mic tap never doubles as a stop control", () => {
   });
 });
 
+describe("the rehearsal reads as a spoken conversation thread", () => {
+  it("stacks confirmed user turns on the right and counterpart turns on the left", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    expect(source).toContain('mineWrap: { alignSelf: "flex-end"');
+    expect(source).toContain('themWrap: { alignSelf: "flex-start"');
+    expect(source).toContain("mine ? styles.mineBubble : styles.themBubble");
+    expect(source).toContain("onContentSizeChange={() =>");
+    expect(source).toContain("scrollRef.current?.scrollToEnd");
+  });
+
+  it("keeps the active spoken task visible through both onboarding turns", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    for (const copy of [
+      "IN-PERSON REHEARSAL",
+      "Speak as if",
+      "TURN 1 OF 2",
+      "You start. What do you say?",
+      "TURN 2 OF 2",
+      "They’ve pushed back. What do you say now?",
+      "REHEARSAL COMPLETE",
+    ]) {
+      expect(source).toContain(copy);
+    }
+  });
+
+  it("confirms each recorded transcript before adding it to the thread", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    expect(source).toContain("EDIT TRANSCRIPT");
+    expect(source).toContain('myTurnCount === 0 ? "Use opener" : "Use reply"');
+    expect(source).toContain(">Re-record</Text>");
+    expect(source.indexOf("setPending(recognizerEndState(text).pendingText)")).toBeLessThan(source.indexOf("submitText(pending)"));
+  });
+
+  it("shows counterpart thinking and speaking inside the left-side thread", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    expect(source).toContain('speech.phase === "speaking"');
+    expect(source).toContain("is speaking…");
+    expect(source).toContain("is thinking…");
+    expect(source).toContain("styles.themBubble");
+  });
+});
+
 describe("a free rehearsal waits for the user after its fixed exchange", () => {
   it("recognizes completion only after the counterpart close", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
