@@ -17,14 +17,13 @@ import type {
 const BASE = process.env.EXPO_PUBLIC_TOOLKIT_URL ?? "";
 const KEY = process.env.EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY ?? "";
 
-/** Fast, expressive model for live in-character replies. */
-const ROLEPLAY_MODEL = "google/gemini-3.6-flash";
-/** Cross-provider fallbacks keep a live turn moving through a model/provider outage. */
+/** Claude remains the BYSI provider for live Hope and Adam replies. */
+const ROLEPLAY_MODEL = "anthropic/claude-sonnet-5";
+/** Anthropic-only fallback keeps generation inside the approved provider boundary. */
 const ROLEPLAY_FALLBACK_MODELS: readonly string[] = [
-  "google/gemini-3.5-flash-lite",
-  "openai/gpt-5-mini",
+  "anthropic/claude-haiku-4.5",
 ];
-/** Careful reasoner for the structured post-session debrief. */
+/** Claude also produces structured debriefs, coaching, and generated practice content. */
 const DEBRIEF_MODEL = "anthropic/claude-sonnet-5";
 
 interface ChatMessage {

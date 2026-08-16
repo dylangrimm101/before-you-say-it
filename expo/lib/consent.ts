@@ -4,11 +4,11 @@
  */
 
 /** The real provider that receives recorded audio, named in the disclosure. */
-export const TRANSCRIPTION_PROVIDER = "OpenAI (gpt-4o-mini-transcribe, via the Vercel AI Gateway)";
+export const TRANSCRIPTION_PROVIDER = "OpenAI (gpt-4o-mini-transcribe, through the BYSI backend)";
 
-/** The real providers that receive typed and transcribed text. */
-export const ROLEPLAY_PROVIDER = "Google (Gemini)";
-export const DEBRIEF_PROVIDER = "Anthropic (Claude)";
+/** The real provider that receives typed and confirmed transcribed text. */
+export const ROLEPLAY_PROVIDER = "Anthropic (Claude, through the BYSI generation service)";
+export const DEBRIEF_PROVIDER = "Anthropic (Claude, through the BYSI generation service)";
 export const VOICE_PROVIDER = "ElevenLabs";
 
 export interface ConsentState {

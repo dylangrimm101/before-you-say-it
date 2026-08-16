@@ -31,7 +31,7 @@ describe("server-side recording transcription", () => {
     expect(rehearsal).toContain("Turning your voice into text…");
     expect(rehearsal).toContain("EDIT TRANSCRIPT");
     expect(rehearsal).toContain("Re-record");
-    expect(rehearsal).toContain('myTurnCount === 0 ? "Use opener" : "Use reply"');
+    expect(rehearsal).toContain('myTurnCount === 0 ? "Use this opener" : "Use this reply"');
     expect(rehearsal).toContain("setPending(recognizerEndState(text).pendingText)");
     expect(rehearsal.indexOf("setPending(recognizerEndState(text).pendingText)")).toBeLessThan(
       rehearsal.indexOf("submitText(pending)"),
@@ -52,5 +52,19 @@ describe("server-side recording transcription", () => {
     expect(ai).not.toContain("/v2/vercel/v4/ai/transcription-model");
     expect(dictation).not.toContain("transcribeAudio");
     expect(dictation).not.toContain("base64");
+  });
+
+  test("Hope, Adam, debrief, and coaching generation remain Claude-backed", async () => {
+    const ai = await Bun.file(`${expoRoot}/lib/ai.ts`).text();
+    expect(ai).toContain('const ROLEPLAY_MODEL = "anthropic/claude-sonnet-5"');
+    expect(ai).toContain('const DEBRIEF_MODEL = "anthropic/claude-sonnet-5"');
+    expect(ai).toContain('"anthropic/claude-haiku-4.5"');
+    expect(ai).toContain("nextCounterpartTurn");
+    expect(ai).toContain("generateDebrief");
+    expect(ai).toContain("evaluatePilotAttempt");
+    expect(ai).not.toContain('"google/gemini');
+    expect(ai).not.toContain('"openai/gpt');
+    expect(ai).not.toContain("OPENAI_API_KEY");
+    expect(ai).not.toContain("ANTHROPIC_API_KEY");
   });
 });

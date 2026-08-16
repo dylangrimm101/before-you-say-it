@@ -20,12 +20,14 @@ describe("remaining native acquisition and paid experience", () => {
     expect(onboarding).toContain("useState<number>(0)");
   });
 
-  test("rehearsal replies use cross-provider failover and honest recovery copy", async () => {
+  test("rehearsal replies stay on Claude with Anthropic-only failover and honest recovery copy", async () => {
     const ai = await source("lib/ai.ts");
     const rehearsal = await source("app/rehearse/[id].tsx");
     expect(ai).toContain("ROLEPLAY_FALLBACK_MODELS");
-    expect(ai).toContain('"google/gemini-3.5-flash-lite"');
-    expect(ai).toContain('"openai/gpt-5-mini"');
+    expect(ai).toContain('const ROLEPLAY_MODEL = "anthropic/claude-sonnet-5"');
+    expect(ai).toContain('"anthropic/claude-haiku-4.5"');
+    expect(ai).not.toContain('"google/gemini');
+    expect(ai).not.toContain('"openai/gpt');
     expect(ai).toContain("{ models: ROLEPLAY_FALLBACK_MODELS }");
     expect(rehearsal).toContain('label: "Response unavailable"');
     expect(rehearsal).not.toContain('label: "Connection lost"');

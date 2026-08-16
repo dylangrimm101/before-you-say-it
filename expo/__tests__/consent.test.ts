@@ -54,7 +54,8 @@ describe("migration notice", () => {
 });
 
 describe("disclosure copy", () => {
-  it("names the real transcription provider rather than a generic claim", () => {
+  it("names the real transcription provider and backend boundary", () => {
     expect(TRANSCRIPTION_PROVIDER.toLowerCase()).toContain("openai");
+    expect(TRANSCRIPTION_PROVIDER.toLowerCase()).toContain("bysi backend");
   });
 });

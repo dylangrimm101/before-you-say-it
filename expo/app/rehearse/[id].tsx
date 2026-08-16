@@ -187,10 +187,6 @@ function LegacyRehearse() {
     JSON.stringify(activePracticeSession?.freeRehearsalTurns ?? []),
   );
 
-  const initial = scenario
-    ? initialRehearsalState(scenario)
-    : { waitingForUserOpening: true, initialCounterpartLine: null };
-
   const [turns, setTurns] = useState<Turn[]>(() =>
     params.entry === "onboarding" && activePracticeSession?.id === params.practiceSessionId
       ? activePracticeSession?.freeRehearsalTurns ?? []
@@ -1078,7 +1074,7 @@ function LegacyRehearse() {
                         pending.trim().length === 0 ? styles.analyzeTextWaiting : null,
                       ]}
                     >
-                      {myTurnCount === 0 ? "Use opener" : "Use reply"}
+                      {myTurnCount === 0 ? "Use this opener" : "Use this reply"}
                     </Text>
                   </View>
                 </PressCard>
@@ -1265,7 +1261,7 @@ const DOCK_COPY: Record<
   },
   composing: () => ({
     label: "Composing",
-    help: "Edit it if we misheard. Nothing is sent until you tap Send it.",
+    help: "Edit it if we misheard. Nothing is sent until you approve this turn.",
   }),
   "response-unavailable": (_them, _counterpart, h) => ({
     label: "Response unavailable",

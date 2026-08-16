@@ -253,7 +253,7 @@ describe("the rehearsal reads as a spoken conversation thread", () => {
   it("confirms each recorded transcript before adding it to the thread", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     expect(source).toContain("EDIT TRANSCRIPT");
-    expect(source).toContain('myTurnCount === 0 ? "Use opener" : "Use reply"');
+    expect(source).toContain('myTurnCount === 0 ? "Use this opener" : "Use this reply"');
     expect(source).toContain(">Re-record</Text>");
     expect(source.indexOf("setPending(recognizerEndState(text).pendingText)")).toBeLessThan(source.indexOf("submitText(pending)"));
   });
