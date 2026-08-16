@@ -156,8 +156,9 @@ describe("required exercised curriculum paths", () => {
     expect(dictation).toContain("new MediaRecorder(stream");
     expect(dictation).toContain("await stopWebRecorder(webRecorder)");
     expect(dictation).toContain("webStreamRef.current?.getTracks().forEach");
-    expect(dictation).toContain("await response.blob()");
-    expect(dictation).toContain("reader.readAsDataURL(blob)");
+    expect(dictation).toContain("transcribeRecording(uri, mediaType, turn)");
+    expect(dictation).not.toContain("readAudioPayload");
+    expect(dictation).not.toContain("reader.readAsDataURL(blob)");
     expect(dictation).toContain("URL.revokeObjectURL(uri)");
     expect(rehearsal).toContain('dockState === "mic-blocked"');
     expect(rehearsal).toContain('dockState === "mic-error"');
@@ -166,8 +167,17 @@ describe("required exercised curriculum paths", () => {
     expect(rehearsal).toContain("retryMicrophone");
     expect(rehearsal).toContain('"Transcription unavailable"');
     const ai = await Bun.file(`${import.meta.dir}/../lib/ai.ts`).text();
-    expect(ai).toContain('"ai-transcription-model-specification-version": "4"');
-    expect(ai).toContain("res.status === 402 || res.status === 429 || res.status >= 500");
+    const transcription = await Bun.file(`${import.meta.dir}/../lib/transcription.ts`).text();
+    const backend = await Bun.file(`${import.meta.dir}/../../backend/functions/transcribe/index.ts`).text();
+    expect(ai).not.toContain("transcription-model");
+    expect(transcription).toContain("/functions/v1/transcribe");
+    expect(transcription).toContain('body.append("audio"');
+    expect(transcription).toContain('body.append("turn", turn)');
+    expect(transcription).not.toContain("EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY");
+    expect(backend).toContain('Deno.env.get("OPENAI_API_KEY")');
+    expect(backend).toContain('providerBody.append("model"');
+    expect(backend).toContain('providerBody.append("language", "en")');
+    expect(backend).toContain('providerBody.append("response_format", "json")');
   });
 
   test("playback interruption never blocks the rehearsal", async () => {

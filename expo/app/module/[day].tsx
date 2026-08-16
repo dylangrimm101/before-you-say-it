@@ -244,7 +244,7 @@ export default function PilotModuleScreen() {
   }, [attemptDictation, responseDictation, retryDictation]);
 
   const stopCapture = useCallback(async (): Promise<void> => {
-    const text = await dictation.stop();
+    const text = await dictation.stop(activeCapture === "opener" ? "opener" : "reply");
     if (text) setCaptureText(text);
     const reviewState: PilotModuleState = activeCapture === "opener" ? "confirm_attempt_transcript" : activeCapture === "response" ? "confirm_response_transcript" : "confirm_retry_transcript";
     if (day !== 1 && run) await persistRun(transitionPilotRun(run, reviewState));

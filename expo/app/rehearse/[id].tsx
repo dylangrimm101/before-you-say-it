@@ -450,7 +450,7 @@ function LegacyRehearse() {
     if (micLocked(speech.phase)) return;
     if (dictation.status === "recording") {
       tap("medium");
-      const text = await dictation.stop();
+      const text = await dictation.stop(myTurnCount === 0 ? "opener" : "reply");
       // Transcription finishing never submits the turn. The line goes into a
       // review state and waits for the user to send it.
       if (text && text.trim().length > 0) {
@@ -462,7 +462,7 @@ function LegacyRehearse() {
     if (dictation.status === "transcribing") return;
     await dictation.start();
     tap("medium");
-  }, [dictation, thinking, closing, speech.phase]);
+  }, [dictation, thinking, closing, myTurnCount, speech.phase]);
 
   const toggleSpeaker = useCallback(() => {
     tap("light");
@@ -1178,7 +1178,11 @@ function LegacyRehearse() {
                 }
               />
               <Text style={styles.voiceState} accessibilityLiveRegion="polite">
-                {dictation.status === "recording" ? "LISTENING NOW — TAP TO STOP" : "TAP TO SPEAK"}
+                {dictation.status === "transcribing"
+                  ? "Turning your voice into text…"
+                  : dictation.status === "recording"
+                    ? "LISTENING NOW — TAP TO STOP"
+                    : "TAP TO SPEAK"}
               </Text>
               <Pressable
                 onPress={() => {

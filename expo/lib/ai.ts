@@ -577,40 +577,4 @@ function sanitizePilotLabel(value: unknown): string {
   return value.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 48);
 }
 
-export class TranscriptionUnavailableError extends Error {
-  readonly status: number;
-
-  constructor(status: number) {
-    super("Transcription service unavailable");
-    this.name = "TranscriptionUnavailableError";
-    this.status = status;
-  }
-}
-
-/** Transcribe a recorded audio clip using the Rork AI Gateway. */
-export async function transcribeAudio(base64Audio: string, mediaType = "audio/mp4"): Promise<string> {
-  const res = await fetch(`${BASE}/v2/vercel/v4/ai/transcription-model`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${KEY}`,
-      "ai-model-id": "openai/gpt-4o-mini-transcribe",
-      "ai-transcription-model-specification-version": "4",
-    },
-    body: JSON.stringify({ audio: base64Audio, mediaType }),
-  });
-
-  if (!res.ok) {
-    if (res.status === 402 || res.status === 429 || res.status >= 500) {
-      throw new TranscriptionUnavailableError(res.status);
-    }
-    throw new Error(`Transcription failed (${res.status})`);
-  }
-
-  const json = (await res.json()) as { text?: string; transcript?: string; content?: string };
-  const text = json.text ?? json.transcript ?? json.content ?? "";
-  if (!text) throw new Error("Empty transcription");
-  return text.trim();
-}
-
 export { REACTION_BEHAVIOUR };

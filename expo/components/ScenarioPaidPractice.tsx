@@ -81,7 +81,7 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
 
   const stopRecording = useCallback(async (): Promise<void> => {
     if (!value) return;
-    const text = await dictation.stop();
+    const text = await dictation.stop(state === "listening_attempt" ? "opener" : "reply");
     if (text) setDraft(text);
     const review = state === "listening_attempt" ? "confirm_attempt_transcript" : state === "listening_response" ? "confirm_response_transcript" : "confirm_retry_transcript";
     await persist(transitionScenarioPracticeRun(value, review, Date.now()));

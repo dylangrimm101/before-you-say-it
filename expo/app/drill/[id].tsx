@@ -96,7 +96,7 @@ export default function DrillScreen() {
     Keyboard.dismiss();
     if (dictation.status === "recording") {
       tap("medium");
-      const text = await dictation.stop();
+      const text = await dictation.stop("reply");
       if (text && text.trim().length > 0) setDraft((d) => (d ? `${d} ${text}` : text));
       return;
     }

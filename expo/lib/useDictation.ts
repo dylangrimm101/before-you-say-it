@@ -10,9 +10,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 import { tap } from "@/components/ui";
-import { transcribeAudio, TranscriptionUnavailableError } from "@/lib/ai";
 import { keepBaselineAudio } from "@/lib/baselineAudio";
 import { errorShape, safeLog } from "@/lib/redact";
+import {
+  transcribeRecording,
+  TranscriptionUnavailableError,
+  type TranscriptionTurn,
+} from "@/lib/transcription";
 
 export type DictationStatus = "idle" | "recording" | "transcribing" | "denied" | "error";
 
@@ -36,7 +40,7 @@ interface UseDictationReturn {
   level: number;
   requestPermission: () => Promise<boolean>;
   start: () => Promise<void>;
-  stop: () => Promise<string | null>;
+  stop: (turn: TranscriptionTurn) => Promise<string | null>;
   cancel: () => Promise<void>;
   reset: () => void;
 }
@@ -196,7 +200,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
     }
   }, [nativeRecorder]);
 
-  const stop = useCallback(async (): Promise<string | null> => {
+  const stop = useCallback(async (turn: TranscriptionTurn): Promise<string | null> => {
     if (operationRef.current) return null;
     const hasNativeRecording = nativeRecordingRef.current;
     const webRecorder = webRecorderRef.current;
@@ -229,8 +233,8 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         return null;
       }
 
-      const payload = await readAudioPayload(uri);
-      const text = await transcribeAudio(payload.base64, payload.mediaType);
+      const mediaType = webRecorder?.mimeType || "audio/mp4";
+      const text = await transcribeRecording(uri, mediaType, turn);
       setStatus("idle");
       tap("success");
       return text;
@@ -286,41 +290,6 @@ function isPermissionDenied(error: unknown): boolean {
   const name = typeof candidate.name === "string" ? candidate.name.toLowerCase() : "";
   const message = typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
   return name === "notallowederror" || name === "securityerror" || message.includes("permission denied") || message.includes("not allowed");
-}
-
-interface AudioPayload {
-  base64: string;
-  mediaType: string;
-}
-
-/** Read native files and browser blob URLs without assuming they share a filesystem. */
-async function readAudioPayload(uri: string): Promise<AudioPayload> {
-  if (Platform.OS !== "web") {
-    const file = new File(uri);
-    return { base64: await file.base64(), mediaType: file.type || "audio/mp4" };
-  }
-
-  const response = await fetch(uri);
-  if (!response.ok) throw new Error("Recorded audio could not be read");
-  const blob = await response.blob();
-  const dataUrl = await blobDataUrl(blob);
-  const separator = dataUrl.indexOf(",");
-  if (separator < 0) throw new Error("Recorded audio could not be encoded");
-  return {
-    base64: dataUrl.slice(separator + 1),
-    mediaType: blob.type || "audio/webm",
-  };
-}
-
-function blobDataUrl(blob: Blob): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error("Recorded audio could not be encoded"));
-    reader.onload = () => typeof reader.result === "string"
-      ? resolve(reader.result)
-      : reject(new Error("Recorded audio could not be encoded"));
-    reader.readAsDataURL(blob);
-  });
 }
 
 /** Delete a temporary recording, ignoring the case where it is already gone. */
