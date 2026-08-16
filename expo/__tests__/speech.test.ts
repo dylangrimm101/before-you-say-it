@@ -219,8 +219,8 @@ describe("the rehearsal reads as a spoken conversation thread", () => {
   it("keeps the active spoken task visible through both onboarding turns", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     for (const copy of [
-      "IN-PERSON REHEARSAL",
-      "Speak as if",
+      "SITUATION YOU’RE OPENING FOR",
+      "In person with",
       "TURN 1 OF 2",
       "You start. What do you say?",
       "TURN 2 OF 2",
@@ -229,6 +229,16 @@ describe("the rehearsal reads as a spoken conversation thread", () => {
     ]) {
       expect(source).toContain(copy);
     }
+  });
+
+  it("matches the reference hierarchy with a centered turn header and pinned voice area", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    expect(source).toContain("<Text style={styles.headerTurn}>{turnTask.step}</Text>");
+    expect(source).toContain('accessibilityLabel="Close rehearsal"');
+    expect(source).toContain("Goal: {outcome}");
+    expect(source).toContain("LISTENING NOW — TAP TO STOP");
+    expect(source).toContain("Type this turn instead");
+    expect(source.indexOf("styles.taskIntro")).toBeLessThan(source.indexOf("styles.threadContext"));
   });
 
   it("confirms each recorded transcript before adding it to the thread", async () => {

@@ -291,6 +291,7 @@ function LegacyRehearse() {
     }
     return { step: "TURN 1 OF 2", prompt: "You start. What do you say?" };
   }, [isRepReadyForAnalysis, latestRole, myTurnCount, params.entry, themName]);
+  const showsUserPrompt = !isRepReadyForAnalysis && latestRole !== "user" && !thinking && !audioBusy;
 
   const reveal = useCallback((full: string, nudge: string) => {
     const commit = (): void => {
@@ -488,12 +489,6 @@ function LegacyRehearse() {
 
   const stopPlayback = useCallback(() => {
     tap("light");
-    stopSpeech().catch(() => {});
-  }, []);
-
-  const mutePlayback = useCallback(() => {
-    tap("light");
-    setVoiceOn(false);
     stopSpeech().catch(() => {});
   }, []);
 
@@ -695,6 +690,11 @@ function LegacyRehearse() {
     mode,
     dictation.status,
   ]);
+  const usesImmersiveVoiceDock =
+    dockState === "ready" ||
+    dockState === "listening" ||
+    dockState === "waiting" ||
+    dockState === "speaking";
 
   const micState: MicState = micDisabled
     ? "disabled"
@@ -828,18 +828,20 @@ function LegacyRehearse() {
 
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerRow}>
-          <View style={styles.headerCenter}>
-            <Text style={[eyebrow, styles.headerMeta]}>{isPaidScenario ? "SCENARIO REHEARSAL" : "FREE REHEARSAL"}</Text>
-            <Text style={styles.headerName} numberOfLines={1}>{themName}</Text>
-          </View>
-          <PressCard onPress={leave} disabled={closing} accessibilityLabel="End rehearsal">
-            <View style={styles.endBtn}>
-              <Text style={styles.endText}>End rep</Text>
-            </View>
-          </PressCard>
+          <View style={styles.headerSide} />
+          <Text style={styles.headerTurn}>{turnTask.step}</Text>
+          <Pressable
+            onPress={leave}
+            disabled={closing}
+            style={styles.closeHit}
+            accessibilityRole="button"
+            accessibilityLabel="Close rehearsal"
+          >
+            <Text style={styles.closeText}>Close</Text>
+          </Pressable>
         </View>
 
-        {turns.length > 0 ? <View style={styles.tensionWrap}>
+        {isPaidScenario && turns.length > 0 ? <View style={styles.tensionWrap}>
           <Text style={[eyebrow, styles.tensionLabel]}>Tension</Text>
           <View style={styles.flex}>
             <Meter
@@ -865,16 +867,18 @@ function LegacyRehearse() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.threadContext}>
-            <Text style={styles.threadContextLabel}>IN-PERSON REHEARSAL</Text>
-            <Text style={styles.threadContextText}>{scenario.situation}</Text>
-          </View>
-          {turns.length === 0 && initial.waitingForUserOpening ? (
-            <View style={styles.emptyThread}>
-              <Text style={styles.emptyThreadTitle}>The conversation starts with you.</Text>
-              <Text style={styles.emptyThreadSupport}>Speak as if {themName} is right in front of you. Your confirmed words will appear here.</Text>
+          {showsUserPrompt ? (
+            <View style={styles.taskIntro} accessibilityLiveRegion="polite">
+              <Text style={styles.taskIntroLabel}>YOUR TURN</Text>
+              <Text style={styles.taskIntroPrompt}>{turnTask.prompt}</Text>
             </View>
           ) : null}
+          <View style={styles.threadContext}>
+            <Text style={styles.threadContextLabel}>SITUATION YOU’RE OPENING FOR</Text>
+            <Text style={styles.threadContextText}>{scenario.situation}</Text>
+            {outcome ? <Text style={styles.threadContextGoal}>Goal: {outcome}</Text> : null}
+            <Text style={styles.inPersonNote}>In person with {themName}</Text>
+          </View>
 
           {turns.map((t) =>
             t.role === "user" ? (
@@ -916,21 +920,21 @@ function LegacyRehearse() {
           ) : null}
         </ScrollView>
 
-        <StateDock bottomInset={insets.bottom}>
-          <View style={styles.turnTask} accessibilityLiveRegion="polite" accessibilityRole="text">
-            <Text style={styles.turnTaskStep}>{turnTask.step}</Text>
-            <Text style={styles.turnTaskPrompt}>{turnTask.prompt}</Text>
-          </View>
-          <View style={styles.dockHead} accessibilityLiveRegion="polite" accessibilityRole="text">
-            <View
-              style={[
-                styles.dockDot,
-                { backgroundColor: DOCK_TONE[dockState] },
-              ]}
-            />
-            <Text style={[eyebrow, styles.dockLabel]}>{dock.label}</Text>
-          </View>
-          {dock.help ? <Text style={styles.dockHelp}>{dock.help}</Text> : null}
+        <StateDock bottomInset={insets.bottom} style={usesImmersiveVoiceDock ? styles.voiceDock : undefined}>
+          {!usesImmersiveVoiceDock ? (
+            <>
+              <View style={styles.dockHead} accessibilityLiveRegion="polite" accessibilityRole="text">
+                <View
+                  style={[
+                    styles.dockDot,
+                    { backgroundColor: DOCK_TONE[dockState] },
+                  ]}
+                />
+                <Text style={[eyebrow, styles.dockLabel]}>{dock.label}</Text>
+              </View>
+              {dock.help ? <Text style={styles.dockHelp}>{dock.help}</Text> : null}
+            </>
+          ) : null}
 
           {dockState === "response-unavailable" ? (
             <View style={styles.recoveryRow}>
@@ -1081,46 +1085,23 @@ function LegacyRehearse() {
               </View>
             </View>
           ) : dockState === "waiting" ? (
-            // The mic is swapped out entirely while the counterpart is thinking.
-            <View style={styles.playbackRow}>
-              <Thinking />
+            <View style={styles.immersiveControl} accessibilityLiveRegion="polite">
+              <View style={styles.voiceOrb}><Thinking /></View>
+              <Text style={styles.voiceState}>{themName.toUpperCase()} IS THINKING</Text>
+              <Text style={styles.typeUnavailable}>Type this turn instead</Text>
             </View>
           ) : dockState === "speaking" ? (
-            // Analyze remains visibly unavailable until playback finishes. Stop
-            // and Mute replace the mic rather than leaving a dead mic on screen.
-            <View style={styles.speakingActions}>
-              <View style={[styles.analyzeBtn, styles.analyzeBtnWaiting]}>
-                <Waveform
-                  active
-                  subtle={speech.phase === "generating"}
-                  tone={C.purple}
-                  bars={4}
-                  height={16}
-                />
-                <Text style={[styles.analyzeText, styles.analyzeTextWaiting]}>Analyze</Text>
-              </View>
-              <View style={styles.row}>
-                <PressCard
-                  onPress={stopPlayback}
-                  containerStyle={styles.flexOne}
-                  accessibilityLabel="Stop"
-                >
-                  <View style={styles.secondaryBtn}>
-                    <Square size={17} color={C.textSoft} fill={C.textSoft} />
-                    <Text style={styles.secondaryText}>Stop</Text>
-                  </View>
-                </PressCard>
-                <PressCard
-                  onPress={mutePlayback}
-                  containerStyle={styles.flexOne}
-                  accessibilityLabel={`Mute ${themName}`}
-                >
-                  <View style={styles.secondaryBtn}>
-                    <VolumeX size={18} color={C.textSoft} strokeWidth={1.7} />
-                    <Text style={styles.secondaryText}>Mute</Text>
-                  </View>
-                </PressCard>
-              </View>
+            <View style={styles.immersiveControl} accessibilityLiveRegion="polite">
+              <Pressable
+                onPress={stopPlayback}
+                style={styles.voiceOrb}
+                accessibilityRole="button"
+                accessibilityLabel={`${themName} is speaking. Tap to stop.`}
+              >
+                <Waveform active subtle={speech.phase === "generating"} tone={C.purple} bars={5} height={34} />
+              </Pressable>
+              <Text style={styles.voiceState}>{themName.toUpperCase()} IS SPEAKING — TAP TO STOP</Text>
+              <Text style={styles.typeUnavailable}>Type this turn instead</Text>
             </View>
           ) : dockState === "text" ? (
             <View style={styles.textRow}>
@@ -1168,20 +1149,7 @@ function LegacyRehearse() {
               </PressCard>
             </View>
           ) : (
-            <View style={styles.micRow}>
-              <Pressable
-                onPress={() => {
-                  tap("light");
-                  setMode("text");
-                }}
-                hitSlop={10}
-                style={styles.iconHit}
-                accessibilityRole="button"
-                accessibilityLabel="Type instead"
-              >
-                <Keyboard size={20} color={C.dim} strokeWidth={1.7} />
-              </Pressable>
-
+            <View style={styles.immersiveControl}>
               <MicControl
                 state={micState}
                 level={dictation.level}
@@ -1209,20 +1177,26 @@ function LegacyRehearse() {
                   )
                 }
               />
-
+              <Text style={styles.voiceState} accessibilityLiveRegion="polite">
+                {dictation.status === "recording" ? "LISTENING NOW — TAP TO STOP" : "TAP TO SPEAK"}
+              </Text>
               <Pressable
-                onPress={toggleSpeaker}
+                onPress={() => {
+                  tap("light");
+                  setMode("text");
+                }}
                 hitSlop={10}
-                style={styles.iconHit}
+                style={styles.typeInsteadHit}
                 accessibilityRole="button"
-                accessibilityLabel={speakerLabel(speakerState, themName)}
+                accessibilityLabel="Type this turn instead"
               >
-                {speakerState === "muted" ? (
-                  <VolumeX size={20} color={C.dim} strokeWidth={1.7} />
-                ) : (
-                  <Volume2 size={20} color={C.textSoft} strokeWidth={1.7} />
-                )}
+                <Text style={styles.typeInsteadText}>Type this turn instead</Text>
               </Pressable>
+              {speech.canReplay ? (
+                <Pressable onPress={toggleSpeaker} hitSlop={10} accessibilityRole="button" accessibilityLabel={speakerLabel(speakerState, themName)}>
+                  <Text style={styles.voiceUtility}>{speakerState === "muted" ? `Hear ${themName}` : "Voice on"}</Text>
+                </Pressable>
+              ) : null}
             </View>
           )}
         </StateDock>
@@ -1488,19 +1462,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.line,
   },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 48 },
+  headerRow: { flexDirection: "row", alignItems: "center", minHeight: 48 },
+  headerSide: { width: 64 },
+  headerTurn: { ...eyebrow, flex: 1, textAlign: "center", color: C.textSoft, fontSize: 12 },
+  closeHit: { width: 64, minHeight: 44, alignItems: "flex-end", justifyContent: "center" },
+  closeText: { fontFamily: font.regular, fontSize: 17, color: C.text },
   iconHit: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  headerCenter: { flex: 1, alignItems: "flex-start", gap: 2, minWidth: 0 },
-  headerName: { ...T.support, fontFamily: font.semi, color: C.text },
-  headerMeta: { ...T.caption, color: C.dim },
-  endBtn: {
-    borderWidth: 1,
-    borderColor: C.lineStrong,
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  endText: { ...T.caption, fontFamily: font.semi, color: C.textSoft },
   tensionWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -1509,13 +1476,15 @@ const styles = StyleSheet.create({
   },
   tensionLabel: { ...eyebrow, color: C.dim },
 
-  transcript: { paddingHorizontal: GUTTER, paddingTop: 14, paddingBottom: 24 },
-  threadContext: { alignSelf: "center", maxWidth: 330, paddingHorizontal: 16, paddingVertical: 12, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.48)", borderWidth: 1, borderColor: C.glassEdge, marginBottom: 26 },
-  threadContextLabel: { ...eyebrow, color: C.purple, textAlign: "center", marginBottom: 5 },
-  threadContextText: { ...T.caption, color: C.textSoft, textAlign: "center", lineHeight: 19 },
-  emptyThread: { alignItems: "center", paddingHorizontal: 22, paddingVertical: 28 },
-  emptyThreadTitle: { ...T.title, color: C.text, textAlign: "center" },
-  emptyThreadSupport: { ...T.support, color: C.textSoft, textAlign: "center", marginTop: 9, lineHeight: 22 },
+  transcript: { paddingHorizontal: GUTTER, paddingTop: 18, paddingBottom: 28 },
+  taskIntro: { marginBottom: 16 },
+  taskIntroLabel: { ...eyebrow, color: C.purple, marginBottom: 8, fontSize: 12 },
+  taskIntroPrompt: { ...T.display, fontFamily: font.bold, fontSize: 26, lineHeight: 32 },
+  threadContext: { width: "100%", paddingHorizontal: 18, paddingVertical: 18, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.58)", borderWidth: 1, borderColor: C.glassEdge, marginBottom: 26 },
+  threadContextLabel: { ...eyebrow, color: C.textSoft, marginBottom: 10, fontSize: 12 },
+  threadContextText: { ...T.body, color: C.text, lineHeight: 25 },
+  threadContextGoal: { ...T.support, color: C.textSoft, marginTop: 13 },
+  inPersonNote: { ...eyebrow, color: C.purple, marginTop: 14, fontSize: 10 },
   reviewScroll: { paddingHorizontal: GUTTER, gap: 12 },
   reviewEyebrow: { ...eyebrow, color: C.purple },
   reviewTitle: { ...T.display },
@@ -1550,20 +1519,19 @@ const styles = StyleSheet.create({
 
   errorBox: { gap: 10, marginBottom: 20 },
   errorText: { ...T.caption, color: C.clay },
-  turnTask: { backgroundColor: C.purpleSoft, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 11 },
-  turnTaskStep: { ...eyebrow, color: C.purple, marginBottom: 4 },
-  turnTaskPrompt: { ...T.support, fontFamily: font.semi, color: C.text, lineHeight: 21 },
   dockHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   dockDot: { width: 6, height: 6, borderRadius: 3 },
   dockLabel: { color: C.dim },
   dockHelp: { ...T.caption, marginTop: 6 },
 
-  micRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 6,
-  },
+  voiceDock: { minHeight: 260 },
+  immersiveControl: { alignItems: "center", justifyContent: "center", paddingTop: 4, gap: 14 },
+  voiceOrb: { width: 104, height: 104, borderRadius: 52, backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.lineStrong, alignItems: "center", justifyContent: "center" },
+  voiceState: { ...eyebrow, color: C.purple, textAlign: "center", fontSize: 12 },
+  typeInsteadHit: { minHeight: 44, justifyContent: "center", paddingHorizontal: 12 },
+  typeInsteadText: { ...T.support, color: C.textSoft },
+  typeUnavailable: { ...T.support, color: C.textDim, opacity: 0.72, minHeight: 44, textAlignVertical: "center" },
+  voiceUtility: { ...T.caption, color: C.purple, minHeight: 36, textAlignVertical: "center" },
   playbackRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1609,7 +1577,6 @@ const styles = StyleSheet.create({
   completeWaiting: { minHeight: 52, alignItems: "center", justifyContent: "center", marginTop: 12 },
   completeActions: { gap: 10, marginTop: 12 },
   recoveryRow: { marginTop: 12 },
-  speakingActions: { gap: 10, marginTop: 12 },
   composeWrap: { gap: 12, marginTop: 10 },
   composeLabel: { ...eyebrow, color: C.purple },
   composeInput: {
