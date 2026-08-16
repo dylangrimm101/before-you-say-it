@@ -2,7 +2,6 @@ import { Audio } from "expo-av";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 
-import { voiceIdFor } from "@/constants/personas";
 import { PILOT_PROGRAM } from "@/lib/pilotCurriculum";
 import { errorShape, safeLog } from "@/lib/redact";
 import {
@@ -16,38 +15,17 @@ import {
 import type { PersonaVoice } from "@/types/convo";
 import type { PilotAudioLine } from "@/types/pilotCurriculum";
 
-const BASE = process.env.EXPO_PUBLIC_TOOLKIT_URL ?? "";
-const KEY = process.env.EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY ?? "";
+const TTS_ENDPOINT = process.env.EXPO_PUBLIC_TTS_ENDPOINT?.trim() || "https://beforeyousayit.app/api/tts";
 
-// Voice ids live with the persona definitions, so gender and voice cannot drift.
+type BysiVoiceRole = "hope" | "adam";
 
-/** Both voices use the expressive model auditioned and approved in ElevenLabs. */
-const TTS_MODEL: Record<PersonaVoice, string> = {
-  "woman-hope": "eleven_v3",
-  "man-adam": "eleven_v3",
-};
-
-interface VoiceSettings {
-  speed: number;
-  stability: number;
-  similarity_boost: number;
-  style: number;
-  use_speaker_boost: boolean;
+function roleForPersona(persona: PersonaVoice): BysiVoiceRole {
+  return persona === "man-adam" ? "adam" : "hope";
 }
 
-/** Explicitly mirrors each voice's approved ElevenLabs controls. */
-const APPROVED_VOICE_SETTINGS: VoiceSettings = {
-  speed: 0.97,
-  stability: 0.58,
-  similarity_boost: 0.75,
-  style: 0.05,
-  use_speaker_boost: false,
-};
-
-const VOICE_SETTINGS: Record<PersonaVoice, VoiceSettings> = {
-  "woman-hope": APPROVED_VOICE_SETTINGS,
-  "man-adam": APPROVED_VOICE_SETTINGS,
-};
+function evidenceEndpoint(url: string): string {
+  return url.replace(/^https?:\/\//, "").slice(0, 64);
+}
 
 /** A single frame of silence, used only to unlock playback from a real tap. */
 const SILENT_WAV =
@@ -147,22 +125,40 @@ export async function unlockAudioPlayback(): Promise<boolean> {
 }
 
 async function fetchSpeechDataUri(text: string, persona: PersonaVoice): Promise<string> {
-  if (__DEV__) console.log(`[voice] tts_request persona=${persona}`);
-  const request = async (format: "mp3_44100_192" | "mp3_44100_128"): Promise<Response> => fetch(
-    `${BASE}/v2/elevenlabs/v1/text-to-speech/${voiceIdFor(persona)}?output_format=${format}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
-      body: JSON.stringify({ text, model_id: TTS_MODEL[persona], voice_settings: VOICE_SETTINGS[persona] }),
-    },
-  );
-  let res = await request("mp3_44100_192");
-  if (!res.ok && (res.status === 400 || res.status === 402 || res.status === 422)) {
-    res = await request("mp3_44100_128");
+  const role = roleForPersona(persona);
+  safeLog("[evidence] BYSI TTS request", {
+    endpoint: evidenceEndpoint(TTS_ENDPOINT),
+    provider: "user-owned-bysi-tts",
+    role,
+  });
+  const response = await fetch(TTS_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role, text }),
+  });
+  const contentType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown";
+  if (!response.ok) {
+    safeLog("[evidence] BYSI TTS response", {
+      endpoint: evidenceEndpoint(TTS_ENDPOINT),
+      ok: false,
+      role,
+      status: response.status,
+      type: contentType,
+    });
+    throw new Error(`Voice request failed (${response.status})`);
   }
-  if (!res.ok) throw new Error(`Voice request failed (${res.status})`);
+  if (contentType !== "audio/mpeg") throw new Error("Voice response was not MPEG audio");
 
-  const blob = await res.blob();
+  const blob = await response.blob();
+  safeLog("[evidence] BYSI TTS response", {
+    count: blob.size,
+    endpoint: evidenceEndpoint(TTS_ENDPOINT),
+    ok: true,
+    role,
+    status: response.status,
+    type: contentType,
+  });
+  if (blob.size === 0) throw new Error("Voice response was empty");
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(String(reader.result));
@@ -277,7 +273,13 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
     if (!el) return "failed";
     el.src = source;
     el.onended = () => {
-      if (id === token) publish({ phase: "idle" });
+      if (id !== token) return;
+      safeLog("[evidence] BYSI TTS playback completed", {
+        platform: Platform.OS,
+        role: lastUtterance ? roleForPersona(lastUtterance.persona) : "unknown",
+        status: "completed",
+      });
+      publish({ phase: "idle" });
     };
     try {
       await el.play();
@@ -317,7 +319,14 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
     sound.unloadAsync().catch(() => {});
     if (currentSound === sound) {
       currentSound = null;
-      if (id === token) publish({ phase: "idle" });
+      if (id === token) {
+        safeLog("[evidence] BYSI TTS playback completed", {
+          platform: Platform.OS,
+          role: lastUtterance ? roleForPersona(lastUtterance.persona) : "unknown",
+          status: "completed",
+        });
+        publish({ phase: "idle" });
+      }
     }
   });
   return "played";

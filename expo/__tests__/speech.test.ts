@@ -417,4 +417,20 @@ describe("data URIs are never handed to native playback", () => {
     expect(source).toContain("if (id !== token)");
     expect(source).toContain("export async function resetSpeech");
   });
+
+  it("speaks only counterpart text through the user-owned BYSI TTS endpoint", async () => {
+    const voice = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
+    const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    expect(voice).toContain('"https://beforeyousayit.app/api/tts"');
+    expect(voice).toContain("JSON.stringify({ role, text })");
+    expect(voice).toContain('contentType !== "audio/mpeg"');
+    expect(voice).toContain("blob.size");
+    expect(voice).toContain("BYSI TTS playback completed");
+    expect(voice).not.toContain("EXPO_PUBLIC_TOOLKIT_URL");
+    expect(voice).not.toContain("EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY");
+    expect(voice).not.toContain("elevenlabs");
+    expect(rehearsal).toContain("reveal(res.reply, res.nudge)");
+    expect(rehearsal).toContain("await speak(spoken, persona");
+    expect(rehearsal.indexOf("reveal(res.reply, res.nudge)")).toBeLessThan(rehearsal.indexOf("await speak(spoken, persona"));
+  });
 });

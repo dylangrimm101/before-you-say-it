@@ -48,9 +48,11 @@ describe("server-side recording transcription", () => {
   });
 
   test("private provider and deployment credentials are absent from Expo configuration", async () => {
-    const env = await Bun.file(`${expoRoot}/.env`).text();
+    const envFile = Bun.file(`${expoRoot}/.env`);
+    const env = await envFile.exists() ? await envFile.text() : "";
     expect(env).not.toMatch(/^OPENAI_API_KEY=/m);
     expect(env).not.toMatch(/^ANTHROPIC_API_KEY=/m);
+    expect(env).not.toMatch(/^ELEVENLABS_API_KEY=/m);
     expect(env).not.toMatch(/^SUPABASE_ACCESS_TOKEN=/m);
     expect(env).not.toMatch(/^(?:SUPABASE_)?SERVICE_ROLE(?:_KEY)?=/m);
   });

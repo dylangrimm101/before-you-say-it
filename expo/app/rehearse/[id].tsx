@@ -383,13 +383,12 @@ function LegacyRehearse() {
         setTension(res.tension);
         setThinking(false);
         const spoken = speechTextFor(res.reply, themName);
-        if (spoken.length === 0) {
-          reveal(res.reply, res.nudge);
-        } else {
-          // The acquisition rehearsal always honors the selected voice. Keep the
-          // response staged while TTS is generated, then reveal it as playback starts.
+        // Match the web flow: the generated counterpart text is visible immediately,
+        // then that exact Hope/Adam line is sent to BYSI TTS. The learner's own
+        // transcript never enters the playback path.
+        reveal(res.reply, res.nudge);
+        if (spoken.length > 0) {
           await speak(spoken, persona, { muted: !voiceOnRef.current });
-          reveal(res.reply, res.nudge);
         }
       } catch (e) {
         safeLog("[rehearse] turn failed", errorShape(e));

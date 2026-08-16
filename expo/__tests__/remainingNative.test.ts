@@ -36,6 +36,23 @@ describe("remaining native acquisition and paid experience", () => {
     expect(rehearsal).toContain("retry without saying it again");
   });
 
+  test("the free result follows the working web baseline, rewrite, shift, and trial sequence", async () => {
+    const loading = await source("app/debrief/[id].tsx");
+    const results = await source("components/FreeJourneyResults.tsx");
+    expect(loading).toContain("Personalizing your");
+    expect(loading).toContain("practice plan…");
+    expect(results).toContain("Your communication baseline");
+    expect(results).toContain("You stayed in the room. Now make the ask hold.");
+    expect(results).toContain("Where it stalls:");
+    expect(results).toContain("Here’s what practice is helping you say");
+    expect(results).toContain("Your thoughts and feelings are valid and deserve to be heard.");
+    expect(results).toContain("Practicing your communication skills builds the confidence to find the right words when pressure shows up.");
+    expect(results).toContain('label="Start 7-Day free trial"');
+    expect(results.indexOf('label="Show what changes with practice"')).toBeLessThan(results.indexOf("Here’s what practice is helping you say"));
+    expect(results.indexOf("Here’s what practice is helping you say")).toBeLessThan(results.indexOf("Your thoughts and feelings are valid"));
+    expect(results.indexOf("Your thoughts and feelings are valid")).toBeLessThan(results.indexOf('label="Start 7-Day free trial"'));
+  });
+
   test("existing web customers authenticate and reconnect their paid identity", async () => {
     const layout = await source("app/_layout.tsx");
     const continuation = await source("app/continue-from-web.tsx");

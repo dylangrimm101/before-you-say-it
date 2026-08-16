@@ -89,9 +89,23 @@ describe("event-driven plan build", () => {
     expect(screen).toContain("const availableCount = Math.min(build.events.length, PIPELINE_ROWS.length)");
     expect(screen).toContain("if (completedCount >= availableCount) return");
     expect(screen).toContain("presentCompletedEvent.start");
-    expect(screen).toContain('status === "done" ? (');
+    expect(screen).toContain('status === "done" ? <Text style={styles.completedLabel}>Complete</Text> : null');
     expect(screen).toContain('status === "queued" ? 0.32 : 1');
     expect(screen).toContain('build.events.includes("plan.ready")');
+  });
+
+  test("matches the web loading copy and automatically hands off to the baseline", async () => {
+    const screen = await Bun.file(`${import.meta.dir}/../app/debrief/[id].tsx`).text();
+    expect(screen).toContain('Personalizing your{"\\n"}');
+    expect(screen).toContain("practice plan…");
+    expect(screen).toContain("You did the hard part. Practicing it out loud is the step most people skip.");
+    expect(screen).toContain("Reading your pressure pattern");
+    expect(screen).toContain("Finding where the conversation stalled");
+    expect(screen).toContain("Choosing the first skill to train");
+    expect(screen).toContain("Finalizing your report");
+    expect(screen).toContain("Only approved text is used.");
+    expect(screen).toContain("if (!isReady) return");
+    expect(screen).toContain("revealDebrief()");
   });
 
   test("makes the active analysis stage visibly scan before handing off", async () => {

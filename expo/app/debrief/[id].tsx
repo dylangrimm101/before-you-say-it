@@ -21,7 +21,6 @@ import { CURRICULUM_MODULES, curriculumModule, type ModuleId } from "@/constants
 import {
   CONVERSATION_PHASES,
   conversionEvidence,
-  type ConversionEvidence,
 } from "@/lib/conversion";
 import {
   cancelConversionBuild,
@@ -34,13 +33,12 @@ import { getLiveSessionContent } from "@/lib/ephemeral";
 import { cancelPendingResult } from "@/lib/freeJourney";
 import { useIsPro } from "@/lib/purchases";
 import { useStore } from "@/providers/store";
-import type { Turn } from "@/types/convo";
 
 const PIPELINE_ROWS: { event: ConversionEvent; label: string }[] = [
-  { event: "transcript.confirmed", label: "Reviewing what you said" },
-  { event: "exchange.paired", label: "Looking at your opener and the response together" },
-  { event: "skill.identified", label: "Identifying the skill to build first" },
-  { event: "path.mapped", label: "Mapping your recommended practice path" },
+  { event: "transcript.confirmed", label: "Reading your pressure pattern" },
+  { event: "exchange.paired", label: "Finding where the conversation stalled" },
+  { event: "skill.identified", label: "Choosing the first skill to train" },
+  { event: "path.mapped", label: "Finalizing your report" },
 ];
 
 function quote(text: string): string {
@@ -192,78 +190,6 @@ function WaitingDots() {
   );
 }
 
-function TranscriptArtifact({ turns }: { turns: Turn[] }) {
-  const learnerQuote = turns.find((turn) => turn.role === "user")?.text ?? "";
-  if (!learnerQuote) return null;
-  return (
-    <GlassCard style={styles.artifactCard} raised={false}>
-      <Text style={[eyebrow, styles.confirmed]}>Confirmed</Text>
-      <Text style={styles.artifactQuote}>{quote(learnerQuote)}</Text>
-    </GlassCard>
-  );
-}
-
-function ExchangeArtifact({ build }: { build: ConversionBuild }) {
-  const learner = build.turns.find((turn) => turn.role === "user")?.text ?? "";
-  const counterpart = build.turns.find((turn) => turn.role === "them")?.text ?? "";
-  if (!learner || !counterpart) return null;
-  return (
-    <View style={styles.exchange}>
-      <View style={styles.exchangeRow}>
-        <Text style={styles.speaker}>You</Text>
-        <Text style={styles.exchangeText}>{quote(learner)}</Text>
-      </View>
-      <View style={styles.exchangeRow}>
-        <Text style={styles.speaker}>{build.counterpartName}</Text>
-        <Text style={styles.exchangeText}>{quote(counterpart)}</Text>
-      </View>
-    </View>
-  );
-}
-
-function SkillArtifact({ evidence }: { evidence: ConversionEvidence | null }) {
-  if (!evidence) return null;
-  return (
-    <GlassCard style={styles.skillArtifact} raised={false}>
-      <Text style={[eyebrow, styles.focusEyebrow]}>First skill</Text>
-      <Text style={styles.skillArtifactName}>{evidence.focus.name}</Text>
-    </GlassCard>
-  );
-}
-
-function PathArtifact() {
-  return (
-    <View style={styles.pathArtifact}>
-      {CONVERSATION_PHASES.map((phase, index) => (
-        <View key={phase.id} style={styles.pathArtifactRow}>
-          <View style={[styles.pathDot, index === 0 && styles.pathDotCurrent]} />
-          <Text style={[styles.pathName, index > 0 && styles.pathNameFuture]} numberOfLines={1}>
-            {phase.name}
-          </Text>
-          <Text style={styles.pathDays}>Days {phase.days}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function PipelineArtifact({ row, build, evidence }: {
-  row: (typeof PIPELINE_ROWS)[number];
-  build: ConversionBuild;
-  evidence: ConversionEvidence | null;
-}) {
-  switch (row.event) {
-    case "transcript.confirmed":
-      return <TranscriptArtifact turns={build.turns} />;
-    case "exchange.paired":
-      return <ExchangeArtifact build={build} />;
-    case "skill.identified":
-      return <SkillArtifact evidence={evidence} />;
-    case "path.mapped":
-      return <PathArtifact />;
-  }
-}
-
 function ActiveAnalysis() {
   const isReduced = useReducedMotion();
   const pulse = useRef<Animated.Value>(new Animated.Value(0)).current;
@@ -336,14 +262,10 @@ function ActiveAnalysis() {
 function PipelineRow({
   row,
   status,
-  build,
-  evidence,
   isLast,
 }: {
   row: (typeof PIPELINE_ROWS)[number];
   status: PipelineStatus;
-  build: ConversionBuild;
-  evidence: ConversionEvidence | null;
   isLast: boolean;
 }) {
   const isReduced = useReducedMotion();
@@ -416,11 +338,7 @@ function PipelineRow({
         >
           {status === "active" ? `Analyzing · ${row.label}` : row.label}
         </Text>
-        {status === "done" ? (
-          <Artifact>
-            <PipelineArtifact row={row} build={build} evidence={evidence} />
-          </Artifact>
-        ) : null}
+        {status === "done" ? <Text style={styles.completedLabel}>Complete</Text> : null}
       </View>
     </Animated.View>
   );
@@ -436,7 +354,6 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
   const scrollRef = useRef<ScrollView | null>(null);
   const isFollowingNewest = useRef<boolean>(true);
   const screenOpacity = useRef<Animated.Value>(new Animated.Value(1)).current;
-  const evidence = build.debrief ? conversionEvidence(build.turns, build.debrief) : null;
 
   const availableCount = Math.min(build.events.length, PIPELINE_ROWS.length);
 
@@ -474,15 +391,23 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
       onReady();
       return;
     }
-    Animated.timing(screenOpacity, {
-      toValue: 0,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
+    Animated.sequence([
+      Animated.delay(520),
+      Animated.timing(screenOpacity, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
       if (finished) onReady();
     });
   }, [isReduced, onReady, screenOpacity]);
+
+  useEffect(() => {
+    if (!isReady) return;
+    revealDebrief();
+  }, [isReady, revealDebrief]);
 
   return (
     <Animated.View style={[styles.root, { opacity: screenOpacity }]}>
@@ -510,10 +435,8 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
         }}
       >
         <View>
-          <View style={styles.privateRow}>
-            <Text style={styles.privatePractice}>Private practice</Text>
-          </View>
-          <Text style={styles.buildTitle}>Building your communication plan</Text>
+          <Text style={styles.buildTitle}>Personalizing your{"\n"}<Text style={styles.buildTitleAccent}>practice plan…</Text></Text>
+          <Text style={styles.buildAcknowledgement}>You did the hard part. Practicing it out loud is the step most people skip.</Text>
           <SegmentProgress completedCount={completedCount} />
 
           <View style={styles.pipeline}>
@@ -522,8 +445,6 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
                 key={row.event}
                 row={row}
                 status={statusOf(index, completedCount)}
-                build={build}
-                evidence={evidence}
                 isLast={index === PIPELINE_ROWS.length - 1}
               />
             ))}
@@ -531,12 +452,10 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
 
           {isReady ? (
             <Artifact duration={320}>
-              <Text style={styles.readyTitle}>Your starting point is ready</Text>
-              <Text style={styles.readySupport}>
-                One moment from your rehearsal, one skill to build, and where it sits in the curriculum.
-              </Text>
+              <Text style={styles.readyTitle}>Your communication baseline is ready</Text>
             </Artifact>
           ) : null}
+          <Text style={styles.approvedOnly}>Only approved text is used.</Text>
         </View>
       </ScrollView>
 
@@ -546,11 +465,13 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
             <Text style={styles.errorText}>{build.error}</Text>
             <PrimaryButton label="Back to today" onPress={() => router.replace("/(tabs)")} />
           </>
-        ) : isReady ? (
-          <PrimaryButton label="See what I found" onPress={revealDebrief} />
         ) : (
           <View style={styles.workingRow}>
-            {isReduced ? <Text style={styles.workingText}>Working</Text> : <WaitingDots />}
+            {isReady
+              ? <Text style={styles.workingText}>Opening your communication baseline…</Text>
+              : isReduced
+                ? <Text style={styles.workingText}>Working</Text>
+                : <WaitingDots />}
           </View>
         )}
         {!isReady && !build.error ? <PressCard onPress={() => void getSupport()} accessibilityLabel="Get support instead"><Text style={styles.supportLink}>Get support instead</Text></PressCard> : null}
@@ -790,7 +711,9 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", justifyContent: "center", padding: 30 },
   privateRow: { alignItems: "flex-end", minHeight: 24 },
   privatePractice: { ...eyebrow, color: C.dim },
-  buildTitle: { ...T.display, marginTop: 4, maxWidth: 330 },
+  buildTitle: { ...T.display, marginTop: 28, textAlign: "center" },
+  buildTitleAccent: { color: C.purple },
+  buildAcknowledgement: { ...T.support, color: C.textSoft, textAlign: "center", marginTop: 14, marginHorizontal: 12 },
   segments: { flexDirection: "row", gap: 6, marginTop: 14, marginBottom: 16 },
   segmentTrack: { height: 3, flex: 1, borderRadius: 2, backgroundColor: C.track, overflow: "hidden" },
   segmentFill: { ...StyleSheet.absoluteFillObject, backgroundColor: C.purple },
@@ -810,6 +733,8 @@ const styles = StyleSheet.create({
   scanLine: { position: "absolute", left: 0, right: 0, top: 0, height: 2, backgroundColor: C.purple },
   pipelineLabel: { ...T.support, color: C.dim, zIndex: 1 },
   pipelineLabelActive: { ...T.body, fontFamily: font.semi, color: C.text },
+  completedLabel: { ...T.caption, color: C.purple, marginTop: 4 },
+  approvedOnly: { ...T.caption, color: C.dim, textAlign: "center", marginTop: 24 },
   artifactCard: { marginTop: 10, borderRadius: radius.md, padding: 15 },
   confirmed: { color: C.dim },
   artifactQuote: { ...T.support, color: C.text, marginTop: 7 },

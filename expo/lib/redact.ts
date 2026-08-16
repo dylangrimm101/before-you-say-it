@@ -40,6 +40,7 @@ const ALLOWED_KEYS: readonly string[] = [
   "event",
   "platform",
   "provider",
+  "role",
   "turn",
   "type",
   "userTurnCount",
