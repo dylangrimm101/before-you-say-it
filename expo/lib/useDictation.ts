@@ -42,10 +42,17 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   const [error, setError] = useState<string>("");
   const [level, setLevel] = useState<number>(0);
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const webRecorderRef = useRef<MediaRecorder | null>(null);
+  const webStreamRef = useRef<MediaStream | null>(null);
+  const webChunksRef = useRef<Blob[]>([]);
   const operationRef = useRef<boolean>(false);
 
   const reset = useCallback(() => {
     recordingRef.current = null;
+    webRecorderRef.current = null;
+    webStreamRef.current?.getTracks().forEach((track) => track.stop());
+    webStreamRef.current = null;
+    webChunksRef.current = [];
     setStatus("idle");
     setError("");
     setLevel(0);
@@ -54,6 +61,12 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   const requestPermission = useCallback(async (): Promise<boolean> => {
     setError("");
     try {
+      if (Platform.OS === "web") {
+        const stream = await requestWebMicrophone();
+        stream.getTracks().forEach((track) => track.stop());
+        setStatus("idle");
+        return true;
+      }
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
         setStatus("denied");
@@ -71,10 +84,29 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   }, []);
 
   const start = useCallback(async (): Promise<void> => {
-    if (operationRef.current || recordingRef.current) return;
+    if (operationRef.current || recordingRef.current || webRecorderRef.current) return;
     operationRef.current = true;
     setError("");
     try {
+      if (Platform.OS === "web") {
+        const stream = await requestWebMicrophone();
+        webStreamRef.current = stream;
+        const mimeType = preferredWebMimeType();
+        const recorder = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
+        webChunksRef.current = [];
+        recorder.ondataavailable = (event: BlobEvent): void => {
+          if (event.data.size > 0) webChunksRef.current.push(event.data);
+        };
+        recorder.start();
+        webRecorderRef.current = recorder;
+        setLevel(0.45);
+        setStatus("recording");
+        tap("medium");
+        return;
+      }
+
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
         setStatus("denied");
@@ -109,8 +141,14 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         return;
       }
       setStatus("error");
-      setError("Could not start the microphone.");
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+      setError(Platform.OS === "web"
+        ? "Microphone access is unavailable in this preview. Allow it in your browser, or type this turn instead."
+        : "Could not start the microphone.");
+      webStreamRef.current?.getTracks().forEach((track) => track.stop());
+      webStreamRef.current = null;
+      if (Platform.OS !== "web") {
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+      }
     } finally {
       operationRef.current = false;
     }
@@ -120,18 +158,27 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
     if (operationRef.current) return;
     operationRef.current = true;
     const recording = recordingRef.current;
+    const webRecorder = webRecorderRef.current;
     recordingRef.current = null;
+    webRecorderRef.current = null;
     setLevel(0);
     setStatus("idle");
-    if (!recording) {
+    if (!recording && !webRecorder) {
       operationRef.current = false;
       return;
     }
     let uri: string | null = null;
     try {
-      await recording.stopAndUnloadAsync();
-      uri = recording.getURI();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      if (webRecorder) {
+        await stopWebRecorder(webRecorder);
+        webStreamRef.current?.getTracks().forEach((track) => track.stop());
+        webStreamRef.current = null;
+        webChunksRef.current = [];
+      } else if (recording) {
+        await recording.stopAndUnloadAsync();
+        uri = recording.getURI();
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      }
     } catch (e) {
       safeLog("[dictation] cancel failed", errorShape(e));
     } finally {
@@ -143,17 +190,29 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   const stop = useCallback(async (): Promise<string | null> => {
     if (operationRef.current) return null;
     const recording = recordingRef.current;
-    if (!recording) return null;
+    const webRecorder = webRecorderRef.current;
+    if (!recording && !webRecorder) return null;
     operationRef.current = true;
     recordingRef.current = null;
+    webRecorderRef.current = null;
 
     setStatus("transcribing");
     setLevel(0);
     let uri: string | null = null;
     try {
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      uri = recording.getURI();
+      if (webRecorder) {
+        await stopWebRecorder(webRecorder);
+        webStreamRef.current?.getTracks().forEach((track) => track.stop());
+        webStreamRef.current = null;
+        const mimeType = webRecorder.mimeType || "audio/webm";
+        const blob = new Blob(webChunksRef.current, { type: mimeType });
+        webChunksRef.current = [];
+        if (blob.size > 0) uri = URL.createObjectURL(blob);
+      } else if (recording) {
+        await recording.stopAndUnloadAsync();
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+        uri = recording.getURI();
+      }
 
       if (!uri) {
         setStatus("error");
@@ -188,6 +247,28 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   }, [keepAudioAs]);
 
   return { status, error, level, requestPermission, start, stop, cancel, reset };
+}
+
+async function requestWebMicrophone(): Promise<MediaStream> {
+  if (!globalThis.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Microphone capture requires a secure browser preview");
+  }
+  return navigator.mediaDevices.getUserMedia({ audio: true });
+}
+
+function preferredWebMimeType(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+  return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
+}
+
+function stopWebRecorder(recorder: MediaRecorder): Promise<void> {
+  if (recorder.state === "inactive") return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    recorder.onstop = (): void => resolve();
+    recorder.onerror = (): void => reject(new Error("Browser microphone recorder failed"));
+    recorder.stop();
+  });
 }
 
 function isPermissionDenied(error: unknown): boolean {

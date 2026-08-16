@@ -1268,7 +1268,9 @@ const DOCK_COPY: Record<
     help: "Open Settings to allow access, try the permission request again, or type this turn instead.",
   }),
   "mic-error": (_them, _counterpart, h) => ({
-    label: "Microphone unavailable",
+    label: h.dictation?.startsWith("Voice transcription")
+      ? "Transcription unavailable"
+      : "Microphone unavailable",
     help: h.dictation ?? "Try the microphone again, or type this turn instead.",
   }),
   "playback-failed": (_them, counterpart) => ({

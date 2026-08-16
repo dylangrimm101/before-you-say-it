@@ -142,12 +142,16 @@ describe("required exercised curriculum paths", () => {
   test("recording and transcription failures remain recoverable through retry or typed fallback", async () => {
     const dictation = await Bun.file(`${import.meta.dir}/../lib/useDictation.ts`).text();
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
-    expect(dictation).toContain('setError("Could not start the microphone.")');
+    expect(dictation).toContain('"Could not start the microphone."');
     expect(dictation).toContain('setError("No recording was captured.")');
     expect(dictation).toContain('"Voice transcription is temporarily unavailable. Type this turn instead."');
     expect(dictation).toContain('"Could not transcribe that. Try again."');
     expect(dictation).toContain("TranscriptionUnavailableError");
     expect(dictation).toContain('if (Platform.OS !== "web")');
+    expect(dictation).toContain("navigator.mediaDevices.getUserMedia({ audio: true })");
+    expect(dictation).toContain("new MediaRecorder(stream");
+    expect(dictation).toContain("await stopWebRecorder(webRecorder)");
+    expect(dictation).toContain("webStreamRef.current?.getTracks().forEach");
     expect(dictation).toContain("await response.blob()");
     expect(dictation).toContain("reader.readAsDataURL(blob)");
     expect(dictation).toContain("URL.revokeObjectURL(uri)");
@@ -156,6 +160,7 @@ describe("required exercised curriculum paths", () => {
     expect(rehearsal).toContain("Type instead");
     expect(rehearsal).toContain("openMicrophoneSettings");
     expect(rehearsal).toContain("retryMicrophone");
+    expect(rehearsal).toContain('"Transcription unavailable"');
     const ai = await Bun.file(`${import.meta.dir}/../lib/ai.ts`).text();
     expect(ai).toContain('"ai-transcription-model-specification-version": "4"');
     expect(ai).toContain("res.status === 402 || res.status === 429 || res.status >= 500");
