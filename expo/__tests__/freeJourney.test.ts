@@ -222,12 +222,9 @@ describe("Claude Design free journey contract", () => {
     expect(source.indexOf("approveTranscript")).toBeLessThan(source.indexOf("analyzeApprovedTranscript(approvedTurns)"));
   });
 
-  test("Privacy & details opens the real local privacy route with truthful current-build claims", async () => {
-    const briefing = await Bun.file(`${import.meta.dir}/../components/RehearsalBriefing.tsx`).text();
+  test("the local privacy route keeps truthful current-build claims", async () => {
     const layout = await Bun.file(`${import.meta.dir}/../app/_layout.tsx`).text();
     const privacy = await Bun.file(`${import.meta.dir}/../app/privacy.tsx`).text();
-    expect(briefing).toContain('accessibilityLabel="Privacy and details"');
-    expect(briefing).toContain('router.push("/privacy")');
     expect(layout).toContain('firstSegment === "privacy"');
     expect(layout).toContain("canInterruptFreeJourney");
     expect(privacy).toContain("Privacy &amp; details");

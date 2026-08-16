@@ -252,12 +252,14 @@ describe("complete onboarding route walkthroughs", () => {
 });
 
 describe("briefing, consent, and four-turn rehearsal", () => {
-  test("uses one concrete briefing with centered trust and safety access", async () => {
+  test("ends the concrete briefing at the before-you-answer guidance", async () => {
     const briefing = await Bun.file(`${import.meta.dir}/../components/RehearsalBriefing.tsx`).text();
-    for (const copy of ["BEFORE WE START", "Context", "Situation", "Your goal", "Likely pressure", "BEFORE YOU ANSWER", "Microphone requested only after you start.", "Privacy &amp; details", "This doesn’t feel safe"]) {
+    for (const copy of ["BEFORE WE START", "Context", "Situation", "Your goal", "Likely pressure", "BEFORE YOU ANSWER"]) {
       expect(briefing).toContain(copy);
     }
-    expect(briefing).not.toContain("You › Them › You › Them");
+    for (const removedCopy of ["Microphone requested only after you start.", "Privacy &amp; details", "This doesn’t feel safe", "You › Them › You › Them"]) {
+      expect(briefing).not.toContain(removedCopy);
+    }
   });
 
   test("keeps briefing, permission, and practice as separate states", async () => {
