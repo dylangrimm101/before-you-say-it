@@ -216,6 +216,15 @@ describe("the rehearsal reads as a spoken conversation thread", () => {
     expect(source).toContain("scrollRef.current?.scrollToEnd");
   });
 
+  it("slides each bubble in subtly from its speaker’s side", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    expect(source).toContain("const arrival = useRef(new Animated.Value(isReduced ? 1 : 0)).current");
+    expect(source).toContain("outputRange: [mine ? 14 : -14, 0]");
+    expect(source).toContain("bounciness: 2");
+    expect(source).toContain("useNativeDriver: true");
+    expect(source).toContain("arrival.setValue(1)");
+  });
+
   it("keeps the active spoken task visible through both onboarding turns", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     for (const copy of [

@@ -1322,8 +1322,8 @@ function Line({
     }
     const animation = Animated.spring(arrival, {
       toValue: 1,
-      speed: 15,
-      bounciness: 5,
+      speed: 18,
+      bounciness: 2,
       useNativeDriver: true,
     });
     animation.start();
@@ -1337,9 +1337,13 @@ function Line({
         {
           opacity: arrival,
           transform: [
-            { translateX: arrival.interpolate({ inputRange: [0, 1], outputRange: [mine ? 18 : -18, 0] }) },
-            { translateY: arrival.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) },
-            { scale: arrival.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) },
+            {
+              translateX: arrival.interpolate({
+                inputRange: [0, 1],
+                outputRange: [mine ? 14 : -14, 0],
+              }),
+            },
+            { translateY: arrival.interpolate({ inputRange: [0, 1], outputRange: [4, 0] }) },
           ],
         },
       ]}
