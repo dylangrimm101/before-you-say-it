@@ -425,6 +425,9 @@ describe("data URIs are never handed to native playback", () => {
     expect(source).toContain("allowsRecording: false");
     expect(source).toContain("shouldRouteThroughEarpiece: false");
     expect(source).toContain("createAudioPlayer");
+    expect(source).toContain("downloadFirst: false");
+    expect(source).toContain("status.isLoaded");
+    expect(source).toContain("BYSI TTS playback started");
   });
 
   it("speaks only counterpart text through the user-owned BYSI TTS endpoint", async () => {

@@ -314,14 +314,62 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
   if (id !== token) return "empty";
 
   const role = lastUtterance ? roleForPersona(lastUtterance.persona) : "unknown";
+  // `source` is already a complete local cache file. `downloadFirst: true`
+  // initializes an empty imperative player and attaches the source later, which
+  // races with `play()` and can silently do nothing. Attach it synchronously.
   const player = createAudioPlayer({ uri: source }, {
-    downloadFirst: true,
+    downloadFirst: false,
     keepAudioSessionActive: true,
     updateInterval: 100,
   });
   player.volume = 1;
   player.muted = false;
+  currentPlayer = player;
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      let removeLoadListener: (() => void) | null = null;
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        removeLoadListener?.();
+        reject(new Error("Voice audio did not load"));
+      }, 5000);
+      const finish = (): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        removeLoadListener?.();
+        resolve();
+      };
+      const loadSubscription = player.addListener("playbackStatusUpdate", (status) => {
+        if (status.isLoaded) finish();
+      });
+      removeLoadListener = (): void => loadSubscription.remove();
+      if (player.isLoaded || player.currentStatus.isLoaded) finish();
+    });
+  } catch (error) {
+    if (currentPlayer === player) currentPlayer = null;
+    player.remove();
+    throw error;
+  }
+
+  if (id !== token || currentPlayer !== player) {
+    player.remove();
+    return "empty";
+  }
+
+  let hasLoggedStart = false;
   const subscription = player.addListener("playbackStatusUpdate", (status) => {
+    if (status.playing && !hasLoggedStart) {
+      hasLoggedStart = true;
+      safeLog("[evidence] BYSI TTS playback started", {
+        platform: Platform.OS,
+        role,
+        status: "playing",
+      });
+    }
     if (!status.didJustFinish) return;
     subscription.remove();
     if (currentPlayer !== player) {
@@ -339,12 +387,6 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
       publish({ phase: "idle" });
     }
   });
-  if (id !== token) {
-    subscription.remove();
-    player.remove();
-    return "empty";
-  }
-  currentPlayer = player;
   player.play();
   publish({ phase: "speaking" });
   return "played";
