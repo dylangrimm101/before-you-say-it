@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, Lock } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Animated, Easing, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FreeJourneyResults } from "@/components/FreeJourneyResults";
@@ -32,6 +32,7 @@ import {
 import { getLiveSessionContent } from "@/lib/ephemeral";
 import { cancelPendingResult } from "@/lib/freeJourney";
 import { useIsPro } from "@/lib/purchases";
+import { safeLog } from "@/lib/redact";
 import { useStore } from "@/providers/store";
 
 const PIPELINE_ROWS: { event: ConversionEvent; label: string }[] = [
@@ -354,6 +355,13 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
   const scrollRef = useRef<ScrollView | null>(null);
   const isFollowingNewest = useRef<boolean>(true);
   const screenOpacity = useRef<Animated.Value>(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    safeLog("[evidence] native post-rehearsal screen", {
+      platform: Platform.OS,
+      screen: "personalizing",
+    });
+  }, []);
 
   const availableCount = Math.min(build.events.length, PIPELINE_ROWS.length);
 

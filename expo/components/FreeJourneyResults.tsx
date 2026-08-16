@@ -50,7 +50,11 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
     safeLog("[evidence] native post-rehearsal screen", {
       checkpoint,
       platform: Platform.OS,
-      screen: checkpoint === "pressure_moment" ? "communication-baseline" : checkpoint,
+      screen: checkpoint === "pressure_moment"
+        ? "communication-baseline"
+        : checkpoint === "practice_shift"
+          ? "practice-shift"
+          : checkpoint,
     });
   }, [checkpoint]);
 
@@ -136,7 +140,14 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
             </View>
           ) : null}
           <View style={styles.baselineCard}>
-            <Text style={styles.baselineScope}>From this rehearsal only.</Text>
+            <View style={styles.startingIndexSummary}>
+              <View style={styles.startingIndexCopy}>
+                <Text style={styles.groupLabel}>STARTING INDEX</Text>
+                <Text style={styles.startingIndexScope}>A partial view from this rehearsal only</Text>
+              </View>
+              <Text style={styles.startingIndexValue}>{result.starting_index.index_value ?? "—"}</Text>
+            </View>
+            <Text style={styles.baselineScope}>{result.starting_index.observed_count} of 6 signals observed. Unobserved signals aren’t scored.</Text>
             <Text style={styles.groupLabel}>WHAT THIS REP SHOWED</Text>
             {observedSignals.length > 0
               ? observedSignals.map((signal) => <SignalRow key={signal.signal_key} signal={signal} />)
@@ -186,13 +197,10 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
           <PressCard onPress={() => void move("rewrite")} accessibilityLabel="Back to clearer version">
             <Text style={styles.back}>Back</Text>
           </PressCard>
-          <Text style={styles.eyebrow}>YOUR PRACTICE PLAN</Text>
-          <Text style={styles.title}>Practice Shift</Text>
-          <Text style={styles.observation}>Practice helps the clearer version stay available when pressure shows up.</Text>
-          <ShiftComparison
-            currentSteps={result.practice_shift.current_pattern_steps}
-            targetSteps={result.practice_shift.practice_target_steps}
-          />
+          <Text style={styles.eyebrow}>Your Practice Shift</Text>
+          <Text style={styles.title}>Your thoughts and feelings are valid and deserve to be heard.</Text>
+          <Text style={styles.observation}>Practicing your communication skills builds the confidence to find the right words when pressure shows up.</Text>
+          <ShiftComparison />
           <View style={styles.goal}>
             <Text style={styles.detailLabel}>IMPROVE YOUR COMMUNICATION WITH PRACTICE</Text>
             <Text style={styles.goalText}>{result.practice_shift.success_target}</Text>
@@ -203,6 +211,11 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
           <PrimaryButton
             label="Start 7-Day free trial"
             onPress={async () => {
+              safeLog("[evidence] native post-rehearsal transition", {
+                platform: Platform.OS,
+                screen: "trial",
+                step: "practice-shift-to-trial",
+              });
               await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: "complete", updatedAt: Date.now() });
               router.push({ pathname: "/paywall", params: { gate: "recommended-path", source: "debrief", moduleId: result.first_focus?.recommended_module_id } });
             }}
@@ -319,12 +332,22 @@ function Detail({ label, text }: { label: string; text: string }) {
   return <View style={styles.detail}><Text style={styles.detailLabel}>{label}</Text><Text style={styles.detailText}>{text}</Text></View>;
 }
 
-function ShiftComparison({ currentSteps, targetSteps }: { currentSteps: string[]; targetSteps: string[] }) {
+function ShiftComparison() {
   return (
     <View style={styles.comparison}>
-      <ShiftColumn label="WITHOUT PRACTICE" steps={currentSteps} tone={C.amber} />
+      <ShiftColumn label="WITHOUT PRACTICE" steps={[
+        "The conversation starts with the same vague ask",
+        "Pushback makes the point harder to hold",
+        "You explain more than you need to",
+        "The conversation ends without a clear next step",
+      ]} tone={C.amber} />
       <View style={styles.divider} />
-      <ShiftColumn label="WITH BYSI PRACTICE" steps={targetSteps} tone={C.purple} />
+      <ShiftColumn label="WITH BYSI PRACTICE" steps={[
+        "Turn the thought into one clear request",
+        "Stay steady when they get defensive",
+        "Acknowledge them without dropping your point",
+        "Return to one clear next step",
+      ]} tone={C.purple} />
     </View>
   );
 }
@@ -386,6 +409,10 @@ const styles = StyleSheet.create({
   focusSummary: { ...T.support, color: C.textSoft },
   dockPromise: { ...T.caption, color: C.textSoft, textAlign: "center", marginTop: 8 },
   baselineCard: { backgroundColor: C.elevated, borderRadius: 24, padding: 20, gap: 11, marginTop: 10, ...shadow.layer },
+  startingIndexSummary: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 14 },
+  startingIndexCopy: { flex: 1, gap: 3 },
+  startingIndexScope: { ...T.caption, color: C.textSoft },
+  startingIndexValue: { fontFamily: font.bold, fontSize: 34, lineHeight: 38, color: C.purple },
   baselineScope: { ...T.caption, color: C.dim },
   signalChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   signalChip: { borderRadius: 999, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, paddingHorizontal: 11, paddingVertical: 7 },

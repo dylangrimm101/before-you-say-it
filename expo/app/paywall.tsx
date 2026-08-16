@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AlertCircle, ArrowLeft, Check, Clock3, RefreshCw, ShieldCheck } from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PurchasesPackage } from "react-native-purchases";
 
@@ -58,6 +58,14 @@ export default function Paywall() {
   const actions = commerceActionPresentation(commerceState, isPro, purchaseLabel);
   const hasCompleteEarnedResult = Boolean(activePracticeSession?.sharedResult?.pressure_moment && activePracticeSession.sharedResult.practice_shift && activePracticeSession.sharedResult.starting_index && activePracticeSession.sharedResult.first_focus);
   const earnedOfferBlocked = params.source === "debrief" && !hasCompleteEarnedResult;
+
+  useEffect(() => {
+    if (params.source !== "debrief") return;
+    safeLog("[evidence] native post-rehearsal screen", {
+      platform: Platform.OS,
+      screen: "trial",
+    });
+  }, [params.source]);
 
   useEffect(() => {
     if (!isPro || commerceState !== "ready") return;
