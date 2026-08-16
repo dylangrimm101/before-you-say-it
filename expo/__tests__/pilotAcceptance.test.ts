@@ -125,7 +125,7 @@ describe("required exercised curriculum paths", () => {
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     const module = await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text();
     const denialBranch = dictation.indexOf("if (!permission.granted)");
-    const recordingStart = dictation.indexOf("Audio.Recording.createAsync");
+    const recordingStart = dictation.indexOf("nativeRecorder.prepareToRecordAsync");
     expect(denialBranch).toBeGreaterThan(-1);
     expect(denialBranch).toBeLessThan(recordingStart);
     expect(dictation.slice(denialBranch, recordingStart)).toContain('setStatus("denied")');
@@ -148,6 +148,10 @@ describe("required exercised curriculum paths", () => {
     expect(dictation).toContain('"Could not transcribe that. Try again."');
     expect(dictation).toContain("TranscriptionUnavailableError");
     expect(dictation).toContain('if (Platform.OS !== "web")');
+    expect(dictation).toContain("AudioModule.requestRecordingPermissionsAsync()");
+    expect(dictation).toContain("await nativeRecorder.prepareToRecordAsync()");
+    expect(dictation).toContain("nativeRecorder.record()");
+    expect(dictation).toContain("await nativeRecorder.stop()");
     expect(dictation).toContain("navigator.mediaDevices.getUserMedia({ audio: true })");
     expect(dictation).toContain("new MediaRecorder(stream");
     expect(dictation).toContain("await stopWebRecorder(webRecorder)");

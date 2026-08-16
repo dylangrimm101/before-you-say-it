@@ -60,6 +60,12 @@
         {
           "microphonePermission": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal."
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal."
+        }
       ]
     ],
     "experiments": {

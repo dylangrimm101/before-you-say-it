@@ -1,6 +1,12 @@
-import { Audio } from "expo-av";
+import {
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
 import { File } from "expo-file-system";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 import { tap } from "@/components/ui";
@@ -9,6 +15,11 @@ import { keepBaselineAudio } from "@/lib/baselineAudio";
 import { errorShape, safeLog } from "@/lib/redact";
 
 export type DictationStatus = "idle" | "recording" | "transcribing" | "denied" | "error";
+
+const NATIVE_RECORDING_OPTIONS = {
+  ...RecordingPresets.HIGH_QUALITY,
+  isMeteringEnabled: true,
+};
 
 interface UseDictationOptions {
   /**
@@ -41,14 +52,22 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   const [status, setStatus] = useState<DictationStatus>("idle");
   const [error, setError] = useState<string>("");
   const [level, setLevel] = useState<number>(0);
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const nativeRecorder = useAudioRecorder(NATIVE_RECORDING_OPTIONS);
+  const nativeRecorderState = useAudioRecorderState(nativeRecorder, 90);
+  const nativeRecordingRef = useRef<boolean>(false);
   const webRecorderRef = useRef<MediaRecorder | null>(null);
   const webStreamRef = useRef<MediaStream | null>(null);
   const webChunksRef = useRef<Blob[]>([]);
   const operationRef = useRef<boolean>(false);
 
+  useEffect(() => {
+    if (!nativeRecordingRef.current || !nativeRecorderState.isRecording) return;
+    const decibels = nativeRecorderState.metering ?? -60;
+    setLevel(Math.min(1, Math.max(0, (decibels + 60) / 60)));
+  }, [nativeRecorderState.isRecording, nativeRecorderState.metering]);
+
   const reset = useCallback(() => {
-    recordingRef.current = null;
+    nativeRecordingRef.current = false;
     webRecorderRef.current = null;
     webStreamRef.current?.getTracks().forEach((track) => track.stop());
     webStreamRef.current = null;
@@ -67,7 +86,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         setStatus("idle");
         return true;
       }
-      const permission = await Audio.requestPermissionsAsync();
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
       if (!permission.granted) {
         setStatus("denied");
         setError("Microphone access is off.");
@@ -84,7 +103,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   }, []);
 
   const start = useCallback(async (): Promise<void> => {
-    if (operationRef.current || recordingRef.current || webRecorderRef.current) return;
+    if (operationRef.current || nativeRecordingRef.current || webRecorderRef.current) return;
     operationRef.current = true;
     setError("");
     try {
@@ -107,30 +126,20 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         return;
       }
 
-      const permission = await Audio.requestPermissionsAsync();
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
       if (!permission.granted) {
         setStatus("denied");
         setError("Microphone access is off.");
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
-
-      const preset = Audio.RecordingOptionsPresets.HIGH_QUALITY;
-      const { recording } = await Audio.Recording.createAsync({
-        ...preset,
-        isMeteringEnabled: true,
-      });
-      recording.setProgressUpdateInterval(90);
-      recording.setOnRecordingStatusUpdate((recordingStatus) => {
-        if (!recordingStatus.isRecording) return;
-        const decibels = recordingStatus.metering ?? -60;
-        setLevel(Math.min(1, Math.max(0, (decibels + 60) / 60)));
-      });
-      recordingRef.current = recording;
+      await nativeRecorder.prepareToRecordAsync();
+      nativeRecorder.record();
+      nativeRecordingRef.current = true;
       setStatus("recording");
       tap("medium");
     } catch (e) {
@@ -147,23 +156,23 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       webStreamRef.current?.getTracks().forEach((track) => track.stop());
       webStreamRef.current = null;
       if (Platform.OS !== "web") {
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+        await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
       }
     } finally {
       operationRef.current = false;
     }
-  }, []);
+  }, [nativeRecorder]);
 
   const cancel = useCallback(async (): Promise<void> => {
     if (operationRef.current) return;
     operationRef.current = true;
-    const recording = recordingRef.current;
+    const hasNativeRecording = nativeRecordingRef.current;
     const webRecorder = webRecorderRef.current;
-    recordingRef.current = null;
+    nativeRecordingRef.current = false;
     webRecorderRef.current = null;
     setLevel(0);
     setStatus("idle");
-    if (!recording && !webRecorder) {
+    if (!hasNativeRecording && !webRecorder) {
       operationRef.current = false;
       return;
     }
@@ -174,10 +183,10 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         webStreamRef.current?.getTracks().forEach((track) => track.stop());
         webStreamRef.current = null;
         webChunksRef.current = [];
-      } else if (recording) {
-        await recording.stopAndUnloadAsync();
-        uri = recording.getURI();
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      } else if (hasNativeRecording) {
+        await nativeRecorder.stop();
+        uri = nativeRecorder.uri;
+        await setAudioModeAsync({ allowsRecording: false });
       }
     } catch (e) {
       safeLog("[dictation] cancel failed", errorShape(e));
@@ -185,15 +194,15 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       if (uri) await discard(uri);
       operationRef.current = false;
     }
-  }, []);
+  }, [nativeRecorder]);
 
   const stop = useCallback(async (): Promise<string | null> => {
     if (operationRef.current) return null;
-    const recording = recordingRef.current;
+    const hasNativeRecording = nativeRecordingRef.current;
     const webRecorder = webRecorderRef.current;
-    if (!recording && !webRecorder) return null;
+    if (!hasNativeRecording && !webRecorder) return null;
     operationRef.current = true;
-    recordingRef.current = null;
+    nativeRecordingRef.current = false;
     webRecorderRef.current = null;
 
     setStatus("transcribing");
@@ -208,10 +217,10 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         const blob = new Blob(webChunksRef.current, { type: mimeType });
         webChunksRef.current = [];
         if (blob.size > 0) uri = URL.createObjectURL(blob);
-      } else if (recording) {
-        await recording.stopAndUnloadAsync();
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-        uri = recording.getURI();
+      } else if (hasNativeRecording) {
+        await nativeRecorder.stop();
+        uri = nativeRecorder.uri;
+        await setAudioModeAsync({ allowsRecording: false });
       }
 
       if (!uri) {
@@ -244,7 +253,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       }
       operationRef.current = false;
     }
-  }, [keepAudioAs]);
+  }, [keepAudioAs, nativeRecorder]);
 
   return { status, error, level, requestPermission, start, stop, cancel, reset };
 }
