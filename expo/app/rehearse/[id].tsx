@@ -371,7 +371,15 @@ function LegacyRehearse() {
           reaction,
           outcome,
           persona,
+          activePracticeSession?.entryRoute,
         );
+        const userTurnCount = history.filter((turn) => turn.role === "user").length;
+        safeLog("[evidence] native counterpart accepted", {
+          entryRoute: activePracticeSession?.entryRoute ?? "unknown",
+          persona,
+          turn: userTurnCount === 1 ? "pushback" : "close",
+          userTurnCount,
+        });
         setTension(res.tension);
         setThinking(false);
         const spoken = speechTextFor(res.reply, themName);
@@ -393,7 +401,7 @@ function LegacyRehearse() {
         busy.current = false;
       }
     },
-    [scenario, difficulty, reaction, outcome, reveal, persona, themName],
+    [scenario, difficulty, reaction, outcome, reveal, persona, themName, activePracticeSession?.entryRoute],
   );
 
   /** Commit the user's reviewed line. Only an explicit submit advances a turn. */
@@ -438,6 +446,17 @@ function LegacyRehearse() {
     submitText(text);
   }, [draft, submitText]);
 
+  const approvePendingTranscript = useCallback((): void => {
+    const turn = myTurnCount === 0 ? "opener" : "reply";
+    safeLog("[evidence] transcript approved in native UI", {
+      entryRoute: activePracticeSession?.entryRoute ?? "unknown",
+      platform: Platform.OS,
+      screen: "rehearsal-confirm-transcript",
+      turn,
+    });
+    void submitText(pending);
+  }, [activePracticeSession?.entryRoute, myTurnCount, pending, submitText]);
+
   const onMicTap = useCallback(async () => {
     if (thinking || closing) return;
     // The microphone stays disabled while the counterpart is talking, so a tap
@@ -446,19 +465,26 @@ function LegacyRehearse() {
     if (micLocked(speech.phase)) return;
     if (dictation.status === "recording") {
       tap("medium");
-      const text = await dictation.stop(myTurnCount === 0 ? "opener" : "reply");
+      const turn = myTurnCount === 0 ? "opener" : "reply";
+      const text = await dictation.stop(turn);
       // Transcription finishing never submits the turn. The line goes into a
       // review state and waits for the user to send it.
       if (text && text.trim().length > 0) {
         tap("success");
         setPending(recognizerEndState(text).pendingText);
+        safeLog("[evidence] confirm transcript shown in native UI", {
+          entryRoute: activePracticeSession?.entryRoute ?? "unknown",
+          platform: Platform.OS,
+          screen: "rehearsal-confirm-transcript",
+          turn,
+        });
       }
       return;
     }
     if (dictation.status === "transcribing") return;
     await dictation.start();
     tap("medium");
-  }, [dictation, thinking, closing, myTurnCount, speech.phase]);
+  }, [activePracticeSession?.entryRoute, dictation, thinking, closing, myTurnCount, speech.phase]);
 
   const toggleSpeaker = useCallback(() => {
     tap("light");
@@ -547,13 +573,26 @@ function LegacyRehearse() {
     if (params.entry === "onboarding" && activePracticeSession?.id === id) {
       await saveActivePracticeSession({ ...activePracticeSession, freeRehearsalTurns: approvedTurns, freeRehearsalCompletedAt: Date.now(), freeJourneyCheckpoint: "generating", updatedAt: Date.now() });
     }
+    safeLog("[evidence] native flow reached debrief", {
+      entryRoute: activePracticeSession?.entryRoute ?? "unknown",
+      platform: Platform.OS,
+      screen: "debrief",
+      userTurnCount: mine.length,
+    });
     router.replace(`/debrief/${id}`);
 
     try {
       await new Promise<void>((resolve) => InteractionManager.runAfterInteractions(() => resolve()));
       emitConversionEvent(id, "transcript.confirmed");
       emitConversionEvent(id, "exchange.paired");
-      const debrief = await generateDebrief(scenario, difficulty, turns, reaction, outcome);
+      const debrief = await generateDebrief(
+        scenario,
+        difficulty,
+        turns,
+        reaction,
+        outcome,
+        activePracticeSession?.entryRoute,
+      );
       if (!isConversionBuildActive(id)) return;
       emitConversionEvent(id, "skill.identified", debrief);
       const focus = selectFocusSkill(debrief, activePracticeSession?.provisionalModuleId);
@@ -608,6 +647,13 @@ function LegacyRehearse() {
       await upsertSession(record);
       if (challengeDay !== null) await markChallengeDayDone(challengeDay);
       emitConversionEvent(id, "plan.ready");
+      safeLog("[evidence] native debrief ready", {
+        entryRoute: activePracticeSession?.entryRoute ?? "unknown",
+        event: "plan.ready",
+        platform: Platform.OS,
+        screen: "debrief",
+        userTurnCount: mine.length,
+      });
       tap("success");
     } catch (caught) {
       safeLog("[rehearse] debrief failed", errorShape(caught));
@@ -1057,7 +1103,7 @@ function LegacyRehearse() {
                   </View>
                 </PressCard>
                 <PressCard
-                  onPress={() => submitText(pending)}
+                  onPress={approvePendingTranscript}
                   disabled={thinking || pending.trim().length === 0}
                   containerStyle={styles.flexWide}
                   haptic="medium"

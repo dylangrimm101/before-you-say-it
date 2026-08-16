@@ -27,15 +27,16 @@ describe("server-side recording transcription", () => {
 
   test("labels both onboarding turns and preserves transcript confirmation", async () => {
     const rehearsal = await Bun.file(`${expoRoot}/app/rehearse/[id].tsx`).text();
-    expect(rehearsal).toContain('dictation.stop(myTurnCount === 0 ? "opener" : "reply")');
+    expect(rehearsal).toContain('const turn = myTurnCount === 0 ? "opener" : "reply"');
+    expect(rehearsal).toContain("dictation.stop(turn)");
     expect(rehearsal).toContain("Turning your voice into text…");
     expect(rehearsal).toContain("EDIT TRANSCRIPT");
     expect(rehearsal).toContain("Re-record");
     expect(rehearsal).toContain('myTurnCount === 0 ? "Use this opener" : "Use this reply"');
     expect(rehearsal).toContain("setPending(recognizerEndState(text).pendingText)");
-    expect(rehearsal.indexOf("setPending(recognizerEndState(text).pendingText)")).toBeLessThan(
-      rehearsal.indexOf("submitText(pending)"),
-    );
+    expect(rehearsal).toContain("approvePendingTranscript");
+    expect(rehearsal).toContain("void submitText(pending)");
+    expect(rehearsal).toContain('onPress={approvePendingTranscript}');
   });
 
   test("all three onboarding routes converge on the same spoken rehearsal", async () => {
@@ -44,6 +45,14 @@ describe("server-side recording transcription", () => {
     expect(onboarding).toContain('"recurring_problem"');
     expect(onboarding).toContain('"desired_skill"');
     expect(onboarding).toContain("rehearse/");
+  });
+
+  test("private provider and deployment credentials are absent from Expo configuration", async () => {
+    const env = await Bun.file(`${expoRoot}/.env`).text();
+    expect(env).not.toMatch(/^OPENAI_API_KEY=/m);
+    expect(env).not.toMatch(/^ANTHROPIC_API_KEY=/m);
+    expect(env).not.toMatch(/^SUPABASE_ACCESS_TOKEN=/m);
+    expect(env).not.toMatch(/^(?:SUPABASE_)?SERVICE_ROLE(?:_KEY)?=/m);
   });
 
   test("the deprecated client transcription gateway is absent", async () => {
@@ -56,12 +65,17 @@ describe("server-side recording transcription", () => {
 
   test("Hope, Adam, debrief, and coaching use the user-owned Claude-backed BYSI endpoint", async () => {
     const ai = await Bun.file(`${expoRoot}/lib/ai.ts`).text();
+    const rehearsal = await Bun.file(`${expoRoot}/app/rehearse/[id].tsx`).text();
     expect(ai).toContain('"https://beforeyousayit.app/api/generate"');
     expect(ai).toContain('type: "rehearsal_turn"');
     expect(ai).toContain('type: "free_rehearsal_result"');
     expect(ai).toContain("nextCounterpartTurn");
     expect(ai).toContain("generateDebrief");
     expect(ai).toContain("evaluatePilotAttempt");
+    expect(ai).toContain("entry_route: entryRoute");
+    expect(rehearsal).toContain("activePracticeSession?.entryRoute");
+    expect(rehearsal).toContain("[evidence] native counterpart accepted");
+    expect(rehearsal).toContain("[evidence] native debrief ready");
     expect(ai).not.toContain("EXPO_PUBLIC_TOOLKIT_URL");
     expect(ai).not.toContain("EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY");
     expect(ai).not.toContain("/v2/vercel/v1/chat/completions");

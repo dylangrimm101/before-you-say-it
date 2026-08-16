@@ -1,5 +1,7 @@
 import { Platform } from "react-native";
 
+import { safeLog } from "@/lib/redact";
+
 export type TranscriptionTurn = "opener" | "reply";
 
 const CONFIGURED_ENDPOINT = process.env.EXPO_PUBLIC_TRANSCRIBE_ENDPOINT?.trim() ?? "";
@@ -25,6 +27,10 @@ function fileNameFor(mediaType: string): string {
   if (mediaType.includes("webm")) return "recording.webm";
   if (mediaType.includes("wav")) return "recording.wav";
   return "recording.m4a";
+}
+
+function evidenceEndpoint(url: string): string {
+  return url.replace(/^https?:\/\//, "").slice(0, 64);
 }
 
 function requestHeaders(): Record<string, string> {
@@ -60,10 +66,23 @@ export async function transcribeRecording(
     body.append("audio", nativeAudio as unknown as Blob);
   }
 
+  safeLog("[evidence] native transcription request", {
+    endpoint: evidenceEndpoint(TRANSCRIBE_ENDPOINT),
+    platform: Platform.OS,
+    provider: "supabase-openai-transcription",
+    turn,
+  });
   const response = await fetch(TRANSCRIBE_ENDPOINT, {
     method: "POST",
     headers: requestHeaders(),
     body,
+  });
+  safeLog("[evidence] native transcription response", {
+    endpoint: evidenceEndpoint(TRANSCRIBE_ENDPOINT),
+    ok: response.ok,
+    platform: Platform.OS,
+    status: response.status,
+    turn,
   });
 
   if (!response.ok) {
@@ -76,5 +95,10 @@ export async function transcribeRecording(
   const result = await response.json() as { text?: unknown };
   const text = typeof result.text === "string" ? result.text.trim() : "";
   if (!text) throw new Error("Empty transcription");
+  safeLog("[evidence] native transcription completed", {
+    length: text.length,
+    platform: Platform.OS,
+    turn,
+  });
   return text;
 }

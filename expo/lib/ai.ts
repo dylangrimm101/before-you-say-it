@@ -11,8 +11,10 @@ import type {
 
 const GENERATE_ENDPOINT = process.env.EXPO_PUBLIC_GENERATE_ENDPOINT?.trim() || "https://beforeyousayit.app/api/generate";
 
+type BysiEntryRoute = "real_conversation" | "recurring_problem" | "desired_skill";
+
 interface BysiContract {
-  entry_route: "real_conversation" | "recurring_problem" | "desired_skill";
+  entry_route: BysiEntryRoute;
   context: string;
   scenario: string;
   success_target: string;
@@ -55,11 +57,31 @@ interface BysiResultResponse {
   insufficient_evidence?: unknown;
 }
 
+function evidenceEndpoint(url: string): string {
+  return url.replace(/^https?:\/\//, "").slice(0, 64);
+}
+
 async function postBysi<T>(payload: Record<string, unknown>): Promise<T> {
+  const type = typeof payload.type === "string" ? payload.type : "unknown";
+  const contract = payload.contract as { entry_route?: unknown } | undefined;
+  const entryRoute = typeof contract?.entry_route === "string" ? contract.entry_route : "unknown";
+  safeLog("[evidence] BYSI generation request", {
+    endpoint: evidenceEndpoint(GENERATE_ENDPOINT),
+    entryRoute,
+    provider: "user-owned-claude-backend",
+    type,
+  });
   const response = await fetch(GENERATE_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+  safeLog("[evidence] BYSI generation response", {
+    endpoint: evidenceEndpoint(GENERATE_ENDPOINT),
+    entryRoute,
+    ok: response.ok,
+    status: response.status,
+    type,
   });
   const result = await response.json().catch((): Record<string, never> => ({})) as T & { error?: unknown };
   if (!response.ok) throw new Error(`BYSI generation failed (${response.status})`);
@@ -70,9 +92,10 @@ function bysiContract(
   scenario: Scenario,
   reaction?: ReactionPattern,
   outcome?: string,
+  entryRoute: BysiEntryRoute = "real_conversation",
 ): BysiContract {
   return {
-    entry_route: "real_conversation",
+    entry_route: entryRoute,
     context: scenario.category,
     scenario: `${scenario.title}. ${scenario.situation}`.trim(),
     success_target: outcome?.trim() || scenario.goal,
@@ -163,6 +186,7 @@ export async function nextCounterpartTurn(
   reaction?: ReactionPattern,
   outcome?: string,
   persona?: PersonaVoice,
+  entryRoute: BysiEntryRoute = "real_conversation",
 ): Promise<CounterpartTurn> {
   const turn: AcquisitionCounterpartTurn = turns.filter((item) => item.role === "user").length >= 2 ? "close" : "pushback";
   const avoidRepeating = turns
@@ -176,7 +200,7 @@ export async function nextCounterpartTurn(
       const result = await postBysi<BysiTurnResponse>({
         type: "rehearsal_turn",
         turn,
-        contract: bysiContract(scenario, reaction, outcome),
+        contract: bysiContract(scenario, reaction, outcome, entryRoute),
         transcript: bysiTranscript(turns, scenario),
         avoid_repeating: avoidRepeating,
         variation_seed: `${scenario.id}-${turn}-${Date.now().toString(36)}-${attempt}`,
@@ -199,11 +223,12 @@ export async function generateDebrief(
   turns: Turn[],
   reaction?: ReactionPattern,
   outcome?: string,
+  entryRoute: BysiEntryRoute = "real_conversation",
 ): Promise<Debrief> {
   void difficulty;
   const result = await postBysi<BysiResultResponse>({
     type: "free_rehearsal_result",
-    contract: bysiContract(scenario, reaction, outcome),
+    contract: bysiContract(scenario, reaction, outcome, entryRoute),
     transcript: bysiTranscript(turns, scenario),
   });
   const moment = result.pressure_moment;

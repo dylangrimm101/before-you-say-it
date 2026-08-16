@@ -255,7 +255,10 @@ describe("the rehearsal reads as a spoken conversation thread", () => {
     expect(source).toContain("EDIT TRANSCRIPT");
     expect(source).toContain('myTurnCount === 0 ? "Use this opener" : "Use this reply"');
     expect(source).toContain(">Re-record</Text>");
-    expect(source.indexOf("setPending(recognizerEndState(text).pendingText)")).toBeLessThan(source.indexOf("submitText(pending)"));
+    expect(source).toContain("setPending(recognizerEndState(text).pendingText)");
+    expect(source).toContain("approvePendingTranscript");
+    expect(source).toContain("void submitText(pending)");
+    expect(source).toContain('onPress={approvePendingTranscript}');
   });
 
   it("shows counterpart thinking and speaking inside the left-side thread", async () => {

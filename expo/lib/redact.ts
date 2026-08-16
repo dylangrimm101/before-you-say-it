@@ -34,6 +34,15 @@ const ALLOWED_KEYS: readonly string[] = [
   "removed",
   "kept",
   "retries",
+  "attempt",
+  "endpoint",
+  "entryRoute",
+  "event",
+  "platform",
+  "provider",
+  "turn",
+  "type",
+  "userTurnCount",
 ];
 
 const ALLOWED = new Set<string>(ALLOWED_KEYS);
