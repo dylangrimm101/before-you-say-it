@@ -1,4 +1,4 @@
-import { curriculumModule, type ModuleId } from "@/constants/modules";
+import { CURRICULUM_MODULES, curriculumModule, type ModuleId } from "@/constants/modules";
 import type { BysiResultResponse } from "@/lib/ai";
 import { conversionEvidence } from "@/lib/conversion";
 import type { ActivePracticeSession, FreeJourneyCheckpoint } from "@/lib/practiceSession";
@@ -63,6 +63,12 @@ function focusKey(moduleId: ModuleId): string {
   return `curriculum-focus-${moduleId}`;
 }
 
+function providerModuleId(value: string | undefined): ModuleId | null {
+  const normalized = value?.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") ?? "";
+  if (!normalized) return null;
+  return CURRICULUM_MODULES.find((module) => module.id === normalized || module.name.toLowerCase().replace(/[^a-z0-9]+/g, "_") === normalized)?.id ?? null;
+}
+
 const SIGNAL_KEYS: readonly SharedSignalV1["signal_key"][] = [
   "clarity", "specificity", "steadiness", "listening", "boundaries", "repair",
 ];
@@ -89,9 +95,10 @@ export function buildFreeJourneyResult(
   if (!opening || !pushback || !response) throw new Error("A complete approved rehearsal is required.");
 
   const evidence = conversionEvidence(session.freeRehearsalTurns ?? [], debrief, session.provisionalModuleId);
-  const module = curriculumModule(evidence.focus.id);
-  const firstFocusLabel = module?.name ?? evidence.focus.name;
-  const firstFocus = createFirstFocus(focusKey(evidence.focus.id), firstFocusLabel, evidence.focus.id, "suggested");
+  const recommendedModuleId = providerModuleId(analysis.recommended_path?.first_module) ?? evidence.focus.id;
+  const module = curriculumModule(recommendedModuleId);
+  const firstFocusLabel = module?.name ?? analysis.recommended_path?.first_module?.trim() ?? evidence.focus.name;
+  const firstFocus = createFirstFocus(focusKey(recommendedModuleId), firstFocusLabel, recommendedModuleId, "suggested");
   const observation = debrief.wins[0]?.trim() || debrief.flags[0]?.issue.trim() || `Your response changed after ${session.counterpartDisplayLabel ?? session.counterpart} pushed back.`;
   const pressureMoment = validatePressureMoment({
     pressure_moment_version: PRESSURE_MOMENT_VERSION,
@@ -104,20 +111,21 @@ export function buildFreeJourneyResult(
     confidence_statement: "This is one short exchange. It suggests a starting point, not a fixed trait.",
   }, transcript);
 
+  const providerShift = analysis.practice_shift;
   const practiceShift = validatePracticeShift({
     practice_shift_version: PRACTICE_SHIFT_VERSION,
-    headline: evidence.focus.headline,
+    headline: providerShift?.headline?.trim() || evidence.focus.headline,
     current_pattern_steps: [
       `Open with: “${opening.approved_text}”`,
       `Meet the pushback: “${pushback.approved_text}”`,
       `Respond under pressure: “${response.approved_text}”`,
     ],
-    practice_target_steps: [
+    practice_target_steps: providerShift?.practice_target?.map((step) => step.trim()).filter(Boolean) ?? [
       "Keep the original point in view",
       evidence.immediateAction,
       `Return to your goal: ${session.usefulOutcome}`,
     ],
-    success_target: session.usefulOutcome,
+    success_target: providerShift?.goal_line?.trim() || session.usefulOutcome,
     first_focus_key: firstFocus.first_focus_key,
     first_focus_label: firstFocus.first_focus_label,
     recommended_module_id: firstFocus.recommended_module_id,
@@ -178,6 +186,11 @@ export function buildFreeJourneyResult(
       index_value: typeof providerOverall === "number" && Number.isFinite(providerOverall)
         ? score(providerOverall)
         : calculatedIndex.index_value,
+      ...(analysis.starting_index?.label?.trim() ? { label: analysis.starting_index.label.trim() } : {}),
+      ...(analysis.starting_index?.coverage_note?.trim() ? { coverage_note: analysis.starting_index.coverage_note.trim() } : {}),
+      ...(analysis.starting_index?.focus_dimension?.trim() ? { focus_dimension: analysis.starting_index.focus_dimension.trim() } : {}),
+      ...(analysis.starting_index?.unobserved_dimensions ? { unobserved_dimensions: analysis.starting_index.unobserved_dimensions.map((value) => value.trim()).filter(Boolean) } : {}),
+      ...(analysis.starting_index?.score_note?.trim() ? { score_note: analysis.starting_index.score_note.trim() } : {}),
       index_version: STARTING_INDEX_VERSION,
     },
     first_focus: firstFocus,

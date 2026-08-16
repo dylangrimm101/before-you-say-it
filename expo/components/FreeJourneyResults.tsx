@@ -1,10 +1,12 @@
 import { useRouter } from "expo-router";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
+import Svg, { Circle, Path } from "react-native-svg";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, PrimaryButton, PressCard, StateDock, tap, useReducedMotion } from "@/components/ui";
+import { curriculumModule } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, shadow } from "@/constants/theme";
 import { CONVERSATION_PHASES } from "@/lib/conversion";
 import type { ActivePracticeSession, FreeJourneyCheckpoint } from "@/lib/practiceSession";
@@ -128,14 +130,14 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
         <Backdrop />
         <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 26, paddingBottom: insets.bottom + 150 }]} showsVerticalScrollIndicator={false}>
           <Text style={styles.eyebrow}>Your communication baseline</Text>
-          <Text style={styles.title}>You stayed in the room. Now make the ask hold.</Text>
+          <Text style={styles.title}>{moment.headline || "You stayed in the room. Now make the ask hold."}</Text>
           <Text style={styles.observation}>{moment.observation}</Text>
           <View style={styles.stallCard}>
             <Text style={styles.stallText}><Text style={styles.stallLead}>Where it stalls: </Text>You stayed in the conversation, but the ask still did not hold under pressure.</Text>
           </View>
           <View style={styles.exchange}>
             <Text style={styles.focusTitle}>{result.first_focus.first_focus_label}</Text>
-            <Text style={styles.focusSummary}>{session.recommendation?.immediateAction ?? "This module trains the next move, so the conversation has something concrete to hold onto."}</Text>
+            <Text style={styles.focusSummary}>{curriculumModule(result.first_focus.recommended_module_id)?.promise ?? "This module trains the next move, so the conversation has something concrete to hold onto."}</Text>
             <View style={styles.rewriteDivider} />
             <ExchangeNode label="Your ask" text={byId.get(moment.opening_turn_id) ?? ""} tone="you" />
             <ExchangeNode label="The pushback" text={byId.get(moment.pushback_turn_id) ?? ""} tone="push" />
@@ -189,15 +191,21 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
       <View style={styles.root}>
         <Backdrop />
         <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 150 }]}>
-          <PressCard onPress={() => void move("pressure_moment")} accessibilityLabel="Back to Pressure Moment"><Text style={styles.back}>Back</Text></PressCard>
-          <Text style={styles.eyebrow}>Your words, made usable</Text>
+          <PressCard onPress={() => void move("pressure_moment")} accessibilityLabel="Back to Communication baseline"><Text style={styles.back}>Back</Text></PressCard>
+          <View style={styles.rewriteHeroSpace} />
           <Text style={styles.title}>Here’s what practice is helping you say</Text>
           <View style={styles.rewriteCard}>
-            <Detail label="Your original ask" text={`“${rewrite.original_ask}”`} />
-            <View style={styles.rewriteDivider} />
-            <Detail label="A clearer version" text={`“${rewrite.clearer_version}”`} />
+            <Text style={styles.rewriteEyebrow}>YOUR WORDS, MADE USABLE</Text>
+            <View style={styles.originalBlock}>
+              <Text style={styles.detailLabel}>YOUR ORIGINAL ASK</Text>
+              <Text style={styles.originalQuote}>“{rewrite.original_ask}”</Text>
+            </View>
+            <View style={styles.clearerBlock}>
+              <Text style={[styles.detailLabel, styles.clearerLabel]}>A CLEARER VERSION</Text>
+              <Text style={styles.clearerQuote}>“{rewrite.clearer_version}”</Text>
+            </View>
+            <Text style={styles.rewriteNote}>{"Practice is what makes this version come out when they push back. That's what the practice plan trains."}</Text>
           </View>
-          <Text style={styles.observation}>{"Practice is what makes this version come out when they push back. That's what the practice plan trains."}</Text>
         </ScrollView>
         <StateDock bottomInset={insets.bottom}><PrimaryButton label="See the practice plan" onPress={() => void move("practice_shift")} /></StateDock>
       </View>
@@ -212,15 +220,10 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
           <PressCard onPress={() => void move("rewrite")} accessibilityLabel="Back to clearer version">
             <Text style={styles.back}>Back</Text>
           </PressCard>
-          <Text style={styles.eyebrow}>Your Practice Shift</Text>
           <Text style={styles.title}>Your thoughts and feelings are valid and deserve to be heard.</Text>
           <Text style={styles.observation}>Practicing your communication skills builds the confidence to find the right words when pressure shows up.</Text>
           <ShiftComparison />
-          <View style={styles.goal}>
-            <Text style={styles.detailLabel}>IMPROVE YOUR COMMUNICATION WITH PRACTICE</Text>
-            <Text style={styles.goalText}>{result.practice_shift.success_target}</Text>
-          </View>
-          <Text style={styles.caveat}>{result.practice_shift.caveat}</Text>
+          <PracticeImprovementGraph />
         </ScrollView>
         <StateDock bottomInset={insets.bottom}>
           <PrimaryButton
@@ -228,7 +231,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
             onPress={async () => {
               safeLog("[evidence] native post-rehearsal transition", {
                 platform: Platform.OS,
-                screen: "trial",
+                screen: "pay1",
                 step: "practice-shift-to-trial",
               });
               await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: "complete", postRehearsalState: transitionPostRehearsal(session.postRehearsalState, "pay1"), updatedAt: Date.now() });
@@ -350,36 +353,52 @@ function Detail({ label, text }: { label: string; text: string }) {
 function ShiftComparison() {
   return (
     <View style={styles.comparison}>
-      <ShiftColumn label="WITHOUT PRACTICE" steps={[
+      <ShiftSection label="WITHOUT PRACTICE" tone={C.amber} regularSteps={[
         "The conversation starts with the same vague ask",
         "Pushback makes the point harder to hold",
+      ]} strongSteps={[
         "You explain more than you need to",
         "The conversation ends without a clear next step",
-      ]} tone={C.amber} />
+      ]} />
       <View style={styles.divider} />
-      <ShiftColumn label="WITH BYSI PRACTICE" steps={[
+      <ShiftSection label="WITH BYSI PRACTICE" tone={C.purple} regularSteps={[
         "Turn the thought into one clear request",
         "Stay steady when they get defensive",
+      ]} strongSteps={[
         "Acknowledge them without dropping your point",
         "Return to one clear next step",
-      ]} tone={C.purple} />
+      ]} />
     </View>
   );
 }
 
-function ShiftColumn({ label, steps, tone }: { label: string; steps: string[]; tone: string }) {
+function ShiftSection({ label, regularSteps, strongSteps, tone }: { label: string; regularSteps: string[]; strongSteps: string[]; tone: string }) {
   return (
-    <View style={styles.shiftColumn}>
+    <View style={styles.shiftSection}>
       <Text style={[styles.shiftLabel, { color: tone }]}>{label}</Text>
-      {steps.map((step, index) => (
-        <React.Fragment key={`${label}-${index}`}>
-          <View style={styles.shiftStep}>
-            <View style={[styles.smallDot, { backgroundColor: tone }]} />
-            <Text style={styles.shiftText}>{step}</Text>
-          </View>
-          {index < steps.length - 1 ? <Text style={[styles.shiftArrow, { color: tone }]}>↓</Text> : null}
-        </React.Fragment>
-      ))}
+      {regularSteps.map((step) => <Text key={step} style={styles.shiftText}>{step}</Text>)}
+      {strongSteps.map((step) => <Text key={step} style={[styles.shiftText, styles.shiftStrong, { color: tone }]}>{step}</Text>)}
+    </View>
+  );
+}
+
+function PracticeImprovementGraph() {
+  return (
+    <View style={styles.improvementCard} accessible accessibilityRole="image" accessibilityLabel="Skills improve with BYSI practice while the same ask without practice stays in the same loop.">
+      <Text style={styles.improvementLabel}>IMPROVE YOUR COMMUNICATION WITH PRACTICE</Text>
+      <View style={styles.graphCanvas}>
+        <Svg width="100%" height="190" viewBox="0 0 320 190">
+          <Path d="M16 150 C60 150 70 144 95 116 S145 121 176 88 S220 82 252 76 S281 55 302 40" fill="none" stroke={C.purple} strokeWidth="4" strokeLinecap="round" />
+          <Path d="M16 150 C82 159 144 169 204 174 S270 176 302 176" fill="none" stroke={C.amber} strokeWidth="3" strokeLinecap="round" />
+          <Circle cx="16" cy="150" r="6" fill={C.purple} />
+          <Circle cx="302" cy="40" r="7" fill={C.purple} />
+          <Circle cx="302" cy="176" r="6" fill={C.amber} />
+        </Svg>
+        <View style={styles.practiceBadge}><Text style={styles.practiceBadgeText}>With BYSI practice</Text></View>
+        <View style={styles.loopBadge}><Text style={styles.loopBadgeText}>Same ask, same loop</Text></View>
+      </View>
+      <View style={styles.graphAxis}><Text style={styles.graphAxisText}>TODAY</Text><Text style={styles.graphAxisText}>IN 30 DAYS</Text></View>
+      <Text style={styles.graphCaption}>Skills improvement</Text>
     </View>
   );
 }
@@ -435,7 +454,15 @@ const styles = StyleSheet.create({
   signalChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   signalChip: { borderRadius: 999, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, paddingHorizontal: 11, paddingVertical: 7 },
   signalChipText: { ...T.caption, color: C.textSoft },
+  rewriteHeroSpace: { height: 230 },
   rewriteCard: { backgroundColor: C.elevated, borderRadius: 24, padding: 20, gap: 16, ...shadow.layer },
+  rewriteEyebrow: { ...eyebrow, color: C.purple, fontSize: 11 },
+  originalBlock: { borderLeftWidth: 3, borderLeftColor: `${C.amber}55`, paddingLeft: 12, gap: 5 },
+  originalQuote: { ...T.body, color: C.textSoft },
+  clearerBlock: { borderLeftWidth: 3, borderLeftColor: C.purple, paddingLeft: 12, gap: 5 },
+  clearerLabel: { color: C.purple },
+  clearerQuote: { ...T.title, fontSize: 20, lineHeight: 28 },
+  rewriteNote: { ...T.support, color: C.dim, marginTop: 2 },
   rewriteDivider: { height: 1, backgroundColor: C.line },
   disclosure: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6 },
   disclosureText: { ...T.caption, color: C.purple, fontFamily: font.semi },
@@ -443,17 +470,22 @@ const styles = StyleSheet.create({
   detail: { gap: 4 },
   detailLabel: { ...eyebrow, color: C.dim, fontSize: 9 },
   detailText: { ...T.support, color: C.text },
-  comparison: { flexDirection: "row", gap: 10, backgroundColor: C.elevated, borderRadius: 24, paddingHorizontal: 14, paddingVertical: 16, ...shadow.layer },
-  shiftColumn: { flex: 1, minWidth: 0, gap: 5 },
-  divider: { width: 1, backgroundColor: C.line, marginHorizontal: 1 },
-  shiftLabel: { ...eyebrow, fontSize: 8, lineHeight: 12, minHeight: 25 },
-  shiftStep: { flexDirection: "row", gap: 6, alignItems: "flex-start" },
-  smallDot: { width: 6, height: 6, borderRadius: 3, marginTop: 6, flexShrink: 0 },
-  shiftText: { flex: 1, minWidth: 0, color: C.text, fontFamily: font.regular, fontSize: 13, lineHeight: 18 },
-  shiftArrow: { fontFamily: font.semi, fontSize: 12, lineHeight: 13, marginLeft: 11 },
-  goal: { gap: 4 },
-  goalText: { ...T.support, color: C.text },
-  caveat: { ...T.caption, color: C.dim },
+  comparison: { backgroundColor: C.elevated, borderRadius: 24, paddingHorizontal: 20, paddingVertical: 18, ...shadow.layer },
+  shiftSection: { gap: 9 },
+  divider: { height: 1, backgroundColor: C.line, marginVertical: 16 },
+  shiftLabel: { ...eyebrow, fontSize: 10, lineHeight: 14 },
+  shiftText: { color: C.textSoft, fontFamily: font.regular, fontSize: 14, lineHeight: 20 },
+  shiftStrong: { fontFamily: font.semi },
+  improvementCard: { backgroundColor: C.elevated, borderRadius: 24, padding: 18, ...shadow.layer },
+  improvementLabel: { ...eyebrow, color: C.purple, fontSize: 10 },
+  graphCanvas: { height: 190, marginTop: 10 },
+  practiceBadge: { position: "absolute", right: 2, top: 0, borderRadius: 10, backgroundColor: C.purple, paddingHorizontal: 12, paddingVertical: 7 },
+  practiceBadgeText: { fontFamily: font.semi, fontSize: 10, color: C.onAccent },
+  loopBadge: { position: "absolute", right: 54, bottom: 0, borderRadius: 10, borderWidth: 1, borderColor: `${C.amber}55`, backgroundColor: "#F8F4EC", paddingHorizontal: 11, paddingVertical: 6 },
+  loopBadgeText: { fontFamily: font.semi, fontSize: 10, color: C.amber },
+  graphAxis: { flexDirection: "row", justifyContent: "space-between", marginTop: -2 },
+  graphAxisText: { ...eyebrow, color: C.purple, fontSize: 9 },
+  graphCaption: { ...T.caption, fontFamily: font.semi, color: C.text, textAlign: "center", marginTop: 12 },
   layerCard: { minHeight: 470, borderRadius: 28, backgroundColor: C.elevated, padding: 22, gap: 12, ...shadow.layer },
   pathCard: { justifyContent: "flex-start" },
   cardTitle: { ...T.title, fontSize: 18 },

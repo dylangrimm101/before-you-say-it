@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, Lock } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Animated, Easing, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FreeJourneyResults } from "@/components/FreeJourneyResults";
@@ -53,6 +53,27 @@ function statusOf(index: number, completedCount: number): PipelineStatus {
   if (index < completedCount) return "done";
   if (index === completedCount) return "active";
   return "queued";
+}
+
+function ReferencePipelineRow({ label, status }: { label: string; status: PipelineStatus }) {
+  const progress = status === "done" ? 100 : status === "active" ? 8 : 0;
+  return (
+    <View style={[styles.referencePipelineRow, status === "queued" && styles.referencePipelineQueued]}>
+      <View style={styles.referencePipelineHead}>
+        <Text style={[styles.referencePipelineLabel, status === "active" && styles.referencePipelineActive]}>{label}</Text>
+        {status === "done" ? (
+          <View style={styles.referencePipelineCheck}><Check size={13} color={C.onAccent} strokeWidth={2.7} /></View>
+        ) : status === "active" ? (
+          <Text style={styles.referencePipelinePercent}>{progress}%</Text>
+        ) : (
+          <View style={styles.referencePipelineCircle} />
+        )}
+      </View>
+      <View style={styles.referencePipelineTrack}>
+        <View style={[styles.referencePipelineFill, { width: `${progress}%` }]} />
+      </View>
+    </View>
+  );
 }
 
 function Artifact({ children, duration = 380 }: { children: React.ReactNode; duration?: number }) {
@@ -348,6 +369,7 @@ function PipelineRow({
 function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: () => void }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const { activePracticeSession, saveActivePracticeSession } = useStore();
   const isReduced = useReducedMotion();
   const [completedCount, setCompletedCount] = useState<number>(0);
@@ -423,9 +445,11 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={{
-          paddingTop: insets.top + 26,
+          minHeight: Math.max(640, height - insets.top - insets.bottom),
+          justifyContent: "center",
+          paddingTop: insets.top + 24,
           paddingHorizontal: GUTTER,
-          paddingBottom: insets.bottom + 158,
+          paddingBottom: insets.bottom + 128,
         }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
@@ -445,16 +469,9 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
         <View>
           <Text style={styles.buildTitle}>Personalizing your{"\n"}<Text style={styles.buildTitleAccent}>practice plan…</Text></Text>
           <Text style={styles.buildAcknowledgement}>You did the hard part. Practicing it out loud is the step most people skip.</Text>
-          <SegmentProgress completedCount={completedCount} />
-
-          <View style={styles.pipeline}>
+          <View style={styles.referencePipeline}>
             {PIPELINE_ROWS.map((row, index) => (
-              <PipelineRow
-                key={row.event}
-                row={row}
-                status={statusOf(index, completedCount)}
-                isLast={index === PIPELINE_ROWS.length - 1}
-              />
+              <ReferencePipelineRow key={row.event} label={row.label} status={statusOf(index, completedCount)} />
             ))}
           </View>
 
@@ -646,6 +663,31 @@ function FreeDebrief({ id, build }: { id: string; build: ConversionBuild | null 
     return <FreeJourneyResults session={activePracticeSession} />;
   }
 
+  if (activePracticeSession?.id === id) {
+    const retryResult = async (): Promise<void> => {
+      await saveActivePracticeSession(cancelPendingResult(activePracticeSession));
+      router.replace({
+        pathname: "/rehearse/[id]",
+        params: {
+          id: activePracticeSession.scenarioId,
+          entry: "onboarding",
+          practiceSessionId: activePracticeSession.id,
+          reaction: activePracticeSession.expectedReaction,
+          persona: activePracticeSession.persona,
+        },
+      });
+    };
+    return (
+      <View style={[styles.root, styles.center]}>
+        <Backdrop />
+        <Eyebrow color={C.purple}>Your approved exchange is safe</Eyebrow>
+        <Text style={styles.missingTitle}>We couldn’t finish your communication baseline.</Text>
+        <Text style={styles.missingBody}>No generic debrief has been substituted. Return to the complete transcript and retry the real analysis.</Text>
+        <PrimaryButton label="Return to complete transcript" onPress={() => void retryResult()} style={styles.missingButton} />
+      </View>
+    );
+  }
+
   if (!evidence) {
     return (
       <View style={[styles.root, styles.center]}>
@@ -760,9 +802,20 @@ const styles = StyleSheet.create({
   center: { alignItems: "center", justifyContent: "center", padding: 30 },
   privateRow: { alignItems: "flex-end", minHeight: 24 },
   privatePractice: { ...eyebrow, color: C.dim },
-  buildTitle: { ...T.display, marginTop: 28, textAlign: "center" },
+  buildTitle: { ...T.display, fontFamily: font.bold, fontSize: 32, lineHeight: 40, textAlign: "center" },
   buildTitleAccent: { color: C.purple },
-  buildAcknowledgement: { ...T.support, color: C.textSoft, textAlign: "center", marginTop: 14, marginHorizontal: 12 },
+  buildAcknowledgement: { ...T.support, fontSize: 16, lineHeight: 24, color: C.textSoft, textAlign: "center", marginTop: 12, marginHorizontal: 4 },
+  referencePipeline: { gap: 22, marginTop: 30 },
+  referencePipelineRow: { gap: 10 },
+  referencePipelineQueued: { opacity: 0.42 },
+  referencePipelineHead: { minHeight: 28, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  referencePipelineLabel: { ...T.support, flex: 1, color: C.textSoft, fontFamily: font.semi, fontSize: 16 },
+  referencePipelineActive: { color: C.text },
+  referencePipelinePercent: { ...T.support, color: C.purple, fontFamily: font.semi },
+  referencePipelineCircle: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: C.lineStrong },
+  referencePipelineCheck: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: C.purple },
+  referencePipelineTrack: { height: 8, borderRadius: 4, backgroundColor: "rgba(81,40,136,0.07)", overflow: "hidden" },
+  referencePipelineFill: { height: 8, borderRadius: 4, backgroundColor: C.purple },
   segments: { flexDirection: "row", gap: 6, marginTop: 14, marginBottom: 16 },
   segmentTrack: { height: 3, flex: 1, borderRadius: 2, backgroundColor: C.track, overflow: "hidden" },
   segmentFill: { ...StyleSheet.absoluteFillObject, backgroundColor: C.purple },

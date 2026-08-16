@@ -629,12 +629,6 @@ function LegacyRehearse() {
       );
       const { analysis, debrief } = generated;
       if (!isConversionBuildActive(id)) return;
-      emitConversionEvent(id, "skill.identified", debrief);
-      const focus = selectFocusSkill(debrief, activePracticeSession?.provisionalModuleId);
-      const evidence = conversionEvidence(approvedTurns, debrief, activePracticeSession?.provisionalModuleId);
-      emitConversionEvent(id, "path.mapped");
-      setLiveSessionContent(id, { turns: approvedTurns, debrief, outcome });
-
       if (params.entry === "onboarding" && generationSession?.id === id && analysis.mode === "insufficient_evidence") {
         const insufficient = analysis.insufficient_evidence;
         if (!insufficient?.headline?.trim() || !insufficient.note?.trim() || !insufficient.next_step?.trim()) {
@@ -665,6 +659,11 @@ function LegacyRehearse() {
         });
         return;
       }
+      emitConversionEvent(id, "skill.identified", debrief);
+      const focus = selectFocusSkill(debrief, activePracticeSession?.provisionalModuleId);
+      const evidence = conversionEvidence(approvedTurns, debrief, activePracticeSession?.provisionalModuleId);
+      emitConversionEvent(id, "path.mapped");
+      setLiveSessionContent(id, { turns: approvedTurns, debrief, outcome });
 
       if (params.entry === "onboarding" && generationSession?.id === id) {
         const preserved = preserveFreeRehearsalArtifact(generationSession, approvedTurns, Date.now());
@@ -906,22 +905,25 @@ function LegacyRehearse() {
       <View style={styles.root}>
         <Backdrop />
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScrollView contentContainerStyle={[styles.reviewScroll, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 150 }]} keyboardShouldPersistTaps="handled">
-            <Text style={styles.reviewEyebrow}>COMPLETE TRANSCRIPT</Text>
-            <Text style={styles.reviewTitle}>Check the exchange before analysis.</Text>
-            <Text style={styles.reviewSupport}>Only the text you approve here will be analyzed.</Text>
-            <Text style={styles.reviewLabel}>Your opening</Text>
+          <ScrollView contentContainerStyle={[styles.reviewScroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 170 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <Pressable onPress={() => setReviewingTranscript(false)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back to rehearsal">
+              <Text style={styles.reviewBackTop}>Back</Text>
+            </Pressable>
+            <Text style={styles.reviewEyebrow}>REVIEW AND CORRECT</Text>
+            <Text style={styles.reviewTitle}>Check what we heard.</Text>
+            <Text style={styles.reviewLabel}>YOU · TURN 1</Text>
             <TextInput value={reviewDrafts.opening} onChangeText={(opening) => setReviewDrafts((current) => ({ ...current, opening }))} multiline style={styles.reviewInput} accessibilityLabel="Edit your opening" />
-            <Text style={styles.reviewLabel}>{themName}</Text>
+            <Text style={[styles.reviewLabel, styles.counterpartLabel]}>{themName.toUpperCase()}</Text>
             <View style={styles.counterpartReview}><Text style={styles.counterpartReviewText}>{counterpartTurns[0]?.text ?? ""}</Text></View>
-            <Text style={styles.reviewLabel}>Your response under pressure</Text>
+            <Text style={styles.reviewLabel}>YOU · TURN 2</Text>
             <TextInput value={reviewDrafts.response} onChangeText={(response) => setReviewDrafts((current) => ({ ...current, response }))} multiline style={styles.reviewInput} accessibilityLabel="Edit your response under pressure" />
-            <Text style={styles.reviewLabel}>{themName}’s close</Text>
+            <Text style={[styles.reviewLabel, styles.counterpartLabel]}>{themName.toUpperCase()} · CLOSE</Text>
             <View style={styles.counterpartReview}><Text style={styles.counterpartReviewText}>{counterpartTurns[1]?.text ?? ""}</Text></View>
+            <Text style={styles.reviewPrivacy}>Nothing gets analyzed until you approve it.</Text>
           </ScrollView>
           <StateDock bottomInset={insets.bottom}>
             <PrimaryButton label="Approve transcript" onPress={approveTranscript} disabled={!reviewDrafts.opening.trim() || !reviewDrafts.response.trim() || closing} />
-            <PressCard onPress={() => setReviewingTranscript(false)} accessibilityLabel="Back to rehearsal"><Text style={styles.reviewBack}>Back to rehearsal</Text></PressCard>
+            <GhostButton label="Record again" onPress={() => setReviewingTranscript(false)} />
           </StateDock>
         </KeyboardAvoidingView>
       </View>
@@ -1614,14 +1616,15 @@ const styles = StyleSheet.create({
   threadContextGoal: { ...T.support, color: C.textSoft, marginTop: 13 },
   inPersonNote: { ...eyebrow, color: C.purple, marginTop: 14, fontSize: 10 },
   reviewScroll: { paddingHorizontal: GUTTER, gap: 12 },
-  reviewEyebrow: { ...eyebrow, color: C.purple },
-  reviewTitle: { ...T.display },
-  reviewSupport: { ...T.support, marginBottom: 8 },
-  reviewLabel: { ...eyebrow, color: C.dim, marginTop: 8 },
-  reviewInput: { ...T.body, minHeight: 112, borderRadius: radius.md, borderWidth: 1, borderColor: C.lineStrong, backgroundColor: C.surfaceHigh, padding: 16, textAlignVertical: "top", color: C.text },
-  counterpartReview: { borderRadius: radius.md, backgroundColor: C.purpleSoft, padding: 16 },
+  reviewBackTop: { ...T.support, color: C.textSoft, minHeight: 44, textAlignVertical: "center" },
+  reviewEyebrow: { ...eyebrow, color: C.dim, fontSize: 12, marginTop: 2 },
+  reviewTitle: { ...T.display, fontFamily: font.bold, fontSize: 31, lineHeight: 38, marginBottom: 8 },
+  reviewLabel: { ...eyebrow, color: C.purple, fontSize: 11, marginTop: 8 },
+  counterpartLabel: { color: C.amber, marginLeft: 16 },
+  reviewInput: { ...T.body, minHeight: 88, maxHeight: 150, borderRadius: radius.md, borderWidth: 1, borderColor: C.line, backgroundColor: C.elevated, padding: 16, textAlignVertical: "top", color: C.text },
+  counterpartReview: { borderRadius: radius.lg, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, paddingHorizontal: 18, paddingVertical: 17 },
   counterpartReviewText: { ...T.body, color: C.text },
-  reviewBack: { ...T.support, color: C.purple, textAlign: "center", paddingVertical: 12, fontFamily: font.semi },
+  reviewPrivacy: { ...T.caption, color: C.dim, marginTop: 8 },
 
   themWrap: { alignSelf: "flex-start", alignItems: "flex-start", maxWidth: "84%", marginBottom: 16 },
   mineWrap: { alignSelf: "flex-end", alignItems: "flex-end", maxWidth: "84%", marginBottom: 16 },

@@ -278,9 +278,26 @@ export async function generateDebrief(
       type: "free_rehearsal_result",
     });
   });
+  if (result.mode === "insufficient_evidence") {
+    const insufficient = result.insufficient_evidence;
+    if (!insufficient?.headline?.trim() || !insufficient.note?.trim() || !insufficient.next_step?.trim()) {
+      throw new Error("Could not read the BYSI insufficient-evidence result");
+    }
+    return {
+      analysis: result,
+      debrief: {
+        headline: insufficient.headline.trim(),
+        scores: { clarity: 0, empathy: 0, assertiveness: 0, composure: 0 },
+        wins: [],
+        flags: [],
+        script: [],
+        nextRep: insufficient.next_step.trim(),
+      },
+    };
+  }
   const moment = result.pressure_moment;
   const shift = result.practice_shift;
-  if ((result.mode !== "result" && result.mode !== "insufficient_evidence") || !moment?.headline || !shift?.headline) {
+  if (result.mode !== "result" || !moment?.headline || !shift?.headline) {
     throw new Error("Could not read the BYSI debrief");
   }
   const learnerLines = turns.filter((turn) => turn.role === "user").map((turn) => turn.text);

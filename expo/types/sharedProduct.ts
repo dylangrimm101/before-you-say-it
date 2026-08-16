@@ -100,6 +100,12 @@ export interface PartialStartingIndexV1 {
   index_value: number | null;
   observed_count: number;
   total_signal_count: 6;
+  /** Provider framing retained for page-level parity with the web result. */
+  label?: string;
+  coverage_note?: string;
+  focus_dimension?: string;
+  unobserved_dimensions?: string[];
+  score_note?: string;
   index_version: typeof STARTING_INDEX_VERSION;
 }
 
