@@ -260,6 +260,13 @@ describe("briefing, consent, and four-turn rehearsal", () => {
     for (const removedCopy of ["Microphone requested only after you start.", "Privacy &amp; details", "This doesn’t feel safe", "You › Them › You › Them"]) {
       expect(briefing).not.toContain(removedCopy);
     }
+    const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    const briefingStage = rehearsal.slice(
+      rehearsal.indexOf('if (rehearsalStage === "briefing")'),
+      rehearsal.indexOf('if (rehearsalStage === "permission")'),
+    );
+    expect(briefingStage).toContain("contentContainerStyle={[styles.introScroll, { paddingBottom: 24 }]}");
+    expect(briefingStage).not.toContain("paddingBottom: insets.bottom + 150");
   });
 
   test("keeps briefing, permission, and practice as separate states", async () => {

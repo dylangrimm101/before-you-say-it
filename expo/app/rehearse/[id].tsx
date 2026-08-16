@@ -728,7 +728,7 @@ function LegacyRehearse() {
             <Text style={styles.backText}>Back</Text>
           </Pressable>
         </View>
-        <ScrollView contentContainerStyle={[styles.introScroll, { paddingBottom: insets.bottom + 150 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.introScroll, { paddingBottom: 24 }]} showsVerticalScrollIndicator={false}>
           <RehearsalBriefing
             entryRoute={activePracticeSession?.entryRoute}
             counterpart={themName}
