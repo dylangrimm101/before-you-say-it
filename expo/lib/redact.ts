@@ -44,6 +44,10 @@ const ALLOWED_KEYS: readonly string[] = [
   "turn",
   "type",
   "userTurnCount",
+  "productId",
+  "price",
+  "trial",
+  "period",
 ];
 
 const ALLOWED = new Set<string>(ALLOWED_KEYS);

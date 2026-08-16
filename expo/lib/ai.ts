@@ -34,8 +34,21 @@ interface BysiTurnResponse {
   safety?: unknown;
 }
 
-interface BysiResultResponse {
-  mode?: string;
+export interface BysiObservedDimension {
+  name: string;
+  score: number;
+  evidence: string;
+}
+
+export interface BysiInsufficientEvidence {
+  headline: string;
+  note: string;
+  next_step: string;
+}
+
+export interface BysiResultResponse {
+  mode?: "result" | "insufficient_evidence" | "safety";
+  outputVersion?: string;
   pressure_moment?: {
     headline?: string;
     ask_quote?: string;
@@ -50,11 +63,20 @@ interface BysiResultResponse {
   };
   starting_index?: {
     overall?: number;
+    label?: string;
+    coverage_note?: string;
     focus_dimension?: string;
-    observed_dimensions?: Array<{ name?: string; score?: number; evidence?: string }>;
+    observed_dimensions?: BysiObservedDimension[];
+    unobserved_dimensions?: string[];
+    score_note?: string;
   };
-  recommended_path?: { first_module?: string; reason?: string };
-  insufficient_evidence?: unknown;
+  recommended_path?: { first_module?: string; reason?: string; next_modules?: string[] };
+  insufficient_evidence?: BysiInsufficientEvidence | null;
+}
+
+export interface GeneratedDebrief {
+  debrief: Debrief;
+  analysis: BysiResultResponse;
 }
 
 function evidenceEndpoint(url: string): string {
@@ -224,16 +246,41 @@ export async function generateDebrief(
   reaction?: ReactionPattern,
   outcome?: string,
   entryRoute: BysiEntryRoute = "real_conversation",
-): Promise<Debrief> {
+): Promise<GeneratedDebrief> {
   void difficulty;
+  const transcript = bysiTranscript(turns, scenario);
+  safeLog("[evidence] BYSI complete transcript payload", {
+    count: Object.values(transcript).filter((value) => value.trim().length > 0).length,
+    step: "four-fields-present",
+    type: "free_rehearsal_result",
+    userTurnCount: turns.filter((turn) => turn.role === "user").length,
+  });
+  safeLog("[evidence] BYSI counterpart fields present", {
+    count: [transcript.counterpart_pushback, transcript.counterpart_close].filter((value) => value.trim().length > 0).length,
+    step: "pushback-and-close",
+    type: "free_rehearsal_result",
+  });
   const result = await postBysi<BysiResultResponse>({
     type: "free_rehearsal_result",
     contract: bysiContract(scenario, reaction, outcome, entryRoute),
-    transcript: bysiTranscript(turns, scenario),
+    transcript,
+  });
+  safeLog("[evidence] BYSI result shape", {
+    count: result.starting_index?.observed_dimensions?.length ?? 0,
+    status: result.mode ?? "unknown",
+    step: "pressure-index-shift-path",
+    type: "free_rehearsal_result",
+  });
+  (["pressure_moment", "starting_index", "practice_shift", "recommended_path"] as const).forEach((key) => {
+    safeLog("[evidence] BYSI result key", {
+      status: result[key] ? "present" : "missing",
+      step: key,
+      type: "free_rehearsal_result",
+    });
   });
   const moment = result.pressure_moment;
   const shift = result.practice_shift;
-  if (result.mode !== "result" || !moment?.headline || !shift?.headline) {
+  if ((result.mode !== "result" && result.mode !== "insufficient_evidence") || !moment?.headline || !shift?.headline) {
     throw new Error("Could not read the BYSI debrief");
   }
   const learnerLines = turns.filter((turn) => turn.role === "user").map((turn) => turn.text);
@@ -241,16 +288,19 @@ export async function generateDebrief(
   const quote = learnerLines.some((line) => line.includes(candidateQuote)) ? candidateQuote : "";
   const reframe = shift.practice_target?.[0]?.trim() || shift.goal_line?.trim() || "Try the same moment with one concrete request.";
   return {
-    headline: moment.headline,
-    scores: { clarity: 0, empathy: 0, assertiveness: 0, composure: 0 },
-    wins: moment.conclusion ? [moment.conclusion] : [],
-    flags: [{
-      quote,
-      issue: moment.how_bysi_read_this?.observed?.trim() || shift.headline,
-      reframe,
-    }],
-    script: shift.practice_target?.slice(0, 1) ?? [],
-    nextRep: shift.goal_line?.trim() || reframe,
+    analysis: result,
+    debrief: {
+      headline: moment.headline,
+      scores: { clarity: 0, empathy: 0, assertiveness: 0, composure: 0 },
+      wins: moment.conclusion ? [moment.conclusion] : [],
+      flags: [{
+        quote,
+        issue: moment.how_bysi_read_this?.observed?.trim() || shift.headline,
+        reframe,
+      }],
+      script: shift.practice_target?.slice(0, 1) ?? [],
+      nextRep: shift.goal_line?.trim() || reframe,
+    },
   };
 }
 

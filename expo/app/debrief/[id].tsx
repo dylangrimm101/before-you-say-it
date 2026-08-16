@@ -601,6 +601,47 @@ function FreeDebrief({ id, build }: { id: string; build: ConversionBuild | null 
     router.replace({ pathname: "/module/[day]", params: { day: recommendedModuleId } });
   }, [hasPurchasedPro, recommendedModuleId, router, session]);
 
+  if (activePracticeSession?.id === id && activePracticeSession.insufficientEvidence) {
+    const insufficient = activePracticeSession.insufficientEvidence;
+    const retryAnalysis = async (): Promise<void> => {
+      const retrySession = {
+        ...activePracticeSession,
+        freeRehearsalTurns: undefined,
+        freeRehearsalCompletedAt: undefined,
+        recommendation: undefined,
+        sharedResult: undefined,
+        insufficientEvidence: undefined,
+        postRehearsalState: undefined,
+        freeJourneyCheckpoint: "rehearsal" as const,
+        updatedAt: Date.now(),
+      };
+      await saveActivePracticeSession(retrySession);
+      router.replace({
+        pathname: "/rehearse/[id]",
+        params: {
+          id: activePracticeSession.scenarioId,
+          entry: "onboarding",
+          practiceSessionId: activePracticeSession.id,
+          reaction: activePracticeSession.expectedReaction,
+          persona: activePracticeSession.persona,
+        },
+      });
+    };
+    return (
+      <View style={[styles.root, styles.center]}>
+        <Backdrop />
+        <Eyebrow color={C.purple}>One more complete exchange</Eyebrow>
+        <Text style={styles.missingTitle}>{insufficient.headline}</Text>
+        <Text style={styles.missingBody}>{insufficient.note}</Text>
+        <GlassCard style={styles.insufficientCard} raised={false}>
+          <Text style={styles.lockedTitle}>What to do next</Text>
+          <Text style={styles.lockedBody}>{insufficient.nextStep}</Text>
+        </GlassCard>
+        <PrimaryButton label="Practice this conversation again" onPress={() => void retryAnalysis()} style={styles.missingButton} />
+      </View>
+    );
+  }
+
   if (activePracticeSession?.id === id && activePracticeSession.sharedResult) {
     return <FreeJourneyResults session={activePracticeSession} />;
   }
@@ -807,5 +848,6 @@ const styles = StyleSheet.create({
   freeNote: { ...T.caption, textAlign: "center", marginTop: 8 },
   missingTitle: { ...T.title, textAlign: "center" },
   missingBody: { ...T.support, textAlign: "center", marginTop: 10 },
-  missingButton: { width: 220, marginTop: 22 },
+  missingButton: { width: 260, marginTop: 22 },
+  insufficientCard: { width: "100%", marginTop: 18, padding: 18 },
 });

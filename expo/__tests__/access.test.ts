@@ -127,27 +127,24 @@ describe("curriculum access starts behind the paid boundary", () => {
 });
 
 describe("preview pilot access", () => {
-  it("offers an explicit no-purchase unlock and honors it across pilot entry points", async () => {
+  it("keeps developer unlock controls out of the accepted offer path", async () => {
     const paywall = await Bun.file(`${import.meta.dir}/../app/paywall.tsx`).text();
     const module = await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text();
     const today = await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text();
-    const store = await Bun.file(`${import.meta.dir}/../providers/store.tsx`).text();
 
-    expect(paywall).toContain('label="Unlock all modules for testing"');
-    expect(paywall).toContain("await toggleDevPro(true)");
-    expect(paywall).toContain("Preview only · no purchase or subscription");
+    expect(paywall).not.toContain("Unlock all modules for testing");
+    expect(paywall).not.toContain("Preview only · no purchase or subscription");
     expect(module).toContain("const decision = canContinuePilot(access)");
     expect(module).toContain("if (!decision.allowed)");
     expect(module).not.toContain("const hasPurchasedPro = useIsPro()");
     expect(today).toContain('access.entitlement !== "pro"');
-    expect(store).toContain('purchasedPro || (__DEV__ && devPro) ? "pro" : "free"');
   });
 
-  it("keeps the tester entitlement development-only", async () => {
+  it("keeps any internal tester entitlement development-only and outside paywall UI", async () => {
     const paywall = await Bun.file(`${import.meta.dir}/../app/paywall.tsx`).text();
     const store = await Bun.file(`${import.meta.dir}/../providers/store.tsx`).text();
-    expect(paywall).toContain("if (!__DEV__) return");
-    expect(paywall).toContain("{__DEV__ && !devProEnabled ? (");
+    expect(paywall).not.toContain("devProEnabled");
+    expect(paywall).not.toContain("toggleDevPro");
     expect(store).toContain("if (!__DEV__) return");
     expect(store).toContain("__DEV__ ? AsyncStorage.getItem(KEYS.devPro) : Promise.resolve(null)");
     expect(store).toContain('purchasedPro || (__DEV__ && devPro) ? "pro" : "free"');

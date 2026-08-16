@@ -110,13 +110,11 @@ describe("a gender-locked counterpart keeps its own voice", () => {
   });
 });
 
-describe("the gender actually reaches the model", () => {
-  it("feeds the counterpart's gender into the roleplay prompt", async () => {
-    const source = await Bun.file(`${import.meta.dir}/../lib/ai.ts`).text();
-    // This used to be a table that was exported but never read, so the model
-    // picked a gender at random and could contradict the spoken voice.
-    expect(source).toContain("genderPromptLine(genderFor(persona))");
-    expect(source).not.toContain("PERSONA_VOICE");
+describe("the selected Hope or Adam role reaches speech", () => {
+  it("maps the selected persona to the BYSI TTS role", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
+    expect(source).toContain('persona === "man-adam" ? "adam" : "hope"');
+    expect(source).toContain('"https://beforeyousayit.app/api/tts"');
   });
 
   it("treats the explicit onboarding choice as authoritative during navigation", () => {
@@ -144,18 +142,17 @@ describe("the gender actually reaches the model", () => {
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     const dailyModule = await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text();
     expect(rehearsal).toContain("await speak(spoken, persona");
-    expect(rehearsal).toContain("await speak(spoken, persona, { muted: !voiceOnRef.current });\n          reveal(res.reply, res.nudge);");
+    expect(rehearsal.indexOf("reveal(res.reply, res.nudge);")).toBeLessThan(rehearsal.indexOf("await speak(spoken, persona, { muted: !voiceOnRef.current });"));
     expect(rehearsal).not.toContain("speakPilotAudio");
     expect(dailyModule).toContain("speakPilotAudio");
     expect(dailyModule).toContain('voice_key: "adam_counterpart"');
   });
 
-  it("keeps the selected Hope or Adam identity in generated scenarios", async () => {
+  it("keeps the selected Hope or Adam identity in fallback scenarios", async () => {
     const source = await Bun.file(`${import.meta.dir}/../lib/ai.ts`).text();
-    expect(source).toContain('Set "counterpart" to exactly');
-    expect(source).toContain("Do not invent or substitute another first name");
-    expect(source).toContain("counterpart: form.persona");
-    expect(source).toContain("counterpartGender: personaFor(form.persona).gender");
+    expect(source).toContain('const voice = personaFor(form.persona ?? "woman-hope")');
+    expect(source).toContain("counterpart: `${voice.name}");
+    expect(source).toContain("counterpartGender: voice.gender");
   });
 
   it("uses a contextual free counterpart while retaining persona identity for paid rehearsals", async () => {
@@ -166,24 +163,20 @@ describe("the gender actually reaches the model", () => {
     expect(source).toContain("<RehearsalBriefing");
   });
 
-  it("reads voice ids from the shared persona record", async () => {
+  it("keeps provider voice IDs and credentials out of native source", async () => {
     const source = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
-    expect(source).toContain("voiceIdFor(persona)");
-    // A second local copy of the ids is how gender and voice drifted before.
+    expect(source).toContain("roleForPersona(persona)");
     expect(source).not.toContain("EXAVITQu4vr4xnSDxMaL");
+    expect(source).not.toContain("ELEVENLABS_API_KEY");
   });
 
-  it("uses the approved ElevenLabs v3 configuration for Hope and Adam", async () => {
+  it("uses the BYSI TTS endpoint for both Hope and Adam", async () => {
     const source = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
-    expect(source).toContain('"woman-hope": "eleven_v3"');
-    expect(source).toContain('"man-adam": "eleven_v3"');
-    expect(source).toContain("speed: 0.97");
-    expect(source).toContain("stability: 0.58");
-    expect(source).toContain("similarity_boost: 0.75");
-    expect(source).toContain("style: 0.05");
-    expect(source).toContain("use_speaker_boost: false");
-    expect(source).toContain('request("mp3_44100_192")');
-    expect(source).toContain('request("mp3_44100_128")');
+    expect(source).toContain('"https://beforeyousayit.app/api/tts"');
+    expect(source).toContain("const role = roleForPersona(persona)");
+    expect(source).toContain("JSON.stringify({ role, text })");
+    expect(source).toContain("text");
+    expect(source).not.toContain("eleven_v3");
   });
 });
 
@@ -285,7 +278,7 @@ describe("onboarding rehearsal always has a safe exit", () => {
     expect(source).toContain('await saveActivePracticeSession(null)');
     expect(source).toContain('router.replace("/onboarding")');
     expect(source).toContain('if (router.canGoBack()) router.back()');
-    expect(source).toContain('accessibilityLabel="End rehearsal"');
+    expect(source).toContain('accessibilityLabel="Close rehearsal"');
   });
 });
 

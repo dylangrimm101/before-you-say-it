@@ -66,7 +66,8 @@ import {
 import { conversionEvidence, selectFocusSkill } from "@/lib/conversion";
 import { approvedUserTurn, buildFreeJourneyResult, recognizerEndState, shouldGeneratePushback } from "@/lib/freeJourney";
 import { setLiveSessionContent } from "@/lib/ephemeral";
-import { preserveFreeRehearsalArtifact } from "@/lib/practiceSession";
+import { preserveFreeRehearsalArtifact, type ActivePracticeSession } from "@/lib/practiceSession";
+import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
 import { errorShape, safeLog } from "@/lib/redact";
 import { createScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
 import {
@@ -201,7 +202,13 @@ function LegacyRehearse() {
     if (persistedTurnsRef.current === serializedTurns) return;
     persistedTurnsRef.current = serializedTurns;
     const roles = turns.map((turn) => turn.role).join(",");
-    saveActivePracticeSession({ ...currentSession, freeRehearsalTurns: turns, freeJourneyCheckpoint: roles === "user,them,user,them" ? "transcript_review" : "rehearsal", updatedAt: Date.now() }).catch(() => {});
+    saveActivePracticeSession({
+      ...currentSession,
+      freeRehearsalTurns: turns,
+      freeJourneyCheckpoint: "rehearsal",
+      ...(roles === "user,them,user,them" ? { postRehearsalState: transitionPostRehearsal(currentSession.postRehearsalState, "rehearsal_complete") } : {}),
+      updatedAt: Date.now(),
+    }).catch(() => {});
   }, [activePracticeSession, params.entry, params.practiceSessionId, saveActivePracticeSession, turns]);
   const [thinking, setThinking] = useState<boolean>(false);
   const [draft, setDraft] = useState<string>("");
@@ -288,6 +295,24 @@ function LegacyRehearse() {
     return { step: "TURN 1 OF 2", prompt: "You start. What do you say?" };
   }, [isRepReadyForAnalysis, latestRole, myTurnCount, params.entry, themName]);
   const showsUserPrompt = !isRepReadyForAnalysis && latestRole !== "user" && !thinking && !audioBusy;
+
+  useEffect(() => {
+    if (!isRepReadyForAnalysis) return;
+    safeLog("[evidence] native post-rehearsal screen", {
+      platform: Platform.OS,
+      screen: "rehearsal-complete",
+      step: "rehearsal_complete",
+    });
+  }, [isRepReadyForAnalysis]);
+
+  useEffect(() => {
+    if (!reviewingTranscript) return;
+    safeLog("[evidence] native post-rehearsal screen", {
+      platform: Platform.OS,
+      screen: "complete-transcript",
+      step: "transcript_review",
+    });
+  }, [reviewingTranscript]);
 
   const reveal = useCallback((full: string, nudge: string) => {
     const commit = (): void => {
@@ -425,7 +450,7 @@ function LegacyRehearse() {
         busy.current = false;
         const currentSession = activePracticeSession;
         if (params.entry === "onboarding" && currentSession && currentSession.id === params.practiceSessionId) {
-          await saveActivePracticeSession({ ...currentSession, freeRehearsalTurns: next, freeJourneyCheckpoint: "transcript_review", updatedAt: Date.now() });
+          await saveActivePracticeSession({ ...currentSession, freeRehearsalTurns: next, freeJourneyCheckpoint: "rehearsal", updatedAt: Date.now() });
         }
       }
     },
@@ -569,8 +594,18 @@ function LegacyRehearse() {
     await resetSpeech().catch(() => {});
     const id = sessionId.current;
     beginConversionBuild({ id, scenarioTitle: scenario.title, counterpartName: themName, turns: approvedTurns });
+    let generationSession: ActivePracticeSession | null = activePracticeSession;
     if (params.entry === "onboarding" && activePracticeSession?.id === id) {
-      await saveActivePracticeSession({ ...activePracticeSession, freeRehearsalTurns: approvedTurns, freeRehearsalCompletedAt: Date.now(), freeJourneyCheckpoint: "generating", updatedAt: Date.now() });
+      generationSession = {
+        ...activePracticeSession,
+        freeRehearsalTurns: approvedTurns,
+        freeRehearsalCompletedAt: Date.now(),
+        freeJourneyCheckpoint: "generating",
+        postRehearsalState: transitionPostRehearsal(activePracticeSession.postRehearsalState, "generating"),
+        insufficientEvidence: undefined,
+        updatedAt: Date.now(),
+      };
+      await saveActivePracticeSession(generationSession);
     }
     safeLog("[evidence] native flow reached debrief", {
       entryRoute: activePracticeSession?.entryRoute ?? "unknown",
@@ -584,7 +619,7 @@ function LegacyRehearse() {
       await new Promise<void>((resolve) => InteractionManager.runAfterInteractions(() => resolve()));
       emitConversionEvent(id, "transcript.confirmed");
       emitConversionEvent(id, "exchange.paired");
-      const debrief = await generateDebrief(
+      const generated = await generateDebrief(
         scenario,
         difficulty,
         turns,
@@ -592,6 +627,7 @@ function LegacyRehearse() {
         outcome,
         activePracticeSession?.entryRoute,
       );
+      const { analysis, debrief } = generated;
       if (!isConversionBuildActive(id)) return;
       emitConversionEvent(id, "skill.identified", debrief);
       const focus = selectFocusSkill(debrief, activePracticeSession?.provisionalModuleId);
@@ -599,8 +635,39 @@ function LegacyRehearse() {
       emitConversionEvent(id, "path.mapped");
       setLiveSessionContent(id, { turns: approvedTurns, debrief, outcome });
 
-      if (params.entry === "onboarding" && activePracticeSession?.id === id) {
-        const preserved = preserveFreeRehearsalArtifact(activePracticeSession, approvedTurns, Date.now());
+      if (params.entry === "onboarding" && generationSession?.id === id && analysis.mode === "insufficient_evidence") {
+        const insufficient = analysis.insufficient_evidence;
+        if (!insufficient?.headline?.trim() || !insufficient.note?.trim() || !insufficient.next_step?.trim()) {
+          throw new Error("The insufficient-evidence response was incomplete.");
+        }
+        const preserved = preserveFreeRehearsalArtifact(generationSession, approvedTurns, Date.now());
+        await saveActivePracticeSession({
+          ...preserved,
+          freeRehearsalTurns: approvedTurns,
+          freeRehearsalCompletedAt: Date.now(),
+          freeJourneyCheckpoint: "insufficient_evidence",
+          postRehearsalState: transitionPostRehearsal(preserved.postRehearsalState, "insufficient_evidence"),
+          sharedResult: undefined,
+          recommendation: undefined,
+          insufficientEvidence: {
+            headline: insufficient.headline.trim(),
+            note: insufficient.note.trim(),
+            nextStep: insufficient.next_step.trim(),
+          },
+          updatedAt: Date.now(),
+        });
+        emitConversionEvent(id, "plan.ready");
+        safeLog("[evidence] native insufficient result", {
+          event: "plan.ready",
+          platform: Platform.OS,
+          screen: "insufficient-evidence",
+          status: "api-confirmed",
+        });
+        return;
+      }
+
+      if (params.entry === "onboarding" && generationSession?.id === id) {
+        const preserved = preserveFreeRehearsalArtifact(generationSession, approvedTurns, Date.now());
         const evidenceTurn = evidence.learnerQuote ? mine.find((turn) => turn.text.includes(evidence.learnerQuote)) ?? null : null;
         const withRecommendation = {
           ...preserved,
@@ -608,7 +675,7 @@ function LegacyRehearse() {
           freeRehearsalCompletedAt: Date.now(),
           recommendation: {
             moduleId: focus.id,
-            ...(activePracticeSession.provisionalModuleId ? { hypothesisModuleId: activePracticeSession.provisionalModuleId } : {}),
+            ...(generationSession.provisionalModuleId ? { hypothesisModuleId: generationSession.provisionalModuleId } : {}),
             evidenceQuote: evidence.learnerQuote || null,
             evidenceTurnId: evidenceTurn?.id ?? null,
             confidence: evidence.confidence,
@@ -621,10 +688,12 @@ function LegacyRehearse() {
           retryInstruction: focus.name,
           nextState: "focused_coach_note" as const,
           freeJourneyCheckpoint: "pressure_moment" as const,
+          postRehearsalState: transitionPostRehearsal(preserved.postRehearsalState, "pressure"),
+          insufficientEvidence: undefined,
           updatedAt: Date.now(),
         };
         const completedAt = Date.now();
-        const sharedResult = buildFreeJourneyResult(withRecommendation, debrief);
+        const sharedResult = buildFreeJourneyResult(withRecommendation, debrief, analysis);
         await saveActivePracticeSession({ ...withRecommendation, sharedResult });
         const approvedTextByTurnId = new Map(approvedTurns.map((turn) => [turn.id, turn.text]));
         await saveScoredPracticeRecord(createScoredPracticeRecord(sharedResult, {
@@ -664,7 +733,17 @@ function LegacyRehearse() {
     const userTurns = turns.filter((turn) => turn.role === "user");
     setReviewDrafts({ opening: userTurns[0]?.text ?? "", response: userTurns[1]?.text ?? "" });
     setReviewingTranscript(true);
-  }, [turns]);
+    const currentSession = activePracticeSession;
+    if (params.entry === "onboarding" && currentSession && currentSession.id === params.practiceSessionId) {
+      saveActivePracticeSession({
+        ...currentSession,
+        freeRehearsalTurns: turns,
+        freeJourneyCheckpoint: "transcript_review",
+        postRehearsalState: transitionPostRehearsal(currentSession.postRehearsalState, "transcript_review"),
+        updatedAt: Date.now(),
+      }).catch(() => {});
+    }
+  }, [activePracticeSession, params.entry, params.practiceSessionId, saveActivePracticeSession, turns]);
 
   const approveTranscript = useCallback((): void => {
     if (!reviewDrafts.opening.trim() || !reviewDrafts.response.trim()) return;

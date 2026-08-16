@@ -1,4 +1,5 @@
 import { APPROVED_ONBOARDING_SCENARIOS, scenarioFromApproved } from "@/constants/onboardingScenarios";
+import type { BysiResultResponse } from "@/lib/ai";
 import { createOnboardingPracticeSession, normalizePracticeSession, preserveFreeRehearsalArtifact, type ActivePracticeSession } from "@/lib/practiceSession";
 import { activePracticeSessionToSharedRoute, completedPracticeSessionToSharedTranscript, sharedProductAnalyticsMeta, sharedProductRouteParams } from "@/lib/sharedProductAdapters";
 import { approvedUserTurn, buildFreeJourneyResult, cancelPendingResult, invalidateFreeJourney, recognizerEndState, shouldGeneratePushback, validFreeJourneyCheckpoint } from "@/lib/freeJourney";
@@ -15,6 +16,19 @@ const turns: Turn[] = [
   { id: "response", role: "user", text: "I hear that. Can you take Tuesday pickup?" },
   { id: "close", role: "them", text: "I’m not agreeing yet. What would taking Tuesday actually involve?" },
 ];
+
+const analysis: BysiResultResponse = {
+  mode: "result",
+  starting_index: {
+    overall: 64,
+    observed_dimensions: [
+      { name: "Clarity", score: 72, evidence: "The opening made the topic visible." },
+      { name: "Specificity", score: 66, evidence: "The response returned to one answerable request." },
+      { name: "Steadiness", score: 54, evidence: "The request remained available after pushback." },
+    ],
+    unobserved_dimensions: ["Listening", "Boundaries", "Repair"],
+  },
+};
 
 const debrief: Debrief = {
   headline: "Your request stayed visible after the pushback.",
@@ -50,7 +64,7 @@ describe("Claude Design free journey contract", () => {
   });
 
   test("changing an upstream answer invalidates every downstream acquisition value", () => {
-    const complete = { ...session(), recommendation: { moduleId: "make_a_clear_ask" as const, evidenceQuote: "quote", evidenceTurnId: "response", confidence: "confirmed_quote" as const, status: "suggested" as const, supportedStrength: null, immediateAction: "ask", createdAt: 300 }, sharedResult: buildFreeJourneyResult(session(), debrief) };
+    const complete = { ...session(), recommendation: { moduleId: "make_a_clear_ask" as const, evidenceQuote: "quote", evidenceTurnId: "response", confidence: "confirmed_quote" as const, status: "suggested" as const, supportedStrength: null, immediateAction: "ask", createdAt: 300 }, sharedResult: buildFreeJourneyResult(session(), debrief, analysis) };
     const invalidated = invalidateFreeJourney(complete, 400);
     expect(invalidated.freeRehearsalTurns).toBeUndefined();
     expect(invalidated.freeRehearsalCompletedAt).toBeUndefined();
@@ -75,7 +89,7 @@ describe("Claude Design free journey contract", () => {
   });
 
   test("analysis result uses one approved rehearsal and keeps Practice Shift structured", () => {
-    const result = buildFreeJourneyResult(session(), debrief);
+    const result = buildFreeJourneyResult(session(), debrief, analysis);
     const transcript = completedPracticeSessionToSharedTranscript(session());
     expect(result.pressure_moment?.opening_turn_id).toBe(transcript.turns[0]?.id);
     expect(result.pressure_moment?.pushback_turn_id).toBe(transcript.turns[1]?.id);
@@ -87,12 +101,12 @@ describe("Claude Design free journey contract", () => {
     expect(result.practice_shift?.caveat).toBe("A practice target, not a result you’ve already achieved.");
   });
 
-  test("legacy fixture scores never become production signal defaults", () => {
-    const result = buildFreeJourneyResult(session(), debrief);
-    expect(result.signals.map((signal) => signal.score)).toEqual([null, null, null, null, null, null]);
-    expect(result.signals.every((signal) => signal.observation_status === "insufficient_evidence")).toBe(true);
-    expect(result.starting_index).toMatchObject({ index_value: null, observed_count: 0, total_signal_count: 6 });
-    expect(JSON.stringify(result)).not.toContain('"score":72');
+  test("maps provider Starting Index dimensions instead of creating a placeholder empty index", () => {
+    const result = buildFreeJourneyResult(session(), debrief, analysis);
+    expect(result.signals.map((signal) => signal.score)).toEqual([72, 66, 54, null, null, null]);
+    expect(result.signals.slice(0, 3).every((signal) => signal.observation_status === "observed")).toBe(true);
+    expect(result.starting_index).toMatchObject({ index_value: 64, observed_count: 3, total_signal_count: 6 });
+    expect(result.signals[0]?.evidence_summary).toBe("The opening made the topic visible.");
   });
 
   test("test-only successful visual result averages only its three evidence-linked signals", () => {
@@ -181,7 +195,7 @@ describe("Claude Design free journey contract", () => {
   });
 
   test("first-focus label stays separate from the module ID and evidence", () => {
-    const result = buildFreeJourneyResult(session(), debrief);
+    const result = buildFreeJourneyResult(session(), debrief, analysis);
     expect(result.first_focus?.first_focus_label).toBe("Stay Clear Under Pushback");
     expect(result.first_focus?.recommended_module_id).toBe("stay_clear_under_pushback");
     expect(result.first_focus?.first_focus_label).not.toBe(result.first_focus?.recommended_module_id);

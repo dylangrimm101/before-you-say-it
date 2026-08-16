@@ -90,6 +90,8 @@ export interface SharedSignalV1 {
   observation_status: SharedObservationStatus;
   score: number | null;
   evidence_turn_ids: string[];
+  /** Provider-generated evidence summary for an observed dimension. */
+  evidence_summary?: string;
   signal_version: typeof SIGNAL_VERSION;
 }
 
@@ -324,7 +326,8 @@ export function validateSignals(signals: readonly SharedSignalV1[], transcript: 
       if (signal.evidence_turn_ids.length === 0 || signal.evidence_turn_ids.some((id) => !turnIds.has(id))) {
         throw new SharedContractError("invalid_contract", "Observed signal evidence must reference approved turns in the rehearsal.");
       }
-    } else if (signal.score !== null || signal.evidence_turn_ids.length !== 0) {
+      if (signal.evidence_summary !== undefined) requireString(signal.evidence_summary, "signal.evidence_summary");
+    } else if (signal.score !== null || signal.evidence_turn_ids.length !== 0 || signal.evidence_summary !== undefined) {
       throw new SharedContractError("invalid_contract", "Unobserved or insufficient-evidence signals must have null scores and no evidence.");
     }
     return { ...signal, evidence_turn_ids: [...signal.evidence_turn_ids] };

@@ -17,7 +17,14 @@ export type DayOneLearningState =
   | "complete";
 
 export type PracticeSessionState = "awaiting_onboarding_baseline" | DayOneLearningState;
-export type FreeJourneyCheckpoint = "briefing" | "rehearsal" | "transcript_review" | "generating" | "pressure_moment" | "rewrite" | "practice_shift" | "starting_index" | "complete";
+export type FreeJourneyCheckpoint = "briefing" | "rehearsal" | "transcript_review" | "generating" | "pressure_moment" | "rewrite" | "practice_shift" | "starting_index" | "complete" | "insufficient_evidence";
+export type PostRehearsalState = "rehearsal_complete" | "transcript_review" | "generating" | "pressure" | "rewrite" | "shift" | "pay1" | "pay2" | "pay3" | "insufficient_evidence";
+
+export interface InsufficientEvidenceResult {
+  headline: string;
+  note: string;
+  nextStep: string;
+}
 
 export interface ImmutablePracticeAttempt {
   id: string;
@@ -114,6 +121,10 @@ export interface ActivePracticeSession {
   freeRehearsalCompletedAt?: number;
   /** Furthest valid local acquisition checkpoint; drafts and raw audio are never stored here. */
   freeJourneyCheckpoint?: FreeJourneyCheckpoint;
+  /** Canonical deterministic state for the accepted post-rehearsal funnel. */
+  postRehearsalState?: PostRehearsalState;
+  /** Present only when the generation API explicitly returns insufficient evidence. */
+  insufficientEvidence?: InsufficientEvidenceResult;
   /** Evidence-linked v1 result built only from the completely approved transcript. */
   sharedResult?: SharedResultContractV1;
   attemptOne?: ImmutablePracticeAttempt;

@@ -359,16 +359,22 @@ describe("the debrief only claims what it can measure", () => {
     });
   });
 
-  it("forbids the coach from commenting on tone or delivery", async () => {
+  it("sends approved transcript text—not audio or delivery metadata—for analysis", async () => {
     const source = await Bun.file(`${import.meta.dir}/../lib/ai.ts`).text();
-    expect(source).toContain("You cannot hear the recording");
-    expect(source).toContain("Never comment on tone, volume, pace, pitch, delivery, emotion, or confidence");
+    expect(source).toContain("user_turn_1");
+    expect(source).toContain("counterpart_pushback");
+    expect(source).toContain("user_turn_2");
+    expect(source).toContain("counterpart_close");
+    expect(source).not.toContain("audio_blob");
+    expect(source).not.toContain("recording_url");
   });
 
-  it("instructs the scenario builder to use second person and no diagnosis", async () => {
+  it("uses the constrained BYSI contract instead of a client-authored diagnostic prompt", async () => {
     const source = await Bun.file(`${import.meta.dir}/../lib/ai.ts`).text();
-    expect(source).toContain("or third-person phrasing about them");
-    expect(source).toContain("Do not label, diagnose or pathologize them");
-    expect(source).toContain("describe the observable loop, not a diagnosis");
+    expect(source).toContain("entry_route");
+    expect(source).toContain("success_target");
+    expect(source).toContain("pressure_condition");
+    expect(source).not.toContain("systemPrompt");
+    expect(source).not.toContain("diagnose or pathologize");
   });
 });

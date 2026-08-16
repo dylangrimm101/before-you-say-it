@@ -129,11 +129,12 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
     await persist(approved);
     try {
       const response = approved.run.responseAttempt?.transcript ?? draft.trim();
-      const debrief = await generateDebrief(scenario, context.difficulty, [
+      const generated = await generateDebrief(scenario, context.difficulty, [
         turn(approved.run.attempt?.id ?? `${approved.run.id}-opener`, "user", approved.run.attempt?.transcript ?? ""),
         turn(pressure.id, "them", pressure.text),
         turn(approved.run.responseAttempt?.id ?? `${approved.run.id}-response`, "user", response),
       ], context.reaction, context.objective);
+      const debrief = generated.debrief;
       const flag = debrief.flags[0];
       const coached = attachScenarioCoaching(
         approved,

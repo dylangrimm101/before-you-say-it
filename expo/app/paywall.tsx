@@ -19,6 +19,7 @@ import {
   type CommercePresentationState,
   type OfferState,
 } from "@/lib/nativeCommerce";
+import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useCustomerInfo, useIsPro, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
 import { useStore } from "@/providers/store";
@@ -36,7 +37,7 @@ export default function Paywall() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ gate?: string; source?: string; moduleId?: string }>();
   const isPro = useIsPro();
-  const { devProEnabled, toggleDevPro, activePracticeSession } = useStore();
+  const { activePracticeSession, saveActivePracticeSession } = useStore();
   const moduleId: ModuleId | null = isModuleId(params.moduleId) ? params.moduleId : activePracticeSession?.recommendation?.moduleId ?? null;
   const recommendedModule = curriculumModule(moduleId);
   const { data: offerings, isLoading, error: offeringsError } = useOfferings();
@@ -54,18 +55,67 @@ export default function Paywall() {
   }, [offerings]);
   const selectedPackage = billing === "annual" ? plans.annual ?? plans.monthly : plans.monthly ?? plans.annual;
   const terms = storeProductSnapshot(selectedPackage?.product);
-  const purchaseLabel = terms?.trialDurationLabel ? `Start ${terms.trialDurationLabel} free trial` : terms ? `Continue · ${terms.priceString}` : "Plans unavailable";
+  const monthlyTerms = storeProductSnapshot(plans.monthly?.product);
+  const annualTerms = storeProductSnapshot(plans.annual?.product);
+  const isApprovedStoreOffer = Boolean(
+    plans.monthly && plans.annual
+      && monthlyTerms?.trialDurationLabel === "7 days"
+      && annualTerms?.trialDurationLabel === "7 days",
+  );
+  const purchaseLabel = isApprovedStoreOffer && terms ? "Start my free trial" : "Store setup required";
   const actions = commerceActionPresentation(commerceState, isPro, purchaseLabel);
   const hasCompleteEarnedResult = Boolean(activePracticeSession?.sharedResult?.pressure_moment && activePracticeSession.sharedResult.practice_shift && activePracticeSession.sharedResult.starting_index && activePracticeSession.sharedResult.first_focus);
   const earnedOfferBlocked = params.source === "debrief" && !hasCompleteEarnedResult;
 
   useEffect(() => {
     if (params.source !== "debrief") return;
+    const screen = `pay${stage}`;
     safeLog("[evidence] native post-rehearsal screen", {
       platform: Platform.OS,
-      screen: "trial",
+      screen,
+      step: `${stage}-of-3`,
     });
-  }, [params.source]);
+    const currentSession = activePracticeSession;
+    if (!currentSession || currentSession.postRehearsalState === screen) return;
+    saveActivePracticeSession({
+      ...currentSession,
+      postRehearsalState: transitionPostRehearsal(currentSession.postRehearsalState, screen as "pay1" | "pay2" | "pay3"),
+      updatedAt: Date.now(),
+    }).catch((caught) => safeLog("[paywall] offer checkpoint failed", errorShape(caught)));
+  }, [activePracticeSession, params.source, saveActivePracticeSession, stage]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    safeLog("[evidence] native store offer", {
+      count: Number(Boolean(plans.monthly)) + Number(Boolean(plans.annual)),
+      platform: Platform.OS,
+      provider: "revenuecat",
+      status: isApprovedStoreOffer ? "ready" : "iap-blocker",
+    });
+    safeLog("[evidence] native store product", {
+      period: "monthly",
+      price: monthlyTerms?.priceString ?? "missing",
+      productId: plans.monthly?.product.identifier ?? "missing",
+      provider: "revenuecat",
+      trial: monthlyTerms?.trialDurationLabel ?? "missing",
+    });
+    safeLog("[evidence] native store product", {
+      period: "annual",
+      price: annualTerms?.priceString ?? "missing",
+      productId: plans.annual?.product.identifier ?? "missing",
+      provider: "revenuecat",
+      trial: annualTerms?.trialDurationLabel ?? "missing",
+    });
+  }, [
+    annualTerms?.priceString,
+    annualTerms?.trialDurationLabel,
+    isApprovedStoreOffer,
+    isLoading,
+    monthlyTerms?.priceString,
+    monthlyTerms?.trialDurationLabel,
+    plans.annual,
+    plans.monthly,
+  ]);
 
   useEffect(() => {
     if (!isPro || commerceState !== "ready") return;
@@ -155,8 +205,8 @@ export default function Paywall() {
       <View style={styles.progress}>{([1, 2, 3] as const).map((value) => <View key={value} style={[styles.progressPart, value <= stage && styles.progressOn]} />)}</View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 180 }]} showsVerticalScrollIndicator={false}>
-        {stage === 1 ? <StageOne moduleName={recommendedModule?.name} plans={plans} trialDuration={terms?.trialDurationLabel ?? null} /> : null}
-        {stage === 2 ? <StageTwo trialDuration={terms?.trialDurationLabel ?? null} /> : null}
+        {stage === 1 ? <StageOne moduleName={recommendedModule?.name} /> : null}
+        {stage === 2 ? <StageTwo /> : null}
         {stage === 3 ? (
           <StageThree
             plans={plans}
@@ -164,7 +214,7 @@ export default function Paywall() {
             onBilling={setBilling}
             terms={terms}
             isLoading={isLoading}
-            unavailable={Boolean(offeringsError || !selectedPackage)}
+            unavailable={Boolean(offeringsError || !isApprovedStoreOffer || !selectedPackage)}
             commerceState={commerceState}
             onPrivacy={() => router.push("/privacy")}
           />
@@ -177,11 +227,8 @@ export default function Paywall() {
             <PrimaryButton
               label={actions.primaryLabel}
               onPress={() => void onPrimaryAction()}
-              disabled={actions.isPrimaryDisabled || (actions.primaryAction === "purchase" && !selectedPackage)}
+              disabled={actions.isPrimaryDisabled || (actions.primaryAction === "purchase" && !isApprovedStoreOffer)}
             />
-            {__DEV__ && !devProEnabled ? (
-              <><GhostButton label="Unlock all modules for testing" onPress={async () => { if (!__DEV__) return; await toggleDevPro(true); router.replace("/(tabs)"); }} style={styles.devButton} /><Text style={styles.devNote}>Preview only · no purchase or subscription</Text></>
-            ) : null}
           </>
         )}
         <GhostButton label="Keep my free debrief for now" onPress={() => navigateOffer("dismiss")} style={styles.secondary} />
@@ -190,26 +237,24 @@ export default function Paywall() {
   );
 }
 
-function StageOne({ moduleName, plans, trialDuration }: { moduleName?: string; plans: { monthly: PurchasesPackage | null; annual: PurchasesPackage | null }; trialDuration: string | null }) {
-  return <Reveal><Eyebrow color={C.purple}>Your practice plan</Eyebrow><Text style={styles.title}>{moduleName ? `Start with ${moduleName}.` : "Practice the moment you just found."}</Text><Text style={styles.lede}>Based on this rehearsal, your first 7 days start where the conversation got stuck.</Text><View style={styles.planSummary}><DetailLine label="First module" value={moduleName ?? "Your first focus"} /><DetailLine label="Training focus" value="Keep the request usable after pushback" /></View><View style={styles.valueList}>{VALUE_POINTS.slice(0, 3).map((point, index) => <View key={point} style={styles.valueRow}><Text style={styles.valueNumber}>{String(index + 1).padStart(2, "0")}</Text><Text style={styles.valueText}>{point}</Text></View>)}</View><PricingSummary plans={plans} trialDuration={trialDuration} /></Reveal>;
+function StageOne({ moduleName }: { moduleName?: string }) {
+  return <Reveal><Eyebrow color={C.purple}>Your practice plan</Eyebrow><Text style={styles.title}>{moduleName ? `Start with ${moduleName}.` : "Practice the moment you just found."}</Text><Text style={styles.lede}>Based on this rehearsal, your first 7 days start where the conversation got stuck.</Text><View style={styles.planSummary}><DetailLine label="First module" value={moduleName ?? "Your first focus"} /><DetailLine label="Training focus" value="Keep the request usable after pushback" /></View><View style={styles.valueList}>{VALUE_POINTS.slice(0, 3).map((point, index) => <View key={point} style={styles.valueRow}><Text style={styles.valueNumber}>{String(index + 1).padStart(2, "0")}</Text><Text style={styles.valueText}>{point}</Text></View>)}</View><View style={styles.pricingSummary}><Text style={styles.trialPrice}>7 days free</Text><Text style={styles.priceLine}>then $11.99/month or $89.99/year · cancel anytime</Text><Text style={styles.priceNote}>The final screen verifies the live App Store or Google Play offer before purchase.</Text></View></Reveal>;
 }
 
-function StageTwo({ trialDuration }: { trialDuration: string | null }) {
-  return <Reveal><Eyebrow color={C.purple}>No surprise charge</Eyebrow><Text style={styles.title}>{trialDuration ? `Try the full plan for ${trialDuration}.` : "Review the store terms before you decide."}</Text><Text style={styles.lede}>{trialDuration ? "Your store shows the trial and renewal terms before you confirm. BYSI never starts a subscription without that confirmation." : "A free trial is not currently confirmed for this account. The final screen shows the live provider terms without inventing one."}</Text><View style={styles.timeline}><TimelineRow active label="Today" detail={trialDuration ? "Trial begins after store confirmation" : "Review the live offer"} /><TimelineRow label="Before renewal" detail="Review or manage the subscription in your store account" /><TimelineRow label="Renewal" detail="The store applies the price and cadence shown at confirmation" last /></View></Reveal>;
+function StageTwo() {
+  return <Reveal><Eyebrow color={C.purple}>No surprise charge</Eyebrow><Text style={styles.title}>We’ll email you 3 days before your free trial ends.</Text><Text style={styles.lede}>You’ll have time to decide whether you want to continue.</Text><View style={styles.timeline}><TimelineRow active label="Today" detail="Trial begins" /><TimelineRow label="3 days before it ends" detail="We’ll email you a reminder." /><TimelineRow label="Trial end" detail="You’ll be charged unless you cancel before the trial ends." last /></View></Reveal>;
 }
 
 function StageThree({ plans, billing, onBilling, terms, isLoading, unavailable, commerceState, onPrivacy }: { plans: { monthly: PurchasesPackage | null; annual: PurchasesPackage | null }; billing: "monthly" | "annual"; onBilling: (value: "monthly" | "annual") => void; terms: ReturnType<typeof storeProductSnapshot>; isLoading: boolean; unavailable: boolean; commerceState: CommercePresentationState; onPrivacy: () => void }) {
-  return <Reveal><Eyebrow color={C.purple}>Your plan</Eyebrow><Text style={styles.title}>{terms?.trialDurationLabel ? "Start your free trial" : "Choose your plan"}</Text><Text style={styles.lede}>{terms?.trialDurationLabel ? `${terms.trialDurationLabel} free, then ${terms.priceString}${terms.periodLabel ? ` ${terms.periodLabel.toLowerCase()}` : ""}.` : "Choose with the live App Store or Google Play details in view."}</Text>{isLoading ? <ActivityIndicator color={C.purple} style={styles.loading} /> : unavailable ? <StatusCard state="failed" /> : <View style={styles.planList}>{plans.monthly ? <PlanChoice label="Monthly option" price={plans.monthly.product.priceString} selected={billing === "monthly"} onPress={() => onBilling("monthly")} /> : null}{plans.annual ? <PlanChoice label="Annual option" price={plans.annual.product.priceString} selected={billing === "annual"} onPress={() => onBilling("annual")} /> : null}</View>}<GlassCard style={styles.termsCard}><View style={styles.termRow}><Text style={styles.termLabel}>Price</Text><Text style={styles.termValue}>{terms?.priceString ?? "Unavailable"}</Text></View><View style={styles.termRow}><Text style={styles.termLabel}>Cadence</Text><Text style={styles.termValue}>{terms?.periodLabel ?? "Confirmed by provider"}</Text></View><View style={styles.termRow}><Text style={styles.termLabel}>Trial</Text><Text style={styles.termValue}>{terms?.trialDurationLabel ?? "No confirmed trial"}</Text></View></GlassCard>{commerceState !== "ready" ? <StatusCard state={commerceState} /> : null}<View style={styles.links}><PressCard onPress={() => void Linking.openURL("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")} accessibilityLabel="Terms"><Text style={styles.link}>Terms</Text></PressCard><Text style={styles.dot}>·</Text><PressCard onPress={onPrivacy} accessibilityLabel="Privacy"><Text style={styles.link}>Privacy in app</Text></PressCard></View></Reveal>;
+  return <Reveal><Eyebrow color={C.purple}>Your plan</Eyebrow><Text style={styles.title}>Start your free trial</Text><Text style={styles.lede}>7 days free, then $11.99/month or $89.99/year.</Text>{isLoading ? <ActivityIndicator color={C.purple} style={styles.loading} /> : unavailable ? <IapBlocker /> : <><View style={styles.planList}>{plans.monthly ? <PlanChoice label="Monthly option" price={plans.monthly.product.priceString} selected={billing === "monthly"} onPress={() => onBilling("monthly")} /> : null}{plans.annual ? <PlanChoice label="Annual option" price={plans.annual.product.priceString} selected={billing === "annual"} onPress={() => onBilling("annual")} /> : null}</View><GlassCard style={styles.termsCard}><View style={styles.termRow}><Text style={styles.termLabel}>Price</Text><Text style={styles.termValue}>{terms?.priceString}</Text></View><View style={styles.termRow}><Text style={styles.termLabel}>Cadence</Text><Text style={styles.termValue}>{terms?.periodLabel}</Text></View><View style={styles.termRow}><Text style={styles.termLabel}>Trial</Text><Text style={styles.termValue}>{terms?.trialDurationLabel} free</Text></View></GlassCard></>}{commerceState !== "ready" ? <StatusCard state={commerceState} /> : null}<View style={styles.links}><PressCard onPress={() => void Linking.openURL("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")} accessibilityLabel="Terms"><Text style={styles.link}>Terms</Text></PressCard><Text style={styles.dot}>·</Text><PressCard onPress={onPrivacy} accessibilityLabel="Privacy"><Text style={styles.link}>Privacy</Text></PressCard><Text style={styles.dot}>·</Text><Text style={styles.billingLink}>Billing & cancellation</Text></View></Reveal>;
+}
+
+function IapBlocker() {
+  return <View style={styles.iapBlocker}><AlertCircle size={20} color={C.clay} /><View style={styles.iapBlockerCopy}><Text style={styles.iapBlockerTitle}>In-app purchase configuration required</Text><Text style={styles.iapBlockerBody}>The live store has not returned both approved plans with a 7-day trial. Trial checkout stays disabled until the App Store or Google Play offer is configured.</Text></View></View>;
 }
 
 function DetailLine({ label, value }: { label: string; value: string }) {
   return <View style={styles.detailLine}><Text style={styles.detailLineLabel}>{label}</Text><Text style={styles.detailLineValue}>{value}</Text></View>;
-}
-
-function PricingSummary({ plans, trialDuration }: { plans: { monthly: PurchasesPackage | null; annual: PurchasesPackage | null }; trialDuration: string | null }) {
-  if (!plans.monthly && !plans.annual) return null;
-  const prices = [plans.monthly ? `${plans.monthly.product.priceString}/month` : null, plans.annual ? `${plans.annual.product.priceString}/year` : null].filter((value): value is string => Boolean(value));
-  return <View style={styles.pricingSummary}>{trialDuration ? <Text style={styles.trialPrice}>{trialDuration} free</Text> : null}<Text style={styles.priceLine}>{prices.join(" or ")} · cancel anytime</Text><Text style={styles.priceNote}>Store eligibility and localized renewal terms are confirmed before purchase.</Text></View>;
 }
 
 function PlanChoice({ label, price, selected, onPress }: { label: string; price: string; selected: boolean; onPress: () => void }) {
@@ -239,5 +284,6 @@ const styles = StyleSheet.create({
   timeline: { marginTop: 34 }, timelineRow: { flexDirection: "row", minHeight: 82 }, rail: { width: 20, alignItems: "center" }, railDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: C.track, borderWidth: 2, borderColor: C.bg }, railDotOn: { width: 14, height: 14, borderRadius: 7, backgroundColor: C.purple }, railLine: { width: 1, flex: 1, backgroundColor: C.lineStrong }, timelineCopy: { flex: 1, paddingLeft: 10, paddingBottom: 20 }, timelineLabel: { ...T.support, fontFamily: font.semi, color: C.text }, timelineDetail: { ...T.caption, marginTop: 4 },
   loading: { marginTop: 50 }, planList: { gap: 10, marginTop: 24 }, plan: { minHeight: 74, borderRadius: radius.md, borderWidth: 1, borderColor: C.glassEdge, backgroundColor: C.surface, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, planSelected: { borderColor: C.purple, backgroundColor: C.purpleSoft }, planLabel: { ...T.support, fontFamily: font.semi, color: C.text }, planPrice: { ...T.caption, marginTop: 4 },
   termsCard: { marginTop: 18, padding: 18, gap: 12 }, termRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 }, termLabel: { ...T.caption }, termValue: { ...T.caption, fontFamily: font.semi, color: C.text, textAlign: "right", flex: 1 }, status: { marginTop: 16, padding: 14, borderRadius: radius.md, backgroundColor: C.surface, flexDirection: "row", alignItems: "flex-start", gap: 10 }, statusText: { ...T.caption, color: C.text, flex: 1 },
-  pricingSummary: { alignItems: "center", marginTop: 28, paddingVertical: 20, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, gap: 5 }, trialPrice: { fontFamily: font.bold, fontSize: 24, lineHeight: 30, color: C.purple, textAlign: "center" }, priceLine: { ...T.support, fontFamily: font.semi, color: C.text, textAlign: "center" }, priceNote: { ...T.caption, color: C.dim, textAlign: "center", maxWidth: 310 }, links: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, marginTop: 16 }, link: { ...T.caption, color: C.purple, textDecorationLine: "underline", paddingVertical: 10 }, dot: { ...T.caption }, disabledText: { color: C.dim }, devButton: { marginTop: 8 }, devNote: { ...T.caption, color: C.purple, textAlign: "center", marginTop: 4 }, secondary: { marginTop: 8 },
+  pricingSummary: { alignItems: "center", marginTop: 28, paddingVertical: 20, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, gap: 5 }, trialPrice: { fontFamily: font.bold, fontSize: 24, lineHeight: 30, color: C.purple, textAlign: "center" }, priceLine: { ...T.support, fontFamily: font.semi, color: C.text, textAlign: "center" }, priceNote: { ...T.caption, color: C.dim, textAlign: "center", maxWidth: 310 }, links: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 10, marginTop: 16 }, link: { ...T.caption, color: C.purple, textDecorationLine: "underline", paddingVertical: 10 }, billingLink: { ...T.caption, color: C.purple }, dot: { ...T.caption }, disabledText: { color: C.dim }, secondary: { marginTop: 8 },
+  iapBlocker: { marginTop: 28, borderRadius: radius.md, borderWidth: 1, borderColor: `${C.clay}55`, backgroundColor: `${C.clay}0D`, padding: 16, flexDirection: "row", alignItems: "flex-start", gap: 12 }, iapBlockerCopy: { flex: 1, gap: 5 }, iapBlockerTitle: { ...T.support, fontFamily: font.semi, color: C.text }, iapBlockerBody: { ...T.caption, color: C.textSoft },
 });

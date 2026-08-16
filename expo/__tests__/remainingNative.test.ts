@@ -65,7 +65,15 @@ describe("remaining native acquisition and paid experience", () => {
     expect(loading).toContain('screen: "personalizing"');
     expect(results).toContain('step: "practice-shift-to-trial"');
     const paywall = await source("app/paywall.tsx");
-    expect(paywall).toContain('screen: "trial"');
+    expect(paywall).toContain("const screen = `pay${stage}`");
+    expect(paywall).toContain("7 days free");
+    expect(paywall).toContain("$11.99/month or $89.99/year");
+    expect(paywall).toContain("We’ll email you 3 days before your free trial ends.");
+    expect(paywall).toContain("In-app purchase configuration required");
+    expect(paywall).not.toContain("Price Unavailable");
+    expect(paywall).not.toContain("No confirmed trial");
+    expect(paywall).not.toContain("Plans unavailable");
+    expect(paywall).not.toContain("Unlock all modules for testing");
   });
 
   test("existing web customers authenticate and reconnect their paid identity", async () => {
@@ -102,7 +110,15 @@ describe("remaining native acquisition and paid experience", () => {
     expect(results.indexOf('freeJourneyCheckpoint: "complete"')).toBeLessThan(results.indexOf('pathname: "/paywall"'));
   });
 
-  test("live product values remain live and unavailable fields stay explicit", () => {
+  test("live product values remain provider-derived and incomplete store setup blocks checkout", async () => {
+    const paywall = await source("app/paywall.tsx");
+    expect(paywall).toContain('monthlyTerms?.trialDurationLabel === "7 days"');
+    expect(paywall).toContain('annualTerms?.trialDurationLabel === "7 days"');
+    expect(paywall).toContain('label={actions.primaryLabel}');
+    expect(paywall).toContain('!isApprovedStoreOffer');
+    expect(paywall).toContain('status: isApprovedStoreOffer ? "ready" : "iap-blocker"');
+    expect(paywall).not.toContain("devProEnabled");
+    expect(paywall).not.toContain("toggleDevPro");
     expect(storeProductSnapshot({ priceString: "€8.49", subscriptionPeriod: "P1M", introPrice: { price: 0, priceString: "€0.00", period: "P7D" } })).toEqual({ priceString: "€8.49", periodLabel: "1 month", trialDurationLabel: "7 days", trialPriceString: "€0.00" });
     expect(storeProductSnapshot({ priceString: "¥980" })).toEqual({ priceString: "¥980", periodLabel: null, trialDurationLabel: null, trialPriceString: null });
     expect(storeProductSnapshot({ subscriptionPeriod: "P1M" })).toBeNull();

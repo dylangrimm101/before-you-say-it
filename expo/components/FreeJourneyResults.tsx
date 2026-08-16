@@ -8,6 +8,7 @@ import { Backdrop, PrimaryButton, PressCard, StateDock, tap, useReducedMotion } 
 import { C, GUTTER, T, eyebrow, font, shadow } from "@/constants/theme";
 import { CONVERSATION_PHASES } from "@/lib/conversion";
 import type { ActivePracticeSession, FreeJourneyCheckpoint } from "@/lib/practiceSession";
+import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
 import { safeLog } from "@/lib/redact";
 import { completedPracticeSessionToSharedTranscript } from "@/lib/sharedProductAdapters";
 import { useStore } from "@/providers/store";
@@ -60,7 +61,21 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
 
   const move = useCallback(async (next: FreeJourneyCheckpoint): Promise<void> => {
     tap("medium");
-    await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: next, updatedAt: Date.now() });
+    const postRehearsalState = next === "pressure_moment"
+      ? "pressure" as const
+      : next === "rewrite"
+        ? "rewrite" as const
+        : next === "practice_shift"
+          ? "shift" as const
+          : session.postRehearsalState;
+    await saveActivePracticeSession({
+      ...session,
+      freeJourneyCheckpoint: next,
+      postRehearsalState: postRehearsalState
+        ? transitionPostRehearsal(session.postRehearsalState, postRehearsalState)
+        : undefined,
+      updatedAt: Date.now(),
+    });
   }, [saveActivePracticeSession, session]);
 
   const showResultCard = useCallback((next: ResultCard): void => {
@@ -120,7 +135,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
           </View>
           <View style={styles.exchange}>
             <Text style={styles.focusTitle}>{result.first_focus.first_focus_label}</Text>
-            <Text style={styles.focusSummary}>This module trains the next move, so the conversation has something concrete to hold onto.</Text>
+            <Text style={styles.focusSummary}>{session.recommendation?.immediateAction ?? "This module trains the next move, so the conversation has something concrete to hold onto."}</Text>
             <View style={styles.rewriteDivider} />
             <ExchangeNode label="Your ask" text={byId.get(moment.opening_turn_id) ?? ""} tone="you" />
             <ExchangeNode label="The pushback" text={byId.get(moment.pushback_turn_id) ?? ""} tone="push" />
@@ -216,7 +231,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
                 screen: "trial",
                 step: "practice-shift-to-trial",
               });
-              await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: "complete", updatedAt: Date.now() });
+              await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: "complete", postRehearsalState: transitionPostRehearsal(session.postRehearsalState, "pay1"), updatedAt: Date.now() });
               router.push({ pathname: "/paywall", params: { gate: "recommended-path", source: "debrief", moduleId: result.first_focus?.recommended_module_id } });
             }}
           />
@@ -300,7 +315,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
               <PrimaryButton
                 label="Continue with my path"
                 onPress={async () => {
-                  await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: "complete", updatedAt: Date.now() });
+                  await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: "complete", postRehearsalState: transitionPostRehearsal(session.postRehearsalState, "pay1"), updatedAt: Date.now() });
                   router.push({ pathname: "/paywall", params: { gate: "recommended-path", source: "debrief", moduleId: result.first_focus?.recommended_module_id } });
                 }}
                 style={styles.continueButton}
@@ -371,13 +386,16 @@ function ShiftColumn({ label, steps, tone }: { label: string; steps: string[]; t
 
 function SignalRow({ signal }: { signal: SharedSignalV1 }) {
   return (
-    <View style={styles.signalRow}>
-      <Text style={styles.signalName}>{SIGNAL_LABELS[signal.signal_key]}</Text>
-      {signal.score === null ? (
-        <><View style={styles.dashedTrack} /><Text style={styles.notObserved}>Not observed</Text></>
-      ) : (
-        <><View style={styles.scoreTrack}><View style={[styles.scoreFill, { width: `${signal.score}%` }]} /></View><Text style={styles.score}>{Math.round(signal.score)}</Text></>
-      )}
+    <View style={styles.signalBlock}>
+      <View style={styles.signalRow}>
+        <Text style={styles.signalName}>{SIGNAL_LABELS[signal.signal_key]}</Text>
+        {signal.score === null ? (
+          <><View style={styles.dashedTrack} /><Text style={styles.notObserved}>Not observed</Text></>
+        ) : (
+          <><View style={styles.scoreTrack}><View style={[styles.scoreFill, { width: `${signal.score}%` }]} /></View><Text style={styles.score}>{Math.round(signal.score)}</Text></>
+        )}
+      </View>
+      {signal.evidence_summary ? <Text style={styles.signalEvidence}>{signal.evidence_summary}</Text> : null}
     </View>
   );
 }
@@ -446,7 +464,9 @@ const styles = StyleSheet.create({
   averageNote: { ...T.caption, color: C.textSoft, paddingBottom: 11, borderBottomWidth: 1, borderBottomColor: C.line },
   groupLabel: { ...eyebrow, fontSize: 9, color: C.dim },
   emptyEvidence: { ...T.caption, color: C.textSoft },
+  signalBlock: { gap: 5, paddingVertical: 3 },
   signalRow: { minHeight: 26, flexDirection: "row", alignItems: "center", gap: 9 },
+  signalEvidence: { ...T.caption, color: C.textSoft, paddingLeft: 87 },
   signalName: { ...T.caption, color: C.text, width: 78 },
   dashedTrack: { flex: 1, height: 6, borderRadius: 3, borderWidth: 1, borderStyle: "dashed", borderColor: C.lineStrong },
   notObserved: { ...T.caption, fontSize: 11, width: 78, textAlign: "right" },
