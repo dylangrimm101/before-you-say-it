@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, Lock } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Animated, Easing, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Animated, Easing, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FreeJourneyResults } from "@/components/FreeJourneyResults";
@@ -110,7 +110,6 @@ function Artifact({ children, duration = 380 }: { children: React.ReactNode; dur
 function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: () => void }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
   const isReduced = useReducedMotion();
   const [completedCount, setCompletedCount] = useState<number>(0);
   const stageProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
@@ -179,7 +178,7 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={{
-          minHeight: Math.max(640, height - insets.top - insets.bottom),
+          flexGrow: 1,
           justifyContent: "center",
           paddingTop: insets.top + 24,
           paddingHorizontal: GUTTER,
@@ -431,7 +430,7 @@ function FreeDebrief({ id, build }: { id: string; build: ConversionBuild | null 
         contentContainerStyle={{
           paddingTop: insets.top + 22,
           paddingHorizontal: GUTTER,
-          paddingBottom: insets.bottom + 148,
+          paddingBottom: 32,
         }}
         showsVerticalScrollIndicator={false}
       >

@@ -207,7 +207,15 @@ export default function Paywall() {
         <PressCard onPress={() => navigateOffer("dismiss")} style={[styles.topHit, styles.closeHit]} accessibilityLabel="Close offer. Keep my free debrief for now"><Text style={styles.topText}>Close</Text></PressCard>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scroll, stage === 2 && styles.stageTwoScroll, { paddingBottom: insets.bottom + 150 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          stage === 1 && styles.centeredStageScroll,
+          stage === 2 && styles.centeredStageScroll,
+          { paddingBottom: 28 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {stage === 1 ? <StageOne moduleId={moduleId} moduleName={recommendedModule?.name} trainingFocus={activePracticeSession?.sharedResult?.starting_index?.focus_dimension} /> : null}
         {stage === 2 ? <StageTwo /> : null}
         {stage === 3 ? (
@@ -286,7 +294,7 @@ function Unavailable({ title, body, onBack }: { title: string; body: string; onB
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, center: { alignItems: "center", justifyContent: "center", padding: GUTTER }, centerText: { textAlign: "center" }, unavailableButton: { width: "100%", marginTop: 28 },
   top: { minHeight: 58, paddingHorizontal: GUTTER, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, topHit: { width: 72, minHeight: 44, justifyContent: "center" }, closeHit: { alignItems: "flex-end" }, topText: { ...T.support, color: C.textSoft, fontSize: 17 }, step: { ...eyebrow, color: C.dim, fontSize: 11 },
-  scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, stageTwoScroll: { flexGrow: 1, justifyContent: "center", paddingBottom: 190 },
+  scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, centeredStageScroll: { flexGrow: 1, justifyContent: "center" },
   stageOne: { alignItems: "stretch" },
   title: { ...T.display, fontFamily: font.bold, fontSize: 29, lineHeight: 36, marginTop: 10 }, centerTitle: { textAlign: "center", marginTop: 26 }, lede: { ...T.body, color: C.textSoft, marginTop: 14 }, centerLede: { textAlign: "center" },
   planCard: { marginTop: 24, borderRadius: radius.lg, backgroundColor: C.elevated, paddingHorizontal: 16, paddingVertical: 8, shadowColor: "#1C2430", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 3 }, detailLine: { paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }, detailLineLabel: { ...T.support, color: C.textSoft }, detailLineValue: { ...T.support, color: C.text, fontFamily: font.semi, flex: 1, textAlign: "right" }, repList: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, paddingTop: 10, paddingBottom: 8, gap: 8 }, repText: { ...T.support, color: C.text },

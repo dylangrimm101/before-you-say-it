@@ -905,7 +905,7 @@ function LegacyRehearse() {
       <View style={styles.root}>
         <Backdrop />
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScrollView contentContainerStyle={[styles.reviewScroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 170 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={[styles.reviewScroll, { paddingTop: insets.top + 8, paddingBottom: 28 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Pressable onPress={() => setReviewingTranscript(false)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back to rehearsal">
               <Text style={styles.reviewBackTop}>Back</Text>
             </Pressable>

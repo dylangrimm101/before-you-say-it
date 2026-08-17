@@ -190,7 +190,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
     return (
       <View style={styles.root}>
         <Backdrop />
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 150 }]}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: 28 }]}>
           <PressCard onPress={() => void move("pressure_moment")} accessibilityLabel="Back to Communication baseline"><Text style={styles.back}>Back</Text></PressCard>
           <View style={styles.rewriteHeroSpace} />
           <Text style={styles.title}>Here’s what practice is helping you say</Text>
@@ -216,7 +216,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
     return (
       <View style={styles.root}>
         <Backdrop />
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 150 }]}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: 28 }]}>
           <PressCard onPress={() => void move("rewrite")} accessibilityLabel="Back to clearer version">
             <Text style={styles.back}>Back</Text>
           </PressCard>
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
   signalChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   signalChip: { borderRadius: 999, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, paddingHorizontal: 11, paddingVertical: 7 },
   signalChipText: { ...T.caption, color: C.textSoft },
-  rewriteHeroSpace: { height: 230 },
+  rewriteHeroSpace: { height: 96 },
   rewriteCard: { backgroundColor: C.elevated, borderRadius: 24, padding: 20, gap: 16, ...shadow.layer },
   rewriteEyebrow: { ...eyebrow, color: C.purple, fontSize: 11 },
   originalBlock: { borderLeftWidth: 3, borderLeftColor: `${C.amber}55`, paddingLeft: 12, gap: 5 },
