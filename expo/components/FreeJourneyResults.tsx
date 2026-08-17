@@ -35,6 +35,9 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
   const isReduced = useReducedMotion();
   const [resultCard, setResultCard] = useState<ResultCard>("index");
   const cardProgress = useRef<Animated.Value>(new Animated.Value(1)).current;
+  const skillBubbleProgress = useRef<Animated.Value[]>(
+    Array.from({ length: 6 }, () => new Animated.Value(0)),
+  ).current;
   const cardDirection = useRef<1 | -1>(1);
   const result = session.sharedResult;
   const storedCheckpoint: FreeJourneyCheckpoint = session.freeJourneyCheckpoint ?? "pressure_moment";
@@ -102,6 +105,28 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
     return () => animation.stop();
   }, [cardProgress, isReduced, resultCard]);
 
+  useEffect(() => {
+    const isIndexVisible = checkpoint === "pressure_moment" || (checkpoint === "starting_index" && resultCard === "index");
+    if (!isIndexVisible) return;
+    if (isReduced) {
+      skillBubbleProgress.forEach((progress) => progress.setValue(1));
+      return;
+    }
+
+    skillBubbleProgress.forEach((progress) => progress.setValue(0));
+    const entrance = Animated.stagger(
+      70,
+      skillBubbleProgress.map((progress) => Animated.timing(progress, {
+        toValue: 1,
+        duration: 420,
+        easing: Easing.bezier(0.22, 0.9, 0.28, 1),
+        useNativeDriver: true,
+      })),
+    );
+    entrance.start();
+    return () => entrance.stop();
+  }, [checkpoint, isReduced, resultCard, skillBubbleProgress]);
+
   if (!result?.pressure_moment || !result.practice_shift || !result.starting_index || !result.first_focus) {
     return (
       <View style={[styles.root, styles.center]}>
@@ -164,7 +189,13 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
               <View style={styles.untestedGroup}>
                 <Text style={styles.untestedLabel}>SKILLS NOT OBSERVED</Text>
                 <View style={styles.signalChips}>
-                  {unobservedSignals.map((signal) => <View key={signal.signal_key} style={styles.signalChip}><Text style={styles.signalChipText}>{SIGNAL_LABELS[signal.signal_key]}</Text></View>)}
+                  {unobservedSignals.map((signal, index) => (
+                    <SkillBubble
+                      key={signal.signal_key}
+                      label={SIGNAL_LABELS[signal.signal_key]}
+                      progress={skillBubbleProgress[index] ?? skillBubbleProgress[0]!}
+                    />
+                  ))}
                 </View>
                 <Text style={styles.untestedNote}>These skills weren’t tested in this short exchange.</Text>
               </View>
@@ -290,7 +321,13 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
               {unobservedSignals.length > 0 ? <>
                 <Text style={styles.groupLabel}>NOT TESTED YET</Text>
                 <View style={styles.signalChips}>
-                  {unobservedSignals.map((signal) => <View key={signal.signal_key} style={styles.signalChip}><Text style={styles.signalChipText}>{SIGNAL_LABELS[signal.signal_key]}</Text></View>)}
+                  {unobservedSignals.map((signal, index) => (
+                    <SkillBubble
+                      key={signal.signal_key}
+                      label={SIGNAL_LABELS[signal.signal_key]}
+                      progress={skillBubbleProgress[index] ?? skillBubbleProgress[0]!}
+                    />
+                  ))}
                 </View>
               </> : null}
               <PrimaryButton label="See my practice path" onPress={() => showResultCard("path")} style={styles.cardAction} />
@@ -330,6 +367,27 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
         </Animated.View>
       </ScrollView>
     </View>
+  );
+}
+
+function SkillBubble({ label, progress }: { label: string; progress: Animated.Value }) {
+  return (
+    <Animated.View
+      style={[
+        styles.signalChip,
+        {
+          opacity: progress,
+          transform: [{
+            translateY: progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [10, 0],
+            }),
+          }],
+        },
+      ]}
+    >
+      <Text style={styles.signalChipText}>{label}</Text>
+    </Animated.View>
   );
 }
 

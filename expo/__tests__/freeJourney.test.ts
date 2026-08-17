@@ -340,6 +340,9 @@ describe("Claude Design free journey contract", () => {
     expect(source).toContain('showResultCard("index")');
     expect(source).toContain("if (isReduced)");
     expect(source).toContain("cardProgress.setValue(1)");
+    expect(source).toContain("skillBubbleProgress.forEach((progress) => progress.setValue(1))");
+    expect(source).toContain("const entrance = Animated.stagger(");
+    expect(source).toContain("outputRange: [10, 0]");
     expect(source).not.toContain("How BYSI read this");
     expect(source).toContain("styles.signalChips");
     expect(source).toContain("styles.startingIndexBadge");
