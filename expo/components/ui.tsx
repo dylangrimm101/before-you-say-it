@@ -322,6 +322,7 @@ export function PrimaryButton({
   tone = C.purple,
   style,
   containerStyle,
+  compact = false,
 }: {
   label: string;
   onPress: () => void;
@@ -329,6 +330,7 @@ export function PrimaryButton({
   tone?: string;
   style?: StyleProp<ViewStyle>;
   containerStyle?: StyleProp<ViewStyle>;
+  compact?: boolean;
 }) {
   return (
     <PressCard
@@ -343,13 +345,14 @@ export function PrimaryButton({
       <View
         style={[
           styles.primary,
+          compact && styles.primaryCompact,
           disabled
             ? styles.primaryDisabled
             : { backgroundColor: tone, shadowColor: tone },
         ]}
       >
         <Text
-          style={[styles.primaryLabel, { color: disabled ? C.textDim : C.onAccent }]}
+          style={[styles.primaryLabel, compact && styles.primaryLabelCompact, { color: disabled ? C.textDim : C.onAccent }]}
         >
           {label}
         </Text>
@@ -1005,7 +1008,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
+  primaryCompact: { height: 46, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.22, shadowRadius: 13 },
   primaryLabel: { fontFamily: font.semi, fontSize: 17, letterSpacing: 0.1 },
+  primaryLabelCompact: { fontSize: 15 },
   ghost: {
     height: 52,
     borderRadius: radius.button,

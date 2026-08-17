@@ -198,7 +198,7 @@ export default function Paywall() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          stage === 1 && styles.centeredStageScroll,
+          stage === 1 && styles.stageOneScroll,
           stage === 2 && styles.centeredStageScroll,
           { paddingBottom: 28 },
         ]}
@@ -223,7 +223,7 @@ export default function Paywall() {
       </ScrollView>
 
       <StateDock bottomInset={insets.bottom}>
-        {stage < 3 ? <PrimaryButton label="Continue" onPress={() => navigateOffer("forward")} /> : (
+        {stage < 3 ? <PrimaryButton label="Continue" onPress={() => navigateOffer("forward")} compact={stage === 1} /> : (
           <>
             <PrimaryButton
               label={actions.primaryLabel}
@@ -299,16 +299,16 @@ function Unavailable({ title, body, onBack }: { title: string; body: string; onB
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, center: { alignItems: "center", justifyContent: "center", padding: GUTTER }, centerText: { textAlign: "center" }, unavailableButton: { width: "100%", marginTop: 28 },
-  top: { minHeight: 58, paddingHorizontal: GUTTER, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, topHit: { width: 72, minHeight: 44, justifyContent: "center" }, closeHit: { alignItems: "flex-end" }, topText: { ...T.support, color: C.textSoft, fontSize: 17 }, step: { ...eyebrow, color: C.dim, fontSize: 11 },
-  scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, centeredStageScroll: { flexGrow: 1, justifyContent: "center" },
+  top: { minHeight: 58, paddingHorizontal: GUTTER, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, topHit: { width: 72, minHeight: 44, justifyContent: "center" }, closeHit: { alignItems: "flex-end" }, topText: { ...T.support, color: C.textSoft, fontSize: 15 }, step: { ...eyebrow, color: C.dim, fontSize: 10 },
+  scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, stageOneScroll: { flexGrow: 1, justifyContent: "flex-start", paddingTop: 12 }, centeredStageScroll: { flexGrow: 1, justifyContent: "center" },
   stageOne: { alignItems: "stretch" },
-  title: { ...T.display, fontFamily: font.bold, fontSize: 29, lineHeight: 36, marginTop: 10 }, stageOneTitle: { fontSize: 27, lineHeight: 33, marginTop: 14 }, lede: { ...T.body, color: C.textSoft, marginTop: 14 }, stageOneLede: { marginTop: 8, lineHeight: 22 },
-  planCard: { marginTop: 20, borderRadius: radius.lg, backgroundColor: C.elevated, padding: 16, shadowColor: "#1C2430", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 3 },
-  moduleEyebrow: { ...eyebrow, color: C.dim, fontSize: 9 }, moduleTitle: { ...T.title, color: C.text, fontFamily: font.bold, fontSize: 19, lineHeight: 24, marginTop: 5 }, focusPill: { alignSelf: "flex-start", borderRadius: 999, backgroundColor: C.purpleSoft, paddingHorizontal: 10, paddingVertical: 5, marginTop: 10 }, focusPillText: { ...T.caption, color: C.purple, fontFamily: font.semi, fontSize: 11 }, modulePreview: { ...T.support, color: C.textSoft, fontSize: 14, lineHeight: 20, marginTop: 10 },
-  offerLockup: { alignItems: "center", marginTop: 18 }, offerTitle: { fontFamily: font.bold, fontSize: 26, lineHeight: 32, color: C.text }, sevenSegments: { flexDirection: "row", gap: 6, marginTop: 16 }, sevenSegment: { flex: 1, height: 8, borderRadius: 4, backgroundColor: C.purple },
+  title: { ...T.display, fontFamily: font.bold, fontSize: 29, lineHeight: 36, marginTop: 10 }, stageOneTitle: { fontSize: 24, lineHeight: 29, marginTop: 10 }, lede: { ...T.body, color: C.textSoft, marginTop: 14 }, stageOneLede: { fontSize: 15, lineHeight: 21, marginTop: 6 },
+  planCard: { marginTop: 15, borderRadius: radius.lg, backgroundColor: C.elevated, paddingHorizontal: 15, paddingVertical: 13, shadowColor: "#1C2430", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 2 },
+  moduleEyebrow: { ...eyebrow, color: C.dim, fontSize: 8 }, moduleTitle: { ...T.title, color: C.text, fontFamily: font.bold, fontSize: 17, lineHeight: 22, marginTop: 3 }, focusPill: { alignSelf: "flex-start", borderRadius: 999, backgroundColor: C.purpleSoft, paddingHorizontal: 9, paddingVertical: 3, marginTop: 7 }, focusPillText: { ...T.caption, color: C.purple, fontFamily: font.semi, fontSize: 10, lineHeight: 16 }, modulePreview: { ...T.support, color: C.textSoft, fontSize: 13, lineHeight: 18, marginTop: 7 },
+  offerLockup: { alignItems: "center", marginTop: 12 }, offerTitle: { fontFamily: font.bold, fontSize: 21, lineHeight: 27, color: C.text }, sevenSegments: { flexDirection: "row", gap: 6, marginTop: 10 }, sevenSegment: { flex: 1, height: 8, borderRadius: 4, backgroundColor: C.purple },
   timeline: { marginTop: 32 }, checkoutTimeline: { marginTop: 22 }, timelineRow: { flexDirection: "row", minHeight: 76 }, rail: { width: 20, alignItems: "center" }, railDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: C.bg, borderWidth: 2, borderColor: C.purple }, railDotOn: { width: 14, height: 14, borderRadius: 7, backgroundColor: C.purple }, railLine: { width: 2, flex: 1, backgroundColor: `${C.purple}35` }, timelineCopy: { flex: 1, paddingLeft: 10, paddingBottom: 16 }, timelineLabel: { ...eyebrow, color: C.dim, fontSize: 10 }, timelineDetail: { ...T.body, color: C.text, marginTop: 3, fontSize: 16, lineHeight: 23 },
   loading: { marginTop: 50 }, planList: { gap: 10, marginTop: 24 }, plan: { minHeight: 74, borderRadius: radius.md, borderWidth: 1, borderColor: C.glassEdge, backgroundColor: C.surface, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, planSelected: { borderColor: C.purple, backgroundColor: C.purpleSoft }, planLabel: { ...T.support, fontFamily: font.semi, color: C.text }, planPrice: { ...T.caption, marginTop: 4 },
   termsCard: { marginTop: 18, padding: 18, gap: 12 }, termRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 }, termLabel: { ...T.caption }, termValue: { ...T.caption, fontFamily: font.semi, color: C.text, textAlign: "right", flex: 1 }, status: { marginTop: 16, padding: 14, borderRadius: radius.md, backgroundColor: C.surface, flexDirection: "row", alignItems: "flex-start", gap: 10 }, statusText: { ...T.caption, color: C.text, flex: 1 },
-  priceLine: { ...T.caption, color: C.textSoft, textAlign: "center", marginTop: 3, lineHeight: 19 }, renewalCopy: { ...T.caption, color: C.textSoft, marginTop: 18, lineHeight: 20 }, links: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: 18, rowGap: 0, marginTop: 16 }, link: { ...T.caption, color: C.textSoft, paddingVertical: 10 }, billingLink: { ...T.caption, color: C.textSoft }, disabledText: { color: C.dim },
+  priceLine: { ...T.caption, color: C.textSoft, textAlign: "center", fontSize: 12, lineHeight: 17, marginTop: 2 }, renewalCopy: { ...T.caption, color: C.textSoft, marginTop: 18, lineHeight: 20 }, links: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: 18, rowGap: 0, marginTop: 16 }, link: { ...T.caption, color: C.textSoft, paddingVertical: 10 }, billingLink: { ...T.caption, color: C.textSoft }, disabledText: { color: C.dim },
   iapBlocker: { marginTop: 28, borderRadius: radius.md, borderWidth: 1, borderColor: `${C.clay}55`, backgroundColor: `${C.clay}0D`, padding: 16, flexDirection: "row", alignItems: "flex-start", gap: 12 }, iapBlockerCopy: { flex: 1, gap: 5 }, iapBlockerTitle: { ...T.support, fontFamily: font.semi, color: C.text }, iapBlockerBody: { ...T.caption, color: C.textSoft },
 });
