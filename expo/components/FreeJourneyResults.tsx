@@ -1,5 +1,4 @@
 import { useRouter } from "expo-router";
-import { ChevronDown, ChevronUp } from "lucide-react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
@@ -33,7 +32,6 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
   const { width } = useWindowDimensions();
   const { saveActivePracticeSession } = useStore();
   const isReduced = useReducedMotion();
-  const [expanded, setExpanded] = useState<boolean>(false);
   const [resultCard, setResultCard] = useState<ResultCard>("index");
   const cardProgress = useRef<Animated.Value>(new Animated.Value(1)).current;
   const cardDirection = useRef<1 | -1>(1);
@@ -136,6 +134,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
             <Text style={styles.stallText}><Text style={styles.stallLead}>Where it stalls: </Text>You stayed in the conversation, but the ask still did not hold under pressure.</Text>
           </View>
           <View style={styles.exchange}>
+            <Text style={styles.focusEyebrow}>FIRST PRACTICE FOCUS</Text>
             <Text style={styles.focusTitle}>{result.first_focus.first_focus_label}</Text>
             <Text style={styles.focusSummary}>{curriculumModule(result.first_focus.recommended_module_id)?.promise ?? "This module trains the next move, so the conversation has something concrete to hold onto."}</Text>
             <View style={styles.rewriteDivider} />
@@ -143,26 +142,17 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
             <ExchangeNode label="The pushback" text={byId.get(moment.pushback_turn_id) ?? ""} tone="push" />
             <ExchangeNode label="Your response" text={byId.get(moment.pressure_response_turn_id) ?? ""} tone="you" last />
           </View>
-          <PressCard onPress={() => setExpanded((value) => !value)} accessibilityLabel="How BYSI read this">
-            <View style={styles.disclosure}>
-              <Text style={styles.disclosureText}>How BYSI read this</Text>
-              {expanded ? <ChevronUp size={17} color={C.purple} /> : <ChevronDown size={17} color={C.purple} />}
-            </View>
-          </PressCard>
-          {expanded ? (
-            <View style={styles.details}>
-              <Detail label="Observed" text={moment.observation} />
-              <Detail label="Why it matters here" text={moment.why_it_matters} />
-              <Detail label="Confidence" text={moment.confidence_statement} />
-            </View>
-          ) : null}
+          <View style={styles.baselineAction}>
+            <PrimaryButton label="Show what changes with practice" onPress={() => void move("rewrite")} />
+            <Text style={styles.dockPromise}>See your same ask rewritten as one specific request you could actually say.</Text>
+          </View>
           <View style={styles.baselineCard}>
             <View style={styles.startingIndexSummary}>
               <View style={styles.startingIndexCopy}>
                 <Text style={styles.groupLabel}>STARTING INDEX</Text>
                 <Text style={styles.startingIndexScope}>A partial view from this rehearsal only</Text>
               </View>
-              <Text style={styles.startingIndexValue}>{result.starting_index.index_value ?? "—"}</Text>
+              <View style={styles.startingIndexBadge}><Text style={styles.startingIndexValue}>{result.starting_index.index_value ?? "—"}</Text></View>
             </View>
             <Text style={styles.baselineScope}>{result.starting_index.observed_count} of 6 signals observed. Unobserved signals aren’t scored.</Text>
             <Text style={styles.groupLabel}>WHAT THIS REP SHOWED</Text>
@@ -175,10 +165,6 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
                 {unobservedSignals.map((signal) => <View key={signal.signal_key} style={styles.signalChip}><Text style={styles.signalChipText}>{SIGNAL_LABELS[signal.signal_key]}</Text></View>)}
               </View>
             </> : null}
-          </View>
-          <View style={styles.baselineAction}>
-            <PrimaryButton label="Show what changes with practice" onPress={() => void move("rewrite")} />
-            <Text style={styles.dockPromise}>See your same ask rewritten as one specific request you could actually say.</Text>
           </View>
         </ScrollView>
       </View>
@@ -273,7 +259,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
             <View style={[styles.layerCard, { width: cardWidth }]} accessibilityLabel="Partial Starting Index card">
               <Text style={styles.cardTitle}>Where you are now</Text>
               <View style={styles.indexRow}>
-                <Text style={styles.indexValue}>{result.starting_index.index_value ?? "—"}</Text>
+                <View style={styles.indexScoreBadge}><Text style={styles.indexValue}>{result.starting_index.index_value ?? "—"}</Text></View>
                 <View style={styles.indexCopy}>
                   <Text style={styles.detailLabel}>PARTIAL INDEX</Text>
                   <Text style={styles.indexCount}>{result.starting_index.observed_count} of 6 signals observed</Text>
@@ -289,8 +275,12 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
               {observedSignals.length > 0
                 ? observedSignals.map((signal) => <SignalRow key={signal.signal_key} signal={signal} />)
                 : <Text style={styles.emptyEvidence}>No signal had enough evidence for a responsible score in this short exchange.</Text>}
-              <Text style={styles.groupLabel}>NOT OBSERVED YET</Text>
-              {unobservedSignals.map((signal) => <SignalRow key={signal.signal_key} signal={signal} />)}
+              {unobservedSignals.length > 0 ? <>
+                <Text style={styles.groupLabel}>NOT TESTED YET</Text>
+                <View style={styles.signalChips}>
+                  {unobservedSignals.map((signal) => <View key={signal.signal_key} style={styles.signalChip}><Text style={styles.signalChipText}>{SIGNAL_LABELS[signal.signal_key]}</Text></View>)}
+                </View>
+              </> : null}
               <PrimaryButton label="See my practice path" onPress={() => showResultCard("path")} style={styles.cardAction} />
             </View>
           ) : (
@@ -333,21 +323,11 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
 
 function ExchangeNode({ label, text, tone, last = false }: { label: string; text: string; tone: "you" | "push"; last?: boolean }) {
   return (
-    <View style={styles.exchangeRow}>
-      <View style={styles.exchangeRail}>
-        <View style={[styles.exchangeDot, tone === "push" && styles.exchangeDotPush]} />
-        {!last ? <View style={styles.exchangeLine} /> : null}
-      </View>
-      <View style={styles.exchangeCopy}>
-        <Text style={[styles.nodeLabel, tone === "push" && styles.pushLabel]}>{label}</Text>
-        <Text style={styles.quote}>“{text}”</Text>
-      </View>
+    <View style={[styles.exchangeRow, !last && styles.exchangeRowDivided]}>
+      <Text style={[styles.nodeLabel, tone === "push" && styles.pushLabel]}>{label}</Text>
+      <Text style={styles.quote}>“{text}”</Text>
     </View>
   );
-}
-
-function Detail({ label, text }: { label: string; text: string }) {
-  return <View style={styles.detail}><Text style={styles.detailLabel}>{label}</Text><Text style={styles.detailText}>{text}</Text></View>;
 }
 
 function ShiftComparison() {
@@ -404,15 +384,15 @@ function PracticeImprovementGraph() {
 }
 
 function SignalRow({ signal }: { signal: SharedSignalV1 }) {
+  const isSpecificity = signal.signal_key === "specificity";
   return (
-    <View style={styles.signalBlock}>
+    <View style={[styles.signalBlock, isSpecificity && styles.signalBlockFocus]}>
       <View style={styles.signalRow}>
-        <Text style={styles.signalName}>{SIGNAL_LABELS[signal.signal_key]}</Text>
-        {signal.score === null ? (
-          <><View style={styles.dashedTrack} /><Text style={styles.notObserved}>Not observed</Text></>
-        ) : (
-          <><View style={styles.scoreTrack}><View style={[styles.scoreFill, { width: `${signal.score}%` }]} /></View><Text style={styles.score}>{Math.round(signal.score)}</Text></>
-        )}
+        <Text style={[styles.signalName, isSpecificity && styles.signalNameFocus]}>{SIGNAL_LABELS[signal.signal_key]}</Text>
+        <View style={styles.scoreTrack}>
+          {signal.score !== null ? <View style={[styles.scoreFill, isSpecificity && styles.scoreFillFocus, { width: `${signal.score}%` }]} /> : null}
+        </View>
+        <Text style={styles.score}>{signal.score === null ? "—" : Math.round(signal.score)}</Text>
       </View>
       {signal.evidence_summary ? <Text style={styles.signalEvidence}>{signal.evidence_summary}</Text> : null}
     </View>
@@ -422,39 +402,37 @@ function SignalRow({ signal }: { signal: SharedSignalV1 }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   center: { justifyContent: "center", paddingHorizontal: GUTTER, gap: 14 },
-  scroll: { paddingHorizontal: GUTTER, gap: 14 },
+  scroll: { paddingHorizontal: GUTTER, gap: 12 },
   eyebrow: { ...eyebrow, color: C.purple },
-  title: { ...T.display },
+  title: { ...T.display, fontSize: 27, lineHeight: 33 },
   support: { ...T.support, textAlign: "center" },
   returnButton: { marginTop: 12 },
   back: { ...T.support, color: C.textSoft, fontFamily: font.semi, minHeight: 44, textAlignVertical: "center" },
-  exchange: { backgroundColor: C.elevated, borderRadius: 24, padding: 20, ...shadow.layer },
-  exchangeRow: { flexDirection: "row", gap: 12 },
-  exchangeRail: { width: 12, alignItems: "center" },
-  exchangeDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.purple, marginTop: 5 },
-  exchangeDotPush: { backgroundColor: C.amber },
-  exchangeLine: { flex: 1, width: 1, minHeight: 28, backgroundColor: C.lineStrong },
-  exchangeCopy: { flex: 1, paddingBottom: 15, gap: 5 },
+  exchange: { backgroundColor: C.elevated, borderRadius: 24, paddingHorizontal: 18, paddingVertical: 17, ...shadow.layer },
+  exchangeRow: { gap: 5, paddingVertical: 13 },
+  exchangeRowDivided: { borderBottomWidth: 1, borderBottomColor: C.line },
   nodeLabel: { ...eyebrow, color: C.purple, fontSize: 9 },
   pushLabel: { color: C.amber },
-  quote: { ...T.support, color: C.text },
-  observation: { ...T.support, color: C.textSoft },
-  stallCard: { borderRadius: 18, borderWidth: 1, borderColor: `${C.purple}22`, backgroundColor: `${C.purple}0C`, padding: 15 },
-  stallText: { ...T.support, color: C.text },
+  quote: { ...T.support, color: C.text, fontSize: 14, lineHeight: 21 },
+  observation: { ...T.support, color: C.textSoft, lineHeight: 21 },
+  stallCard: { borderRadius: 17, borderWidth: 1, borderColor: `${C.purple}22`, backgroundColor: `${C.purple}0C`, paddingHorizontal: 15, paddingVertical: 13 },
+  stallText: { ...T.support, color: C.text, lineHeight: 21 },
   stallLead: { color: C.purple, fontFamily: font.semi },
-  focusTitle: { ...T.title, fontSize: 20 },
-  focusSummary: { ...T.support, color: C.textSoft },
-  dockPromise: { ...T.caption, color: C.textSoft, textAlign: "center", marginTop: 8 },
-  baselineAction: { marginTop: 8, paddingBottom: 8 },
-  baselineCard: { backgroundColor: C.elevated, borderRadius: 24, padding: 20, gap: 11, marginTop: 10, ...shadow.layer },
+  focusEyebrow: { ...eyebrow, color: C.purple, fontSize: 9 },
+  focusTitle: { ...T.title, fontSize: 19, lineHeight: 24, marginTop: 4 },
+  focusSummary: { ...T.support, color: C.textSoft, fontSize: 14, lineHeight: 21, marginTop: 5 },
+  dockPromise: { ...T.caption, color: C.textSoft, textAlign: "center", marginTop: 7, paddingHorizontal: 8 },
+  baselineAction: { marginTop: 4, marginBottom: 8 },
+  baselineCard: { backgroundColor: C.elevated, borderRadius: 24, paddingHorizontal: 18, paddingVertical: 17, gap: 10, ...shadow.layer },
   startingIndexSummary: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 14 },
   startingIndexCopy: { flex: 1, gap: 3 },
   startingIndexScope: { ...T.caption, color: C.textSoft },
+  startingIndexBadge: { minWidth: 70, height: 64, paddingHorizontal: 12, alignItems: "center", justifyContent: "center", borderRadius: 19, borderWidth: 1, borderColor: `${C.purple}24`, backgroundColor: `${C.purple}08` },
   startingIndexValue: { fontFamily: font.bold, fontSize: 34, lineHeight: 38, color: C.purple },
   baselineScope: { ...T.caption, color: C.dim },
-  signalChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  signalChip: { borderRadius: 999, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, paddingHorizontal: 11, paddingVertical: 7 },
-  signalChipText: { ...T.caption, color: C.textSoft },
+  signalChips: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  signalChip: { borderRadius: 999, backgroundColor: "rgba(255,255,255,0.34)", borderWidth: 1, borderStyle: "dashed", borderColor: C.lineStrong, paddingHorizontal: 11, paddingVertical: 6 },
+  signalChipText: { ...T.caption, color: C.textSoft, fontSize: 12 },
   rewriteHeroSpace: { height: 96 },
   rewriteCard: { backgroundColor: C.elevated, borderRadius: 24, padding: 20, gap: 16, ...shadow.layer },
   rewriteEyebrow: { ...eyebrow, color: C.purple, fontSize: 11 },
@@ -464,13 +442,8 @@ const styles = StyleSheet.create({
   clearerLabel: { color: C.purple },
   clearerQuote: { ...T.title, fontSize: 20, lineHeight: 28 },
   rewriteNote: { ...T.support, color: C.dim, marginTop: 2 },
-  rewriteDivider: { height: 1, backgroundColor: C.line },
-  disclosure: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6 },
-  disclosureText: { ...T.caption, color: C.purple, fontFamily: font.semi },
-  details: { gap: 13, paddingLeft: 13, borderLeftWidth: 2, borderLeftColor: `${C.purple}3D` },
-  detail: { gap: 4 },
+  rewriteDivider: { height: 1, backgroundColor: C.line, marginTop: 14 },
   detailLabel: { ...eyebrow, color: C.dim, fontSize: 9 },
-  detailText: { ...T.support, color: C.text },
   comparison: { backgroundColor: C.elevated, borderRadius: 24, paddingHorizontal: 20, paddingVertical: 18, ...shadow.layer },
   shiftSection: { gap: 9 },
   divider: { height: 1, backgroundColor: C.line, marginVertical: 16 },
@@ -487,25 +460,27 @@ const styles = StyleSheet.create({
   graphAxis: { flexDirection: "row", justifyContent: "space-between", marginTop: -2 },
   graphAxisText: { ...eyebrow, color: C.purple, fontSize: 9 },
   graphCaption: { ...T.caption, fontFamily: font.semi, color: C.text, textAlign: "center", marginTop: 12 },
-  layerCard: { minHeight: 470, borderRadius: 28, backgroundColor: C.elevated, padding: 22, gap: 12, ...shadow.layer },
+  layerCard: { borderRadius: 26, backgroundColor: C.elevated, padding: 18, gap: 11, ...shadow.layer },
   pathCard: { justifyContent: "flex-start" },
   cardTitle: { ...T.title, fontSize: 18 },
-  indexRow: { flexDirection: "row", alignItems: "flex-end", gap: 13 },
-  indexCopy: { flex: 1, paddingBottom: 4 },
-  indexValue: { fontFamily: font.bold, fontSize: 42, lineHeight: 46, color: C.purple },
+  indexRow: { flexDirection: "row", alignItems: "center", gap: 13 },
+  indexScoreBadge: { minWidth: 74, height: 68, paddingHorizontal: 12, alignItems: "center", justifyContent: "center", borderRadius: 20, borderWidth: 1, borderColor: `${C.purple}24`, backgroundColor: `${C.purple}08` },
+  indexCopy: { flex: 1 },
+  indexValue: { fontFamily: font.bold, fontSize: 36, lineHeight: 40, color: C.purple },
   indexCount: { ...T.caption, color: C.dim },
   averageNote: { ...T.caption, color: C.textSoft, paddingBottom: 11, borderBottomWidth: 1, borderBottomColor: C.line },
   groupLabel: { ...eyebrow, fontSize: 9, color: C.dim },
   emptyEvidence: { ...T.caption, color: C.textSoft },
-  signalBlock: { gap: 5, paddingVertical: 3 },
-  signalRow: { minHeight: 26, flexDirection: "row", alignItems: "center", gap: 9 },
-  signalEvidence: { ...T.caption, color: C.textSoft, paddingLeft: 87 },
-  signalName: { ...T.caption, color: C.text, width: 78 },
-  dashedTrack: { flex: 1, height: 6, borderRadius: 3, borderWidth: 1, borderStyle: "dashed", borderColor: C.lineStrong },
-  notObserved: { ...T.caption, fontSize: 11, width: 78, textAlign: "right" },
-  scoreTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: C.track, overflow: "hidden" },
-  scoreFill: { height: 6, backgroundColor: C.purple },
-  score: { ...T.caption, width: 28, textAlign: "right" },
+  signalBlock: { gap: 6, borderRadius: 16, backgroundColor: `${C.purple}08`, paddingHorizontal: 12, paddingVertical: 11 },
+  signalBlockFocus: { backgroundColor: `${C.amber}0D`, borderWidth: 1, borderColor: `${C.amber}35` },
+  signalRow: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 9 },
+  signalEvidence: { ...T.caption, color: C.textSoft, fontSize: 12, lineHeight: 17 },
+  signalName: { ...T.caption, color: C.text, fontFamily: font.medium, width: 78 },
+  signalNameFocus: { color: C.amber },
+  scoreTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "rgba(23,26,31,0.08)", overflow: "hidden" },
+  scoreFill: { height: 6, borderRadius: 3, backgroundColor: C.purple },
+  scoreFillFocus: { backgroundColor: `${C.amber}B8` },
+  score: { ...T.caption, width: 28, color: C.text, fontFamily: font.semi, textAlign: "right" },
   cardAction: { marginTop: "auto" },
   pathLead: { ...T.body, fontFamily: font.semi, color: C.purple },
   pathEvidence: { ...T.caption, color: C.textSoft },

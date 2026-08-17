@@ -47,6 +47,9 @@ describe("remaining native acquisition and paid experience", () => {
     expect(results).toContain("Here’s what practice is helping you say");
     expect(results).toContain("STARTING INDEX");
     expect(results).toContain("observed_count} of 6 signals observed");
+    expect(results).not.toContain("How BYSI read this");
+    expect(results.indexOf('label="Show what changes with practice"')).toBeLessThan(results.indexOf("STARTING INDEX"));
+    expect(results).toContain("styles.signalChips");
     expect(results).toContain("Your thoughts and feelings are valid and deserve to be heard.");
     expect(results).toContain("Practicing your communication skills builds the confidence to find the right words when pressure shows up.");
     expect(results).toContain('label="WITHOUT PRACTICE"');
