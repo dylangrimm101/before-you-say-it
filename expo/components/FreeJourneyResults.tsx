@@ -47,7 +47,8 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
     storedCheckpoint === "briefing" ||
     storedCheckpoint === "rehearsal" ||
     storedCheckpoint === "transcript_review" ||
-    storedCheckpoint === "generating"
+    storedCheckpoint === "generating" ||
+    storedCheckpoint === "starting_index"
       ? "pressure_moment"
       : storedCheckpoint;
 
@@ -106,7 +107,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
   }, [cardProgress, isReduced, resultCard]);
 
   useEffect(() => {
-    const isIndexVisible = checkpoint === "pressure_moment" || (checkpoint === "starting_index" && resultCard === "index");
+    const isIndexVisible = checkpoint === "pressure_moment" || (checkpoint === "complete" && resultCard === "index");
     if (!isIndexVisible) return;
     if (isReduced) {
       skillBubbleProgress.forEach((progress) => progress.setValue(1));
@@ -318,18 +319,21 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
               {observedSignals.length > 0
                 ? observedSignals.map((signal) => <SignalRow key={signal.signal_key} signal={signal} />)
                 : <Text style={styles.emptyEvidence}>No signal had enough evidence for a responsible score in this short exchange.</Text>}
-              {unobservedSignals.length > 0 ? <>
-                <Text style={styles.groupLabel}>NOT TESTED YET</Text>
-                <View style={styles.signalChips}>
-                  {unobservedSignals.map((signal, index) => (
-                    <SkillBubble
-                      key={signal.signal_key}
-                      label={SIGNAL_LABELS[signal.signal_key]}
-                      progress={skillBubbleProgress[index] ?? skillBubbleProgress[0]!}
-                    />
-                  ))}
+              {unobservedSignals.length > 0 ? (
+                <View style={styles.untestedGroup}>
+                  <Text style={styles.untestedLabel}>SKILLS NOT OBSERVED</Text>
+                  <View style={styles.signalChips}>
+                    {unobservedSignals.map((signal, index) => (
+                      <SkillBubble
+                        key={signal.signal_key}
+                        label={SIGNAL_LABELS[signal.signal_key]}
+                        progress={skillBubbleProgress[index] ?? skillBubbleProgress[0]!}
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.untestedNote}>These skills weren’t tested in this short exchange.</Text>
                 </View>
-              </> : null}
+              ) : null}
               <PrimaryButton label="See my practice path" onPress={() => showResultCard("path")} style={styles.cardAction} />
             </View>
           ) : (

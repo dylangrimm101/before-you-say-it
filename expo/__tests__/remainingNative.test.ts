@@ -54,6 +54,8 @@ describe("remaining native acquisition and paid experience", () => {
     expect(results).toContain("SKILLS NOT OBSERVED");
     expect(results).toContain("These skills weren’t tested in this short exchange.");
     expect(results).toContain("styles.untestedGroup");
+    expect(results).not.toContain("NOT TESTED YET");
+    expect(results).toContain('storedCheckpoint === "starting_index"');
     expect(results).toContain("Your thoughts and feelings are valid and deserve to be heard.");
     expect(results).toContain("Practicing your communication skills builds the confidence to find the right words when pressure shows up.");
     expect(results).toContain('label="WITHOUT PRACTICE"');
