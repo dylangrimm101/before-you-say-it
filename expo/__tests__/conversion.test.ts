@@ -142,7 +142,14 @@ describe("conversion paywall", () => {
     const source = await Bun.file(`${import.meta.dir}/../app/paywall.tsx`).text();
     expect(source).toContain("Your practice plan");
     expect(source).toContain("Keep my free debrief for now");
-    expect(source).toContain("One evidence-linked adjustment, then the same moment again.");
+    expect(source).toContain("Start with a clear ask.");
+    expect(source).toContain("Make a Clear Ask");
+    expect(source).toContain("Focus: Specificity");
+    expect(source).toContain("Practice saying it clearly, holding it through pushback, and putting it in your own words.");
+    expect(source).not.toContain("Rep 1");
+    expect(source).not.toContain("Rep 2");
+    expect(source).not.toContain("Rep 3");
+    expect(source).toContain("Array.from({ length: 7 }");
   });
 
   test("uses a real purchase—not preview access—to bypass the paywall", async () => {

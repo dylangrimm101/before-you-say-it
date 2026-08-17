@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PurchasesPackage } from "react-native-purchases";
 
 import { Backdrop, Eyebrow, GlassCard, PressCard, PrimaryButton, Reveal, StateDock, tap } from "@/components/ui";
-import { curriculumModule, isModuleId, type ModuleId } from "@/constants/modules";
+import { isModuleId, type ModuleId } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { storeProductSnapshot } from "@/lib/commerce";
 import {
@@ -25,17 +25,6 @@ import { useCustomerInfo, useIsPro, useOfferings, usePurchasePackage, useRestore
 import { useStore } from "@/providers/store";
 import type { SharedResultContractV1 } from "@/types/sharedProduct";
 
-const TRAINING_FOCUS_BY_MODULE: Partial<Record<ModuleId, string>> = {
-  get_to_the_point: "Clarity",
-  make_a_clear_ask: "Specificity",
-  start_the_conversation: "Clarity",
-  listen_and_respond: "Listening",
-  stay_clear_under_pushback: "Steadiness",
-  pause_say_no_boundary: "Boundaries",
-  repair_what_went_wrong: "Repair",
-  use_it_in_real_life: "Clarity",
-};
-
 export default function Paywall() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -43,7 +32,6 @@ export default function Paywall() {
   const isPro = useIsPro();
   const { activePracticeSession, saveActivePracticeSession } = useStore();
   const moduleId: ModuleId | null = isModuleId(params.moduleId) ? params.moduleId : activePracticeSession?.recommendation?.moduleId ?? null;
-  const recommendedModule = curriculumModule(moduleId);
   const { data: offerings, isLoading, error: offeringsError } = useOfferings();
   const purchase = usePurchasePackage();
   const restore = useRestorePurchases();
@@ -216,7 +204,7 @@ export default function Paywall() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {stage === 1 ? <StageOne moduleId={moduleId} moduleName={recommendedModule?.name} trainingFocus={activePracticeSession?.sharedResult?.starting_index?.focus_dimension} /> : null}
+        {stage === 1 ? <StageOne /> : null}
         {stage === 2 ? <StageTwo /> : null}
         {stage === 3 ? (
           <StageThree
@@ -250,10 +238,32 @@ export default function Paywall() {
   );
 }
 
-function StageOne({ moduleId, moduleName, trainingFocus }: { moduleId: ModuleId | null; moduleName?: string; trainingFocus?: string }) {
-  const firstModule = moduleName ?? "Your first focus";
-  const focus = trainingFocus?.trim() || (moduleId ? TRAINING_FOCUS_BY_MODULE[moduleId] ?? "Clarity" : "Clarity");
-  return <Reveal style={styles.stageOne}><Eyebrow color={C.dim}>Your practice plan</Eyebrow><Text style={[styles.title, styles.centerTitle]}>{`Start with ${firstModule}.`}</Text><Text style={[styles.lede, styles.centerLede]}>Based on this rehearsal, your first 7 days start where the conversation got stuck.</Text><View style={styles.planCard}><DetailLine label="First module" value={firstModule} /><DetailLine label="Training focus" value={focus} /><View style={styles.repList} accessibilityLabel="One evidence-linked adjustment, then the same moment again."><Text style={styles.repText}>Rep 1 · Say the clear version out loud</Text><Text style={styles.repText}>Rep 2 · Hold it when they push back</Text><Text style={styles.repText}>Rep 3 · Say it clean, in your own words</Text></View></View><View style={styles.freeLockup}><Text style={styles.seven}>7</Text><View><Text style={styles.days}>days</Text><Text style={styles.free}>free</Text></View></View><Text style={styles.priceLine}>then $11.99/month or $89.99/year · cancel anytime</Text><View style={styles.sevenSegments}>{Array.from({ length: 7 }, (_, index) => <View key={index} style={styles.sevenSegment} />)}</View></Reveal>;
+function StageOne() {
+  return (
+    <Reveal style={styles.stageOne}>
+      <Eyebrow color={C.dim}>Your practice plan</Eyebrow>
+      <Text style={[styles.title, styles.stageOneTitle]}>Start with a clear ask.</Text>
+      <Text style={[styles.lede, styles.stageOneLede]}>Your first 7 days focus on where the conversation got stuck.</Text>
+
+      <View style={styles.planCard}>
+        <Text style={styles.moduleEyebrow}>First module</Text>
+        <Text style={styles.moduleTitle}>Make a Clear Ask</Text>
+        <View style={styles.focusPill}>
+          <Text style={styles.focusPillText}>Focus: Specificity</Text>
+        </View>
+        <Text style={styles.modulePreview}>Practice saying it clearly, holding it through pushback, and putting it in your own words.</Text>
+      </View>
+
+      <View style={styles.offerLockup}>
+        <Text style={styles.offerTitle}>7 days free</Text>
+        <Text style={styles.priceLine}>Then $11.99/month or $89.99/year. Cancel anytime.</Text>
+      </View>
+
+      <View style={styles.sevenSegments} accessibilityLabel="Seven-day free trial">
+        {Array.from({ length: 7 }, (_, index) => <View key={index} style={styles.sevenSegment} />)}
+      </View>
+    </Reveal>
+  );
 }
 
 function StageTwo() {
@@ -266,10 +276,6 @@ function StageThree({ plans, billing, onBilling, terms, isLoading, unavailable, 
 
 function IapBlocker() {
   return <View style={styles.iapBlocker}><AlertCircle size={20} color={C.clay} /><View style={styles.iapBlockerCopy}><Text style={styles.iapBlockerTitle}>In-app purchase configuration required</Text><Text style={styles.iapBlockerBody}>The live store has not returned both approved plans with a 7-day trial. Trial checkout stays disabled until the App Store or Google Play offer is configured.</Text></View></View>;
-}
-
-function DetailLine({ label, value }: { label: string; value: string }) {
-  return <View style={styles.detailLine}><Text style={styles.detailLineLabel}>{label}</Text><Text style={styles.detailLineValue}>{value}</Text></View>;
 }
 
 function PlanChoice({ label, price, selected, onPress }: { label: string; price: string; selected: boolean; onPress: () => void }) {
@@ -296,12 +302,13 @@ const styles = StyleSheet.create({
   top: { minHeight: 58, paddingHorizontal: GUTTER, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, topHit: { width: 72, minHeight: 44, justifyContent: "center" }, closeHit: { alignItems: "flex-end" }, topText: { ...T.support, color: C.textSoft, fontSize: 17 }, step: { ...eyebrow, color: C.dim, fontSize: 11 },
   scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, centeredStageScroll: { flexGrow: 1, justifyContent: "center" },
   stageOne: { alignItems: "stretch" },
-  title: { ...T.display, fontFamily: font.bold, fontSize: 29, lineHeight: 36, marginTop: 10 }, centerTitle: { textAlign: "center", marginTop: 26 }, lede: { ...T.body, color: C.textSoft, marginTop: 14 }, centerLede: { textAlign: "center" },
-  planCard: { marginTop: 24, borderRadius: radius.lg, backgroundColor: C.elevated, paddingHorizontal: 16, paddingVertical: 8, shadowColor: "#1C2430", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 3 }, detailLine: { paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }, detailLineLabel: { ...T.support, color: C.textSoft }, detailLineValue: { ...T.support, color: C.text, fontFamily: font.semi, flex: 1, textAlign: "right" }, repList: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, paddingTop: 10, paddingBottom: 8, gap: 8 }, repText: { ...T.support, color: C.text },
-  freeLockup: { marginTop: 18, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }, seven: { fontFamily: font.bold, fontSize: 76, lineHeight: 84, color: C.purple }, days: { fontFamily: font.bold, fontSize: 24, lineHeight: 28, color: C.text }, free: { fontFamily: font.bold, fontSize: 24, lineHeight: 28, color: C.purple }, sevenSegments: { flexDirection: "row", gap: 6, marginTop: 20 }, sevenSegment: { flex: 1, height: 8, borderRadius: 4, backgroundColor: C.purple },
+  title: { ...T.display, fontFamily: font.bold, fontSize: 29, lineHeight: 36, marginTop: 10 }, stageOneTitle: { fontSize: 27, lineHeight: 33, marginTop: 14 }, lede: { ...T.body, color: C.textSoft, marginTop: 14 }, stageOneLede: { marginTop: 8, lineHeight: 22 },
+  planCard: { marginTop: 20, borderRadius: radius.lg, backgroundColor: C.elevated, padding: 16, shadowColor: "#1C2430", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 3 },
+  moduleEyebrow: { ...eyebrow, color: C.dim, fontSize: 9 }, moduleTitle: { ...T.title, color: C.text, fontFamily: font.bold, fontSize: 19, lineHeight: 24, marginTop: 5 }, focusPill: { alignSelf: "flex-start", borderRadius: 999, backgroundColor: C.purpleSoft, paddingHorizontal: 10, paddingVertical: 5, marginTop: 10 }, focusPillText: { ...T.caption, color: C.purple, fontFamily: font.semi, fontSize: 11 }, modulePreview: { ...T.support, color: C.textSoft, fontSize: 14, lineHeight: 20, marginTop: 10 },
+  offerLockup: { alignItems: "center", marginTop: 18 }, offerTitle: { fontFamily: font.bold, fontSize: 26, lineHeight: 32, color: C.text }, sevenSegments: { flexDirection: "row", gap: 6, marginTop: 16 }, sevenSegment: { flex: 1, height: 8, borderRadius: 4, backgroundColor: C.purple },
   timeline: { marginTop: 32 }, checkoutTimeline: { marginTop: 22 }, timelineRow: { flexDirection: "row", minHeight: 76 }, rail: { width: 20, alignItems: "center" }, railDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: C.bg, borderWidth: 2, borderColor: C.purple }, railDotOn: { width: 14, height: 14, borderRadius: 7, backgroundColor: C.purple }, railLine: { width: 2, flex: 1, backgroundColor: `${C.purple}35` }, timelineCopy: { flex: 1, paddingLeft: 10, paddingBottom: 16 }, timelineLabel: { ...eyebrow, color: C.dim, fontSize: 10 }, timelineDetail: { ...T.body, color: C.text, marginTop: 3, fontSize: 16, lineHeight: 23 },
   loading: { marginTop: 50 }, planList: { gap: 10, marginTop: 24 }, plan: { minHeight: 74, borderRadius: radius.md, borderWidth: 1, borderColor: C.glassEdge, backgroundColor: C.surface, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, planSelected: { borderColor: C.purple, backgroundColor: C.purpleSoft }, planLabel: { ...T.support, fontFamily: font.semi, color: C.text }, planPrice: { ...T.caption, marginTop: 4 },
   termsCard: { marginTop: 18, padding: 18, gap: 12 }, termRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 }, termLabel: { ...T.caption }, termValue: { ...T.caption, fontFamily: font.semi, color: C.text, textAlign: "right", flex: 1 }, status: { marginTop: 16, padding: 14, borderRadius: radius.md, backgroundColor: C.surface, flexDirection: "row", alignItems: "flex-start", gap: 10 }, statusText: { ...T.caption, color: C.text, flex: 1 },
-  priceLine: { ...T.support, color: C.text, textAlign: "center", marginTop: 4 }, renewalCopy: { ...T.caption, color: C.textSoft, marginTop: 18, lineHeight: 20 }, links: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: 18, rowGap: 0, marginTop: 16 }, link: { ...T.caption, color: C.textSoft, paddingVertical: 10 }, billingLink: { ...T.caption, color: C.textSoft }, disabledText: { color: C.dim },
+  priceLine: { ...T.caption, color: C.textSoft, textAlign: "center", marginTop: 3, lineHeight: 19 }, renewalCopy: { ...T.caption, color: C.textSoft, marginTop: 18, lineHeight: 20 }, links: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: 18, rowGap: 0, marginTop: 16 }, link: { ...T.caption, color: C.textSoft, paddingVertical: 10 }, billingLink: { ...T.caption, color: C.textSoft }, disabledText: { color: C.dim },
   iapBlocker: { marginTop: 28, borderRadius: radius.md, borderWidth: 1, borderColor: `${C.clay}55`, backgroundColor: `${C.clay}0D`, padding: 16, flexDirection: "row", alignItems: "flex-start", gap: 12 }, iapBlockerCopy: { flex: 1, gap: 5 }, iapBlockerTitle: { ...T.support, fontFamily: font.semi, color: C.text }, iapBlockerBody: { ...T.caption, color: C.textSoft },
 });
