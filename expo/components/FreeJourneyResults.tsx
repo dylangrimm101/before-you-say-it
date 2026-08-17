@@ -8,6 +8,7 @@ import { Backdrop, PrimaryButton, PressCard, StateDock, tap, useReducedMotion } 
 import { curriculumModule } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, shadow } from "@/constants/theme";
 import { CONVERSATION_PHASES } from "@/lib/conversion";
+import { clearerSpokenRequest } from "@/lib/freeJourney";
 import type { ActivePracticeSession, FreeJourneyCheckpoint } from "@/lib/practiceSession";
 import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
 import { safeLog } from "@/lib/redact";
@@ -175,7 +176,15 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
   }
 
   if (checkpoint === "rewrite") {
-    const rewrite = result.rewrite ?? { original_ask: byId.get(result.pressure_moment.opening_turn_id) ?? "", clearer_version: session.recommendation?.immediateAction ?? result.practice_shift.practice_target_steps[1] ?? "" };
+    const originalAsk = result.rewrite?.original_ask ?? byId.get(result.pressure_moment.opening_turn_id) ?? "";
+    const rewrite = {
+      original_ask: originalAsk,
+      clearer_version: clearerSpokenRequest(
+        originalAsk,
+        result.rewrite?.clearer_version,
+        { category: session.category, topic: session.topic, usefulOutcome: session.usefulOutcome },
+      ),
+    };
     return (
       <View style={styles.root}>
         <Backdrop />

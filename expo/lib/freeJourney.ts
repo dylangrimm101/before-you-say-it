@@ -4,7 +4,7 @@ import { conversionEvidence } from "@/lib/conversion";
 import type { ActivePracticeSession, FreeJourneyCheckpoint } from "@/lib/practiceSession";
 import { completedPracticeSessionToSharedTranscript, createFirstFocus } from "@/lib/sharedProductAdapters";
 import { safeLog } from "@/lib/redact";
-import type { Debrief, Turn } from "@/types/convo";
+import type { CategoryId, Debrief, Turn } from "@/types/convo";
 import {
   PRESSURE_MOMENT_VERSION,
   PRACTICE_SHIFT_CAVEAT,
@@ -80,6 +80,67 @@ function signalKeyForDimension(name: string): SharedSignalV1["signal_key"] | nul
 
 function score(value: number): number {
   return Math.round(Math.min(100, Math.max(0, value)));
+}
+
+export interface ClearerVersionContext {
+  category: CategoryId;
+  topic: string;
+  usefulOutcome: string;
+}
+
+const COACHING_PREFIX = /^(?:pick|try|focus|make|keep|start|name|choose|practice|use|avoid|remember|you should|the goal is|the skill is)\b/i;
+const SPOKEN_ASK_PREFIX = /^(?:(?:can|could|would|will) (?:you|we)|please\b|i(?:'|’)d like (?:you|us) to)\b/i;
+
+function cleanSpokenLine(value: string | undefined): string {
+  return value?.trim().replace(/^[“\"]|[”\"]$/g, "").trim() ?? "";
+}
+
+/** True only for a direct line the learner could naturally say to the counterpart. */
+export function isDirectSpokenRequest(value: string | undefined): boolean {
+  const line = cleanSpokenLine(value);
+  return line.length >= 12 && line.length <= 240 && !COACHING_PREFIX.test(line) && SPOKEN_ASK_PREFIX.test(line);
+}
+
+/**
+ * Returns provider dialogue when it is usable, otherwise creates a concrete,
+ * answerable request from the approved ask and scenario context.
+ */
+export function clearerSpokenRequest(
+  originalAsk: string,
+  candidate: string | undefined,
+  context: ClearerVersionContext,
+): string {
+  const cleanedCandidate = cleanSpokenLine(candidate);
+  if (isDirectSpokenRequest(cleanedCandidate)) return cleanedCandidate;
+
+  const issue = `${originalAsk} ${context.topic} ${context.usefulOutcome}`.toLowerCase();
+  const knownChore = ["dishes", "laundry", "trash", "cooking", "cleaning", "pickup", "drop-off"]
+    .find((task) => issue.includes(task));
+  if (/\b(?:chore|housework|around the house|at home)\b/.test(issue)) {
+    return knownChore
+      ? `Can you fully own the ${knownChore} this week without me reminding or tracking it?`
+      : "Can you take one recurring chore this week without me having to remind or track it?";
+  }
+  if (/\b(?:scope|priority|priorities|new work|more work|workload)\b/.test(issue)) {
+    return "Can we decide what priority moves before I take on the new work?";
+  }
+  if (/\b(?:pay me back|repay|repayment|owe|owed|money)\b/.test(issue)) {
+    return "Can you send the first payment by Friday and tell me when the rest is coming?";
+  }
+  if (/\b(?:joke|comment|make fun|in front of|family)\b/.test(issue)) {
+    return "Can you talk to me privately instead of making comments about my choices in front of other people?";
+  }
+  if (/\b(?:meeting|combative|interrupt|disagree)\b/.test(issue)) {
+    return "Can we disagree about the work without making personal comments or interrupting each other in meetings?";
+  }
+
+  const categoryFallbacks: Record<CategoryId, string> = {
+    partner: "Can you take ownership of one specific responsibility this week without me having to manage it?",
+    work: "Can we agree on one specific next step, who owns it, and when it will happen?",
+    friends: "Can you commit to one specific next step by Friday and tell me if that timing won’t work?",
+    family: "Can you talk to me privately about this instead of bringing it up in front of other people?",
+  };
+  return categoryFallbacks[context.category];
 }
 
 /** Builds contract-v1 results from the provider result for this exact approved rehearsal. */
@@ -177,7 +238,11 @@ export function buildFreeJourneyResult(
     pressure_moment: pressureMoment,
     rewrite: {
       original_ask: opening.approved_text,
-      clearer_version: debrief.script[0]?.trim() || `What I’m asking for is this: ${session.usefulOutcome}`,
+      clearer_version: clearerSpokenRequest(
+        opening.approved_text,
+        analysis.rewrite?.clearer_version ?? debrief.script[0],
+        { category: session.category, topic: session.topic, usefulOutcome: session.usefulOutcome },
+      ),
     },
     practice_shift: practiceShift,
     signals,

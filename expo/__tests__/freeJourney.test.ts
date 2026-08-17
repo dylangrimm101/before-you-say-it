@@ -2,7 +2,7 @@ import { APPROVED_ONBOARDING_SCENARIOS, scenarioFromApproved } from "@/constants
 import type { BysiResultResponse } from "@/lib/ai";
 import { createOnboardingPracticeSession, normalizePracticeSession, preserveFreeRehearsalArtifact, type ActivePracticeSession } from "@/lib/practiceSession";
 import { activePracticeSessionToSharedRoute, completedPracticeSessionToSharedTranscript, sharedProductAnalyticsMeta, sharedProductRouteParams } from "@/lib/sharedProductAdapters";
-import { approvedUserTurn, buildFreeJourneyResult, cancelPendingResult, invalidateFreeJourney, recognizerEndState, shouldGeneratePushback, validFreeJourneyCheckpoint } from "@/lib/freeJourney";
+import { approvedUserTurn, buildFreeJourneyResult, cancelPendingResult, clearerSpokenRequest, invalidateFreeJourney, isDirectSpokenRequest, recognizerEndState, shouldGeneratePushback, validFreeJourneyCheckpoint } from "@/lib/freeJourney";
 import type { Debrief, Scenario, Turn } from "@/types/convo";
 import {
   SUCCESSFUL_VISUAL_APPROVED_TURNS,
@@ -88,6 +88,39 @@ describe("Claude Design free journey contract", () => {
     expect({ ...approvedUserTurn("typed", "Same line"), id: "spoken" }).toEqual(approvedUserTurn("spoken", "Same line"));
   });
 
+  test("clearer version rejects coaching advice and returns dialogue grounded in the issue", () => {
+    const context = { category: "partner" as const, topic: "Help more with chores around the house", usefulOutcome: "Agree on specific household responsibilities." };
+    const clearer = clearerSpokenRequest(
+      "I need your help more with chores around the house.",
+      "Pick one concrete task to raise first.",
+      context,
+    );
+    expect(clearer).toBe("Can you take one recurring chore this week without me having to remind or track it?");
+    expect(isDirectSpokenRequest(clearer)).toBe(true);
+    expect(isDirectSpokenRequest("Try asking for one concrete task.")).toBe(false);
+  });
+
+  test("clearer version preserves a usable provider-written spoken request", () => {
+    const spoken = "Can you fully own the dishes on weeknights this week without me reminding you?";
+    expect(clearerSpokenRequest("I need more help.", spoken, {
+      category: "partner",
+      topic: "Dishes on weeknights",
+      usefulOutcome: "Share the chores",
+    })).toBe(spoken);
+  });
+
+  test("clearer version covers the approved work, repayment, and family behaviors", () => {
+    expect(clearerSpokenRequest("My manager keeps adding work after we agree on scope.", "Focus on priorities.", {
+      category: "work", topic: "Changing scope", usefulOutcome: "Protect the agreed scope",
+    })).toBe("Can we decide what priority moves before I take on the new work?");
+    expect(clearerSpokenRequest("You still haven’t paid me back.", undefined, {
+      category: "friends", topic: "Late repayment", usefulOutcome: "Agree on a payment plan",
+    })).toBe("Can you send the first payment by Friday and tell me when the rest is coming?");
+    expect(clearerSpokenRequest("My sister keeps making jokes about me in front of everyone.", undefined, {
+      category: "family", topic: "Public comments", usefulOutcome: "Stop the comments",
+    })).toBe("Can you talk to me privately instead of making comments about my choices in front of other people?");
+  });
+
   test("analysis result uses one approved rehearsal and keeps Practice Shift structured", () => {
     const result = buildFreeJourneyResult(session(), debrief, analysis);
     const transcript = completedPracticeSessionToSharedTranscript(session());
@@ -95,7 +128,8 @@ describe("Claude Design free journey contract", () => {
     expect(result.pressure_moment?.pushback_turn_id).toBe(transcript.turns[1]?.id);
     expect(result.pressure_moment?.pressure_response_turn_id).toBe(transcript.turns[2]?.id);
     expect(result.rewrite?.original_ask).toBe(transcript.turns[0]?.approved_text);
-    expect(result.rewrite?.clearer_version).toBeTruthy();
+    expect(result.rewrite?.clearer_version).toBe("Can you take Tuesday pickup?");
+    expect(isDirectSpokenRequest(result.rewrite?.clearer_version)).toBe(true);
     expect(result.practice_shift?.current_pattern_steps).toHaveLength(3);
     expect(result.practice_shift?.practice_target_steps.length).toBeGreaterThan(1);
     expect(result.practice_shift?.caveat).toBe("A practice target, not a result you’ve already achieved.");

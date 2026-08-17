@@ -56,6 +56,9 @@ export interface BysiResultResponse {
     conclusion?: string;
     how_bysi_read_this?: { observed?: string; why_it_matters?: string };
   };
+  rewrite?: {
+    clearer_version?: string;
+  };
   practice_shift?: {
     headline?: string;
     practice_target?: string[];
@@ -264,6 +267,16 @@ export async function generateDebrief(
     type: "free_rehearsal_result",
     contract: bysiContract(scenario, reaction, outcome, entryRoute),
     transcript,
+    rewrite_requirement: {
+      original_ask: transcript.user_turn_1,
+      output: "One direct line the learner could say to the counterpart",
+      rules: [
+        "Rewrite the original issue as one specific, answerable request",
+        "Use a natural spoken ask such as Can you or Can we",
+        "Name one concrete action and include a timeframe when relevant",
+        "Do not return coaching advice, instructions, skill labels, or prefatory text",
+      ],
+    },
   });
   safeLog("[evidence] BYSI result shape", {
     count: result.starting_index?.observed_dimensions?.length ?? 0,
@@ -271,7 +284,7 @@ export async function generateDebrief(
     step: "pressure-index-shift-path",
     type: "free_rehearsal_result",
   });
-  (["pressure_moment", "starting_index", "practice_shift", "recommended_path"] as const).forEach((key) => {
+  (["pressure_moment", "rewrite", "starting_index", "practice_shift", "recommended_path"] as const).forEach((key) => {
     safeLog("[evidence] BYSI result key", {
       status: result[key] ? "present" : "missing",
       step: key,
