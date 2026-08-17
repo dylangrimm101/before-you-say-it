@@ -197,7 +197,6 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
               <Text style={styles.readyTitle}>Your communication baseline is ready</Text>
             </Artifact>
           ) : null}
-          <Text style={styles.approvedOnly}>Only approved text is used.</Text>
         </View>
       </ScrollView>
 
@@ -522,7 +521,6 @@ const styles = StyleSheet.create({
   referencePipelineCheck: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: C.purple },
   referencePipelineTrack: { height: 8, borderRadius: 4, backgroundColor: "rgba(81,40,136,0.07)", overflow: "hidden" },
   referencePipelineFill: { height: 8, borderRadius: 4, backgroundColor: C.purple },
-  approvedOnly: { ...T.caption, color: C.dim, textAlign: "center", marginTop: 24 },
   artifactCard: { marginTop: 10, borderRadius: radius.md, padding: 15 },
   confirmed: { color: C.dim },
   artifactQuote: { ...T.support, color: C.text, marginTop: 7 },

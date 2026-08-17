@@ -104,7 +104,7 @@ describe("event-driven plan build", () => {
     expect(screen).toContain("Finding where the conversation stalled");
     expect(screen).toContain("Choosing the first skill to train");
     expect(screen).toContain("Finalizing your report");
-    expect(screen).toContain("Only approved text is used.");
+    expect(screen).not.toContain("Only approved text is used.");
     expect(screen).toContain("if (!isReady) return");
     expect(screen).toContain("revealDebrief()");
   });
