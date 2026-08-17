@@ -113,8 +113,6 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
   const isReduced = useReducedMotion();
   const [completedCount, setCompletedCount] = useState<number>(0);
   const stageProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
-  const scrollRef = useRef<ScrollView | null>(null);
-  const isFollowingNewest = useRef<boolean>(true);
   const screenOpacity = useRef<Animated.Value>(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -176,7 +174,6 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
     <Animated.View style={[styles.root, { opacity: screenOpacity }]}>
       <Backdrop />
       <ScrollView
-        ref={scrollRef}
         contentContainerStyle={{
           flexGrow: 1,
           justifyContent: "center",
@@ -185,19 +182,6 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
           paddingBottom: insets.bottom + 24,
         }}
         showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={({ nativeEvent }) => {
-          const distanceFromBottom =
-            nativeEvent.contentSize.height -
-            nativeEvent.layoutMeasurement.height -
-            nativeEvent.contentOffset.y;
-          isFollowingNewest.current = distanceFromBottom <= 48;
-        }}
-        onContentSizeChange={() => {
-          if (isFollowingNewest.current) {
-            scrollRef.current?.scrollToEnd({ animated: !isReduced });
-          }
-        }}
       >
         <View>
           <Text style={styles.buildTitle}>Personalizing your{"\n"}<Text style={styles.buildTitleAccent}>practice plan…</Text></Text>
