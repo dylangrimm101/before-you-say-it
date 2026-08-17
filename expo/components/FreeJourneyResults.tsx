@@ -127,9 +127,9 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
       <View style={styles.root}>
         <Backdrop />
         <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 26, paddingBottom: insets.bottom + 32 }]} showsVerticalScrollIndicator={false}>
-          <Text style={styles.eyebrow}>Your communication baseline</Text>
-          <Text style={styles.title}>{moment.headline || "You stayed in the room. Now make the ask hold."}</Text>
-          <Text style={styles.observation}>{moment.observation}</Text>
+          <Text style={styles.baselineEyebrow}>YOUR COMMUNICATION BASELINE</Text>
+          <Text style={styles.title}>You stayed in the room. Now make the ask hold.</Text>
+          <Text style={styles.baselineObservation}>You kept the conversation from turning into a fight, but the request still needs a specific owner and rhythm so it can survive defensiveness.</Text>
           <View style={styles.stallCard}>
             <Text style={styles.stallText}><Text style={styles.stallLead}>Where it stalls: </Text>You stayed in the conversation, but the ask still did not hold under pressure.</Text>
           </View>
@@ -143,7 +143,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
             <ExchangeNode label="Your response" text={byId.get(moment.pressure_response_turn_id) ?? ""} tone="you" last />
           </View>
           <View style={styles.baselineAction}>
-            <PrimaryButton label="Show what changes with practice" onPress={() => void move("rewrite")} />
+            <PrimaryButton label="See what changes with practice" onPress={() => void move("rewrite")} />
             <Text style={styles.dockPromise}>See your same ask rewritten as one specific request you could actually say.</Text>
           </View>
           <View style={styles.baselineCard}>
@@ -159,12 +159,15 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
             {observedSignals.length > 0
               ? observedSignals.map((signal) => <SignalRow key={signal.signal_key} signal={signal} />)
               : <Text style={styles.emptyEvidence}>This short exchange did not support a responsible score yet.</Text>}
-            {unobservedSignals.length > 0 ? <>
-              <Text style={styles.groupLabel}>NOT TESTED YET</Text>
-              <View style={styles.signalChips}>
-                {unobservedSignals.map((signal) => <View key={signal.signal_key} style={styles.signalChip}><Text style={styles.signalChipText}>{SIGNAL_LABELS[signal.signal_key]}</Text></View>)}
+            {unobservedSignals.length > 0 ? (
+              <View style={styles.untestedGroup}>
+                <Text style={styles.untestedLabel}>SKILLS NOT OBSERVED</Text>
+                <View style={styles.signalChips}>
+                  {unobservedSignals.map((signal) => <View key={signal.signal_key} style={styles.signalChip}><Text style={styles.signalChipText}>{SIGNAL_LABELS[signal.signal_key]}</Text></View>)}
+                </View>
+                <Text style={styles.untestedNote}>These skills weren’t tested in this short exchange.</Text>
               </View>
-            </> : null}
+            ) : null}
           </View>
         </ScrollView>
       </View>
@@ -404,7 +407,9 @@ const styles = StyleSheet.create({
   center: { justifyContent: "center", paddingHorizontal: GUTTER, gap: 14 },
   scroll: { paddingHorizontal: GUTTER, gap: 12 },
   eyebrow: { ...eyebrow, color: C.purple },
+  baselineEyebrow: { ...eyebrow, color: C.dim, fontSize: 10, lineHeight: 14 },
   title: { ...T.display, fontSize: 27, lineHeight: 33 },
+  baselineObservation: { ...T.body, color: C.text, fontSize: 17, lineHeight: 25 },
   support: { ...T.support, textAlign: "center" },
   returnButton: { marginTop: 12 },
   back: { ...T.support, color: C.textSoft, fontFamily: font.semi, minHeight: 44, textAlignVertical: "center" },
@@ -430,9 +435,12 @@ const styles = StyleSheet.create({
   startingIndexBadge: { minWidth: 70, height: 64, paddingHorizontal: 12, alignItems: "center", justifyContent: "center", borderRadius: 19, borderWidth: 1, borderColor: `${C.purple}24`, backgroundColor: `${C.purple}08` },
   startingIndexValue: { fontFamily: font.bold, fontSize: 34, lineHeight: 38, color: C.purple },
   baselineScope: { ...T.caption, color: C.dim },
+  untestedGroup: { borderRadius: 17, backgroundColor: `${C.purple}08`, borderWidth: 1, borderColor: `${C.purple}14`, paddingHorizontal: 13, paddingVertical: 12, gap: 9 },
+  untestedLabel: { ...eyebrow, color: C.dim, fontSize: 9 },
   signalChips: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  signalChip: { borderRadius: 999, backgroundColor: "rgba(255,255,255,0.34)", borderWidth: 1, borderStyle: "dashed", borderColor: C.lineStrong, paddingHorizontal: 11, paddingVertical: 6 },
+  signalChip: { borderRadius: 999, backgroundColor: C.elevated, borderWidth: 1, borderColor: `${C.purple}18`, paddingHorizontal: 11, paddingVertical: 6 },
   signalChipText: { ...T.caption, color: C.textSoft, fontSize: 12 },
+  untestedNote: { ...T.caption, color: C.dim, fontSize: 11, lineHeight: 16 },
   rewriteHeroSpace: { height: 96 },
   rewriteCard: { backgroundColor: C.elevated, borderRadius: 24, padding: 20, gap: 16, ...shadow.layer },
   rewriteEyebrow: { ...eyebrow, color: C.purple, fontSize: 11 },
