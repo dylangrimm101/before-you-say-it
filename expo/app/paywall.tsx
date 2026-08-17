@@ -1,12 +1,12 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { AlertCircle, Check, Clock3, RefreshCw, ShieldCheck } from "lucide-react-native";
-import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AlertCircle, Check, ChevronDown, Clock3, RefreshCw, ShieldCheck } from "lucide-react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Easing, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PurchasesPackage } from "react-native-purchases";
 
-import { Backdrop, Eyebrow, GlassCard, PressCard, PrimaryButton, Reveal, StateDock, tap } from "@/components/ui";
-import { isModuleId, type ModuleId } from "@/constants/modules";
+import { Backdrop, Eyebrow, GlassCard, PressCard, PrimaryButton, Reveal, StateDock, tap, useReducedMotion } from "@/components/ui";
+import { curriculumModule, isModuleId, type ModuleId } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { storeProductSnapshot } from "@/lib/commerce";
 import {
@@ -58,6 +58,10 @@ export default function Paywall() {
   const actions = commerceActionPresentation(commerceState, isPro, purchaseLabel);
   const hasCompleteEarnedResult = Boolean(activePracticeSession?.sharedResult?.pressure_moment && activePracticeSession.sharedResult.practice_shift && activePracticeSession.sharedResult.starting_index && activePracticeSession.sharedResult.first_focus);
   const earnedOfferBlocked = params.source === "debrief" && !hasCompleteEarnedResult;
+  const practiceModule = curriculumModule(moduleId) ?? curriculumModule("make_a_clear_ask");
+  const practiceFocus = activePracticeSession?.sharedResult?.starting_index?.focus_dimension
+    ?? activePracticeSession?.sharedResult?.first_focus?.first_focus_label
+    ?? "Specificity";
 
   useEffect(() => {
     if (params.source !== "debrief") return;
@@ -204,7 +208,13 @@ export default function Paywall() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {stage === 1 ? <StageOne /> : null}
+        {stage === 1 ? (
+          <StageOne
+            moduleName={practiceModule?.name ?? "Make a Clear Ask"}
+            modulePreview={practiceModule?.promise ?? "Practice saying it clearly, holding it through pushback, and putting it in your own words."}
+            focus={practiceFocus}
+          />
+        ) : null}
         {stage === 2 ? <StageTwo /> : null}
         {stage === 3 ? (
           <StageThree
@@ -238,30 +248,88 @@ export default function Paywall() {
   );
 }
 
-function StageOne() {
+function StageOne({ moduleName, modulePreview, focus }: { moduleName: string; modulePreview: string; focus: string }) {
+  const [isPlanOpen, setIsPlanOpen] = useState<boolean>(false);
+  const isReduced = useReducedMotion();
+  const segmentProgress = useRef<Animated.Value[]>(
+    Array.from({ length: 7 }, () => new Animated.Value(isReduced ? 1 : 0)),
+  ).current;
+
+  useEffect(() => {
+    if (isReduced) {
+      segmentProgress.forEach((value) => value.setValue(1));
+      return;
+    }
+    segmentProgress.forEach((value) => value.setValue(0));
+    const entrance = Animated.stagger(
+      85,
+      segmentProgress.map((value) => Animated.timing(value, {
+        toValue: 1,
+        duration: 520,
+        easing: Easing.bezier(0.2, 0.9, 0.25, 1),
+        useNativeDriver: true,
+      })),
+    );
+    entrance.start();
+    return () => entrance.stop();
+  }, [isReduced, segmentProgress]);
+
+  const focusLabel = focus.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+
   return (
     <Reveal style={styles.stageOne}>
-      <Eyebrow color={C.dim}>Your practice plan</Eyebrow>
-      <Text style={[styles.title, styles.stageOneTitle]}>Start with a clear ask.</Text>
-      <Text style={[styles.lede, styles.stageOneLede]}>Your first 7 days focus on where the conversation got stuck.</Text>
-
-      <View style={styles.planCard}>
-        <Text style={styles.moduleEyebrow}>First module</Text>
-        <Text style={styles.moduleTitle}>Make a Clear Ask</Text>
-        <View style={styles.focusPill}>
-          <Text style={styles.focusPillText}>Focus: Specificity</Text>
-        </View>
-        <Text style={styles.modulePreview}>Practice saying it clearly, holding it through pushback, and putting it in your own words.</Text>
-      </View>
-
-      <View style={styles.offerLockup}>
+      <View style={styles.offerHero}>
+        <Text style={styles.trialEyebrow}>START YOUR FREE TRIAL</Text>
         <Text style={styles.offerTitle}>7 days free</Text>
         <Text style={styles.priceLine}>Then $11.99/month or $89.99/year. Cancel anytime.</Text>
+
+        <View style={styles.sevenSegments} accessibilityLabel="Seven animated lines representing the seven-day free trial">
+          {segmentProgress.map((progress, index) => (
+            <Animated.View
+              key={index}
+              style={[
+                styles.sevenSegment,
+                {
+                  opacity: progress,
+                  transform: [
+                    { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [index % 2 === 0 ? -22 : 22, 0] }) },
+                    { scaleX: progress.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] }) },
+                  ],
+                },
+              ]}
+            />
+          ))}
+        </View>
+        <Text style={styles.trialSupport}>Seven days to practice the conversations that matter.</Text>
       </View>
 
-      <View style={styles.sevenSegments} accessibilityLabel="Seven-day free trial">
-        {Array.from({ length: 7 }, (_, index) => <View key={index} style={styles.sevenSegment} />)}
-      </View>
+      <PressCard
+        onPress={() => setIsPlanOpen((current) => !current)}
+        accessibilityLabel={`${isPlanOpen ? "Hide" : "Show"} your practice plan`}
+        containerStyle={styles.planDisclosureHit}
+        style={styles.planDisclosure}
+      >
+        <View>
+          <Text style={styles.planDisclosureTitle}>Your practice plan</Text>
+          <Text style={styles.planDisclosureHint}>{isPlanOpen ? "Tap to hide details" : "See where you’ll start"}</Text>
+        </View>
+        <ChevronDown
+          size={20}
+          color={C.purple}
+          style={{ transform: [{ rotate: isPlanOpen ? "180deg" : "0deg" }] }}
+        />
+      </PressCard>
+
+      {isPlanOpen ? (
+        <View style={styles.planCard}>
+          <Text style={styles.moduleEyebrow}>First module</Text>
+          <Text style={styles.moduleTitle}>{moduleName}</Text>
+          <View style={styles.focusPill}>
+            <Text style={styles.focusPillText}>Focus: {focusLabel}</Text>
+          </View>
+          <Text style={styles.modulePreview}>{modulePreview}</Text>
+        </View>
+      ) : null}
     </Reveal>
   );
 }
@@ -302,13 +370,15 @@ const styles = StyleSheet.create({
   top: { minHeight: 58, paddingHorizontal: GUTTER, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, topHit: { width: 72, minHeight: 44, justifyContent: "center" }, closeHit: { alignItems: "flex-end" }, topText: { ...T.support, color: C.textSoft, fontSize: 15 }, step: { ...eyebrow, color: C.dim, fontSize: 10 },
   scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, stageOneScroll: { flexGrow: 1, justifyContent: "flex-start", paddingTop: 12 }, centeredStageScroll: { flexGrow: 1, justifyContent: "center" },
   stageOne: { alignItems: "stretch" },
-  title: { ...T.display, fontFamily: font.bold, fontSize: 29, lineHeight: 36, marginTop: 10 }, stageOneTitle: { fontSize: 24, lineHeight: 29, marginTop: 10 }, lede: { ...T.body, color: C.textSoft, marginTop: 14 }, stageOneLede: { fontSize: 15, lineHeight: 21, marginTop: 6 },
-  planCard: { marginTop: 15, borderRadius: radius.lg, backgroundColor: C.elevated, paddingHorizontal: 15, paddingVertical: 13, shadowColor: "#1C2430", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 2 },
+  title: { ...T.display, fontFamily: font.bold, fontSize: 29, lineHeight: 36, marginTop: 10 }, lede: { ...T.body, color: C.textSoft, marginTop: 14 },
+  offerHero: { alignItems: "center", paddingTop: 22, paddingBottom: 28 }, trialEyebrow: { ...eyebrow, color: C.purple, fontSize: 10 }, offerTitle: { fontFamily: font.bold, fontSize: 43, lineHeight: 50, letterSpacing: -1.4, color: C.text, marginTop: 9 }, priceLine: { ...T.support, color: C.textSoft, textAlign: "center", fontSize: 15, lineHeight: 21, marginTop: 5 }, trialSupport: { ...T.caption, color: C.textSoft, textAlign: "center", fontSize: 12, marginTop: 14 },
+  sevenSegments: { width: "100%", flexDirection: "row", gap: 7, marginTop: 27, overflow: "hidden", paddingVertical: 3 }, sevenSegment: { flex: 1, height: 11, borderRadius: 6, backgroundColor: C.purple },
+  planDisclosureHit: { width: "100%" }, planDisclosure: { minHeight: 64, borderTopWidth: 1, borderBottomWidth: 1, borderColor: `${C.purple}24`, paddingVertical: 12, paddingHorizontal: 4, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, planDisclosureTitle: { ...T.support, color: C.purple, fontFamily: font.semi, fontSize: 14 }, planDisclosureHint: { ...T.caption, color: C.textSoft, fontSize: 11, marginTop: 2 },
+  planCard: { marginTop: 14, borderRadius: radius.lg, backgroundColor: C.elevated, paddingHorizontal: 16, paddingVertical: 15, shadowColor: "#1C2430", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 2 },
   moduleEyebrow: { ...eyebrow, color: C.dim, fontSize: 8 }, moduleTitle: { ...T.title, color: C.text, fontFamily: font.bold, fontSize: 17, lineHeight: 22, marginTop: 3 }, focusPill: { alignSelf: "flex-start", borderRadius: 999, backgroundColor: C.purpleSoft, paddingHorizontal: 9, paddingVertical: 3, marginTop: 7 }, focusPillText: { ...T.caption, color: C.purple, fontFamily: font.semi, fontSize: 10, lineHeight: 16 }, modulePreview: { ...T.support, color: C.textSoft, fontSize: 13, lineHeight: 18, marginTop: 7 },
-  offerLockup: { alignItems: "center", marginTop: 12 }, offerTitle: { fontFamily: font.bold, fontSize: 21, lineHeight: 27, color: C.text }, sevenSegments: { flexDirection: "row", gap: 6, marginTop: 10 }, sevenSegment: { flex: 1, height: 8, borderRadius: 4, backgroundColor: C.purple },
   timeline: { marginTop: 32 }, checkoutTimeline: { marginTop: 22 }, timelineRow: { flexDirection: "row", minHeight: 76 }, rail: { width: 20, alignItems: "center" }, railDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: C.bg, borderWidth: 2, borderColor: C.purple }, railDotOn: { width: 14, height: 14, borderRadius: 7, backgroundColor: C.purple }, railLine: { width: 2, flex: 1, backgroundColor: `${C.purple}35` }, timelineCopy: { flex: 1, paddingLeft: 10, paddingBottom: 16 }, timelineLabel: { ...eyebrow, color: C.dim, fontSize: 10 }, timelineDetail: { ...T.body, color: C.text, marginTop: 3, fontSize: 16, lineHeight: 23 },
   loading: { marginTop: 50 }, planList: { gap: 10, marginTop: 24 }, plan: { minHeight: 74, borderRadius: radius.md, borderWidth: 1, borderColor: C.glassEdge, backgroundColor: C.surface, padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, planSelected: { borderColor: C.purple, backgroundColor: C.purpleSoft }, planLabel: { ...T.support, fontFamily: font.semi, color: C.text }, planPrice: { ...T.caption, marginTop: 4 },
   termsCard: { marginTop: 18, padding: 18, gap: 12 }, termRow: { flexDirection: "row", justifyContent: "space-between", gap: 12 }, termLabel: { ...T.caption }, termValue: { ...T.caption, fontFamily: font.semi, color: C.text, textAlign: "right", flex: 1 }, status: { marginTop: 16, padding: 14, borderRadius: radius.md, backgroundColor: C.surface, flexDirection: "row", alignItems: "flex-start", gap: 10 }, statusText: { ...T.caption, color: C.text, flex: 1 },
-  priceLine: { ...T.caption, color: C.textSoft, textAlign: "center", fontSize: 12, lineHeight: 17, marginTop: 2 }, renewalCopy: { ...T.caption, color: C.textSoft, marginTop: 18, lineHeight: 20 }, links: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: 18, rowGap: 0, marginTop: 16 }, link: { ...T.caption, color: C.textSoft, paddingVertical: 10 }, billingLink: { ...T.caption, color: C.textSoft }, disabledText: { color: C.dim },
+  renewalCopy: { ...T.caption, color: C.textSoft, marginTop: 18, lineHeight: 20 }, links: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: 18, rowGap: 0, marginTop: 16 }, link: { ...T.caption, color: C.textSoft, paddingVertical: 10 }, billingLink: { ...T.caption, color: C.textSoft }, disabledText: { color: C.dim },
   iapBlocker: { marginTop: 28, borderRadius: radius.md, borderWidth: 1, borderColor: `${C.clay}55`, backgroundColor: `${C.clay}0D`, padding: 16, flexDirection: "row", alignItems: "flex-start", gap: 12 }, iapBlockerCopy: { flex: 1, gap: 5 }, iapBlockerTitle: { ...T.support, fontFamily: font.semi, color: C.text }, iapBlockerBody: { ...T.caption, color: C.textSoft },
 });

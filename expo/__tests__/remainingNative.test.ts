@@ -76,6 +76,15 @@ describe("remaining native acquisition and paid experience", () => {
     const paywall = await source("app/paywall.tsx");
     expect(paywall).toContain("const screen = `pay${stage}`");
     expect(paywall).toContain("7 days free");
+    expect(paywall.indexOf("7 days free")).toBeLessThan(paywall.indexOf("Your practice plan"));
+    expect(paywall).toContain("START YOUR FREE TRIAL");
+    expect(paywall).toContain("Animated.stagger");
+    expect(paywall).toContain("segmentProgress.map");
+    expect(paywall).toContain("useReducedMotion");
+    expect(paywall).toContain('${isPlanOpen ? "Hide" : "Show"} your practice plan');
+    expect(paywall).toContain("See where you’ll start");
+    expect(paywall).toContain("isPlanOpen ? (");
+    expect(paywall).toContain("curriculumModule(moduleId)");
     expect(paywall).toContain("$11.99/month or $89.99/year");
     expect(paywall).toContain("We’ll email you 3 days before your free trial ends.");
     expect(paywall).toContain("In-app purchase configuration required");
