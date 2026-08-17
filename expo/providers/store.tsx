@@ -59,8 +59,9 @@ const KEYS = {
   activePracticeSession: "cc.activePracticeSession.v1",
   activeScenarioRun: "cc.activeScenarioRun.v1",
   nativeJourneyStarted: "cc.nativeJourneyStarted.v1",
-  /** Development-only entitlement override. Never read in a release build. */
+  /** Development-only entitlement overrides. Never read in a release build. */
   devPro: "cc.devpro.v1",
+  devForceUnpaid: "cc.devForceUnpaid.v1",
 } as const;
 
 const DEFAULT_FREEZE: FreezeState = { available: 1, usedDates: [], lastMilestone: 0 };
@@ -103,12 +104,13 @@ export const [StoreProvider, useStore] = createContextHook(() => {
   const [activeScenarioRun, setActiveScenarioRun] = useState<PersistedScenarioPracticeRun | null>(null);
   const [nativeJourneyStarted, setNativeJourneyStarted] = useState<boolean>(false);
   const [devPro, setDevPro] = useState<boolean>(false);
+  const [devForceUnpaid, setDevForceUnpaid] = useState<boolean>(false);
 
   useEffect(() => {
     let alive = true;
     const load = async () => {
       try {
-        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, journeyStarted, dp] = await Promise.all([
+        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, journeyStarted, dp, devUnpaid] = await Promise.all([
           AsyncStorage.getItem(KEYS.profile),
           AsyncStorage.getItem(KEYS.sessions),
           AsyncStorage.getItem(KEYS.sessionsLegacy),
@@ -125,10 +127,12 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           AsyncStorage.getItem(KEYS.activeScenarioRun),
           AsyncStorage.getItem(KEYS.nativeJourneyStarted),
           __DEV__ ? AsyncStorage.getItem(KEYS.devPro) : Promise.resolve(null),
+          __DEV__ ? AsyncStorage.getItem(KEYS.devForceUnpaid) : Promise.resolve(null),
         ]);
         if (!alive) return;
 
         if (__DEV__ && dp === "1") setDevPro(true);
+        if (__DEV__ && devUnpaid === "1") setDevForceUnpaid(true);
         setNativeJourneyStarted(journeyStarted === "1");
         const stableAnonymousId = anonymousId?.trim() || newAnonymousUserId();
         setAnonymousUserId(stableAnonymousId);
@@ -497,6 +501,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
   const reset = useCallback(async () => {
     setProfile(null);
     setDevPro(false);
+    setDevForceUnpaid(false);
     setSessions([]);
     setCustomScenarios([]);
     setDrillLog([]);
@@ -531,6 +536,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         KEYS.nativeJourneyStarted,
         KEYS.anonymousUserId,
         KEYS.devPro,
+        KEYS.devForceUnpaid,
       ]);
     } catch (e) {
       safeLog("[store] reset failed", errorShape(e));
@@ -736,7 +742,9 @@ export const [StoreProvider, useStore] = createContextHook(() => {
   const toggleDevPro = useCallback(async (enabled: boolean) => {
     if (!__DEV__) return;
     setDevPro(enabled);
+    setDevForceUnpaid(false);
     try {
+      await AsyncStorage.removeItem(KEYS.devForceUnpaid);
       if (enabled) await AsyncStorage.setItem(KEYS.devPro, "1");
       else await AsyncStorage.removeItem(KEYS.devPro);
     } catch (e) {
@@ -744,7 +752,23 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     }
   }, []);
 
-  const entitlement: Entitlement = purchasedPro || (__DEV__ && devPro) ? "pro" : "free";
+  const forceDevUnpaid = useCallback(async (): Promise<void> => {
+    if (!__DEV__) return;
+    setDevPro(false);
+    setDevForceUnpaid(true);
+    try {
+      await AsyncStorage.removeItem(KEYS.devPro);
+      await AsyncStorage.setItem(KEYS.devForceUnpaid, "1");
+    } catch (e) {
+      safeLog("[store] dev unpaid state save failed", errorShape(e));
+    }
+  }, []);
+
+  const entitlement: Entitlement = __DEV__ && devForceUnpaid
+    ? "free"
+    : purchasedPro || (__DEV__ && devPro)
+      ? "pro"
+      : "free";
 
   /** Single source of truth for every free/paid decision. */
   const access = useMemo<AccessState>(
@@ -771,7 +795,9 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     access,
     entitlement,
     devProEnabled: devPro,
+    devUnpaidEnabled: devForceUnpaid,
     toggleDevPro,
+    forceDevUnpaid,
     challengeLog,
     challengeDoneDays,
     currentChallengeDay,

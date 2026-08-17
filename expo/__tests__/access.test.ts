@@ -147,7 +147,31 @@ describe("preview pilot access", () => {
     expect(paywall).not.toContain("toggleDevPro");
     expect(store).toContain("if (!__DEV__) return");
     expect(store).toContain("__DEV__ ? AsyncStorage.getItem(KEYS.devPro) : Promise.resolve(null)");
-    expect(store).toContain('purchasedPro || (__DEV__ && devPro) ? "pro" : "free"');
+    expect(store).toContain("__DEV__ && devForceUnpaid");
+    expect(store).toContain("purchasedPro || (__DEV__ && devPro)");
+  });
+
+  it("provides a development-only QA lab without weakening the release boundary", async () => {
+    const qa = await Bun.file(`${import.meta.dir}/../app/qa-access.tsx`).text();
+    const settings = await Bun.file(`${import.meta.dir}/../app/settings.tsx`).text();
+    const path = await Bun.file(`${import.meta.dir}/../app/path.tsx`).text();
+    const module = await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text();
+    const paywall = await Bun.file(`${import.meta.dir}/../app/paywall.tsx`).text();
+
+    expect(settings).toContain('{__DEV__ ? <Reveal index={4}');
+    expect(settings).toContain('router.push("/qa-access")');
+    expect(qa).toContain("if (!__DEV__)");
+    expect(qa).toContain("Production access continues to require an active trial or subscription.");
+    expect(qa).toContain("await toggleDevPro(true)");
+    expect(qa).toContain("await forceDevUnpaid()");
+    expect(qa).toContain('pathname: "/paywall"');
+    expect(qa).toContain('pathname: "/module/[day]"');
+    expect(qa).toContain("recommended_module_id");
+    expect(qa).toContain("current rehearsal and debrief");
+    expect(path).toContain("QA unlocked · no store entitlement");
+    expect(module).toContain("const decision = canContinuePilot(access)");
+    expect(paywall).not.toContain("toggleDevPro");
+    expect(paywall).not.toContain("devProEnabled");
   });
 
   it("keeps RevenueCat configuration identifiers unchanged", async () => {

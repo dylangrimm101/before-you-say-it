@@ -110,6 +110,7 @@ function RootLayoutNav() {
         <Stack.Screen name="progress/dimension/[signal]" />
         <Stack.Screen name="progress/how-it-works" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="qa-access" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="privacy" />
         <Stack.Screen name="safety" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
         <Stack.Screen name="internal-review-evidence" options={{ animation: "fade" }} />

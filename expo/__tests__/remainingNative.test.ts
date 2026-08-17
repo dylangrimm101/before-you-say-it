@@ -112,7 +112,8 @@ describe("remaining native acquisition and paid experience", () => {
   test("an existing entitlement continues through the current access source of truth", async () => {
     const store = await source("providers/store.tsx");
     const today = await source("app/(tabs)/index.tsx");
-    expect(store).toContain('purchasedPro || (__DEV__ && devPro) ? "pro" : "free"');
+    expect(store).toContain("__DEV__ && devForceUnpaid");
+    expect(store).toContain("purchasedPro || (__DEV__ && devPro)");
     expect(today).toContain('access.entitlement !== "pro"');
     expect(today).toContain('pathname: "/module/[day]"');
   });
