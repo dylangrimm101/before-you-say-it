@@ -81,15 +81,15 @@ describe("event-driven plan build", () => {
     expect(getConversionBuild("reh-order")?.events).toEqual(["transcript.confirmed"]);
   });
 
-  test("presents named events from top to bottom without staged timers", async () => {
+  test("presents named events from top to bottom with visible sequential progress", async () => {
     const screen = await Bun.file(`${import.meta.dir}/../app/debrief/[id].tsx`).text();
     expect(screen).not.toContain("setTimeout");
     expect(screen).not.toContain("setInterval");
     expect(screen).toContain("const [completedCount, setCompletedCount] = useState<number>(0)");
     expect(screen).toContain("const availableCount = Math.min(build.events.length, PIPELINE_ROWS.length)");
-    expect(screen).toContain("if (completedCount >= availableCount) return");
-    expect(screen).toContain("presentCompletedEvent.start");
-    expect(screen).toContain('status === "done" ? 100 : status === "active" ? 8 : 0');
+    expect(screen).toContain("const canComplete = completedCount < availableCount");
+    expect(screen).toContain("progressAnimation.start");
+    expect(screen).toContain("Math.min(current + 1, availableCount)");
     expect(screen).toContain('<View style={styles.referencePipelineCheck}><Check');
     expect(screen).toContain('status === "queued" && styles.referencePipelineQueued');
     expect(screen).toContain('build.events.includes("plan.ready")');
@@ -109,9 +109,13 @@ describe("event-driven plan build", () => {
     expect(screen).toContain("revealDebrief()");
   });
 
-  test("shows the active analysis row at eight percent before handing off", async () => {
+  test("moves the active analysis row beyond eight percent while real work is pending", async () => {
     const screen = await Bun.file(`${import.meta.dir}/../app/debrief/[id].tsx`).text();
-    expect(screen).toContain('status === "done" ? 100 : status === "active" ? 8 : 0');
+    expect(screen).toContain("progress.setValue(8)");
+    expect(screen).toContain("toValue: canComplete ? 100 : 88");
+    expect(screen).toContain("duration: canComplete ? 820 : 7000");
+    expect(screen).toContain("useNativeDriver: false");
+    expect(screen).toContain("displayedProgress");
     expect(screen).toContain("styles.referencePipelineActive");
     expect(screen).toContain("styles.referencePipelinePercent");
     expect(screen).toContain("styles.referencePipelineTrack");

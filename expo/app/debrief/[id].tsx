@@ -54,8 +54,20 @@ function statusOf(index: number, completedCount: number): PipelineStatus {
   return "queued";
 }
 
-function ReferencePipelineRow({ label, status }: { label: string; status: PipelineStatus }) {
-  const progress = status === "done" ? 100 : status === "active" ? 8 : 0;
+function ReferencePipelineRow({ label, status, progress }: { label: string; status: PipelineStatus; progress: Animated.Value }) {
+  const [displayedProgress, setDisplayedProgress] = useState<number>(status === "done" ? 100 : status === "active" ? 8 : 0);
+  const displayedProgressRef = useRef<number>(displayedProgress);
+
+  useEffect(() => {
+    const listenerId = progress.addListener(({ value }) => {
+      const rounded = Math.round(value);
+      if (rounded === displayedProgressRef.current) return;
+      displayedProgressRef.current = rounded;
+      setDisplayedProgress(rounded);
+    });
+    return () => progress.removeListener(listenerId);
+  }, [progress]);
+
   return (
     <View style={[styles.referencePipelineRow, status === "queued" && styles.referencePipelineQueued]}>
       <View style={styles.referencePipelineHead}>
@@ -63,13 +75,18 @@ function ReferencePipelineRow({ label, status }: { label: string; status: Pipeli
         {status === "done" ? (
           <View style={styles.referencePipelineCheck}><Check size={13} color={C.onAccent} strokeWidth={2.7} /></View>
         ) : status === "active" ? (
-          <Text style={styles.referencePipelinePercent}>{progress}%</Text>
+          <Text style={styles.referencePipelinePercent}>{displayedProgress}%</Text>
         ) : (
           <View style={styles.referencePipelineCircle} />
         )}
       </View>
       <View style={styles.referencePipelineTrack}>
-        <View style={[styles.referencePipelineFill, { width: `${progress}%` }]} />
+        <Animated.View
+          style={[
+            styles.referencePipelineFill,
+            { width: progress.interpolate({ inputRange: [0, 100], outputRange: ["0%", "100%"] }) },
+          ]}
+        />
       </View>
     </View>
   );
@@ -112,7 +129,8 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
   const insets = useSafeAreaInsets();
   const isReduced = useReducedMotion();
   const [completedCount, setCompletedCount] = useState<number>(0);
-  const stageProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
+  const rowProgress = useRef<Animated.Value[]>(PIPELINE_ROWS.map(() => new Animated.Value(0))).current;
+  const initializedRows = useRef<Set<number>>(new Set<number>());
   const screenOpacity = useRef<Animated.Value>(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -125,24 +143,37 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
   const availableCount = Math.min(build.events.length, PIPELINE_ROWS.length);
 
   useEffect(() => {
-    if (completedCount >= availableCount) return;
+    if (completedCount >= PIPELINE_ROWS.length) return;
+    const progress = rowProgress[completedCount];
+    if (!progress) return;
+
+    if (!initializedRows.current.has(completedCount)) {
+      initializedRows.current.add(completedCount);
+      progress.setValue(8);
+    }
+
+    const canComplete = completedCount < availableCount;
     if (isReduced) {
-      setCompletedCount(availableCount);
+      if (canComplete) {
+        progress.setValue(100);
+        setCompletedCount((current) => Math.min(current + 1, availableCount));
+      }
       return;
     }
 
-    stageProgress.setValue(0);
-    const presentCompletedEvent = Animated.timing(stageProgress, {
-      toValue: 1,
-      duration: 680,
-      easing: Easing.bezier(0.22, 0.9, 0.28, 1),
-      useNativeDriver: true,
+    const progressAnimation = Animated.timing(progress, {
+      toValue: canComplete ? 100 : 88,
+      duration: canComplete ? 820 : 7000,
+      easing: canComplete ? Easing.bezier(0.22, 0.9, 0.28, 1) : Easing.out(Easing.quad),
+      useNativeDriver: false,
     });
-    presentCompletedEvent.start(({ finished }) => {
-      if (finished) setCompletedCount((current) => Math.min(current + 1, availableCount));
+    progressAnimation.start(({ finished }) => {
+      if (finished && canComplete) {
+        setCompletedCount((current) => Math.min(current + 1, availableCount));
+      }
     });
-    return () => presentCompletedEvent.stop();
-  }, [availableCount, completedCount, isReduced, stageProgress]);
+    return () => progressAnimation.stop();
+  }, [availableCount, completedCount, isReduced, rowProgress]);
 
   const isReady =
     completedCount === PIPELINE_ROWS.length && build.events.includes("plan.ready");
@@ -188,7 +219,7 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
           <Text style={styles.buildAcknowledgement}>You did the hard part. Practicing it out loud is the step most people skip.</Text>
           <View style={styles.referencePipeline}>
             {PIPELINE_ROWS.map((row, index) => (
-              <ReferencePipelineRow key={row.event} label={row.label} status={statusOf(index, completedCount)} />
+              <ReferencePipelineRow key={row.event} label={row.label} status={statusOf(index, completedCount)} progress={rowProgress[index]!} />
             ))}
           </View>
 
