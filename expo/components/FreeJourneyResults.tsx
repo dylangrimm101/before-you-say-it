@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
   graphCanvas: { height: 190, marginTop: 10 },
   practiceBadge: { position: "absolute", right: 2, top: 0, borderRadius: 10, backgroundColor: C.purple, paddingHorizontal: 12, paddingVertical: 7 },
   practiceBadgeText: { fontFamily: font.semi, fontSize: 10, color: C.onAccent },
-  loopBadge: { position: "absolute", right: 54, bottom: 0, borderRadius: 10, borderWidth: 1, borderColor: `${C.amber}55`, backgroundColor: "#F8F4EC", paddingHorizontal: 11, paddingVertical: 6 },
+  loopBadge: { position: "absolute", right: 54, bottom: 24, borderRadius: 10, borderWidth: 1, borderColor: `${C.amber}55`, backgroundColor: "#F8F4EC", paddingHorizontal: 11, paddingVertical: 6 },
   loopBadgeText: { fontFamily: font.semi, fontSize: 10, color: C.amber },
   graphAxis: { flexDirection: "row", justifyContent: "space-between", marginTop: -2 },
   graphAxisText: { ...eyebrow, color: C.purple, fontSize: 9 },
