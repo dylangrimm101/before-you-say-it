@@ -23,7 +23,6 @@ import {
   conversionEvidence,
 } from "@/lib/conversion";
 import {
-  cancelConversionBuild,
   getConversionBuild,
   subscribeConversionBuild,
   type ConversionBuild,
@@ -108,269 +107,10 @@ function Artifact({ children, duration = 380 }: { children: React.ReactNode; dur
   );
 }
 
-function ProgressSegment({ filled }: { filled: boolean }) {
-  const isReduced = useReducedMotion();
-  const value = useRef<Animated.Value>(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!filled) return;
-    if (isReduced) {
-      value.setValue(1);
-      return;
-    }
-    const animation = Animated.timing(value, {
-      toValue: 1,
-      duration: 420,
-      easing: Easing.bezier(0.22, 0.9, 0.28, 1),
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [filled, isReduced, value]);
-
-  return (
-    <View style={styles.segmentTrack}>
-      <Animated.View
-        style={[
-          styles.segmentFill,
-          { transformOrigin: "left center", transform: [{ scaleX: value }] },
-        ]}
-      />
-    </View>
-  );
-}
-
-function SegmentProgress({ completedCount }: { completedCount: number }) {
-  return (
-    <View
-      style={styles.segments}
-      accessibilityRole="progressbar"
-      accessibilityValue={{
-        min: 0,
-        max: PIPELINE_ROWS.length,
-        now: completedCount,
-        text: `${completedCount} of ${PIPELINE_ROWS.length} complete`,
-      }}
-    >
-      {PIPELINE_ROWS.map((row, index) => (
-        <ProgressSegment key={row.event} filled={index < completedCount} />
-      ))}
-    </View>
-  );
-}
-
-function WaitingDots() {
-  const values = useRef<Animated.Value[]>([
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-  ]).current;
-
-  useEffect(() => {
-    const loops = values.map((value, index) => {
-      const remainingDelay = Math.max(0, 320 - index * 160);
-      return Animated.loop(
-        Animated.sequence([
-          Animated.delay(index * 160),
-          Animated.timing(value, {
-            toValue: 1,
-            duration: 440,
-            easing: Easing.inOut(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(value, {
-            toValue: 0,
-            duration: 440,
-            easing: Easing.inOut(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.delay(remainingDelay),
-        ]),
-      );
-    });
-    loops.forEach((loop) => loop.start());
-    return () => loops.forEach((loop) => loop.stop());
-  }, [values]);
-
-  return (
-    <View style={styles.waitingDots} accessibilityLabel="Working">
-      {values.map((value, index) => (
-        <Animated.View
-          key={index}
-          style={[
-            styles.waitingDot,
-            {
-              opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0.25, 1] }),
-              transform: [
-                { translateY: value.interpolate({ inputRange: [0, 1], outputRange: [0, -2] }) },
-              ],
-            },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-function ActiveAnalysis() {
-  const isReduced = useReducedMotion();
-  const pulse = useRef<Animated.Value>(new Animated.Value(0)).current;
-  const scan = useRef<Animated.Value>(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (isReduced) {
-      pulse.setValue(0.55);
-      scan.setValue(0.5);
-      return;
-    }
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 620,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 620,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    const scanLoop = Animated.loop(
-      Animated.timing(scan, {
-        toValue: 1,
-        duration: 1050,
-        easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    );
-    pulseLoop.start();
-    scanLoop.start();
-    return () => {
-      pulseLoop.stop();
-      scanLoop.stop();
-    };
-  }, [isReduced, pulse, scan]);
-
-  return (
-    <View
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={styles.activeAnalysis}
-    >
-      <Animated.View
-        style={[
-          styles.activeGlow,
-          { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.18, 0.42] }) },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.scanLine,
-          {
-            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.9] }),
-            transform: [{ translateY: scan.interpolate({ inputRange: [0, 1], outputRange: [-2, 50] }) }],
-          },
-        ]}
-      />
-    </View>
-  );
-}
-
-function PipelineRow({
-  row,
-  status,
-  isLast,
-}: {
-  row: (typeof PIPELINE_ROWS)[number];
-  status: PipelineStatus;
-  isLast: boolean;
-}) {
-  const isReduced = useReducedMotion();
-  const rowOpacity = useRef<Animated.Value>(new Animated.Value(status === "queued" ? 0.32 : 1)).current;
-  const doneOpacity = useRef<Animated.Value>(new Animated.Value(status === "done" ? 1 : 0)).current;
-
-  useEffect(() => {
-    const target = status === "queued" ? 0.32 : 1;
-    if (isReduced) {
-      rowOpacity.setValue(target);
-      return;
-    }
-    const animation = Animated.timing(rowOpacity, {
-      toValue: target,
-      duration: 200,
-      easing: Easing.bezier(0.22, 0.9, 0.28, 1),
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [isReduced, rowOpacity, status]);
-
-  useEffect(() => {
-    const target = status === "done" ? 1 : 0;
-    if (isReduced) {
-      doneOpacity.setValue(target);
-      return;
-    }
-    const animation = Animated.timing(doneOpacity, {
-      toValue: target,
-      duration: 180,
-      easing: Easing.bezier(0.22, 0.9, 0.28, 1),
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [doneOpacity, isReduced, status]);
-
-  return (
-    <Animated.View style={[styles.pipelineRow, { opacity: rowOpacity }]}>
-      <View style={styles.markerColumn}>
-        {!isLast ? (
-          <View style={styles.timelineTrack}>
-            <Animated.View
-              style={[
-                styles.timelineFill,
-                { opacity: doneOpacity, transform: [{ scaleY: doneOpacity }] },
-              ]}
-            />
-          </View>
-        ) : null}
-        <View style={styles.markerFrame}>
-          <Animated.View
-            style={[
-              styles.marker,
-              status === "active" && styles.markerActive,
-              { opacity: doneOpacity.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) },
-            ]}
-          />
-          <Animated.View style={[styles.markerDone, { opacity: doneOpacity }]}>
-            <Check size={13} color={C.sage} strokeWidth={2.7} />
-          </Animated.View>
-        </View>
-      </View>
-      <View style={[styles.pipelineContent, status === "active" && styles.pipelineContentActive]}>
-        {status === "active" ? <ActiveAnalysis /> : null}
-        <Text
-          accessibilityLiveRegion={status === "active" ? "polite" : "none"}
-          style={[styles.pipelineLabel, status === "active" && styles.pipelineLabelActive]}
-        >
-          {status === "active" ? `Analyzing · ${row.label}` : row.label}
-        </Text>
-        {status === "done" ? <Text style={styles.completedLabel}>Complete</Text> : null}
-      </View>
-    </Animated.View>
-  );
-}
-
 function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: () => void }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const { activePracticeSession, saveActivePracticeSession } = useStore();
   const isReduced = useReducedMotion();
   const [completedCount, setCompletedCount] = useState<number>(0);
   const stageProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
@@ -410,12 +150,6 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
   const isReady =
     completedCount === PIPELINE_ROWS.length && build.events.includes("plan.ready");
 
-  const getSupport = useCallback(async (): Promise<void> => {
-    cancelConversionBuild(build.id);
-    if (activePracticeSession?.id === build.id) await saveActivePracticeSession(cancelPendingResult(activePracticeSession));
-    router.replace({ pathname: "/safety", params: { returnTo: "generating", sessionId: build.id } });
-  }, [activePracticeSession, build.id, router, saveActivePracticeSession]);
-
   const revealDebrief = useCallback(() => {
     if (isReduced) {
       onReady();
@@ -449,7 +183,7 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
           justifyContent: "center",
           paddingTop: insets.top + 24,
           paddingHorizontal: GUTTER,
-          paddingBottom: insets.bottom + 128,
+          paddingBottom: insets.bottom + 24,
         }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
@@ -484,23 +218,12 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
         </View>
       </ScrollView>
 
-      <StateDock bottomInset={insets.bottom}>
-        {build.error ? (
-          <>
-            <Text style={styles.errorText}>{build.error}</Text>
-            <PrimaryButton label="Back to today" onPress={() => router.replace("/(tabs)")} />
-          </>
-        ) : (
-          <View style={styles.workingRow}>
-            {isReady
-              ? <Text style={styles.workingText}>Opening your communication baseline…</Text>
-              : isReduced
-                ? <Text style={styles.workingText}>Working</Text>
-                : <WaitingDots />}
-          </View>
-        )}
-        {!isReady && !build.error ? <PressCard onPress={() => void getSupport()} accessibilityLabel="Get support instead"><Text style={styles.supportLink}>Get support instead</Text></PressCard> : null}
-      </StateDock>
+      {build.error ? (
+        <StateDock bottomInset={insets.bottom}>
+          <Text style={styles.errorText}>{build.error}</Text>
+          <PrimaryButton label="Back to today" onPress={() => router.replace("/(tabs)")} />
+        </StateDock>
+      ) : null}
     </Animated.View>
   );
 }
@@ -816,26 +539,6 @@ const styles = StyleSheet.create({
   referencePipelineCheck: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: C.purple },
   referencePipelineTrack: { height: 8, borderRadius: 4, backgroundColor: "rgba(81,40,136,0.07)", overflow: "hidden" },
   referencePipelineFill: { height: 8, borderRadius: 4, backgroundColor: C.purple },
-  segments: { flexDirection: "row", gap: 6, marginTop: 14, marginBottom: 16 },
-  segmentTrack: { height: 3, flex: 1, borderRadius: 2, backgroundColor: C.track, overflow: "hidden" },
-  segmentFill: { ...StyleSheet.absoluteFillObject, backgroundColor: C.purple },
-  pipeline: { gap: 13 },
-  pipelineRow: { flexDirection: "row", gap: 10, minHeight: 50 },
-  markerColumn: { width: 18, paddingTop: 3, alignItems: "center" },
-  timelineTrack: { position: "absolute", top: 20, bottom: -16, width: 2, borderRadius: 1, backgroundColor: C.track, overflow: "hidden" },
-  timelineFill: { ...StyleSheet.absoluteFillObject, backgroundColor: C.purple, transformOrigin: "top center" },
-  markerFrame: { width: 18, height: 18, alignItems: "center", justifyContent: "center" },
-  marker: { position: "absolute", width: 15, height: 15, borderRadius: 8, borderWidth: 1, borderColor: C.lineStrong },
-  markerActive: { borderColor: C.purple, borderStyle: "dashed", borderWidth: 1.5 },
-  markerDone: { position: "absolute", width: 18, height: 18, alignItems: "center", justifyContent: "center" },
-  pipelineContent: { flex: 1, minHeight: 44, paddingVertical: 7, paddingHorizontal: 10, overflow: "hidden", borderRadius: radius.sm },
-  pipelineContentActive: { borderWidth: 1, borderColor: `${C.purple}38`, backgroundColor: `${C.purple}0A` },
-  activeAnalysis: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
-  activeGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: `${C.purple}22` },
-  scanLine: { position: "absolute", left: 0, right: 0, top: 0, height: 2, backgroundColor: C.purple },
-  pipelineLabel: { ...T.support, color: C.dim, zIndex: 1 },
-  pipelineLabelActive: { ...T.body, fontFamily: font.semi, color: C.text },
-  completedLabel: { ...T.caption, color: C.purple, marginTop: 4 },
   approvedOnly: { ...T.caption, color: C.dim, textAlign: "center", marginTop: 24 },
   artifactCard: { marginTop: 10, borderRadius: radius.md, padding: 15 },
   confirmed: { color: C.dim },
@@ -856,11 +559,6 @@ const styles = StyleSheet.create({
   pathDays: { ...T.caption, color: C.dim },
   readyTitle: { ...T.title, marginTop: 20 },
   readySupport: { ...T.support, marginTop: 6 },
-  workingRow: { minHeight: 56, alignItems: "center", justifyContent: "center" },
-  workingText: { ...T.support, fontFamily: font.semi, color: C.dim },
-  supportLink: { ...T.caption, color: C.clay, fontFamily: font.semi, textAlign: "center", minHeight: 42, textAlignVertical: "center" },
-  waitingDots: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
-  waitingDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: C.purple },
   errorText: { ...T.support, color: C.clay, textAlign: "center", marginBottom: 10 },
   debriefTitle: { ...T.display, marginTop: 8 },
   beforeAfter: { flexDirection: "row", gap: 9, marginTop: 20 },

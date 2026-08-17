@@ -128,7 +128,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
     return (
       <View style={styles.root}>
         <Backdrop />
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 26, paddingBottom: insets.bottom + 150 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 26, paddingBottom: insets.bottom + 32 }]} showsVerticalScrollIndicator={false}>
           <Text style={styles.eyebrow}>Your communication baseline</Text>
           <Text style={styles.title}>{moment.headline || "You stayed in the room. Now make the ask hold."}</Text>
           <Text style={styles.observation}>{moment.observation}</Text>
@@ -176,11 +176,11 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
               </View>
             </> : null}
           </View>
+          <View style={styles.baselineAction}>
+            <PrimaryButton label="Show what changes with practice" onPress={() => void move("rewrite")} />
+            <Text style={styles.dockPromise}>See your same ask rewritten as one specific request you could actually say.</Text>
+          </View>
         </ScrollView>
-        <StateDock bottomInset={insets.bottom}>
-          <PrimaryButton label="Show what changes with practice" onPress={() => void move("rewrite")} />
-          <Text style={styles.dockPromise}>See your same ask rewritten as one specific request you could actually say.</Text>
-        </StateDock>
       </View>
     );
   }
@@ -445,6 +445,7 @@ const styles = StyleSheet.create({
   focusTitle: { ...T.title, fontSize: 20 },
   focusSummary: { ...T.support, color: C.textSoft },
   dockPromise: { ...T.caption, color: C.textSoft, textAlign: "center", marginTop: 8 },
+  baselineAction: { marginTop: 8, paddingBottom: 8 },
   baselineCard: { backgroundColor: C.elevated, borderRadius: 24, padding: 20, gap: 11, marginTop: 10, ...shadow.layer },
   startingIndexSummary: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 14 },
   startingIndexCopy: { flex: 1, gap: 3 },

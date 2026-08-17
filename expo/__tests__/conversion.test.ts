@@ -89,8 +89,9 @@ describe("event-driven plan build", () => {
     expect(screen).toContain("const availableCount = Math.min(build.events.length, PIPELINE_ROWS.length)");
     expect(screen).toContain("if (completedCount >= availableCount) return");
     expect(screen).toContain("presentCompletedEvent.start");
-    expect(screen).toContain('status === "done" ? <Text style={styles.completedLabel}>Complete</Text> : null');
-    expect(screen).toContain('status === "queued" ? 0.32 : 1');
+    expect(screen).toContain('status === "done" ? 100 : status === "active" ? 8 : 0');
+    expect(screen).toContain('<View style={styles.referencePipelineCheck}><Check');
+    expect(screen).toContain('status === "queued" && styles.referencePipelineQueued');
     expect(screen).toContain('build.events.includes("plan.ready")');
   });
 
@@ -108,14 +109,13 @@ describe("event-driven plan build", () => {
     expect(screen).toContain("revealDebrief()");
   });
 
-  test("makes the active analysis stage visibly scan before handing off", async () => {
+  test("shows the active analysis row at eight percent before handing off", async () => {
     const screen = await Bun.file(`${import.meta.dir}/../app/debrief/[id].tsx`).text();
-    expect(screen).toContain("function ActiveAnalysis()");
-    expect(screen).toContain("const scanLoop = Animated.loop");
-    expect(screen).toContain('outputRange: [-2, 50]');
-    expect(screen).toContain('`Analyzing · ${row.label}`');
-    expect(screen).toContain("styles.timelineTrack");
-    expect(screen).toContain("styles.timelineFill");
+    expect(screen).toContain('status === "done" ? 100 : status === "active" ? 8 : 0');
+    expect(screen).toContain("styles.referencePipelineActive");
+    expect(screen).toContain("styles.referencePipelinePercent");
+    expect(screen).toContain("styles.referencePipelineTrack");
+    expect(screen).toContain("styles.referencePipelineFill");
   });
 
   test("emits the first event only after the empty plan screen mounts", async () => {
