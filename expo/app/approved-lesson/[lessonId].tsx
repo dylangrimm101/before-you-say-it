@@ -84,6 +84,20 @@ export default function ApprovedLessonDeckScreen() {
             control.style.display = "none";
           });
         }
+        function makeAnswerCardsScrollable() {
+          var labels = Array.prototype.slice.call(document.querySelectorAll("span"));
+          labels.forEach(function (label) {
+            if (textOf(label) !== "select an answer") return;
+            var answerCard = label.parentElement;
+            if (!answerCard) return;
+            answerCard.style.overflowY = "auto";
+            answerCard.style.overscrollBehaviorY = "contain";
+            answerCard.style.webkitOverflowScrolling = "touch";
+            answerCard.style.paddingBottom = "12px";
+            answerCard.style.boxSizing = "border-box";
+            answerCard.setAttribute("data-bysi-scrollable-answers", "true");
+          });
+        }
         document.addEventListener("click", function (event) {
           var target = event.target && event.target.closest ? event.target.closest("button, [role=button], span, div") : event.target;
           var label = textOf(target);
@@ -105,6 +119,7 @@ export default function ApprovedLessonDeckScreen() {
         function enforce() {
           fitApprovedFrame();
           disableDeferredActions();
+          makeAnswerCardsScrollable();
         }
         new MutationObserver(enforce).observe(document, { childList: true, subtree: true });
         window.addEventListener("resize", enforce);

@@ -97,6 +97,14 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     }
   });
 
+  test("keeps tall answer cards scrollable above their fixed quiz controls", async () => {
+    const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
+    expect(deckScreen).toContain('textOf(label) !== "select an answer"');
+    expect(deckScreen).toContain('answerCard.style.overflowY = "auto"');
+    expect(deckScreen).toContain('answerCard.style.webkitOverflowScrolling = "touch"');
+    expect(deckScreen).toContain('answerCard.setAttribute("data-bysi-scrollable-answers", "true")');
+  });
+
   test("keeps the catalog and deck route fail-closed outside development", async () => {
     const catalogScreen = await source("app/approved-lessons.tsx");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
