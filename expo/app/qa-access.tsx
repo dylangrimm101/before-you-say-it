@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Check, ChevronRight, CreditCard, FlaskConical, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react-native";
+import { BookOpen, Check, ChevronRight, CreditCard, FlaskConical, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react-native";
 import React from "react";
 import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -95,6 +95,12 @@ export default function QaAccessScreen() {
               title="Open practice path"
               detail="Review recommendation order and every module card"
               onPress={() => router.push("/path")}
+            />
+            <QaAction
+              icon={<BookOpen size={18} color={C.purple} />}
+              title="Open approved lesson decks"
+              detail="Review the twelve source decks for Modules 1 and 2"
+              onPress={() => router.push("/approved-lessons")}
               last
             />
           </View>
