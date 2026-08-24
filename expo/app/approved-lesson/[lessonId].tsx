@@ -1,14 +1,13 @@
-import { Asset } from "expo-asset";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, ShieldCheck } from "lucide-react-native";
-import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
 import { approvedLessonDeck } from "@/constants/approvedLessons";
 import { C, GUTTER, T, font, shadow } from "@/constants/theme";
-import { errorShape, safeLog } from "@/lib/redact";
+import { safeLog } from "@/lib/redact";
 
 /** Renders an approved source deck behind a strict internal-review boundary. */
 export default function ApprovedLessonDeckScreen() {
@@ -16,23 +15,7 @@ export default function ApprovedLessonDeckScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ lessonId?: string }>();
   const lesson = approvedLessonDeck(params.lessonId);
-  const [assetUri, setAssetUri] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<boolean>(false);
-
-  useEffect(() => {
-    let active = true;
-    if (!__DEV__ || !lesson) return () => { active = false; };
-    const asset = Asset.fromModule(lesson.deckAsset);
-    asset.downloadAsync()
-      .then((downloaded) => {
-        if (active) setAssetUri(downloaded.localUri ?? downloaded.uri);
-      })
-      .catch((error) => {
-        safeLog("[approved-lessons] deck asset failed", errorShape(error));
-        if (active) setLoadError(true);
-      });
-    return () => { active = false; };
-  }, [lesson]);
 
   const reviewGuard = useMemo(() => {
     if (!lesson) return "true;";
@@ -121,13 +104,11 @@ export default function ApprovedLessonDeckScreen() {
 
   return (
     <View style={styles.root}>
-      {assetUri && !loadError ? (
+      {!loadError ? (
         <WebView
-          source={{ uri: assetUri }}
+          source={{ html: lesson.deckHtml, baseUrl: "about:blank" }}
           style={styles.webView}
           originWhitelist={["*"]}
-          allowFileAccess
-          allowingReadAccessToURL={assetUri}
           javaScriptEnabled
           domStorageEnabled={false}
           incognito
@@ -135,17 +116,15 @@ export default function ApprovedLessonDeckScreen() {
           injectedJavaScript={reviewGuard}
           injectedJavaScriptBeforeContentLoaded={reviewGuard}
           setSupportMultipleWindows={false}
-          onShouldStartLoadWithRequest={(request) => request.url === assetUri || request.url.startsWith("blob:") || request.url.startsWith("about:blank")}
+          onShouldStartLoadWithRequest={(request) => request.url.startsWith("blob:") || request.url.startsWith("about:blank")}
           onError={(event) => {
             safeLog("[approved-lessons] webview failed", { code: event.nativeEvent.code, description: event.nativeEvent.description });
             setLoadError(true);
           }}
           accessibilityLabel={`${lesson.title} approved source deck`}
         />
-      ) : loadError ? (
-        <Unavailable title="The approved deck couldn't open." body="Return to the catalog and try again." />
       ) : (
-        <View style={styles.loading}><ActivityIndicator color={C.purple} /><Text style={styles.loadingText}>Opening approved deck…</Text></View>
+        <Unavailable title="The approved deck couldn't open." body="Return to the catalog and try again." />
       )}
       <Pressable
         onPress={() => router.back()}
@@ -175,8 +154,6 @@ function Unavailable({ title, body }: { title: string; body: string }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#F2EDE4" },
   webView: { flex: 1, backgroundColor: "#F2EDE4" },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  loadingText: { ...T.caption },
   backButton: { position: "absolute", left: 12, zIndex: 4, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
   qaBadge: { position: "absolute", right: 14, zIndex: 3, minHeight: 32, borderRadius: 16, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line },
   qaBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.1, color: C.purple },

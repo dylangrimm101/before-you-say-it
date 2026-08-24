@@ -26,7 +26,7 @@ export interface ApprovedLessonDeck {
   reviewThroughCard: number;
   rehearsalReturnCard: number | null;
   isCloseDeck: boolean;
-  deckAsset: number;
+  deckHtml: string;
   thumbnail: ImageSourcePropType | null;
 }
 
@@ -48,7 +48,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 20,
     rehearsalReturnCard: 21,
     isCloseDeck: false,
-    deckAsset: require("../assets/lesson-decks/M1-L1-Buried-Point.html"),
+    deckHtml: require("../assets/lesson-decks/M1-L1-Buried-Point.html"),
     thumbnail: require("../assets/lesson-thumbnails/m1-l1-buried-point.png"),
   },
   {
@@ -63,7 +63,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 20,
     rehearsalReturnCard: 21,
     isCloseDeck: false,
-    deckAsset: require("../assets/lesson-decks/M1-L2-Cut-the-Case.html"),
+    deckHtml: require("../assets/lesson-decks/M1-L2-Cut-the-Case.html"),
     thumbnail: require("../assets/lesson-thumbnails/m1-l2-cut-the-case.png"),
   },
   {
@@ -78,7 +78,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 20,
     rehearsalReturnCard: 21,
     isCloseDeck: false,
-    deckAsset: require("../assets/lesson-decks/M1-L3-Park-and-Return.html"),
+    deckHtml: require("../assets/lesson-decks/M1-L3-Park-and-Return.html"),
     thumbnail: require("../assets/lesson-thumbnails/m1-l3-park-and-return.png"),
   },
   {
@@ -93,7 +93,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 17,
     rehearsalReturnCard: 18,
     isCloseDeck: false,
-    deckAsset: require("../assets/lesson-decks/M1-L4-Make-It-Repeatable.html"),
+    deckHtml: require("../assets/lesson-decks/M1-L4-Make-It-Repeatable.html"),
     thumbnail: require("../assets/lesson-thumbnails/m1-l4-make-it-repeatable.png"),
   },
   {
@@ -108,7 +108,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 18,
     rehearsalReturnCard: 19,
     isCloseDeck: false,
-    deckAsset: require("../assets/lesson-decks/M1-L5-Fit-in-One.html"),
+    deckHtml: require("../assets/lesson-decks/M1-L5-Fit-in-One.html"),
     thumbnail: require("../assets/lesson-thumbnails/m1-l5-fit-in-one.png"),
   },
   {
@@ -123,7 +123,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 6,
     rehearsalReturnCard: null,
     isCloseDeck: true,
-    deckAsset: require("../assets/lesson-decks/M1-Close.html"),
+    deckHtml: require("../assets/lesson-decks/M1-Close.html"),
     thumbnail: null,
   },
   {
@@ -138,7 +138,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 20,
     rehearsalReturnCard: 21,
     isCloseDeck: false,
-    deckAsset: require("../assets/lesson-decks/M2-L1-Clear-Ask.html"),
+    deckHtml: require("../assets/lesson-decks/M2-L1-Clear-Ask.html"),
     thumbnail: require("../assets/lesson-thumbnails/m2-l1-clear-ask.png"),
   },
   {
@@ -153,7 +153,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 20,
     rehearsalReturnCard: 21,
     isCloseDeck: false,
-    deckAsset: require("../assets/lesson-decks/M2-L2-Say-Who.html"),
+    deckHtml: require("../assets/lesson-decks/M2-L2-Say-Who.html"),
     thumbnail: require("../assets/lesson-thumbnails/m2-l2-say-who.png"),
   },
   {
@@ -168,7 +168,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 20,
     rehearsalReturnCard: 21,
     isCloseDeck: false,
-    deckAsset: require("../assets/lesson-decks/M2-L3-When-They-Say-They-Cant.html"),
+    deckHtml: require("../assets/lesson-decks/M2-L3-When-They-Say-They-Cant.html"),
     thumbnail: require("../assets/lesson-thumbnails/m2-l3-when-they-say-they-cant.png"),
   },
   {
@@ -183,7 +183,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 20,
     rehearsalReturnCard: 21,
     isCloseDeck: false,
-    deckAsset: require("../assets/lesson-decks/M2-L4-Say-Whether-No.html"),
+    deckHtml: require("../assets/lesson-decks/M2-L4-Say-Whether-No.html"),
     thumbnail: require("../assets/lesson-thumbnails/m2-l4-say-whether-no.png"),
   },
   {
@@ -198,7 +198,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 20,
     rehearsalReturnCard: 21,
     isCloseDeck: false,
-    deckAsset: require("../assets/lesson-decks/M2-L5-Ask-for-the-Loop.html"),
+    deckHtml: require("../assets/lesson-decks/M2-L5-Ask-for-the-Loop.html"),
     thumbnail: require("../assets/lesson-thumbnails/m2-l5-ask-for-the-loop.png"),
   },
   {
@@ -213,7 +213,7 @@ export const APPROVED_LESSON_DECKS: readonly ApprovedLessonDeck[] = [
     reviewThroughCard: 6,
     rehearsalReturnCard: null,
     isCloseDeck: true,
-    deckAsset: require("../assets/lesson-decks/M2-Close.html"),
+    deckHtml: require("../assets/lesson-decks/M2-Close.html"),
     thumbnail: null,
   },
 ] as const;
