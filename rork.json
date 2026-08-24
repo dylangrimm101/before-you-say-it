@@ -2,7 +2,7 @@
   "$schema": "https://rork.com/schema/rork.json",
   "apps": [
     {
-      "name": "ConvoCoach",
+      "name": "Before You Say It",
       "path": "expo",
       "framework": "react-native"
     },
