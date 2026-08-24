@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { authorizedDeckHtml } from "../lib/approvedDeckLoader";
+
 const DECK_LIMITS = {
   "M1-L1-Buried-Point.html": 20,
   "M1-L2-Cut-the-Case.html": 20,
@@ -68,19 +70,31 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     }
   });
 
-  test("bundles HTML as source text instead of relying on preview asset URLs", async () => {
-    const metroConfig = await source("metro.config.js");
-    const transformer = await source("html-transformer.js");
+  test("loads decks without relying on unsupported live-preview HTML asset URLs", async () => {
+    const catalog = await source("constants/approvedLessons.ts");
+    const loader = await source("lib/approvedDeckLoader.ts");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
-    expect(metroConfig).toContain('extension !== "html"');
-    expect(metroConfig).toContain('config.resolver.sourceExts.push("html")');
-    expect(metroConfig).toContain('require.resolve("./html-transformer")');
-    expect(transformer).toContain("JSON.stringify(props.src)");
-    expect(deckScreen).toContain('const deckHtml = typeof lesson?.deckHtml === "string" ? lesson.deckHtml : null;');
+    expect(catalog).toContain('archivePath: "BYSI-Rork-Handoff/decks/M1-L1-Buried-Point.html"');
+    expect(catalog).not.toContain("deckHtml: require");
+    expect(loader).toContain("unzipSync");
+    expect(loader).toContain("authorizedDeckHtml");
+    expect(deckScreen).toContain("loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard)");
     expect(deckScreen).toContain('source={{ html: deckHtml, baseUrl: "about:blank" }}');
-    expect(deckScreen).toContain("if (!deckHtml)");
     expect(deckScreen).not.toContain("Asset.fromModule");
     expect(deckScreen).not.toContain("downloadAsync");
+  });
+
+  test("re-verifies every fetched deck against its authorized boundary before display", async () => {
+    for (const [fileName, limit] of Object.entries(DECK_LIMITS)) {
+      const approvedSlice = await Bun.file(`${import.meta.dir}/../assets/lesson-decks/${fileName}`).text();
+      const sanitized = authorizedDeckHtml(approvedSlice, limit);
+      const template = approvedTemplate(sanitized);
+      expect(cardNumbers(template)).toHaveLength(limit);
+      expect(template).not.toContain(`{ n:${limit + 1}, type:`);
+      expect(template).not.toContain("Voice-engine handoff preview");
+      expect(template).not.toContain('value="{{ handoffOpen }}"');
+      expect(template).not.toMatch(/<button[^>]*data-sheet-primary/);
+    }
   });
 
   test("keeps the catalog and deck route fail-closed outside development", async () => {

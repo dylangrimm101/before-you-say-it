@@ -1,13 +1,14 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, ShieldCheck } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
 import { approvedLessonDeck } from "@/constants/approvedLessons";
 import { C, GUTTER, T, font, shadow } from "@/constants/theme";
-import { safeLog } from "@/lib/redact";
+import { loadApprovedDeckHtml } from "@/lib/approvedDeckLoader";
+import { errorShape, safeLog } from "@/lib/redact";
 
 /** Renders an approved source deck behind a strict internal-review boundary. */
 export default function ApprovedLessonDeckScreen() {
@@ -15,8 +16,23 @@ export default function ApprovedLessonDeckScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ lessonId?: string }>();
   const lesson = approvedLessonDeck(params.lessonId);
-  const deckHtml = typeof lesson?.deckHtml === "string" ? lesson.deckHtml : null;
+  const [deckHtml, setDeckHtml] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isActive = true;
+    setDeckHtml(null);
+    setLoadError(false);
+    if (!__DEV__ || !lesson) return () => { isActive = false; };
+
+    loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard)
+      .then((html) => { if (isActive) setDeckHtml(html); })
+      .catch((error: unknown) => {
+        safeLog("[approved-lessons] approved archive failed", errorShape(error));
+        if (isActive) setLoadError(true);
+      });
+    return () => { isActive = false; };
+  }, [lesson]);
 
   const reviewGuard = useMemo(() => {
     if (!lesson) return "true;";
@@ -102,14 +118,10 @@ export default function ApprovedLessonDeckScreen() {
     return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
   }
   if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to the internal lesson catalog and choose another deck." />;
-  if (!deckHtml) {
-    safeLog("[approved-lessons] deck module was not bundled as HTML", { lessonId: lesson.id, moduleType: typeof lesson.deckHtml });
-    return <Unavailable title="The approved deck couldn't open." body="Reload the preview to apply the lesson bundle update, then try again." />;
-  }
 
   return (
     <View style={styles.root}>
-      {!loadError ? (
+      {deckHtml && !loadError ? (
         <WebView
           source={{ html: deckHtml, baseUrl: "about:blank" }}
           style={styles.webView}
@@ -128,8 +140,10 @@ export default function ApprovedLessonDeckScreen() {
           }}
           accessibilityLabel={`${lesson.title} approved source deck`}
         />
+      ) : loadError ? (
+        <Unavailable title="The approved deck couldn't open." body="Check your connection, return to the catalog, and try again." />
       ) : (
-        <Unavailable title="The approved deck couldn't open." body="Return to the catalog and try again." />
+        <View style={styles.loading}><ActivityIndicator color={C.purple} /><Text style={styles.loadingText}>Opening approved deck…</Text></View>
       )}
       <Pressable
         onPress={() => router.back()}
@@ -159,6 +173,8 @@ function Unavailable({ title, body }: { title: string; body: string }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#F2EDE4" },
   webView: { flex: 1, backgroundColor: "#F2EDE4" },
+  loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingText: { ...T.caption },
   backButton: { position: "absolute", left: 12, zIndex: 4, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
   qaBadge: { position: "absolute", right: 14, zIndex: 3, minHeight: 32, borderRadius: 16, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line },
   qaBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.1, color: C.purple },
