@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { Mic, Square, X } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
@@ -9,6 +9,7 @@ import { Backdrop, MicControl, PrimaryButton, Reveal, StateDock } from "@/compon
 import { DIFFICULTY } from "@/constants/scenarios";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import { generateDebrief, nextCounterpartTurn } from "@/lib/ai";
+import { m1L1CoachNote, m1L1Comparison, type ConvertedLessonConfig } from "@/lib/convertedLesson";
 import {
   attachScenarioCoaching,
   attachScenarioCounterpartTurn,
@@ -21,6 +22,7 @@ import {
   type ScenarioCounterpartPresentation,
 } from "@/lib/scenarioPractice";
 import { useDictation } from "@/lib/useDictation";
+import { replaySpeech, resetSpeech, speak, useSpeech } from "@/lib/voice";
 import { useStore } from "@/providers/store";
 import type { Scenario, Turn } from "@/types/convo";
 import { SESSION_SCHEMA_VERSION, type SessionRecord } from "@/types/privacy";
@@ -28,6 +30,10 @@ import { SESSION_SCHEMA_VERSION, type SessionRecord } from "@/types/privacy";
 interface ScenarioPaidPracticeProps {
   scenario: Scenario;
   requestedRunId?: string;
+  convertedLesson?: ConvertedLessonConfig;
+  onReturnToDeck?: () => void;
+  onDiscard?: () => Promise<void>;
+  onSafetyExit?: () => void;
 }
 
 function turn(id: string, role: Turn["role"], text: string): Turn {
@@ -35,7 +41,7 @@ function turn(id: string, role: Turn["role"], text: string): Turn {
 }
 
 /** Scenario entry surface backed by the same PilotDayRun transitions and immutable attempts as paid modules. */
-export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidPracticeProps) {
+export function ScenarioPaidPractice({ scenario, requestedRunId, convertedLesson, onReturnToDeck, onDiscard, onSafetyExit }: ScenarioPaidPracticeProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeScenarioRun, saveActiveScenarioRun, upsertSession } = useStore();
@@ -52,10 +58,16 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
   });
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+  const [pendingVoiceKind, setPendingVoiceKind] = useState<"opener" | "response" | "retry" | null>(null);
+  const [isMicrophonePrepared, setIsMicrophonePrepared] = useState<boolean>(false);
   const dictation = useDictation();
+  const speech = useSpeech();
   const cancelDictation = dictation.cancel;
 
-  useEffect(() => () => { cancelDictation().catch(() => {}); }, [cancelDictation]);
+  useEffect(() => () => {
+    cancelDictation().catch(() => {});
+    resetSpeech().catch(() => {});
+  }, [cancelDictation]);
 
   const persist = useCallback(async (next: PersistedScenarioPracticeRun): Promise<void> => {
     setValue(next);
@@ -68,16 +80,57 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
   const pressure = run?.counterpartTurn;
   const presentation = scenarioPracticePresentation(value);
   const counterpartPresentation = presentation.isAvailable ? presentation.counterpart : undefined;
+  const handleClose = useCallback((): void => {
+    if (!convertedLesson) {
+      router.back();
+      return;
+    }
+    Alert.alert(
+      "Leave this rehearsal?",
+      "Your lesson progress is saved. Your current rehearsal stays here on this device until you finish or discard it.",
+      [
+        { text: "Keep practicing", style: "cancel" },
+        { text: "Save and leave", onPress: () => router.back() },
+        { text: "Discard this rehearsal", style: "destructive", onPress: () => { void onDiscard?.(); } },
+      ],
+    );
+  }, [convertedLesson, onDiscard, router]);
   const difficultyLabel = context ? DIFFICULTY[context.difficulty].label : "";
 
   const startRecording = useCallback(async (kind: "opener" | "response" | "retry"): Promise<void> => {
-    if (!value) return;
+    if (!value || speech.phase === "speaking" || speech.phase === "generating") return;
     setDraft("");
     setError("");
     const nextState = kind === "opener" ? "listening_attempt" : kind === "response" ? "listening_response" : "listening_retry";
     await persist(transitionScenarioPracticeRun(value, nextState, Date.now()));
     await dictation.start();
-  }, [dictation, persist, value]);
+  }, [dictation, persist, speech.phase, value]);
+
+  const beginCapture = useCallback(async (kind: "opener" | "response" | "retry"): Promise<void> => {
+    if (convertedLesson && !isMicrophonePrepared) {
+      setPendingVoiceKind(kind);
+      return;
+    }
+    await startRecording(kind);
+  }, [convertedLesson, isMicrophonePrepared, startRecording]);
+
+  const allowMicrophone = useCallback(async (): Promise<void> => {
+    const kind = pendingVoiceKind;
+    if (!kind) return;
+    const granted = await dictation.requestPermission();
+    if (!granted) return;
+    setIsMicrophonePrepared(true);
+    setPendingVoiceKind(null);
+    await startRecording(kind);
+  }, [dictation, pendingVoiceKind, startRecording]);
+
+  const openTypedFallback = useCallback(async (): Promise<void> => {
+    const kind = pendingVoiceKind;
+    setPendingVoiceKind(null);
+    if (!kind) return;
+    const review = kind === "opener" ? "confirm_attempt_transcript" : kind === "response" ? "confirm_response_transcript" : "confirm_retry_transcript";
+    if (value) await persist(transitionScenarioPracticeRun(value, review, Date.now()));
+  }, [pendingVoiceKind, persist, value]);
 
   const stopRecording = useCallback(async (): Promise<void> => {
     if (!value) return;
@@ -99,27 +152,31 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
     const approved = preserveScenarioAttempt(value, "opener", draft, Date.now());
     await persist(approved);
     try {
-      const result = await nextCounterpartTurn(
+      const authoredPressure = convertedLesson?.authoredPressureText;
+      const result = authoredPressure ? null : await nextCounterpartTurn(
         scenario,
         context.difficulty,
         [turn(approved.run.attempt?.id ?? `${approved.run.id}-opener`, "user", approved.run.attempt?.transcript ?? draft.trim())],
         context.reaction,
         context.objective,
       );
+      const pressureText = authoredPressure ?? result?.reply ?? "";
+      if (!pressureText) throw new Error("Counterpart pressure is unavailable");
       const withPressure = attachScenarioCounterpartTurn(approved, {
         id: `${approved.run.id}-counterpart-turn-1`,
-        text: result.reply,
-        source: "provider",
+        text: pressureText,
+        source: authoredPressure ? "authored" : "provider",
       }, Date.now());
       setDraft("");
       await persist(transitionScenarioPracticeRun(withPressure, "ready_for_response", Date.now()));
+      await speak(pressureText, "man-adam");
     } catch {
       setError(`${context.counterpartName}'s response did not come through. Your approved transcript is saved.`);
       await persist(transitionScenarioPracticeRun(approved, "network_error", Date.now()));
     } finally {
       setBusy(false);
     }
-  }, [context, draft, persist, scenario, value]);
+  }, [context, convertedLesson, draft, persist, scenario, value]);
 
   const confirmResponse = useCallback(async (): Promise<void> => {
     if (!value || !context || !pressure || draft.trim().length < 2) return;
@@ -129,18 +186,19 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
     await persist(approved);
     try {
       const response = approved.run.responseAttempt?.transcript ?? draft.trim();
-      const generated = await generateDebrief(scenario, context.difficulty, [
+      const lessonNote = convertedLesson ? m1L1CoachNote(response) : null;
+      const generated = lessonNote ? null : await generateDebrief(scenario, context.difficulty, [
         turn(approved.run.attempt?.id ?? `${approved.run.id}-opener`, "user", approved.run.attempt?.transcript ?? ""),
         turn(pressure.id, "them", pressure.text),
         turn(approved.run.responseAttempt?.id ?? `${approved.run.id}-response`, "user", response),
       ], context.reaction, context.objective);
-      const debrief = generated.debrief;
-      const flag = debrief.flags[0];
+      const debrief = generated?.debrief;
+      const flag = debrief?.flags[0];
       const coached = attachScenarioCoaching(
         approved,
-        flag?.quote ? `In “${flag.quote},” ${flag.issue}` : debrief.headline,
-        flag?.reframe || debrief.nextRep || "Answer the same pressure again with one concrete next step.",
-        "pushback_response",
+        lessonNote ? `${lessonNote.worked} ${lessonNote.change}` : flag?.quote ? `In “${flag.quote},” ${flag.issue}` : debrief?.headline ?? "",
+        lessonNote?.retryDirection ?? flag?.reframe ?? debrief?.nextRep ?? "Answer the same pressure again with one concrete next step.",
+        convertedLesson ? "conversation_job" : "pushback_response",
         Date.now(),
       );
       setDraft("");
@@ -151,15 +209,18 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
     } finally {
       setBusy(false);
     }
-  }, [context, draft, persist, pressure, scenario, value]);
+  }, [context, convertedLesson, draft, persist, pressure, scenario, value]);
 
   const confirmRetry = useCallback(async (): Promise<void> => {
     if (!value || draft.trim().length < 2) return;
     const approved = preserveScenarioAttempt(value, "retry", draft, Date.now());
-    const compared = completeScenarioComparison(approved, Date.now());
+    const comparedBase = completeScenarioComparison(approved, Date.now());
+    const compared = convertedLesson && comparedBase.run.responseAttempt && comparedBase.run.retryAttempt
+      ? { ...comparedBase, run: { ...comparedBase.run, comparison: { behaviorId: "conversation_job" as const, text: m1L1Comparison(comparedBase.run.responseAttempt.transcript, comparedBase.run.retryAttempt.transcript), criterionChanged: false } } }
+      : comparedBase;
     setDraft("");
     await persist(compared);
-  }, [draft, persist, value]);
+  }, [convertedLesson, draft, persist, value]);
 
   const finish = useCallback(async (): Promise<void> => {
     if (!value || !context || !run?.retryAttempt || !pressure) return;
@@ -198,21 +259,24 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
 
   return <View style={styles.root}><Backdrop />
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-      <Pressable onPress={() => router.back()} style={styles.close} accessibilityRole="button" accessibilityLabel="Save and leave scenario"><X size={21} color={C.textSoft} /></Pressable>
+      <Pressable onPress={handleClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Leave rehearsal"><X size={21} color={C.textSoft} /></Pressable>
       <View style={styles.headerCopy}><Text style={styles.headerTitle}>{context.counterpartName}</Text><Text style={styles.headerMeta}>{context.counterpartRole} · {difficultyLabel}</Text></View><View style={styles.close} />
     </View>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 150 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <StatusPill label={context.category.toUpperCase()} tone="purple" /><Text style={styles.scenarioTitle}>{context.title}</Text><Text style={styles.context}>{context.situation}</Text>
         <ProductCard style={styles.identityCard}><View><SectionLabel>Counterpart</SectionLabel><Text style={styles.identityValue}>{context.counterpartLabel}</Text></View><View><SectionLabel>Objective</SectionLabel><Text style={styles.identityValue}>{context.objective}</Text></View><View><SectionLabel>Pressure level</SectionLabel><Text style={styles.identityValue}>{difficultyLabel} · {DIFFICULTY[context.difficulty].note}</Text></View></ProductCard>
+        {convertedLesson ? <Pressable onPress={onSafetyExit} style={styles.safetyExit} accessibilityRole="button"><Text style={styles.safetyExitText}>This doesn’t feel safe to practice</Text></Pressable> : null}
 
-        {state === "ready_for_attempt" ? <Reveal><Text style={styles.title}>Open the conversation with {context.counterpartName}.</Text><Text style={styles.body}>Say the first thing you want {context.counterpartRole} to hear. You will approve the transcript before {context.counterpartName} responds.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void startRecording("opener")} onType={() => void openTypedReview("confirm_attempt_transcript")} /></Reveal> : null}
+        {convertedLesson ? <ConversationThread run={run} counterpartName={context.counterpartName} /> : null}
+        {pendingVoiceKind ? <ProductCard accent style={styles.permissionCard}><SectionLabel tone={C.purple}>Use your voice for this rehearsal</SectionLabel><Text style={styles.body}>BYSI asks for microphone access only while you’re practicing. You can type this turn instead.</Text>{dictation.status === "denied" ? <><Text style={styles.title}>Microphone access is off</Text><Text style={styles.body}>Turn it on in Settings, or type this turn instead.</Text><PrimaryButton label="Open Settings" onPress={() => void Linking.openSettings()} containerStyle={styles.action} /></> : <PrimaryButton label="Allow microphone" onPress={() => void allowMicrophone()} containerStyle={styles.action} />}<Pressable onPress={() => void openTypedFallback()} style={styles.permissionSecondary}><Text style={styles.permissionSecondaryText}>Type this turn instead</Text></Pressable><Pressable onPress={() => setPendingVoiceKind(null)} style={styles.permissionSecondary}><Text style={styles.permissionSecondaryText}>Back to rehearsal</Text></Pressable></ProductCard> : null}
+        {state === "ready_for_attempt" ? <Reveal><Text style={styles.title}>Open the conversation with {context.counterpartName}.</Text><Text style={styles.body}>Say the first thing you want {context.counterpartRole} to hear. You will approve the transcript before {context.counterpartName} responds.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("opener")} onType={() => void openTypedReview("confirm_attempt_transcript")} /></Reveal> : null}
         {isListening ? <View style={styles.listening}><Text style={styles.title}>Recording your {state === "listening_attempt" ? "opening" : state === "listening_response" ? "response" : "retry"}.</Text><MicControl state="listening" level={dictation.level} onPress={() => void stopRecording()} glyph={<Square size={24} color={C.onAccent} fill={C.onAccent} />} accessibilityLabel="Done speaking" /><Text style={styles.body}>Tap when you are done. Nothing advances until you approve the transcript.</Text></View> : null}
         {showReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve your {reviewKind}.</Text>{reviewKind !== "opening" && pressure ? <CounterpartCard presentation={counterpartPresentation} /> : null}<TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel={`Edit ${reviewKind} transcript`} /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2 || busy} onPress={() => void (reviewKind === "opening" ? confirmOpening() : reviewKind === "response" ? confirmResponse() : confirmRetry())} containerStyle={styles.action} />{busy ? <ActivityIndicator color={C.purple} style={styles.busy} /> : null}</Reveal> : null}
-        {state === "ready_for_response" && pressure ? <Reveal><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Respond to the pressure.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void startRecording("response")} onType={() => void openTypedReview("confirm_response_transcript")} /></Reveal> : null}
-        {state === "hope_coaching" && pressure ? <Reveal><StatusPill label="Hope · coaching" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><ProductCard accent style={styles.coachCard}><SectionLabel tone={C.purple}>Hope noticed</SectionLabel><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Same-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={`Retry the same ${context.counterpartName} moment`} onPress={() => void persist(transitionScenarioPracticeRun(value, "ready_for_retry", Date.now()))} containerStyle={styles.action} /></Reveal> : null}
-        {state === "ready_for_retry" && pressure ? <Reveal><StatusPill label="Same-moment retry" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Answer the exact same turn again.</Text><Text style={styles.body}>{run.retryInstruction}</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void startRecording("retry")} onType={() => void openTypedReview("confirm_retry_transcript")} /></Reveal> : null}
-        {state === "attempt_comparison" && pressure && run.responseAttempt && run.retryAttempt && run.comparison ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="First approved response" text={run.responseAttempt.transcript} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label="Continue" onPress={() => void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now()))} containerStyle={styles.action} /></Reveal> : null}
+        {state === "ready_for_response" && pressure ? <Reveal><CounterpartCard presentation={counterpartPresentation} />{speech.phase === "speaking" || speech.phase === "generating" ? <Text style={styles.speaking}>{context.counterpartName} is speaking…</Text> : speech.phase === "failed" ? <PrimaryButton label="Try audio again" onPress={() => void replaySpeech()} containerStyle={styles.action} /> : null}<Text style={styles.title}>Respond to the pressure.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("response")} onType={() => void openTypedReview("confirm_response_transcript")} /></Reveal> : null}
+        {state === "hope_coaching" && pressure ? <Reveal><StatusPill label="Hope · coaching" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><ProductCard accent style={styles.coachCard}><SectionLabel tone={C.purple}>Hope noticed</SectionLabel><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Same-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={`Retry the same ${context.counterpartName} moment`} onPress={async () => { await persist(transitionScenarioPracticeRun(value, "ready_for_retry", Date.now())); await speak(pressure.text, "man-adam"); }} containerStyle={styles.action} /></Reveal> : null}
+        {state === "ready_for_retry" && pressure ? <Reveal><StatusPill label="Same-moment retry" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Answer the exact same turn again.</Text><Text style={styles.body}>{run.retryInstruction}</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("retry")} onType={() => void openTypedReview("confirm_retry_transcript")} /></Reveal> : null}
+        {state === "attempt_comparison" && pressure && run.responseAttempt && run.retryAttempt && run.comparison ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="First approved response" text={run.responseAttempt.transcript} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label="Continue" onPress={() => { if (convertedLesson && onReturnToDeck) onReturnToDeck(); else void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now())); }} containerStyle={styles.action} /></Reveal> : null}
         {state === "transfer_cue" ? <Reveal><StatusPill label="Hope · wrap-up" tone="purple" /><Text style={styles.title}>Take the clearer wording into the real conversation.</Text><Text style={styles.body}>This completion belongs to {context.title}, with {context.counterpartName} as {context.counterpartRole}. No unrelated practice fixture was used.</Text><PrimaryButton label="Complete scenario" onPress={() => void finish()} containerStyle={styles.action} /></Reveal> : null}
         {state === "complete" ? <Reveal><StatusPill label="Scenario complete" tone="green" /><Text style={styles.title}>{context.title} is complete.</Text><Text style={styles.body}>You practiced one {context.counterpartName} pressure moment twice at {difficultyLabel.toLowerCase()} difficulty.</Text><PrimaryButton label="Back to Scenarios" onPress={() => router.replace("/(tabs)/library")} containerStyle={styles.action} /></Reveal> : null}
         {state === "network_error" || state === "model_error" ? <Reveal><StatusPill label="Saved checkpoint" tone="amber" /><Text style={styles.title}>{error}</Text><PrimaryButton label="Return to this scenario" onPress={() => void persist(transitionScenarioPracticeRun(value, state === "network_error" ? "confirm_attempt_transcript" : "confirm_response_transcript", Date.now()))} containerStyle={styles.action} /></Reveal> : null}
@@ -220,6 +284,17 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
     </KeyboardAvoidingView>
     {busy ? <StateDock bottomInset={insets.bottom}><View style={styles.processing}><ActivityIndicator color={C.purple} /><Text style={styles.body}>{state === "confirm_attempt_transcript" ? `${context.counterpartName} is responding` : "Hope is reviewing your approved words"}</Text></View></StateDock> : null}
   </View>;
+}
+
+function ConversationThread({ run, counterpartName }: { run: PersistedScenarioPracticeRun["run"]; counterpartName: string }) {
+  const messages = [
+    run.attempt ? { id: run.attempt.id, speaker: "You", text: run.attempt.transcript, mine: true } : null,
+    run.counterpartTurn ? { id: run.counterpartTurn.id, speaker: counterpartName, text: run.counterpartTurn.text, mine: false } : null,
+    run.responseAttempt ? { id: run.responseAttempt.id, speaker: "You", text: run.responseAttempt.transcript, mine: true } : null,
+    run.retryAttempt ? { id: run.retryAttempt.id, speaker: "You · retry", text: run.retryAttempt.transcript, mine: true } : null,
+  ].filter((message): message is { id: string; speaker: string; text: string; mine: boolean } => Boolean(message));
+  if (messages.length === 0) return null;
+  return <View style={styles.thread}>{messages.map((message) => <View key={message.id} style={[styles.messageWrap, message.mine ? styles.messageMine : styles.messageTheirs]}><Text style={styles.messageLabel}>{message.speaker}</Text><View style={[styles.messageBubble, message.mine ? styles.bubbleMine : styles.bubbleTheirs]}><Text style={[styles.messageText, message.mine ? styles.messageTextMine : null]}>{message.text}</Text></View></View>)}</View>;
 }
 
 function CaptureActions({ value, onChange, onRecord, onType }: { value: string; onChange: (text: string) => void; onRecord: () => void; onType: () => void }) {
@@ -238,7 +313,7 @@ function Comparison({ label, text }: { label: string; text: string }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 }, center: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
   header: { minHeight: 70, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerCopy: { flex: 1, alignItems: "center" }, headerTitle: { fontFamily: font.bold, fontSize: 17, color: C.text }, headerMeta: { ...T.caption, color: C.purple, marginTop: 2 },
-  scroll: { paddingHorizontal: GUTTER, paddingTop: 12 }, scenarioTitle: { ...T.title, marginTop: 10 }, context: { ...T.support, marginTop: 7 }, identityCard: { marginTop: 16, gap: 14 }, identityValue: { ...T.support, color: C.text, marginTop: 4 },
+  scroll: { paddingHorizontal: GUTTER, paddingTop: 12 }, safetyExit: { alignSelf: "flex-start", minHeight: 44, justifyContent: "center", marginTop: 8 }, safetyExitText: { ...T.caption, color: C.clay, fontFamily: font.semi }, scenarioTitle: { ...T.title, marginTop: 10 }, context: { ...T.support, marginTop: 7 }, identityCard: { marginTop: 16, gap: 14 }, identityValue: { ...T.support, color: C.text, marginTop: 4 },
   title: { ...T.title, marginTop: 22 }, body: { ...T.support, marginTop: 8 }, action: { marginTop: 18 }, capture: { alignItems: "center", marginTop: 22 }, or: { ...T.caption, marginVertical: 16 }, input: { ...T.body, minHeight: 108, width: "100%", backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.glassEdge, borderRadius: radius.md, padding: 16, textAlignVertical: "top" },
-  listening: { alignItems: "center", gap: 20, paddingTop: 36 }, busy: { marginTop: 14 }, processing: { minHeight: 56, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 }, counterpartCard: { marginTop: 18 }, counterpartText: { ...T.body, marginTop: 10 }, continuityLabel: { ...T.caption, marginTop: 12 }, coachCard: { marginTop: 14, gap: 8 }, comparison: { marginTop: 10 },
+  listening: { alignItems: "center", gap: 20, paddingTop: 36 }, busy: { marginTop: 14 }, speaking: { ...T.caption, color: C.purple, marginTop: 10 }, thread: { marginTop: 16, gap: 12 }, messageWrap: { maxWidth: "84%" }, messageMine: { alignSelf: "flex-end", alignItems: "flex-end" }, messageTheirs: { alignSelf: "flex-start", alignItems: "flex-start" }, messageLabel: { ...T.caption, fontFamily: font.semi, marginBottom: 4 }, messageBubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 11 }, bubbleMine: { backgroundColor: C.purple }, bubbleTheirs: { backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.line }, messageText: { ...T.support, color: C.text }, messageTextMine: { color: C.onAccent }, processing: { minHeight: 56, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 }, permissionCard: { marginTop: 16 }, permissionSecondary: { minHeight: 44, alignItems: "center", justifyContent: "center" }, permissionSecondaryText: { ...T.caption, color: C.purple, fontFamily: font.semi }, counterpartCard: { marginTop: 18 }, counterpartText: { ...T.body, marginTop: 10 }, continuityLabel: { ...T.caption, marginTop: 12 }, coachCard: { marginTop: 14, gap: 8 }, comparison: { marginTop: 10 },
 });

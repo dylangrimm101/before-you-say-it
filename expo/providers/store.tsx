@@ -16,6 +16,7 @@ import {
 } from "@/lib/consent";
 import { clearLiveSessionContent } from "@/lib/ephemeral";
 import { completedReviewPracticeIds, migrateLegacyPilotProgress } from "@/lib/curriculumMigration";
+import type { ConvertedLessonProgress } from "@/lib/convertedLesson";
 import { REVIEW_CURRICULUM_VERSION, isInternalReviewModuleComplete } from "@/lib/modularCurriculum";
 import {
   activityDayKeys,
@@ -58,6 +59,7 @@ const KEYS = {
   anonymousUserId: "cc.anonymousUserId.v1",
   activePracticeSession: "cc.activePracticeSession.v1",
   activeScenarioRun: "cc.activeScenarioRun.v1",
+  convertedLessonProgress: "cc.convertedLessonProgress.v1",
   nativeJourneyStarted: "cc.nativeJourneyStarted.v1",
   /** Development-only entitlement overrides. Never read in a release build. */
   devPro: "cc.devpro.v1",
@@ -102,6 +104,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
   const [anonymousUserId, setAnonymousUserId] = useState<string>("");
   const [activePracticeSession, setActivePracticeSession] = useState<ActivePracticeSession | null>(null);
   const [activeScenarioRun, setActiveScenarioRun] = useState<PersistedScenarioPracticeRun | null>(null);
+  const [convertedLessonProgress, setConvertedLessonProgress] = useState<ConvertedLessonProgress[]>([]);
   const [nativeJourneyStarted, setNativeJourneyStarted] = useState<boolean>(false);
   const [devPro, setDevPro] = useState<boolean>(false);
   const [devForceUnpaid, setDevForceUnpaid] = useState<boolean>(false);
@@ -110,7 +113,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     let alive = true;
     const load = async () => {
       try {
-        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, journeyStarted, dp, devUnpaid] = await Promise.all([
+        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, convertedProgress, journeyStarted, dp, devUnpaid] = await Promise.all([
           AsyncStorage.getItem(KEYS.profile),
           AsyncStorage.getItem(KEYS.sessions),
           AsyncStorage.getItem(KEYS.sessionsLegacy),
@@ -125,6 +128,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           AsyncStorage.getItem(KEYS.anonymousUserId),
           AsyncStorage.getItem(KEYS.activePracticeSession),
           AsyncStorage.getItem(KEYS.activeScenarioRun),
+          AsyncStorage.getItem(KEYS.convertedLessonProgress),
           AsyncStorage.getItem(KEYS.nativeJourneyStarted),
           __DEV__ ? AsyncStorage.getItem(KEYS.devPro) : Promise.resolve(null),
           __DEV__ ? AsyncStorage.getItem(KEYS.devForceUnpaid) : Promise.resolve(null),
@@ -141,6 +145,10 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           const normalizedScenarioRun = normalizeScenarioPracticeRun(JSON.parse(scenarioRun) as unknown);
           setActiveScenarioRun(normalizedScenarioRun);
           if (!normalizedScenarioRun) await AsyncStorage.removeItem(KEYS.activeScenarioRun);
+        }
+        if (convertedProgress) {
+          const parsedConvertedProgress = JSON.parse(convertedProgress) as unknown;
+          if (Array.isArray(parsedConvertedProgress)) setConvertedLessonProgress(parsedConvertedProgress as ConvertedLessonProgress[]);
         }
         if (practiceSession) {
           const normalized = normalizePracticeSession(JSON.parse(practiceSession) as unknown);
@@ -346,6 +354,13 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     }
   }, []);
 
+  /** Atomically commits scoreless converted-lesson progress after every completion requirement is met. */
+  const commitConvertedLessonProgress = useCallback(async (record: ConvertedLessonProgress): Promise<void> => {
+    const next = [...convertedLessonProgress.filter((item) => item.practiceId !== record.practiceId), record];
+    await AsyncStorage.setItem(KEYS.convertedLessonProgress, JSON.stringify(next));
+    setConvertedLessonProgress(next);
+  }, [convertedLessonProgress]);
+
   /** Attach the active anonymous session when an account identity becomes available. */
   const associateActivePracticeSessionWithUser = useCallback(async (userId: string): Promise<void> => {
     if (!activePracticeSession) return;
@@ -513,6 +528,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     setScoredPracticeHistory([]);
     setActivePracticeSession(null);
     setActiveScenarioRun(null);
+    setConvertedLessonProgress([]);
     setNativeJourneyStarted(false);
     clearLiveSessionContent();
     cancelDailyReminder().catch(() => {});
@@ -533,6 +549,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         KEYS.scoredPracticeHistory,
         KEYS.activePracticeSession,
         KEYS.activeScenarioRun,
+        KEYS.convertedLessonProgress,
         KEYS.nativeJourneyStarted,
         KEYS.anonymousUserId,
         KEYS.devPro,
@@ -811,10 +828,12 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     anonymousUserId,
     activePracticeSession,
     activeScenarioRun,
+    convertedLessonProgress,
     nativeJourneyStarted,
     beginNativeJourney,
     saveActivePracticeSession,
     saveActiveScenarioRun,
+    commitConvertedLessonProgress,
     associateActivePracticeSessionWithUser,
     currentPilotDay,
     markPilotDayDone,

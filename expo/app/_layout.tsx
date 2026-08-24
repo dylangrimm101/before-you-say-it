@@ -113,6 +113,7 @@ function RootLayoutNav() {
         <Stack.Screen name="qa-access" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="approved-lessons" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="approved-lesson/[lessonId]" options={{ animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="approved-rehearsal/[lessonId]" options={{ animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="privacy" />
         <Stack.Screen name="safety" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
         <Stack.Screen name="internal-review-evidence" options={{ animation: "fade" }} />

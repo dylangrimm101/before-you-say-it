@@ -122,7 +122,9 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(catalogScreen).toContain("if (!__DEV__)");
     expect(deckScreen).toContain("if (!__DEV__)");
     expect(qa).toContain('router.push("/approved-lessons")');
-    expect(deckScreen).toContain('var blockedLabels = ["start rehearsal", "start voice rehearsal", "continue lesson preview"]');
+    expect(deckScreen).toContain('var blockedLabels = ${isConverted ? "[]"');
+    expect(deckScreen).toContain('["start rehearsal", "start voice rehearsal", "continue lesson preview"]');
+    expect(deckScreen).toContain("conversionRuntimeEnabled(params.lessonId)");
   });
 
   test("keeps the new deck review isolated from purchases, persistence, and legacy scores", async () => {

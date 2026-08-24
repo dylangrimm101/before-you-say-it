@@ -53,10 +53,63 @@ export function authorizedDeckHtml(rawHtml: string, reviewThroughCard: number): 
   return `${rawHtml.slice(0, templateMatch.index)}${rawHtml.slice(templateMatch.index).replace(encodedTemplate, encoded)}`;
 }
 
-/** Downloads the approved handoff once and returns only the authorized lesson slice. */
-export async function loadApprovedDeckHtml(archivePath: string, reviewThroughCard: number): Promise<string> {
+function replaceEncodedTemplate(rawHtml: string, transform: (template: string) => string): string {
+  const templateMatch = rawHtml.match(TEMPLATE_PATTERN);
+  const encodedTemplate = templateMatch?.[1];
+  if (!templateMatch || !encodedTemplate) throw new Error("Approved lesson template is missing");
+  const template = transform(JSON.parse(encodedTemplate) as string);
+  const encoded = JSON.stringify(template).replace(/<\//g, "<\\u002F");
+  return `${rawHtml.slice(0, templateMatch.index)}${rawHtml.slice(templateMatch.index).replace(encodedTemplate, encoded)}`;
+}
+
+function sliceCards(template: string, throughCard: number): string {
+  const cardsStart = template.indexOf("const CARDS = [");
+  const cardsEnd = template.indexOf("\n];", cardsStart);
+  const deferredCardStart = template.indexOf(`{ n:${throughCard + 1}, type:`, cardsStart);
+  if (cardsStart < 0 || cardsEnd < 0 || deferredCardStart < 0 || deferredCardStart >= cardsEnd) {
+    throw new Error("Converted lesson boundary could not be verified");
+  }
+  return `${template.slice(0, deferredCardStart)}${template.slice(cardsEnd)}`;
+}
+
+/** Converts M1 L1's approved handoff action into the fail-closed native QA runtime launch. */
+export function convertedHandoffDeckHtml(rawHtml: string, handoffCard: number): string {
+  return replaceEncodedTemplate(rawHtml, (source) => {
+    const sliced = sliceCards(source, handoffCard);
+    const converted = sliced.replace(
+      /openHandoff:\(\) => \{.*?\},\s*handoffContinue:/s,
+      `openHandoff:() => { window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type:'start-rehearsal' })); }, handoffContinue:`,
+    );
+    if (converted === sliced) throw new Error("Converted lesson handoff could not be installed");
+    return converted;
+  });
+}
+
+/** Opens the authoritative post-rehearsal cards at the manifest-defined return destination. */
+export function returnedDeckHtml(rawHtml: string, returnCard: number): string {
+  return replaceEncodedTemplate(rawHtml, (source) => {
+    const marker = "state = { i:0,";
+    if (!source.includes(marker)) throw new Error("Approved lesson return state is missing");
+    return source.replace(marker, `state = { i:${returnCard - 1},`);
+  });
+}
+
+async function approvedDeckSource(archivePath: string): Promise<string> {
   const archive = await approvedArchive();
   const bytes = archive[archivePath];
   if (!bytes) throw new Error("Approved lesson file is missing from the handoff");
-  return authorizedDeckHtml(strFromU8(bytes), reviewThroughCard);
+  return strFromU8(bytes);
+}
+
+/** Downloads the approved handoff once and returns only the authorized lesson slice. */
+export async function loadApprovedDeckHtml(archivePath: string, reviewThroughCard: number): Promise<string> {
+  return authorizedDeckHtml(await approvedDeckSource(archivePath), reviewThroughCard);
+}
+
+export async function loadConvertedHandoffDeckHtml(archivePath: string, handoffCard: number): Promise<string> {
+  return convertedHandoffDeckHtml(await approvedDeckSource(archivePath), handoffCard);
+}
+
+export async function loadReturnedDeckHtml(archivePath: string, returnCard: number): Promise<string> {
+  return returnedDeckHtml(await approvedDeckSource(archivePath), returnCard);
 }
