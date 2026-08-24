@@ -1,0 +1,997 @@
+diff --git a/expo/__tests__/approvedLessonDecks.test.ts b/expo/__tests__/approvedLessonDecks.test.ts
+index 9d0f36c..2bb6044 100644
+--- a/expo/__tests__/approvedLessonDecks.test.ts
++++ b/expo/__tests__/approvedLessonDecks.test.ts
+@@ -122,7 +122,9 @@ describe("approved Modules 1 and 2 internal deck port", () => {
+     expect(catalogScreen).toContain("if (!__DEV__)");
+     expect(deckScreen).toContain("if (!__DEV__)");
+     expect(qa).toContain('router.push("/approved-lessons")');
+-    expect(deckScreen).toContain('var blockedLabels = ["start rehearsal", "start voice rehearsal", "continue lesson preview"]');
++    expect(deckScreen).toContain('var blockedLabels = ${isConverted ? "[]"');
++    expect(deckScreen).toContain('["start rehearsal", "start voice rehearsal", "continue lesson preview"]');
++    expect(deckScreen).toContain("conversionRuntimeEnabled(params.lessonId)");
+   });
+ 
+   test("keeps the new deck review isolated from purchases, persistence, and legacy scores", async () => {
+diff --git a/expo/__tests__/convertedLesson.test.ts b/expo/__tests__/convertedLesson.test.ts
+new file mode 100644
+index 0000000..1ca5756
+--- /dev/null
++++ b/expo/__tests__/convertedLesson.test.ts
+@@ -0,0 +1,119 @@
++import { describe, expect, test } from "bun:test";
++import { readFile } from "node:fs/promises";
++import path from "node:path";
++
++import { convertedHandoffDeckHtml, returnedDeckHtml } from "@/lib/approvedDeckLoader";
++import { M1_L1_CONVERSION, m1L1CoachNote, m1L1Comparison } from "@/lib/convertedLesson";
++import {
++  attachScenarioCoaching,
++  attachScenarioCounterpartTurn,
++  completeScenarioComparison,
++  createScenarioPracticeRun,
++  preserveScenarioAttempt,
++} from "@/lib/scenarioPractice";
++
++const ROOT = path.resolve(import.meta.dir, "..");
++
++function source(relativePath: string): Promise<string> {
++  return readFile(path.join(ROOT, relativePath), "utf8");
++}
++
++function fixtureDeck(): string {
++  const template = `const CARDS = [
++  { n:20, type:'Rehearsal handoff' },
++  { n:21, type:'Saved move' },
++  { n:22, type:'Transfer cue' }
++];
++class Component {
++  state = { i:0, picks:{} };
++  view() { return { openHandoff:() => { this.setState({ handoffOpen:true }); }, handoffContinue:() => {} }; }
++}`;
++  return `<html><script type="__bundler/template">${JSON.stringify(template)}</script></html>`;
++}
++
++describe("M1 L1 conversion vertical slice", () => {
++  test("binds stable manifest identity and deck-relative return cards", () => {
++    expect(M1_L1_CONVERSION.practiceId).toBe("gtp_conversation_job");
++    expect(M1_L1_CONVERSION.contentVersion).toBe("m1-l1-v2.1-2026-08-24");
++    expect(M1_L1_CONVERSION.rehearsalHandoffCard).toBe(20);
++    expect(M1_L1_CONVERSION.returnCard).toBe(21);
++    expect(M1_L1_CONVERSION.completionCard).toBe(22);
++    expect(M1_L1_CONVERSION.launchEligible).toBe(false);
++  });
++
++  test("converts the handoff without packaging post-rehearsal cards early", () => {
++    const html = convertedHandoffDeckHtml(fixtureDeck(), 20);
++    expect(html).toContain("start-rehearsal");
++    expect(html).not.toContain("{ n:21, type:");
++    expect(html).not.toContain("{ n:22, type:");
++  });
++
++  test("returns to the exact manifest card after a real rehearsal", () => {
++    const html = returnedDeckHtml(fixtureDeck(), M1_L1_CONVERSION.returnCard);
++    expect(html).toContain("state = { i:20,");
++    expect(html).toContain("{ n:21, type:'Saved move' }");
++    expect(html).toContain("{ n:22, type:'Transfer cue' }");
++  });
++
++  test("persists and reuses the exact authored pressure turn for retry", () => {
++    let value = createScenarioPracticeRun(M1_L1_CONVERSION.scenario, "steady", "defensive", "run-1", 1);
++    value = { ...value, run: { ...value.run, practiceId: M1_L1_CONVERSION.practiceId, contentVersion: M1_L1_CONVERSION.contentVersion } };
++    value = preserveScenarioAttempt(value, "opener", "I want to change how we split bedtime.", 2);
++    value = attachScenarioCounterpartTurn(value, { id: "pressure-1", text: M1_L1_CONVERSION.authoredPressureText, source: "authored" }, 3);
++    value = preserveScenarioAttempt(value, "response", "The last three nights I did bedtime alone.", 4);
++    value = attachScenarioCoaching(value, "One observable note.", M1_L1_CONVERSION.retryDirection, "conversation_job", 5);
++    value = preserveScenarioAttempt(value, "retry", "Bedtime is the point. I did the last three nights. Can you take Tuesday and Thursday?", 6);
++    value = completeScenarioComparison(value, 7);
++
++    expect(value.run.counterpartTurn?.text).toBe("You're acting like this happens all the time.");
++    expect(value.run.adamReactionId).toBe("pressure-1");
++    expect(value.run.retryAttempt?.transcript).toContain("Bedtime is the point");
++    expect(JSON.stringify(value)).not.toMatch(/"scores?"|communicationIndex|xp|streak/i);
++  });
++
++  test("keeps Hope feedback transcript-grounded, single-behavior, and bounded", () => {
++    const transcript = "I want to keep this on bedtime. I handled the last three nights. Can you take Tuesday and Thursday?";
++    const note = m1L1CoachNote(transcript);
++    expect(note).not.toBeNull();
++    expect(transcript).toContain(note?.evidenceQuote ?? "missing");
++    expect(note?.coachedBehaviorId).toBe("conversation_job");
++    expect(`${note?.worked} ${note?.change}`.trim().split(/\s+/).length).toBeLessThanOrEqual(32);
++    expect(note?.retryDirection.trim().split(/\s+/).length).toBeLessThanOrEqual(20);
++    expect(`${note?.worked} ${note?.change} ${note?.retryDirection}`.trim().split(/\s+/).length).toBeLessThanOrEqual(48);
++  });
++
++  test("compares only concrete opening wording without producing a score", () => {
++    const comparison = m1L1Comparison(
++      "I know this is complicated, but I wanted to discuss bedtime and a lot of other things.",
++      "I want to change how we split bedtime. Can you take Tuesday and Thursday?",
++    );
++    expect(comparison.split(/\s+/).length).toBeLessThanOrEqual(36);
++    expect(comparison).toContain("First attempt began");
++    expect(comparison).toContain("Retry began");
++    expect(comparison).not.toMatch(/score|percent|grade|improved/i);
++  });
++
++  test("keeps safety answers ephemeral and completion separate from legacy scores", async () => {
++    const route = await source("app/approved-rehearsal/[lessonId].tsx");
++    const store = await source("providers/store.tsx");
++    const deck = await source("app/approved-lesson/[lessonId].tsx");
++    expect(route).toContain("I'm not sure.");
++    expect(route).toContain("A DIFFERENT ROUTE MAY FIT BETTER");
++    expect(route).not.toContain("safetyAnswer");
++    expect(store).toContain('convertedLessonProgress: "cc.convertedLessonProgress.v1"');
++    expect(store).toContain("commitConvertedLessonProgress");
++    expect(deck).toContain("saveActiveScenarioRun(null)");
++    expect(deck).not.toContain("saveScoredPracticeRecord");
++  });
++
++  test("implements explicit transcript approval, typed fallback, TTS, and cleanup", async () => {
++    const practice = await source("components/ScenarioPaidPractice.tsx");
++    expect(practice).toContain("Use your voice for this rehearsal");
++    expect(practice).toContain("Type this turn instead");
++    expect(practice).toContain("Approve this transcript");
++    expect(practice).toContain("await speak(pressureText, \"man-adam\")");
++    expect(practice).toContain("await speak(pressure.text, \"man-adam\")");
++    expect(practice).toContain("resetSpeech().catch");
++    expect(practice).toContain("This doesn’t feel safe to practice");
++  });
++});
+diff --git a/expo/app/_layout.tsx b/expo/app/_layout.tsx
+index 5a11e0d..7ef75e2 100644
+--- a/expo/app/_layout.tsx
++++ b/expo/app/_layout.tsx
+@@ -113,6 +113,7 @@ function RootLayoutNav() {
+         <Stack.Screen name="qa-access" options={{ animation: "slide_from_bottom" }} />
+         <Stack.Screen name="approved-lessons" options={{ animation: "slide_from_right" }} />
+         <Stack.Screen name="approved-lesson/[lessonId]" options={{ animation: "fade", gestureEnabled: false }} />
++        <Stack.Screen name="approved-rehearsal/[lessonId]" options={{ animation: "fade", gestureEnabled: false }} />
+         <Stack.Screen name="privacy" />
+         <Stack.Screen name="safety" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
+         <Stack.Screen name="internal-review-evidence" options={{ animation: "fade" }} />
+diff --git a/expo/app/approved-lesson/[lessonId].tsx b/expo/app/approved-lesson/[lessonId].tsx
+index 056d979..2f405f1 100644
+--- a/expo/app/approved-lesson/[lessonId].tsx
++++ b/expo/app/approved-lesson/[lessonId].tsx
+@@ -1,21 +1,28 @@
+ import { useLocalSearchParams, useRouter } from "expo-router";
+ import { ArrowLeft, ShieldCheck } from "lucide-react-native";
+-import React, { useEffect, useMemo, useState } from "react";
+-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
++import React, { useCallback, useEffect, useMemo, useState } from "react";
++import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+ import { useSafeAreaInsets } from "react-native-safe-area-context";
+ import { WebView } from "react-native-webview";
+ 
+ import { approvedLessonDeck } from "@/constants/approvedLessons";
+ import { C, GUTTER, T, font, shadow } from "@/constants/theme";
+-import { loadApprovedDeckHtml } from "@/lib/approvedDeckLoader";
++import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
++import { conversionRuntimeEnabled, M1_L1_CONVERSION, type TransferChoice } from "@/lib/convertedLesson";
+ import { errorShape, safeLog } from "@/lib/redact";
++import { useStore } from "@/providers/store";
+ 
+ /** Renders an approved source deck behind a strict internal-review boundary. */
+ export default function ApprovedLessonDeckScreen() {
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+-  const params = useLocalSearchParams<{ lessonId?: string }>();
++  const params = useLocalSearchParams<{ lessonId?: string; returnFromRehearsal?: string }>();
+   const lesson = approvedLessonDeck(params.lessonId);
++  const { activeScenarioRun, commitConvertedLessonProgress, saveActiveScenarioRun } = useStore();
++  const isConverted = conversionRuntimeEnabled(params.lessonId);
++  const isReturning = isConverted && params.returnFromRehearsal === "1";
++  const [savedMoveHandled, setSavedMoveHandled] = useState<boolean>(false);
++  const [completionCommitted, setCompletionCommitted] = useState<boolean>(false);
+   const [deckHtml, setDeckHtml] = useState<string | null>(null);
+   const [loadError, setLoadError] = useState<boolean>(false);
+ 
+@@ -25,14 +32,18 @@ export default function ApprovedLessonDeckScreen() {
+     setLoadError(false);
+     if (!__DEV__ || !lesson) return () => { isActive = false; };
+ 
+-    loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard)
+-      .then((html) => { if (isActive) setDeckHtml(html); })
++    const loader = isReturning
++      ? loadReturnedDeckHtml(lesson.archivePath, M1_L1_CONVERSION.returnCard)
++      : isConverted
++        ? loadConvertedHandoffDeckHtml(lesson.archivePath, M1_L1_CONVERSION.rehearsalHandoffCard)
++        : loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard);
++    loader.then((html) => { if (isActive) setDeckHtml(html); })
+       .catch((error: unknown) => {
+         safeLog("[approved-lessons] approved archive failed", errorShape(error));
+         if (isActive) setLoadError(true);
+       });
+     return () => { isActive = false; };
+-  }, [lesson]);
++  }, [isConverted, isReturning, lesson]);
+ 
+   const reviewGuard = useMemo(() => {
+     if (!lesson) return "true;";
+@@ -44,7 +55,7 @@ export default function ApprovedLessonDeckScreen() {
+         var boundary = ${boundary};
+         var total = ${total};
+         var stopDeckNavigation = ${shouldStopDeckNavigation ? "true" : "false"};
+-        var blockedLabels = ["start rehearsal", "start voice rehearsal", "continue lesson preview"];
++        var blockedLabels = ${isConverted ? "[]" : '["start rehearsal", "start voice rehearsal", "continue lesson preview"]'};
+         function textOf(node) {
+           return String(node && (node.innerText || node.textContent) || "").trim().toLowerCase();
+         }
+@@ -52,7 +63,7 @@ export default function ApprovedLessonDeckScreen() {
+           var counters = Array.prototype.slice.call(document.querySelectorAll("[data-tnum]"));
+           for (var i = 0; i < counters.length; i += 1) {
+             var value = textOf(counters[i]);
+-            if (value === boundary + " / " + total) return value;
++            if (value.match(new RegExp("^\\\\d+ / " + total + "$"))) return value;
+           }
+           return "";
+         }
+@@ -115,6 +126,15 @@ export default function ApprovedLessonDeckScreen() {
+               return false;
+             }
+           }
++          if (${isReturning ? "true" : "false"}) {
++            window.setTimeout(function () {
++              var counter = currentCounter();
++              var message = null;
++              if (counter === "21 / 22" && document.body.innerText.indexOf("___") < 0) message = { type:"saved-move-handled" };
++              if (counter === "22 / 22" && ["say it", "write it", "save it for later"].indexOf(label) >= 0) message = { type:"transfer-selected", label:label };
++              if (message && window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(message));
++            }, 80);
++          }
+           return true;
+         }, true);
+         function enforce() {
+@@ -128,7 +148,50 @@ export default function ApprovedLessonDeckScreen() {
+       })();
+       true;
+     `;
+-  }, [lesson]);
++  }, [isConverted, isReturning, lesson]);
++
++  const handleDeckMessage = useCallback(async (raw: string): Promise<void> => {
++    let message: { type?: unknown; label?: unknown };
++    try {
++      message = JSON.parse(raw) as { type?: unknown; label?: unknown };
++    } catch {
++      return;
++    }
++    if (message.type === "start-rehearsal" && isConverted && !isReturning) {
++      router.push({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: M1_L1_CONVERSION.lessonId } });
++      return;
++    }
++    if (message.type === "saved-move-handled" && isReturning) {
++      setSavedMoveHandled(true);
++      return;
++    }
++    if (message.type !== "transfer-selected" || !isReturning || completionCommitted) return;
++    const transferByLabel: Record<string, TransferChoice> = { "say it": "say", "write it": "write", "save it for later": "save_later" };
++    const transferChoice = typeof message.label === "string" ? transferByLabel[message.label] : undefined;
++    const run = activeScenarioRun?.run;
++    if (!transferChoice || !savedMoveHandled || !run?.retryAttempt || !run.comparison) return;
++    try {
++      await commitConvertedLessonProgress({
++        lessonId: M1_L1_CONVERSION.lessonId,
++        practiceId: M1_L1_CONVERSION.practiceId,
++        contentVersion: M1_L1_CONVERSION.contentVersion,
++        lessonCardCheckpoint: M1_L1_CONVERSION.completionCard,
++        quizGatesCompleted: true,
++        rehearsalCompleted: true,
++        retryCompleted: true,
++        comparisonViewed: true,
++        savedMoveId: M1_L1_CONVERSION.namedMoveId,
++        transferChoice,
++        completedAt: Date.now(),
++        sourceLineage: "approved-html-deck",
++      });
++      await saveActiveScenarioRun(null);
++      setCompletionCommitted(true);
++    } catch (error: unknown) {
++      safeLog("[converted-lesson] progress commit failed", errorShape(error));
++      Alert.alert("We couldn’t save your progress", "Stay on this screen and try again.");
++    }
++  }, [activeScenarioRun?.run, commitConvertedLessonProgress, completionCommitted, isConverted, isReturning, router, saveActiveScenarioRun, savedMoveHandled]);
+ 
+   if (!__DEV__) {
+     return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
+@@ -150,6 +213,7 @@ export default function ApprovedLessonDeckScreen() {
+           injectedJavaScriptBeforeContentLoaded={reviewGuard}
+           setSupportMultipleWindows={false}
+           onShouldStartLoadWithRequest={(request) => request.url.startsWith("blob:") || request.url.startsWith("about:blank")}
++          onMessage={(event) => { void handleDeckMessage(event.nativeEvent.data); }}
+           onError={(event) => {
+             safeLog("[approved-lessons] webview failed", { code: event.nativeEvent.code, description: event.nativeEvent.description });
+             setLoadError(true);
+@@ -170,7 +234,7 @@ export default function ApprovedLessonDeckScreen() {
+         <ArrowLeft size={20} color={C.text} />
+       </Pressable>
+       <View pointerEvents="none" style={[styles.qaBadge, { top: insets.top + 9 }]}>
+-        <Text style={styles.qaBadgeText}>INTERNAL QA</Text>
++        <Text style={styles.qaBadgeText}>{completionCommitted ? "PRACTICE COMPLETE" : isReturning ? "REHEARSAL COMPLETE" : "INTERNAL QA"}</Text>
+       </View>
+     </View>
+   );
+diff --git a/expo/app/approved-rehearsal/[lessonId].tsx b/expo/app/approved-rehearsal/[lessonId].tsx
+new file mode 100644
+index 0000000..1089cbf
+--- /dev/null
++++ b/expo/app/approved-rehearsal/[lessonId].tsx
+@@ -0,0 +1,132 @@
++import { useLocalSearchParams, useRouter } from "expo-router";
++import { ArrowLeft, ShieldCheck } from "lucide-react-native";
++import React, { useCallback, useMemo, useState } from "react";
++import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
++import { useSafeAreaInsets } from "react-native-safe-area-context";
++
++import { ScenarioPaidPractice } from "@/components/ScenarioPaidPractice";
++import { Backdrop, GlassCard, PrimaryButton } from "@/components/ui";
++import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
++import { conversionRuntimeEnabled, M1_L1_CONVERSION } from "@/lib/convertedLesson";
++import { createScenarioPracticeRun } from "@/lib/scenarioPractice";
++import { useStore } from "@/providers/store";
++
++export default function ApprovedRehearsalRoute(): React.JSX.Element {
++  const params = useLocalSearchParams<{ lessonId?: string }>();
++  const router = useRouter();
++  const insets = useSafeAreaInsets();
++  const { activeScenarioRun, saveActiveScenarioRun } = useStore();
++  const isAvailable = conversionRuntimeEnabled(params.lessonId);
++  const resumable = isAvailable
++    && activeScenarioRun?.run.practiceId === M1_L1_CONVERSION.practiceId
++    && activeScenarioRun.run.contentVersion === M1_L1_CONVERSION.contentVersion
++    && activeScenarioRun.run.state !== "complete";
++  const hasVersionMismatch = isAvailable
++    && activeScenarioRun?.run.practiceId === M1_L1_CONVERSION.practiceId
++    && activeScenarioRun.run.contentVersion !== M1_L1_CONVERSION.contentVersion;
++  const [step, setStep] = useState<"safety" | "different-route" | "scene" | "runtime">(resumable ? "runtime" : "safety");
++
++  const startRuntime = useCallback(async (): Promise<void> => {
++    if (!isAvailable) return;
++    if (!resumable) {
++      const created = createScenarioPracticeRun(M1_L1_CONVERSION.scenario, "steady", "defensive", `lesson-${M1_L1_CONVERSION.lessonId}-${Date.now().toString(36)}`);
++      await saveActiveScenarioRun({
++        ...created,
++        run: {
++          ...created.run,
++          moduleId: "get_to_the_point",
++          practiceId: M1_L1_CONVERSION.practiceId,
++          contentVersion: M1_L1_CONVERSION.contentVersion,
++        },
++      });
++    }
++    setStep("runtime");
++  }, [isAvailable, resumable, saveActiveScenarioRun]);
++
++  const runtimeKey = useMemo(() => activeScenarioRun?.run.id ?? "new-run", [activeScenarioRun?.run.id]);
++
++  if (!isAvailable) return <Unavailable />;
++  if (step === "runtime") {
++    return (
++      <ScenarioPaidPractice
++        key={runtimeKey}
++        scenario={M1_L1_CONVERSION.scenario}
++        requestedRunId={activeScenarioRun?.run.id}
++        convertedLesson={M1_L1_CONVERSION}
++        onReturnToDeck={() => router.replace({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: M1_L1_CONVERSION.lessonId, returnFromRehearsal: "1" } })}
++        onDiscard={async () => { await saveActiveScenarioRun(null); router.back(); }}
++        onSafetyExit={() => setStep("different-route")}
++      />
++    );
++  }
++
++  return (
++    <View style={styles.root}>
++      <Backdrop />
++      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
++        <Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to lesson">
++          <ArrowLeft size={21} color={C.text} />
++        </Pressable>
++        <Text style={styles.headerTitle}>Internal rehearsal QA</Text>
++        <View style={styles.back} />
++      </View>
++      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 30 }]} showsVerticalScrollIndicator={false}>
++        {hasVersionMismatch ? (
++          <GlassCard style={styles.card}>
++            <Text style={styles.eyebrow}>CONTENT UPDATED</Text>
++            <Text style={styles.title}>Restart on the current lesson version.</Text>
++            <Text style={styles.body}>This saved rehearsal belongs to different lesson content. It will not be combined with the current pressure turn or coaching rule.</Text>
++            <PrimaryButton label="Discard old run and restart" onPress={async () => { await saveActiveScenarioRun(null); setStep("safety"); }} containerStyle={styles.action} />
++          </GlassCard>
++        ) : step === "safety" ? (
++          <GlassCard style={styles.card}>
++            <Text style={styles.eyebrow}>BEFORE YOU PRACTICE</Text>
++            <Text style={styles.title}>Is there any reason bringing this up directly could put you at risk, lead to retaliation, or make the situation less safe?</Text>
++            <Choice label="No. Direct conversation feels appropriate." onPress={() => setStep("scene")} />
++            <Choice label="I'm not sure." onPress={() => setStep("different-route")} />
++            <Choice label="Yes." onPress={() => setStep("different-route")} />
++            <Choice label="I'd rather not answer." onPress={() => router.back()} />
++          </GlassCard>
++        ) : step === "different-route" ? (
++          <GlassCard style={styles.card}>
++            <ShieldCheck size={28} color={C.sage} />
++            <Text style={styles.eyebrow}>A DIFFERENT ROUTE MAY FIT BETTER</Text>
++            <Text style={styles.title}>You do not have to practice a direct conversation first.</Text>
++            <Text style={styles.body}>You can review support, documentation, reporting, or safety options instead.</Text>
++            <PrimaryButton label="See other options" onPress={() => router.push("/safety")} containerStyle={styles.action} />
++            <Choice label="Return to the lesson" onPress={() => router.back()} />
++            <Choice label="Leave this practice" onPress={() => router.replace("/(tabs)")} />
++          </GlassCard>
++        ) : (
++          <GlassCard style={styles.card}>
++            <Text style={styles.eyebrow}>THE SCENE</Text>
++            <Text style={styles.title}>{M1_L1_CONVERSION.title}</Text>
++            <Text style={styles.body}>Sunday evening, kitchen. Dishes done, kid finally asleep. You’ve wanted to say this for two weeks. Your partner is on the couch, half looking at their phone. Not hostile. Tired.</Text>
++            <View style={styles.sceneInset}>
++              <Text style={styles.sceneLabel}>WHAT HAPPENS</Text>
++              <Text style={styles.body}>You open. Adam pushes back twice. The second one is “You’re acting like this happens all the time.” Then Hope names one change and hands the same moment back to you.</Text>
++            </View>
++            <PrimaryButton label="Start rehearsal" onPress={() => void startRuntime()} containerStyle={styles.action} />
++            <Choice label="Not now" onPress={() => router.back()} />
++          </GlassCard>
++        )}
++      </ScrollView>
++    </View>
++  );
++}
++
++function Choice({ label, onPress }: { label: string; onPress: () => void }): React.JSX.Element {
++  return <Pressable onPress={onPress} style={styles.choice} accessibilityRole="button"><Text style={styles.choiceText}>{label}</Text></Pressable>;
++}
++
++function Unavailable(): React.JSX.Element {
++  return <View style={[styles.root, styles.unavailable]}><ShieldCheck size={30} color={C.sage} /><Text style={styles.title}>This rehearsal is unavailable.</Text><Text style={styles.body}>The converted lesson runtime is restricted to internal development QA.</Text></View>;
++}
++
++const styles = StyleSheet.create({
++  root: { flex: 1, backgroundColor: C.bg }, unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
++  header: { minHeight: 68, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, back: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerTitle: { flex: 1, textAlign: "center", fontFamily: font.bold, fontSize: 16, color: C.text },
++  scroll: { paddingHorizontal: GUTTER, paddingTop: 16 }, card: { padding: 20, gap: 14 }, eyebrow: { ...eyebrow, color: C.purple }, title: { ...T.title }, body: { ...T.support }, action: { marginTop: 4 },
++  choice: { minHeight: 52, borderRadius: radius.md, borderWidth: 1, borderColor: C.line, backgroundColor: C.surfaceHigh, paddingHorizontal: 16, justifyContent: "center" }, choiceText: { ...T.support, color: C.text, fontFamily: font.medium },
++  sceneInset: { padding: 16, borderRadius: radius.md, backgroundColor: C.purpleSoft, gap: 7 }, sceneLabel: { ...eyebrow, color: C.purple },
++});
+diff --git a/expo/components/ScenarioPaidPractice.tsx b/expo/components/ScenarioPaidPractice.tsx
+index 5174afa..b3e3eb2 100644
+--- a/expo/components/ScenarioPaidPractice.tsx
++++ b/expo/components/ScenarioPaidPractice.tsx
+@@ -1,7 +1,7 @@
+ import { useRouter } from "expo-router";
+ import { Mic, Square, X } from "lucide-react-native";
+ import React, { useCallback, useEffect, useState } from "react";
+-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
++import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+ import { useSafeAreaInsets } from "react-native-safe-area-context";
+ 
+ import { ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
+@@ -9,6 +9,7 @@ import { Backdrop, MicControl, PrimaryButton, Reveal, StateDock } from "@/compon
+ import { DIFFICULTY } from "@/constants/scenarios";
+ import { C, GUTTER, T, font, radius } from "@/constants/theme";
+ import { generateDebrief, nextCounterpartTurn } from "@/lib/ai";
++import { m1L1CoachNote, m1L1Comparison, type ConvertedLessonConfig } from "@/lib/convertedLesson";
+ import {
+   attachScenarioCoaching,
+   attachScenarioCounterpartTurn,
+@@ -21,6 +22,7 @@ import {
+   type ScenarioCounterpartPresentation,
+ } from "@/lib/scenarioPractice";
+ import { useDictation } from "@/lib/useDictation";
++import { replaySpeech, resetSpeech, speak, useSpeech } from "@/lib/voice";
+ import { useStore } from "@/providers/store";
+ import type { Scenario, Turn } from "@/types/convo";
+ import { SESSION_SCHEMA_VERSION, type SessionRecord } from "@/types/privacy";
+@@ -28,6 +30,10 @@ import { SESSION_SCHEMA_VERSION, type SessionRecord } from "@/types/privacy";
+ interface ScenarioPaidPracticeProps {
+   scenario: Scenario;
+   requestedRunId?: string;
++  convertedLesson?: ConvertedLessonConfig;
++  onReturnToDeck?: () => void;
++  onDiscard?: () => Promise<void>;
++  onSafetyExit?: () => void;
+ }
+ 
+ function turn(id: string, role: Turn["role"], text: string): Turn {
+@@ -35,7 +41,7 @@ function turn(id: string, role: Turn["role"], text: string): Turn {
+ }
+ 
+ /** Scenario entry surface backed by the same PilotDayRun transitions and immutable attempts as paid modules. */
+-export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidPracticeProps) {
++export function ScenarioPaidPractice({ scenario, requestedRunId, convertedLesson, onReturnToDeck, onDiscard, onSafetyExit }: ScenarioPaidPracticeProps) {
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+   const { activeScenarioRun, saveActiveScenarioRun, upsertSession } = useStore();
+@@ -52,10 +58,16 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
+   });
+   const [busy, setBusy] = useState<boolean>(false);
+   const [error, setError] = useState<string>("");
++  const [pendingVoiceKind, setPendingVoiceKind] = useState<"opener" | "response" | "retry" | null>(null);
++  const [isMicrophonePrepared, setIsMicrophonePrepared] = useState<boolean>(false);
+   const dictation = useDictation();
++  const speech = useSpeech();
+   const cancelDictation = dictation.cancel;
+ 
+-  useEffect(() => () => { cancelDictation().catch(() => {}); }, [cancelDictation]);
++  useEffect(() => () => {
++    cancelDictation().catch(() => {});
++    resetSpeech().catch(() => {});
++  }, [cancelDictation]);
+ 
+   const persist = useCallback(async (next: PersistedScenarioPracticeRun): Promise<void> => {
+     setValue(next);
+@@ -68,16 +80,57 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
+   const pressure = run?.counterpartTurn;
+   const presentation = scenarioPracticePresentation(value);
+   const counterpartPresentation = presentation.isAvailable ? presentation.counterpart : undefined;
++  const handleClose = useCallback((): void => {
++    if (!convertedLesson) {
++      router.back();
++      return;
++    }
++    Alert.alert(
++      "Leave this rehearsal?",
++      "Your lesson progress is saved. Your current rehearsal stays here on this device until you finish or discard it.",
++      [
++        { text: "Keep practicing", style: "cancel" },
++        { text: "Save and leave", onPress: () => router.back() },
++        { text: "Discard this rehearsal", style: "destructive", onPress: () => { void onDiscard?.(); } },
++      ],
++    );
++  }, [convertedLesson, onDiscard, router]);
+   const difficultyLabel = context ? DIFFICULTY[context.difficulty].label : "";
+ 
+   const startRecording = useCallback(async (kind: "opener" | "response" | "retry"): Promise<void> => {
+-    if (!value) return;
++    if (!value || speech.phase === "speaking" || speech.phase === "generating") return;
+     setDraft("");
+     setError("");
+     const nextState = kind === "opener" ? "listening_attempt" : kind === "response" ? "listening_response" : "listening_retry";
+     await persist(transitionScenarioPracticeRun(value, nextState, Date.now()));
+     await dictation.start();
+-  }, [dictation, persist, value]);
++  }, [dictation, persist, speech.phase, value]);
++
++  const beginCapture = useCallback(async (kind: "opener" | "response" | "retry"): Promise<void> => {
++    if (convertedLesson && !isMicrophonePrepared) {
++      setPendingVoiceKind(kind);
++      return;
++    }
++    await startRecording(kind);
++  }, [convertedLesson, isMicrophonePrepared, startRecording]);
++
++  const allowMicrophone = useCallback(async (): Promise<void> => {
++    const kind = pendingVoiceKind;
++    if (!kind) return;
++    const granted = await dictation.requestPermission();
++    if (!granted) return;
++    setIsMicrophonePrepared(true);
++    setPendingVoiceKind(null);
++    await startRecording(kind);
++  }, [dictation, pendingVoiceKind, startRecording]);
++
++  const openTypedFallback = useCallback(async (): Promise<void> => {
++    const kind = pendingVoiceKind;
++    setPendingVoiceKind(null);
++    if (!kind) return;
++    const review = kind === "opener" ? "confirm_attempt_transcript" : kind === "response" ? "confirm_response_transcript" : "confirm_retry_transcript";
++    if (value) await persist(transitionScenarioPracticeRun(value, review, Date.now()));
++  }, [pendingVoiceKind, persist, value]);
+ 
+   const stopRecording = useCallback(async (): Promise<void> => {
+     if (!value) return;
+@@ -99,27 +152,31 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
+     const approved = preserveScenarioAttempt(value, "opener", draft, Date.now());
+     await persist(approved);
+     try {
+-      const result = await nextCounterpartTurn(
++      const authoredPressure = convertedLesson?.authoredPressureText;
++      const result = authoredPressure ? null : await nextCounterpartTurn(
+         scenario,
+         context.difficulty,
+         [turn(approved.run.attempt?.id ?? `${approved.run.id}-opener`, "user", approved.run.attempt?.transcript ?? draft.trim())],
+         context.reaction,
+         context.objective,
+       );
++      const pressureText = authoredPressure ?? result?.reply ?? "";
++      if (!pressureText) throw new Error("Counterpart pressure is unavailable");
+       const withPressure = attachScenarioCounterpartTurn(approved, {
+         id: `${approved.run.id}-counterpart-turn-1`,
+-        text: result.reply,
+-        source: "provider",
++        text: pressureText,
++        source: authoredPressure ? "authored" : "provider",
+       }, Date.now());
+       setDraft("");
+       await persist(transitionScenarioPracticeRun(withPressure, "ready_for_response", Date.now()));
++      await speak(pressureText, "man-adam");
+     } catch {
+       setError(`${context.counterpartName}'s response did not come through. Your approved transcript is saved.`);
+       await persist(transitionScenarioPracticeRun(approved, "network_error", Date.now()));
+     } finally {
+       setBusy(false);
+     }
+-  }, [context, draft, persist, scenario, value]);
++  }, [context, convertedLesson, draft, persist, scenario, value]);
+ 
+   const confirmResponse = useCallback(async (): Promise<void> => {
+     if (!value || !context || !pressure || draft.trim().length < 2) return;
+@@ -129,18 +186,19 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
+     await persist(approved);
+     try {
+       const response = approved.run.responseAttempt?.transcript ?? draft.trim();
+-      const generated = await generateDebrief(scenario, context.difficulty, [
++      const lessonNote = convertedLesson ? m1L1CoachNote(response) : null;
++      const generated = lessonNote ? null : await generateDebrief(scenario, context.difficulty, [
+         turn(approved.run.attempt?.id ?? `${approved.run.id}-opener`, "user", approved.run.attempt?.transcript ?? ""),
+         turn(pressure.id, "them", pressure.text),
+         turn(approved.run.responseAttempt?.id ?? `${approved.run.id}-response`, "user", response),
+       ], context.reaction, context.objective);
+-      const debrief = generated.debrief;
+-      const flag = debrief.flags[0];
++      const debrief = generated?.debrief;
++      const flag = debrief?.flags[0];
+       const coached = attachScenarioCoaching(
+         approved,
+-        flag?.quote ? `In “${flag.quote},” ${flag.issue}` : debrief.headline,
+-        flag?.reframe || debrief.nextRep || "Answer the same pressure again with one concrete next step.",
+-        "pushback_response",
++        lessonNote ? `${lessonNote.worked} ${lessonNote.change}` : flag?.quote ? `In “${flag.quote},” ${flag.issue}` : debrief?.headline ?? "",
++        lessonNote?.retryDirection ?? flag?.reframe ?? debrief?.nextRep ?? "Answer the same pressure again with one concrete next step.",
++        convertedLesson ? "conversation_job" : "pushback_response",
+         Date.now(),
+       );
+       setDraft("");
+@@ -151,15 +209,18 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
+     } finally {
+       setBusy(false);
+     }
+-  }, [context, draft, persist, pressure, scenario, value]);
++  }, [context, convertedLesson, draft, persist, pressure, scenario, value]);
+ 
+   const confirmRetry = useCallback(async (): Promise<void> => {
+     if (!value || draft.trim().length < 2) return;
+     const approved = preserveScenarioAttempt(value, "retry", draft, Date.now());
+-    const compared = completeScenarioComparison(approved, Date.now());
++    const comparedBase = completeScenarioComparison(approved, Date.now());
++    const compared = convertedLesson && comparedBase.run.responseAttempt && comparedBase.run.retryAttempt
++      ? { ...comparedBase, run: { ...comparedBase.run, comparison: { behaviorId: "conversation_job" as const, text: m1L1Comparison(comparedBase.run.responseAttempt.transcript, comparedBase.run.retryAttempt.transcript), criterionChanged: false } } }
++      : comparedBase;
+     setDraft("");
+     await persist(compared);
+-  }, [draft, persist, value]);
++  }, [convertedLesson, draft, persist, value]);
+ 
+   const finish = useCallback(async (): Promise<void> => {
+     if (!value || !context || !run?.retryAttempt || !pressure) return;
+@@ -198,21 +259,24 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
+ 
+   return <View style={styles.root}><Backdrop />
+     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+-      <Pressable onPress={() => router.back()} style={styles.close} accessibilityRole="button" accessibilityLabel="Save and leave scenario"><X size={21} color={C.textSoft} /></Pressable>
++      <Pressable onPress={handleClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Leave rehearsal"><X size={21} color={C.textSoft} /></Pressable>
+       <View style={styles.headerCopy}><Text style={styles.headerTitle}>{context.counterpartName}</Text><Text style={styles.headerMeta}>{context.counterpartRole} · {difficultyLabel}</Text></View><View style={styles.close} />
+     </View>
+     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 150 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+         <StatusPill label={context.category.toUpperCase()} tone="purple" /><Text style={styles.scenarioTitle}>{context.title}</Text><Text style={styles.context}>{context.situation}</Text>
+         <ProductCard style={styles.identityCard}><View><SectionLabel>Counterpart</SectionLabel><Text style={styles.identityValue}>{context.counterpartLabel}</Text></View><View><SectionLabel>Objective</SectionLabel><Text style={styles.identityValue}>{context.objective}</Text></View><View><SectionLabel>Pressure level</SectionLabel><Text style={styles.identityValue}>{difficultyLabel} · {DIFFICULTY[context.difficulty].note}</Text></View></ProductCard>
++        {convertedLesson ? <Pressable onPress={onSafetyExit} style={styles.safetyExit} accessibilityRole="button"><Text style={styles.safetyExitText}>This doesn’t feel safe to practice</Text></Pressable> : null}
+ 
+-        {state === "ready_for_attempt" ? <Reveal><Text style={styles.title}>Open the conversation with {context.counterpartName}.</Text><Text style={styles.body}>Say the first thing you want {context.counterpartRole} to hear. You will approve the transcript before {context.counterpartName} responds.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void startRecording("opener")} onType={() => void openTypedReview("confirm_attempt_transcript")} /></Reveal> : null}
++        {convertedLesson ? <ConversationThread run={run} counterpartName={context.counterpartName} /> : null}
++        {pendingVoiceKind ? <ProductCard accent style={styles.permissionCard}><SectionLabel tone={C.purple}>Use your voice for this rehearsal</SectionLabel><Text style={styles.body}>BYSI asks for microphone access only while you’re practicing. You can type this turn instead.</Text>{dictation.status === "denied" ? <><Text style={styles.title}>Microphone access is off</Text><Text style={styles.body}>Turn it on in Settings, or type this turn instead.</Text><PrimaryButton label="Open Settings" onPress={() => void Linking.openSettings()} containerStyle={styles.action} /></> : <PrimaryButton label="Allow microphone" onPress={() => void allowMicrophone()} containerStyle={styles.action} />}<Pressable onPress={() => void openTypedFallback()} style={styles.permissionSecondary}><Text style={styles.permissionSecondaryText}>Type this turn instead</Text></Pressable><Pressable onPress={() => setPendingVoiceKind(null)} style={styles.permissionSecondary}><Text style={styles.permissionSecondaryText}>Back to rehearsal</Text></Pressable></ProductCard> : null}
++        {state === "ready_for_attempt" ? <Reveal><Text style={styles.title}>Open the conversation with {context.counterpartName}.</Text><Text style={styles.body}>Say the first thing you want {context.counterpartRole} to hear. You will approve the transcript before {context.counterpartName} responds.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("opener")} onType={() => void openTypedReview("confirm_attempt_transcript")} /></Reveal> : null}
+         {isListening ? <View style={styles.listening}><Text style={styles.title}>Recording your {state === "listening_attempt" ? "opening" : state === "listening_response" ? "response" : "retry"}.</Text><MicControl state="listening" level={dictation.level} onPress={() => void stopRecording()} glyph={<Square size={24} color={C.onAccent} fill={C.onAccent} />} accessibilityLabel="Done speaking" /><Text style={styles.body}>Tap when you are done. Nothing advances until you approve the transcript.</Text></View> : null}
+         {showReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve your {reviewKind}.</Text>{reviewKind !== "opening" && pressure ? <CounterpartCard presentation={counterpartPresentation} /> : null}<TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel={`Edit ${reviewKind} transcript`} /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2 || busy} onPress={() => void (reviewKind === "opening" ? confirmOpening() : reviewKind === "response" ? confirmResponse() : confirmRetry())} containerStyle={styles.action} />{busy ? <ActivityIndicator color={C.purple} style={styles.busy} /> : null}</Reveal> : null}
+-        {state === "ready_for_response" && pressure ? <Reveal><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Respond to the pressure.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void startRecording("response")} onType={() => void openTypedReview("confirm_response_transcript")} /></Reveal> : null}
+-        {state === "hope_coaching" && pressure ? <Reveal><StatusPill label="Hope · coaching" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><ProductCard accent style={styles.coachCard}><SectionLabel tone={C.purple}>Hope noticed</SectionLabel><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Same-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={`Retry the same ${context.counterpartName} moment`} onPress={() => void persist(transitionScenarioPracticeRun(value, "ready_for_retry", Date.now()))} containerStyle={styles.action} /></Reveal> : null}
+-        {state === "ready_for_retry" && pressure ? <Reveal><StatusPill label="Same-moment retry" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Answer the exact same turn again.</Text><Text style={styles.body}>{run.retryInstruction}</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void startRecording("retry")} onType={() => void openTypedReview("confirm_retry_transcript")} /></Reveal> : null}
+-        {state === "attempt_comparison" && pressure && run.responseAttempt && run.retryAttempt && run.comparison ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="First approved response" text={run.responseAttempt.transcript} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label="Continue" onPress={() => void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now()))} containerStyle={styles.action} /></Reveal> : null}
++        {state === "ready_for_response" && pressure ? <Reveal><CounterpartCard presentation={counterpartPresentation} />{speech.phase === "speaking" || speech.phase === "generating" ? <Text style={styles.speaking}>{context.counterpartName} is speaking…</Text> : speech.phase === "failed" ? <PrimaryButton label="Try audio again" onPress={() => void replaySpeech()} containerStyle={styles.action} /> : null}<Text style={styles.title}>Respond to the pressure.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("response")} onType={() => void openTypedReview("confirm_response_transcript")} /></Reveal> : null}
++        {state === "hope_coaching" && pressure ? <Reveal><StatusPill label="Hope · coaching" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><ProductCard accent style={styles.coachCard}><SectionLabel tone={C.purple}>Hope noticed</SectionLabel><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Same-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={`Retry the same ${context.counterpartName} moment`} onPress={async () => { await persist(transitionScenarioPracticeRun(value, "ready_for_retry", Date.now())); await speak(pressure.text, "man-adam"); }} containerStyle={styles.action} /></Reveal> : null}
++        {state === "ready_for_retry" && pressure ? <Reveal><StatusPill label="Same-moment retry" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Answer the exact same turn again.</Text><Text style={styles.body}>{run.retryInstruction}</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("retry")} onType={() => void openTypedReview("confirm_retry_transcript")} /></Reveal> : null}
++        {state === "attempt_comparison" && pressure && run.responseAttempt && run.retryAttempt && run.comparison ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="First approved response" text={run.responseAttempt.transcript} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label="Continue" onPress={() => { if (convertedLesson && onReturnToDeck) onReturnToDeck(); else void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now())); }} containerStyle={styles.action} /></Reveal> : null}
+         {state === "transfer_cue" ? <Reveal><StatusPill label="Hope · wrap-up" tone="purple" /><Text style={styles.title}>Take the clearer wording into the real conversation.</Text><Text style={styles.body}>This completion belongs to {context.title}, with {context.counterpartName} as {context.counterpartRole}. No unrelated practice fixture was used.</Text><PrimaryButton label="Complete scenario" onPress={() => void finish()} containerStyle={styles.action} /></Reveal> : null}
+         {state === "complete" ? <Reveal><StatusPill label="Scenario complete" tone="green" /><Text style={styles.title}>{context.title} is complete.</Text><Text style={styles.body}>You practiced one {context.counterpartName} pressure moment twice at {difficultyLabel.toLowerCase()} difficulty.</Text><PrimaryButton label="Back to Scenarios" onPress={() => router.replace("/(tabs)/library")} containerStyle={styles.action} /></Reveal> : null}
+         {state === "network_error" || state === "model_error" ? <Reveal><StatusPill label="Saved checkpoint" tone="amber" /><Text style={styles.title}>{error}</Text><PrimaryButton label="Return to this scenario" onPress={() => void persist(transitionScenarioPracticeRun(value, state === "network_error" ? "confirm_attempt_transcript" : "confirm_response_transcript", Date.now()))} containerStyle={styles.action} /></Reveal> : null}
+@@ -222,6 +286,17 @@ export function ScenarioPaidPractice({ scenario, requestedRunId }: ScenarioPaidP
+   </View>;
+ }
+ 
++function ConversationThread({ run, counterpartName }: { run: PersistedScenarioPracticeRun["run"]; counterpartName: string }) {
++  const messages = [
++    run.attempt ? { id: run.attempt.id, speaker: "You", text: run.attempt.transcript, mine: true } : null,
++    run.counterpartTurn ? { id: run.counterpartTurn.id, speaker: counterpartName, text: run.counterpartTurn.text, mine: false } : null,
++    run.responseAttempt ? { id: run.responseAttempt.id, speaker: "You", text: run.responseAttempt.transcript, mine: true } : null,
++    run.retryAttempt ? { id: run.retryAttempt.id, speaker: "You · retry", text: run.retryAttempt.transcript, mine: true } : null,
++  ].filter((message): message is { id: string; speaker: string; text: string; mine: boolean } => Boolean(message));
++  if (messages.length === 0) return null;
++  return <View style={styles.thread}>{messages.map((message) => <View key={message.id} style={[styles.messageWrap, message.mine ? styles.messageMine : styles.messageTheirs]}><Text style={styles.messageLabel}>{message.speaker}</Text><View style={[styles.messageBubble, message.mine ? styles.bubbleMine : styles.bubbleTheirs]}><Text style={[styles.messageText, message.mine ? styles.messageTextMine : null]}>{message.text}</Text></View></View>)}</View>;
++}
++
+ function CaptureActions({ value, onChange, onRecord, onType }: { value: string; onChange: (text: string) => void; onRecord: () => void; onType: () => void }) {
+   return <View style={styles.capture}><MicControl state="ready" onPress={onRecord} glyph={<Mic size={28} color={C.purple} />} accessibilityLabel="Start recording" /><Text style={styles.or}>OR TYPE AS AN ACCESSIBLE FALLBACK</Text><TextInput value={value} onChangeText={onChange} multiline style={styles.input} /><PrimaryButton label="Review typed transcript" disabled={value.trim().length < 2} onPress={onType} containerStyle={styles.action} /></View>;
+ }
+@@ -238,7 +313,7 @@ function Comparison({ label, text }: { label: string; text: string }) {
+ const styles = StyleSheet.create({
+   root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 }, center: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
+   header: { minHeight: 70, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerCopy: { flex: 1, alignItems: "center" }, headerTitle: { fontFamily: font.bold, fontSize: 17, color: C.text }, headerMeta: { ...T.caption, color: C.purple, marginTop: 2 },
+-  scroll: { paddingHorizontal: GUTTER, paddingTop: 12 }, scenarioTitle: { ...T.title, marginTop: 10 }, context: { ...T.support, marginTop: 7 }, identityCard: { marginTop: 16, gap: 14 }, identityValue: { ...T.support, color: C.text, marginTop: 4 },
++  scroll: { paddingHorizontal: GUTTER, paddingTop: 12 }, safetyExit: { alignSelf: "flex-start", minHeight: 44, justifyContent: "center", marginTop: 8 }, safetyExitText: { ...T.caption, color: C.clay, fontFamily: font.semi }, scenarioTitle: { ...T.title, marginTop: 10 }, context: { ...T.support, marginTop: 7 }, identityCard: { marginTop: 16, gap: 14 }, identityValue: { ...T.support, color: C.text, marginTop: 4 },
+   title: { ...T.title, marginTop: 22 }, body: { ...T.support, marginTop: 8 }, action: { marginTop: 18 }, capture: { alignItems: "center", marginTop: 22 }, or: { ...T.caption, marginVertical: 16 }, input: { ...T.body, minHeight: 108, width: "100%", backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.glassEdge, borderRadius: radius.md, padding: 16, textAlignVertical: "top" },
+-  listening: { alignItems: "center", gap: 20, paddingTop: 36 }, busy: { marginTop: 14 }, processing: { minHeight: 56, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 }, counterpartCard: { marginTop: 18 }, counterpartText: { ...T.body, marginTop: 10 }, continuityLabel: { ...T.caption, marginTop: 12 }, coachCard: { marginTop: 14, gap: 8 }, comparison: { marginTop: 10 },
++  listening: { alignItems: "center", gap: 20, paddingTop: 36 }, busy: { marginTop: 14 }, speaking: { ...T.caption, color: C.purple, marginTop: 10 }, thread: { marginTop: 16, gap: 12 }, messageWrap: { maxWidth: "84%" }, messageMine: { alignSelf: "flex-end", alignItems: "flex-end" }, messageTheirs: { alignSelf: "flex-start", alignItems: "flex-start" }, messageLabel: { ...T.caption, fontFamily: font.semi, marginBottom: 4 }, messageBubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 11 }, bubbleMine: { backgroundColor: C.purple }, bubbleTheirs: { backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.line }, messageText: { ...T.support, color: C.text }, messageTextMine: { color: C.onAccent }, processing: { minHeight: 56, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 }, permissionCard: { marginTop: 16 }, permissionSecondary: { minHeight: 44, alignItems: "center", justifyContent: "center" }, permissionSecondaryText: { ...T.caption, color: C.purple, fontFamily: font.semi }, counterpartCard: { marginTop: 18 }, counterpartText: { ...T.body, marginTop: 10 }, continuityLabel: { ...T.caption, marginTop: 12 }, coachCard: { marginTop: 14, gap: 8 }, comparison: { marginTop: 10 },
+ });
+diff --git a/expo/lib/approvedDeckLoader.ts b/expo/lib/approvedDeckLoader.ts
+index 82bf7c8..4574a92 100644
+--- a/expo/lib/approvedDeckLoader.ts
++++ b/expo/lib/approvedDeckLoader.ts
+@@ -53,10 +53,63 @@ export function authorizedDeckHtml(rawHtml: string, reviewThroughCard: number):
+   return `${rawHtml.slice(0, templateMatch.index)}${rawHtml.slice(templateMatch.index).replace(encodedTemplate, encoded)}`;
+ }
+ 
+-/** Downloads the approved handoff once and returns only the authorized lesson slice. */
+-export async function loadApprovedDeckHtml(archivePath: string, reviewThroughCard: number): Promise<string> {
++function replaceEncodedTemplate(rawHtml: string, transform: (template: string) => string): string {
++  const templateMatch = rawHtml.match(TEMPLATE_PATTERN);
++  const encodedTemplate = templateMatch?.[1];
++  if (!templateMatch || !encodedTemplate) throw new Error("Approved lesson template is missing");
++  const template = transform(JSON.parse(encodedTemplate) as string);
++  const encoded = JSON.stringify(template).replace(/<\//g, "<\\u002F");
++  return `${rawHtml.slice(0, templateMatch.index)}${rawHtml.slice(templateMatch.index).replace(encodedTemplate, encoded)}`;
++}
++
++function sliceCards(template: string, throughCard: number): string {
++  const cardsStart = template.indexOf("const CARDS = [");
++  const cardsEnd = template.indexOf("\n];", cardsStart);
++  const deferredCardStart = template.indexOf(`{ n:${throughCard + 1}, type:`, cardsStart);
++  if (cardsStart < 0 || cardsEnd < 0 || deferredCardStart < 0 || deferredCardStart >= cardsEnd) {
++    throw new Error("Converted lesson boundary could not be verified");
++  }
++  return `${template.slice(0, deferredCardStart)}${template.slice(cardsEnd)}`;
++}
++
++/** Converts M1 L1's approved handoff action into the fail-closed native QA runtime launch. */
++export function convertedHandoffDeckHtml(rawHtml: string, handoffCard: number): string {
++  return replaceEncodedTemplate(rawHtml, (source) => {
++    const sliced = sliceCards(source, handoffCard);
++    const converted = sliced.replace(
++      /openHandoff:\(\) => \{.*?\},\s*handoffContinue:/s,
++      `openHandoff:() => { window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type:'start-rehearsal' })); }, handoffContinue:`,
++    );
++    if (converted === sliced) throw new Error("Converted lesson handoff could not be installed");
++    return converted;
++  });
++}
++
++/** Opens the authoritative post-rehearsal cards at the manifest-defined return destination. */
++export function returnedDeckHtml(rawHtml: string, returnCard: number): string {
++  return replaceEncodedTemplate(rawHtml, (source) => {
++    const marker = "state = { i:0,";
++    if (!source.includes(marker)) throw new Error("Approved lesson return state is missing");
++    return source.replace(marker, `state = { i:${returnCard - 1},`);
++  });
++}
++
++async function approvedDeckSource(archivePath: string): Promise<string> {
+   const archive = await approvedArchive();
+   const bytes = archive[archivePath];
+   if (!bytes) throw new Error("Approved lesson file is missing from the handoff");
+-  return authorizedDeckHtml(strFromU8(bytes), reviewThroughCard);
++  return strFromU8(bytes);
++}
++
++/** Downloads the approved handoff once and returns only the authorized lesson slice. */
++export async function loadApprovedDeckHtml(archivePath: string, reviewThroughCard: number): Promise<string> {
++  return authorizedDeckHtml(await approvedDeckSource(archivePath), reviewThroughCard);
++}
++
++export async function loadConvertedHandoffDeckHtml(archivePath: string, handoffCard: number): Promise<string> {
++  return convertedHandoffDeckHtml(await approvedDeckSource(archivePath), handoffCard);
++}
++
++export async function loadReturnedDeckHtml(archivePath: string, returnCard: number): Promise<string> {
++  return returnedDeckHtml(await approvedDeckSource(archivePath), returnCard);
+ }
+diff --git a/expo/lib/convertedLesson.ts b/expo/lib/convertedLesson.ts
+new file mode 100644
+index 0000000..9990b86
+--- /dev/null
++++ b/expo/lib/convertedLesson.ts
+@@ -0,0 +1,99 @@
++import type { Scenario } from "@/types/convo";
++
++export type ConvertedLessonId = "m1-l1";
++export type TransferChoice = "say" | "write" | "save_later";
++
++export interface ConvertedLessonConfig {
++  lessonId: ConvertedLessonId;
++  practiceId: "gtp_conversation_job";
++  contentVersion: "m1-l1-v2.1-2026-08-24";
++  title: string;
++  scenario: Scenario;
++  coachedBehaviorId: "conversation_job";
++  authoredPressureText: string;
++  retryDirection: string;
++  namedMoveId: "one-point-one-proof-one-move";
++  namedMove: string;
++  rehearsalHandoffCard: 20;
++  returnCard: 21;
++  completionCard: 22;
++  launchEligible: false;
++}
++
++export interface ConvertedLessonProgress {
++  lessonId: ConvertedLessonId;
++  practiceId: ConvertedLessonConfig["practiceId"];
++  contentVersion: ConvertedLessonConfig["contentVersion"];
++  lessonCardCheckpoint: number;
++  quizGatesCompleted: true;
++  rehearsalCompleted: true;
++  retryCompleted: true;
++  comparisonViewed: true;
++  savedMoveId: ConvertedLessonConfig["namedMoveId"];
++  transferChoice: TransferChoice;
++  completedAt: number;
++  sourceLineage: "approved-html-deck";
++}
++
++export interface LessonCoachNote {
++  evidenceQuote: string;
++  worked: string;
++  change: string;
++  retryDirection: string;
++  coachedBehaviorId: ConvertedLessonConfig["coachedBehaviorId"];
++}
++
++export const M1_L1_CONVERSION: ConvertedLessonConfig = {
++  lessonId: "m1-l1",
++  practiceId: "gtp_conversation_job",
++  contentVersion: "m1-l1-v2.1-2026-08-24",
++  title: "When the Point Gets Buried",
++  scenario: {
++    id: "converted-m1-l1-bedtime-handoff",
++    category: "partner",
++    title: "The bedtime handoff",
++    counterpart: "Adam – your partner",
++    counterpartGender: "man",
++    situation: "Sunday evening in the kitchen. The dishes are done and your child is asleep. You have wanted to raise the bedtime handoff for two weeks.",
++    persona: "Adam is tired and initially treats the issue as an overstatement. He does not resolve the disagreement for the learner.",
++    goal: "Name one point, one concrete proof, and one answerable move.",
++    opensWith: "user",
++    openingLine: "You're acting like this happens all the time.",
++    minutes: 7,
++    isCustom: false,
++  },
++  coachedBehaviorId: "conversation_job",
++  authoredPressureText: "You're acting like this happens all the time.",
++  retryDirection: "Lead with the bedtime point, then give one concrete example and one answerable next step.",
++  namedMoveId: "one-point-one-proof-one-move",
++  namedMove: "One point. One proof. One move.",
++  rehearsalHandoffCard: 20,
++  returnCard: 21,
++  completionCard: 22,
++  launchEligible: false,
++};
++
++/** Produces one transcript-grounded coaching note without scores or inferred tone. */
++export function m1L1CoachNote(confirmedTranscript: string): LessonCoachNote | null {
++  const transcript = confirmedTranscript.trim();
++  if (transcript.length < 2) return null;
++  const evidenceQuote = transcript.split(/\s+/).slice(0, 10).join(" ");
++  return {
++    evidenceQuote,
++    worked: `You gave Adam a concrete line to answer in “${evidenceQuote}”.`,
++    change: "Keep the conversation on one bedtime point instead of expanding the case.",
++    retryDirection: M1_L1_CONVERSION.retryDirection,
++    coachedBehaviorId: M1_L1_CONVERSION.coachedBehaviorId,
++  };
++}
++
++/** Compares only the coached behavior and never creates a score or global claim. */
++export function m1L1Comparison(firstAttempt: string, retry: string): string {
++  const firstLead = (firstAttempt.trim().split(/(?<=[.!?])\s+/)[0]?.trim() ?? "").split(/\s+/).slice(0, 8).join(" ");
++  const retryLead = (retry.trim().split(/(?<=[.!?])\s+/)[0]?.trim() ?? "").split(/\s+/).slice(0, 8).join(" ");
++  return `First attempt began “${firstLead}” Retry began “${retryLead}” Review which opening keeps one bedtime point in view.`;
++}
++
++export function conversionRuntimeEnabled(lessonId: string | null | undefined): lessonId is ConvertedLessonId {
++  return __DEV__ && lessonId === M1_L1_CONVERSION.lessonId;
++}
+diff --git a/expo/providers/store.tsx b/expo/providers/store.tsx
+index 911c2e5..adfd5f2 100644
+--- a/expo/providers/store.tsx
++++ b/expo/providers/store.tsx
+@@ -16,6 +16,7 @@ import {
+ } from "@/lib/consent";
+ import { clearLiveSessionContent } from "@/lib/ephemeral";
+ import { completedReviewPracticeIds, migrateLegacyPilotProgress } from "@/lib/curriculumMigration";
++import type { ConvertedLessonProgress } from "@/lib/convertedLesson";
+ import { REVIEW_CURRICULUM_VERSION, isInternalReviewModuleComplete } from "@/lib/modularCurriculum";
+ import {
+   activityDayKeys,
+@@ -58,6 +59,7 @@ const KEYS = {
+   anonymousUserId: "cc.anonymousUserId.v1",
+   activePracticeSession: "cc.activePracticeSession.v1",
+   activeScenarioRun: "cc.activeScenarioRun.v1",
++  convertedLessonProgress: "cc.convertedLessonProgress.v1",
+   nativeJourneyStarted: "cc.nativeJourneyStarted.v1",
+   /** Development-only entitlement overrides. Never read in a release build. */
+   devPro: "cc.devpro.v1",
+@@ -102,6 +104,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+   const [anonymousUserId, setAnonymousUserId] = useState<string>("");
+   const [activePracticeSession, setActivePracticeSession] = useState<ActivePracticeSession | null>(null);
+   const [activeScenarioRun, setActiveScenarioRun] = useState<PersistedScenarioPracticeRun | null>(null);
++  const [convertedLessonProgress, setConvertedLessonProgress] = useState<ConvertedLessonProgress[]>([]);
+   const [nativeJourneyStarted, setNativeJourneyStarted] = useState<boolean>(false);
+   const [devPro, setDevPro] = useState<boolean>(false);
+   const [devForceUnpaid, setDevForceUnpaid] = useState<boolean>(false);
+@@ -110,7 +113,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+     let alive = true;
+     const load = async () => {
+       try {
+-        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, journeyStarted, dp, devUnpaid] = await Promise.all([
++        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, convertedProgress, journeyStarted, dp, devUnpaid] = await Promise.all([
+           AsyncStorage.getItem(KEYS.profile),
+           AsyncStorage.getItem(KEYS.sessions),
+           AsyncStorage.getItem(KEYS.sessionsLegacy),
+@@ -125,6 +128,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+           AsyncStorage.getItem(KEYS.anonymousUserId),
+           AsyncStorage.getItem(KEYS.activePracticeSession),
+           AsyncStorage.getItem(KEYS.activeScenarioRun),
++          AsyncStorage.getItem(KEYS.convertedLessonProgress),
+           AsyncStorage.getItem(KEYS.nativeJourneyStarted),
+           __DEV__ ? AsyncStorage.getItem(KEYS.devPro) : Promise.resolve(null),
+           __DEV__ ? AsyncStorage.getItem(KEYS.devForceUnpaid) : Promise.resolve(null),
+@@ -142,6 +146,10 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+           setActiveScenarioRun(normalizedScenarioRun);
+           if (!normalizedScenarioRun) await AsyncStorage.removeItem(KEYS.activeScenarioRun);
+         }
++        if (convertedProgress) {
++          const parsedConvertedProgress = JSON.parse(convertedProgress) as unknown;
++          if (Array.isArray(parsedConvertedProgress)) setConvertedLessonProgress(parsedConvertedProgress as ConvertedLessonProgress[]);
++        }
+         if (practiceSession) {
+           const normalized = normalizePracticeSession(JSON.parse(practiceSession) as unknown);
+           setActivePracticeSession(normalized);
+@@ -346,6 +354,13 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+     }
+   }, []);
+ 
++  /** Atomically commits scoreless converted-lesson progress after every completion requirement is met. */
++  const commitConvertedLessonProgress = useCallback(async (record: ConvertedLessonProgress): Promise<void> => {
++    const next = [...convertedLessonProgress.filter((item) => item.practiceId !== record.practiceId), record];
++    await AsyncStorage.setItem(KEYS.convertedLessonProgress, JSON.stringify(next));
++    setConvertedLessonProgress(next);
++  }, [convertedLessonProgress]);
++
+   /** Attach the active anonymous session when an account identity becomes available. */
+   const associateActivePracticeSessionWithUser = useCallback(async (userId: string): Promise<void> => {
+     if (!activePracticeSession) return;
+@@ -513,6 +528,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+     setScoredPracticeHistory([]);
+     setActivePracticeSession(null);
+     setActiveScenarioRun(null);
++    setConvertedLessonProgress([]);
+     setNativeJourneyStarted(false);
+     clearLiveSessionContent();
+     cancelDailyReminder().catch(() => {});
+@@ -533,6 +549,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+         KEYS.scoredPracticeHistory,
+         KEYS.activePracticeSession,
+         KEYS.activeScenarioRun,
++        KEYS.convertedLessonProgress,
+         KEYS.nativeJourneyStarted,
+         KEYS.anonymousUserId,
+         KEYS.devPro,
+@@ -811,10 +828,12 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+     anonymousUserId,
+     activePracticeSession,
+     activeScenarioRun,
++    convertedLessonProgress,
+     nativeJourneyStarted,
+     beginNativeJourney,
+     saveActivePracticeSession,
+     saveActiveScenarioRun,
++    commitConvertedLessonProgress,
+     associateActivePracticeSessionWithUser,
+     currentPilotDay,
+     markPilotDayDone,
