@@ -68,6 +68,12 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     }
   });
 
+  test("registers HTML as a Metro asset so native previews can resolve every deck", async () => {
+    const metroConfig = await source("metro.config.js");
+    expect(metroConfig).toContain('config.resolver.assetExts.includes("html")');
+    expect(metroConfig).toContain('config.resolver.assetExts.push("html")');
+  });
+
   test("keeps the catalog and deck route fail-closed outside development", async () => {
     const catalogScreen = await source("app/approved-lessons.tsx");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
