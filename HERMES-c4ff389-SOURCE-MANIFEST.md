@@ -1,0 +1,18 @@
+# Source manifest
+
+Revision: `c4ff389158bee97dcd5d602aee5cad4db735364e`
+
+| SHA-256 | Bytes | Repository-relative path |
+|---|---:|---|
+| `536f6b40d515ff398a7cee8a2c342a76f17739910a2c0c39c5175be9d7cd0bad` | 67,371 | `source/c4ff389-parent-to-implementation-expo.patch` |
+| `f45147321c423bf28255317b021008b3b6ff96e47eb9ea0117b56d6df8090d63` | 7,374 | `source/expo/__tests__/approvedLessonDecks.test.ts` |
+| `497db5908c27762abf4715e9d8841666fcc5e900ea749d800d36f81ffc194f84` | 6,217 | `source/expo/__tests__/convertedLesson.test.ts` |
+| `7c6a30fbd61f9a533f54eac9a7551253b69103250e09d63f79e6b74c734eba32` | 6,700 | `source/expo/app/_layout.tsx` |
+| `ca2e2174851577b9fc6c12b0634e88deaa9fba7cbf8ad33463d5c0b2f81fd3be` | 13,343 | `source/expo/app/approved-lesson/[lessonId].tsx` |
+| `bd4e4d7701a41b2498039f41de4c9a5b19d0842aa6e8ffff68bf440274c55551` | 8,286 | `source/expo/app/approved-rehearsal/[lessonId].tsx` |
+| `4203c96a31c4f13e522ef4acb74d3966a6c5f96c406a249235871d9a86e5c3c6` | 27,063 | `source/expo/components/ScenarioPaidPractice.tsx` |
+| `34954d8fe7a6f184daa35bed19314dc59fde01cd443212df804441acb328a505` | 5,873 | `source/expo/lib/approvedDeckLoader.ts` |
+| `acadb733e08155f00ac2db8b877cf2a902914b8062dd1ce65a13e19f5e2ce08d` | 3,929 | `source/expo/lib/convertedLesson.ts` |
+| `897f83c0b4858d56a37db7aa7ad6ba1c1ab2585aaf93877dccf42f6002870b6a` | 33,085 | `source/expo/providers/store.tsx` |
+
+All nine changed Expo source/test files were byte-compared against Git object `c4ff389158bee97dcd5d602aee5cad4db735364e`: `9/9` matched.
