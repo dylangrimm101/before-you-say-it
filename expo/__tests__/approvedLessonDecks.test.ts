@@ -76,7 +76,9 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(metroConfig).toContain('config.resolver.sourceExts.push("html")');
     expect(metroConfig).toContain('require.resolve("./html-transformer")');
     expect(transformer).toContain("JSON.stringify(props.src)");
-    expect(deckScreen).toContain('source={{ html: lesson.deckHtml, baseUrl: "about:blank" }}');
+    expect(deckScreen).toContain('const deckHtml = typeof lesson?.deckHtml === "string" ? lesson.deckHtml : null;');
+    expect(deckScreen).toContain('source={{ html: deckHtml, baseUrl: "about:blank" }}');
+    expect(deckScreen).toContain("if (!deckHtml)");
     expect(deckScreen).not.toContain("Asset.fromModule");
     expect(deckScreen).not.toContain("downloadAsync");
   });

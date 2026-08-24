@@ -15,6 +15,7 @@ export default function ApprovedLessonDeckScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ lessonId?: string }>();
   const lesson = approvedLessonDeck(params.lessonId);
+  const deckHtml = typeof lesson?.deckHtml === "string" ? lesson.deckHtml : null;
   const [loadError, setLoadError] = useState<boolean>(false);
 
   const reviewGuard = useMemo(() => {
@@ -101,12 +102,16 @@ export default function ApprovedLessonDeckScreen() {
     return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
   }
   if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to the internal lesson catalog and choose another deck." />;
+  if (!deckHtml) {
+    safeLog("[approved-lessons] deck module was not bundled as HTML", { lessonId: lesson.id, moduleType: typeof lesson.deckHtml });
+    return <Unavailable title="The approved deck couldn't open." body="Reload the preview to apply the lesson bundle update, then try again." />;
+  }
 
   return (
     <View style={styles.root}>
       {!loadError ? (
         <WebView
-          source={{ html: lesson.deckHtml, baseUrl: "about:blank" }}
+          source={{ html: deckHtml, baseUrl: "about:blank" }}
           style={styles.webView}
           originWhitelist={["*"]}
           javaScriptEnabled
