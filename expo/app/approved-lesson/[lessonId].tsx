@@ -84,19 +84,20 @@ export default function ApprovedLessonDeckScreen() {
             control.style.display = "none";
           });
         }
-        function makeAnswerCardsScrollable() {
-          var labels = Array.prototype.slice.call(document.querySelectorAll("span"));
-          labels.forEach(function (label) {
-            if (textOf(label) !== "select an answer") return;
-            var answerCard = label.parentElement;
-            if (!answerCard) return;
-            answerCard.style.overflowY = "auto";
-            answerCard.style.overscrollBehaviorY = "contain";
-            answerCard.style.webkitOverflowScrolling = "touch";
-            answerCard.style.paddingBottom = "12px";
-            answerCard.style.boxSizing = "border-box";
-            answerCard.setAttribute("data-bysi-scrollable-answers", "true");
+        function protectScrollableCardContent() {
+          var deck = document.querySelector('[data-bysi="deck"]');
+          if (!deck) return;
+          var cardFrame = Array.prototype.slice.call(deck.children).find(function (child) {
+            return child.style.position === "relative" && child.style.minHeight === "0px";
           });
+          var contentPane = cardFrame && cardFrame.firstElementChild;
+          if (!contentPane) return;
+          contentPane.style.overflowX = "hidden";
+          contentPane.style.overflowY = "auto";
+          contentPane.style.overscrollBehaviorY = "contain";
+          contentPane.style.webkitOverflowScrolling = "touch";
+          contentPane.style.scrollbarWidth = "none";
+          contentPane.setAttribute("data-bysi-scrollable-content", "true");
         }
         document.addEventListener("click", function (event) {
           var target = event.target && event.target.closest ? event.target.closest("button, [role=button], span, div") : event.target;
@@ -119,7 +120,7 @@ export default function ApprovedLessonDeckScreen() {
         function enforce() {
           fitApprovedFrame();
           disableDeferredActions();
-          makeAnswerCardsScrollable();
+          protectScrollableCardContent();
         }
         new MutationObserver(enforce).observe(document, { childList: true, subtree: true });
         window.addEventListener("resize", enforce);

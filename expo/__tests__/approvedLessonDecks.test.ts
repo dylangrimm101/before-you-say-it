@@ -97,12 +97,22 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     }
   });
 
-  test("keeps tall answer cards scrollable above their fixed quiz controls", async () => {
+  test("gives every approved deck a protected central overflow pane", async () => {
+    const panePattern = /<div style="flex:1;position:relative;display:flex;flex-direction:column;min-height:0">\s*<div style="[^"]*flex:1[^"]*min-height:0[^"]*overflow:hidden[^"]*"/s;
+    for (const fileName of Object.keys(DECK_LIMITS)) {
+      const template = approvedTemplate(await source(`assets/lesson-decks/${fileName}`));
+      expect(template).toMatch(panePattern);
+    }
+  });
+
+  test("makes every card type scrollable when its approved content exceeds the frame", async () => {
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
-    expect(deckScreen).toContain('textOf(label) !== "select an answer"');
-    expect(deckScreen).toContain('answerCard.style.overflowY = "auto"');
-    expect(deckScreen).toContain('answerCard.style.webkitOverflowScrolling = "touch"');
-    expect(deckScreen).toContain('answerCard.setAttribute("data-bysi-scrollable-answers", "true")');
+    expect(deckScreen).toContain("function protectScrollableCardContent()");
+    expect(deckScreen).toContain('child.style.position === "relative" && child.style.minHeight === "0px"');
+    expect(deckScreen).toContain('contentPane.style.overflowY = "auto"');
+    expect(deckScreen).toContain('contentPane.style.webkitOverflowScrolling = "touch"');
+    expect(deckScreen).toContain('contentPane.setAttribute("data-bysi-scrollable-content", "true")');
+    expect(deckScreen).toContain("protectScrollableCardContent();");
   });
 
   test("keeps the catalog and deck route fail-closed outside development", async () => {
