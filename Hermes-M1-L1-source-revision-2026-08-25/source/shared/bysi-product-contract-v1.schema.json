@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beforeyousayit.app/contracts/product/v1",
+  "title": "Before You Say It shared product contract v1",
+  "description": "Web-and-native-neutral product state. It intentionally excludes raw audio, unapproved transcripts, provider payloads, prompts, secrets, tokens, and unrestricted analytics metadata.",
+  "type": "object",
+  "required": ["contract_version", "rehearsal_id", "route", "transcript", "result"],
+  "properties": {
+    "contract_version": { "const": 1 },
+    "rehearsal_id": { "$ref": "#/$defs/nonEmptyString" },
+    "route": { "$ref": "#/$defs/route" },
+    "transcript": { "$ref": "#/$defs/transcript" },
+    "result": { "$ref": "#/$defs/result" },
+    "activation_milestones": { "$ref": "#/$defs/activationMilestones" },
+    "experiment_assignments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/experimentAssignment" }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "entryRoute": {
+      "enum": ["real_conversation", "recurring_problem", "desired_skill"]
+    },
+    "origin": { "enum": ["web", "native"] },
+    "scenarioSource": { "enum": ["approved_authored", "user_supplied"] },
+    "turnKind": {
+      "enum": ["opening", "pushback", "pressure_response", "counterpart_close", "retry"]
+    },
+    "speaker": { "enum": ["user", "counterpart"] },
+    "signalKey": {
+      "enum": ["clarity", "specificity", "steadiness", "listening", "boundaries", "repair"]
+    },
+    "observationStatus": {
+      "enum": ["observed", "unobserved", "insufficient_evidence"]
+    },
+    "focusStatus": { "enum": ["suggested", "confirmed", "changed"] },
+    "route": {
+      "type": "object",
+      "required": [
+        "contract_version", "entry_route", "context", "scenario_source", "scenario_id",
+        "scenario_version", "counterpart_label", "counterpart_relationship", "success_target",
+        "pressure_condition", "pressure_level", "origin"
+      ],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "entry_route": { "$ref": "#/$defs/entryRoute" },
+        "context": { "$ref": "#/$defs/nonEmptyString" },
+        "scenario_source": { "$ref": "#/$defs/scenarioSource" },
+        "scenario_id": { "$ref": "#/$defs/nonEmptyString" },
+        "scenario_version": { "type": ["string", "null"] },
+        "counterpart_label": { "$ref": "#/$defs/nonEmptyString" },
+        "counterpart_relationship": { "$ref": "#/$defs/nonEmptyString" },
+        "success_target": { "$ref": "#/$defs/nonEmptyString" },
+        "pressure_condition": { "$ref": "#/$defs/nonEmptyString" },
+        "pressure_level": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "origin": { "$ref": "#/$defs/origin" }
+      }
+    },
+    "approvedTurn": {
+      "type": "object",
+      "required": ["id", "sequence", "speaker", "turn_kind", "approved_text", "approved_at"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "speaker": { "$ref": "#/$defs/speaker" },
+        "turn_kind": { "$ref": "#/$defs/turnKind" },
+        "approved_text": { "$ref": "#/$defs/nonEmptyString" },
+        "approved_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "transcript": {
+      "type": "object",
+      "required": ["contract_version", "rehearsal_id", "turns"],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "rehearsal_id": { "$ref": "#/$defs/nonEmptyString" },
+        "turns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/approvedTurn" }
+        }
+      }
+    },
+    "pressureMoment": {
+      "type": "object",
+      "required": [
+        "pressure_moment_version", "headline", "opening_turn_id", "pushback_turn_id",
+        "pressure_response_turn_id", "observation", "why_it_matters", "confidence_statement"
+      ],
+      "properties": {
+        "pressure_moment_version": { "$ref": "#/$defs/nonEmptyString" },
+        "headline": { "$ref": "#/$defs/nonEmptyString" },
+        "opening_turn_id": { "$ref": "#/$defs/nonEmptyString" },
+        "pushback_turn_id": { "$ref": "#/$defs/nonEmptyString" },
+        "pressure_response_turn_id": { "$ref": "#/$defs/nonEmptyString" },
+        "observation": { "$ref": "#/$defs/nonEmptyString" },
+        "why_it_matters": { "$ref": "#/$defs/nonEmptyString" },
+        "confidence_statement": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "practiceShift": {
+      "type": "object",
+      "required": [
+        "practice_shift_version", "headline", "current_pattern_steps", "practice_target_steps",
+        "success_target", "first_focus_key", "first_focus_label", "recommended_module_id", "caveat"
+      ],
+      "properties": {
+        "practice_shift_version": { "$ref": "#/$defs/nonEmptyString" },
+        "headline": { "$ref": "#/$defs/nonEmptyString" },
+        "current_pattern_steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/nonEmptyString" } },
+        "practice_target_steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/nonEmptyString" } },
+        "success_target": { "$ref": "#/$defs/nonEmptyString" },
+        "first_focus_key": { "$ref": "#/$defs/nonEmptyString" },
+        "first_focus_label": { "$ref": "#/$defs/nonEmptyString" },
+        "recommended_module_id": { "$ref": "#/$defs/nonEmptyString" },
+        "caveat": { "const": "A practice target, not a result you’ve already achieved." }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "required": ["signal_key", "observation_status", "score", "evidence_turn_ids", "signal_version"],
+      "properties": {
+        "signal_key": { "$ref": "#/$defs/signalKey" },
+        "observation_status": { "$ref": "#/$defs/observationStatus" },
+        "score": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "evidence_turn_ids": { "type": "array", "items": { "$ref": "#/$defs/nonEmptyString" }, "uniqueItems": true },
+        "signal_version": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "startingIndex": {
+      "type": "object",
+      "required": ["index_kind", "index_value", "observed_count", "total_signal_count", "index_version"],
+      "properties": {
+        "index_kind": { "const": "partial" },
+        "index_value": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "observed_count": { "type": "integer", "minimum": 0, "maximum": 6 },
+        "total_signal_count": { "const": 6 },
+        "index_version": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "firstFocus": {
+      "type": "object",
+      "required": ["first_focus_key", "first_focus_label", "recommended_module_id", "focus_status", "focus_version"],
+      "properties": {
+        "first_focus_key": { "$ref": "#/$defs/nonEmptyString" },
+        "first_focus_label": { "$ref": "#/$defs/nonEmptyString" },
+        "recommended_module_id": { "$ref": "#/$defs/nonEmptyString" },
+        "focus_status": { "$ref": "#/$defs/focusStatus" },
+        "focus_version": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": ["contract_version", "rehearsal_id", "pressure_moment", "practice_shift", "signals", "starting_index", "first_focus"],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "rehearsal_id": { "$ref": "#/$defs/nonEmptyString" },
+        "pressure_moment": { "anyOf": [{ "$ref": "#/$defs/pressureMoment" }, { "type": "null" }] },
+        "practice_shift": { "anyOf": [{ "$ref": "#/$defs/practiceShift" }, { "type": "null" }] },
+        "signals": { "type": "array", "items": { "$ref": "#/$defs/signal" }, "maxItems": 6 },
+        "starting_index": { "anyOf": [{ "$ref": "#/$defs/startingIndex" }, { "type": "null" }] },
+        "first_focus": { "anyOf": [{ "$ref": "#/$defs/firstFocus" }, { "type": "null" }] }
+      }
+    },
+    "activationMilestones": {
+      "type": "object",
+      "properties": {
+        "identity_verified_at": { "type": ["string", "null"], "format": "date-time" },
+        "entitlement_confirmed_at": { "type": ["string", "null"], "format": "date-time" },
+        "app_opened_at": { "type": ["string", "null"], "format": "date-time" },
+        "state_hydrated_at": { "type": ["string", "null"], "format": "date-time" },
+        "first_paid_practice_started_at": { "type": ["string", "null"], "format": "date-time" },
+        "first_paid_practice_completed_at": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "experimentAssignment": {
+      "type": "object",
+      "required": ["experiment_key", "variant_key", "assignment_version", "assigned_at"],
+      "properties": {
+        "experiment_key": { "$ref": "#/$defs/nonEmptyString" },
+        "variant_key": { "$ref": "#/$defs/nonEmptyString" },
+        "assignment_version": { "$ref": "#/$defs/nonEmptyString" },
+        "assigned_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  }
+}
