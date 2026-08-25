@@ -1,0 +1,380 @@
+{
+  "schema_version": "3.0",
+  "curriculum_version": "BYSI-days-1-8-v3-2026-08-04",
+  "audio_cache_version": "bysi-v3-20260804",
+  "program_name": "30-Day Conversation Practice",
+  "track": "partner_or_coparent",
+  "modules": [
+    {
+      "day": 1,
+      "phase_id": "baseline",
+      "title": "Your natural baseline",
+      "primary_behavior_id": "baseline_integrity",
+      "duration_minutes": [5, 7],
+      "preserve_uncoached_attempt": true,
+      "copy": {
+        "eyebrow": "DAY 1 · YOUR BASELINE",
+        "heading": "Go back to one moment",
+        "body": "You already made an attempt during setup. Now take one moment out of it and try that part again.",
+        "primary_button": "Show me what to try",
+        "secondary_button": "Use a different conversation",
+        "practice_points": [],
+        "lessons": [],
+        "transfer": "Watch for a smaller moment this week where the same move would fit. You don’t have to use it today.",
+        "finish_button": "Finish Day 1"
+      },
+      "practice": { "reaction_level": 2 },
+      "evaluation": {
+        "priority_order": ["conversation_job", "observation_not_story", "one_point", "answerable_request", "pressure_pattern"],
+        "success_criteria": ["First attempt is preserved separately", "Feedback quotes the confirmed transcript", "Only one priority is coached"],
+        "prohibited_inferences": ["communication ability score", "personality", "attachment style", "partner motive", "relationship prognosis"]
+      },
+      "retry": { "direction": "Try the same moment again in your own words." }
+    },
+    {
+      "day": 2,
+      "phase_id": "get_clear_under_pressure",
+      "title": "Give the conversation one job",
+      "primary_behavior_id": "conversation_job",
+      "duration_minutes": [3, 5],
+      "preserve_uncoached_attempt": false,
+      "copy": {
+        "eyebrow": "DAY 2 · GET CLEAR UNDER PRESSURE",
+        "heading": "Give the conversation one job",
+        "body": "Decide what this conversation is for, then whether now is a good time to have it.",
+        "primary_button": "Start Day 2",
+        "secondary_button": "Use my conversation",
+        "practice_points": ["Name the job of the conversation.", "Hear a real constraint.", "Decide whether to continue, narrow the topic, return later, or move it to writing."],
+        "lessons": [
+          { "audio_id": "bysi-v3-hope-d2-lesson-1", "voice_key": "hope_teacher", "text": "A conversation gets harder when you’re asking it to do five things at once. Choose the one job it needs to do today." },
+          { "audio_id": "bysi-v3-hope-d2-lesson-2", "voice_key": "hope_teacher", "text": "The job might be to understand, decide, ask for something, repair what happened, set a limit, or share something hard." },
+          { "audio_id": "bysi-v3-hope-d2-lesson-3", "voice_key": "hope_teacher", "text": "Then look at the conditions. You can shrink the topic, move it to another time, or put it in writing." },
+          { "audio_id": "bysi-v3-hope-d2-lesson-4", "voice_key": "hope_teacher", "text": "You don’t have to finish a conversation just because you started it." }
+        ],
+        "quiz": {
+          "prompt": "Which version gives the conversation one clear job?",
+          "option_a": { "audio_id": "bysi-v3-hope-d2-quiz-a", "voice_key": "hope_teacher", "text": "I need you to understand why I’m upset, apologize, agree I’m right, and decide bedtime tonight." },
+          "option_b": { "audio_id": "bysi-v3-hope-d2-quiz-b", "voice_key": "hope_teacher", "text": "I want us to decide who owns bedtime Tuesday and Thursday." },
+          "stronger_option": "B",
+          "feedback_a": "A is carrying four jobs. B asks for one decision: who owns bedtime Tuesday and Thursday.",
+          "feedback_b": "B asks for a single decision: who owns bedtime Tuesday and Thursday."
+        },
+        "scenario": {
+          "heading": "Tonight’s rep",
+          "title": "Bedtime needs an owner",
+          "scenario": "You want to decide who owns bedtime Tuesday and Thursday.",
+          "user_job": "Open by saying what you want decided.",
+          "attempt_prompt": "Open by saying what you want decided.",
+          "response_prompt": "You have ten minutes. Narrow the topic, set a time to finish, or move the conversation to text."
+        },
+        "transfer": "Next time something big is coming, ask yourself what you want the conversation to settle.",
+        "finish_button": "Finish Day 2"
+      },
+      "practice": {
+        "reaction_level": 1,
+        "adam_line": { "audio_id": "bysi-v3-adam-d2-ten-minutes", "voice_key": "adam_counterpart", "text": "I can talk, but I have to leave in ten minutes." }
+      },
+      "evaluation": {
+        "priority_order": ["conversation_job", "timing_scope_channel"],
+        "success_criteria": ["One primary job is identifiable", "The timing, scope, or channel choice is usable"],
+        "prohibited_inferences": ["avoidance motive", "confidence", "partner motive"]
+      },
+      "retry": { "direction": "Use the same ten-minute limit. Change only the part Hope named." }
+    },
+    {
+      "day": 3,
+      "phase_id": "get_clear_under_pressure",
+      "title": "Spot what pressure makes you do",
+      "primary_behavior_id": "pressure_pattern",
+      "duration_minutes": [3, 5],
+      "preserve_uncoached_attempt": false,
+      "copy": {
+        "eyebrow": "DAY 3 · GET CLEAR UNDER PRESSURE",
+        "heading": "Spot what pressure makes you do",
+        "body": "Notice the first move you make after someone pushes back.",
+        "primary_button": "Start Day 3",
+        "secondary_button": "Use my conversation",
+        "practice_points": [],
+        "lessons": [
+          { "audio_id": "bysi-v3-hope-d3-lesson-1", "voice_key": "hope_teacher", "text": "Pressure can change what you do next. That move is behavior, not a personality type." },
+          { "audio_id": "bysi-v3-hope-d3-lesson-2", "voice_key": "hope_teacher", "text": "You might talk faster, pile on proof, attack, go quiet, apologize your way out, or rush to fix it." },
+          { "audio_id": "bysi-v3-hope-d3-lesson-3", "voice_key": "hope_teacher", "text": "Listen for a move in your own recording. After my note, choose whether it fits what happened." }
+        ],
+        "quiz": {
+          "prompt": "Which one names a move instead of a type?",
+          "option_a": { "audio_id": "bysi-v3-hope-d3-quiz-a", "voice_key": "hope_teacher", "text": "I’m just bad at conflict." },
+          "option_b": { "audio_id": "bysi-v3-hope-d3-quiz-b", "voice_key": "hope_teacher", "text": "When I hear “you’re overreacting,” I start listing older examples." },
+          "stronger_option": "B",
+          "feedback_a": "A labels the person. B names the cue and the move that followed.",
+          "feedback_b": "B names the cue and the move that followed it."
+        },
+        "scenario": {
+          "heading": "Tonight’s rep",
+          "scenario": "You’re explaining why the bedtime split has to change.",
+          "user_job": "Say what’s wrong with the current split. A sentence or two.",
+          "attempt_prompt": "Say what’s wrong with the current split. A sentence or two.",
+          "response_prompt": "Respond to the pushback the way you’d actually respond."
+        },
+        "transfer": "Listen for the first thing you do after pushback. You may start talking faster or reach back for older examples.",
+        "finish_button": "Finish Day 3"
+      },
+      "practice": {
+        "reaction_level": 2,
+        "adam_line": { "audio_id": "bysi-v3-adam-d3-big-deal", "voice_key": "adam_counterpart", "text": "Why is this suddenly such a big deal?" }
+      },
+      "evaluation": {
+        "priority_order": ["pressure_pattern"],
+        "success_criteria": ["The note identifies one exact observable move", "The learner can confirm or reject whether it fits"],
+        "prohibited_inferences": ["fight-flight-freeze", "trauma response", "attachment style", "nervous-system state", "permanent communication type"]
+      },
+      "retry": { "direction": "Answer the same objection. Change only the move I named." }
+    },
+    {
+      "day": 4,
+      "phase_id": "get_clear_under_pressure",
+      "title": "Give yourself room to answer",
+      "primary_behavior_id": "choice_point",
+      "duration_minutes": [3, 5],
+      "preserve_uncoached_attempt": false,
+      "copy": {
+        "eyebrow": "DAY 4 · GET CLEAR UNDER PRESSURE",
+        "heading": "Give yourself room to answer",
+        "body": "Take a moment after pushback, then pick one thing to say.",
+        "primary_button": "Start Day 4",
+        "secondary_button": "Use my conversation",
+        "practice_points": [],
+        "lessons": [
+          { "audio_id": "bysi-v3-hope-d4-lesson-1", "voice_key": "hope_teacher", "text": "You don’t have to feel calm. Take enough time to choose what you say next." },
+          { "audio_id": "bysi-v3-hope-d4-lesson-2", "voice_key": "hope_teacher", "text": "After an objection, pick one move. Say a sentence, ask a question, or ask to come back to it." },
+          { "audio_id": "bysi-v3-hope-d4-lesson-3", "voice_key": "hope_teacher", "text": "Adding more words before you choose usually hides the move you meant to make." }
+        ],
+        "quiz": {
+          "prompt": "Which one leaves room to choose?",
+          "option_a": { "audio_id": "bysi-v3-hope-d4-quiz-a", "voice_key": "hope_teacher", "text": "No, listen, because last week you also, and the week before that…" },
+          "option_b": { "audio_id": "bysi-v3-hope-d4-quiz-b-pause", "voice_key": "hope_teacher", "text": "(brief pause) The main thing I’m asking is whether you can own Tuesday bedtime.", "leading_pause_ms": 650 },
+          "stronger_option": "B",
+          "feedback_a": "A keeps adding evidence. B waits, then says one thing.",
+          "feedback_b": "B waits, then makes one move the other person can answer."
+        },
+        "scenario": {
+          "heading": "Tonight’s rep",
+          "scenario": "You have asked for a clearer bedtime schedule.",
+          "user_job": "Listen to Adam. Take a moment. Then pick one thing to say.",
+          "response_prompt": "Take a moment. Then say one sentence, ask one question, or ask to come back to it."
+        },
+        "transfer": "When you catch yourself piling on words, stop there and pick one thing to say.",
+        "finish_button": "Finish Day 4"
+      },
+      "practice": {
+        "reaction_level": 2,
+        "adam_line": { "audio_id": "bysi-v3-adam-d4-no-schedule", "voice_key": "adam_counterpart", "text": "I don’t see why we need a schedule. We’ve been figuring it out." }
+      },
+      "evaluation": {
+        "priority_order": ["choice_point"],
+        "success_criteria": ["One conversational move is present", "The response does not pile on evidence", "The move is answerable or usable"],
+        "prohibited_inferences": ["calmness", "heart rate", "confidence from pitch", "intentional silence from ASR gaps", "pause duration"]
+      },
+      "retry": { "direction": "Take a moment after the objection. Then make one move." }
+    },
+    {
+      "day": 5,
+      "phase_id": "get_clear_under_pressure",
+      "title": "Separate what happened from the story",
+      "primary_behavior_id": "observation_not_story",
+      "duration_minutes": [3, 5],
+      "preserve_uncoached_attempt": false,
+      "copy": {
+        "eyebrow": "DAY 5 · GET CLEAR UNDER PRESSURE",
+        "heading": "Separate what happened from the story",
+        "body": "Say what happened so another person could point to the same event.",
+        "primary_button": "Start Day 5",
+        "secondary_button": "Use my conversation",
+        "practice_points": [],
+        "lessons": [
+          { "audio_id": "bysi-v3-hope-d5-lesson-1", "voice_key": "hope_teacher", "text": "Start with something another person could point to: what was said, done, or agreed." },
+          { "audio_id": "bysi-v3-hope-d5-lesson-2", "voice_key": "hope_teacher", "text": "Stop before you turn what you think it means into a fact about them." },
+          { "audio_id": "bysi-v3-hope-d5-lesson-3", "voice_key": "hope_teacher", "text": "Your feelings can stay in. Leave out the verdict about what the event says about them." }
+        ],
+        "quiz": {
+          "prompt": "Which one starts with something that happened?",
+          "option_a": { "audio_id": "bysi-v3-hope-d5-quiz-a", "voice_key": "hope_teacher", "text": "You don’t care how exhausted I am." },
+          "option_b": { "audio_id": "bysi-v3-hope-d5-quiz-b", "voice_key": "hope_teacher", "text": "I handled bedtime alone four nights this week after we agreed to split it." },
+          "stronger_option": "B",
+          "feedback_a": "A turns a motive into a fact. B gives a count and names the agreement.",
+          "feedback_b": "B gives the other person something specific to answer."
+        },
+        "scenario": {
+          "heading": "Tonight’s rep",
+          "scenario": "You want to tell Adam what this week has actually looked like.",
+          "user_job": "Answer Adam with one current event, then stop.",
+          "response_prompt": "Say what happened this week in a sentence or two. Stop before assigning meaning to the other person."
+        },
+        "transfer": "Prepare one current example for the real conversation. Don’t build a historical case file.",
+        "finish_button": "Finish Day 5"
+      },
+      "practice": {
+        "reaction_level": 1,
+        "adam_line": { "audio_id": "bysi-v3-adam-d5-what-happened", "voice_key": "adam_counterpart", "text": "What actually happened this week?" }
+      },
+      "evaluation": {
+        "priority_order": ["observation_not_story"],
+        "success_criteria": ["One observable event is present", "No motive or character claim is presented as fact", "No unnecessary evidence pile follows"],
+        "prohibited_inferences": ["partner motive", "relationship diagnosis", "that a feeling was expressed incorrectly"]
+      },
+      "retry": { "direction": "Give one thing that happened this week. Stop before you say what it proves." }
+    },
+    {
+      "day": 6,
+      "phase_id": "get_clear_under_pressure",
+      "title": "Keep one point in the room",
+      "primary_behavior_id": "one_point",
+      "duration_minutes": [3, 5],
+      "preserve_uncoached_attempt": false,
+      "copy": {
+        "eyebrow": "DAY 6 · GET CLEAR UNDER PRESSURE",
+        "heading": "Keep one point in the room",
+        "body": "Stay with your point after an objection you need to address.",
+        "primary_button": "Start Day 6",
+        "secondary_button": "Use my conversation",
+        "practice_points": [],
+        "lessons": [
+          { "audio_id": "bysi-v3-hope-d6-lesson-1", "voice_key": "hope_teacher", "text": "Pick the point you want to keep clear, even when the conversation gets uncomfortable." },
+          { "audio_id": "bysi-v3-hope-d6-lesson-2", "voice_key": "hope_teacher", "text": "One example is enough. Stack up three and the other person answers the stack instead of the point." },
+          { "audio_id": "bysi-v3-hope-d6-lesson-3", "voice_key": "hope_teacher", "text": "When the other person objects, say you heard it. Then go back to the same point." }
+        ],
+        "quiz": {
+          "prompt": "Which one is easier to stay on?",
+          "option_a": { "audio_id": "bysi-v3-hope-d6-quiz-a", "voice_key": "hope_teacher", "text": "This is about bedtime, the dishes, your phone, your mother visiting, and how we never spend time together." },
+          "option_b": { "audio_id": "bysi-v3-hope-d6-quiz-b", "voice_key": "hope_teacher", "text": "The point I need to keep clear is that bedtime needs an owner, not another list I manage." },
+          "stronger_option": "B",
+          "feedback_a": "A opens five issues at once. B leaves one thing to answer.",
+          "feedback_b": "B keeps one point in view without building a case."
+        },
+        "scenario": {
+          "heading": "Tonight’s rep",
+          "scenario": "You want bedtime to have a clear owner instead of another list you manage.",
+          "user_job": "Say the point once. Then hold it after Adam’s objection.",
+          "attempt_prompt": "Say the point once. Then hold it after Adam’s objection.",
+          "response_prompt": "Respond to the part about work, then come back to bedtime. Leave the other issues for later."
+        },
+        "transfer": "Say your one point out loud before the real conversation.",
+        "finish_button": "Finish Day 6"
+      },
+      "practice": {
+        "reaction_level": 2,
+        "adam_line": { "audio_id": "bysi-v3-adam-d6-work", "voice_key": "adam_counterpart", "text": "I do bedtime when I can. Work has been all over the place." }
+      },
+      "evaluation": {
+        "priority_order": ["one_point"],
+        "success_criteria": ["One central point is identifiable", "At most one supporting example is used", "The same point remains after resistance"],
+        "prohibited_inferences": ["rambling personality", "anxiety from length", "a universal word limit for a good answer"]
+      },
+      "retry": { "direction": "Answer the work concern briefly, then return to the bedtime request." }
+    },
+    {
+      "day": 7,
+      "phase_id": "get_clear_under_pressure",
+      "title": "Make one answerable request",
+      "primary_behavior_id": "answerable_request",
+      "duration_minutes": [3, 5],
+      "preserve_uncoached_attempt": false,
+      "copy": {
+        "eyebrow": "DAY 7 · GET CLEAR UNDER PRESSURE",
+        "heading": "Make one answerable request",
+        "body": "Ask for one next step the other person can answer.",
+        "primary_button": "Start Day 7",
+        "secondary_button": "Use my conversation",
+        "practice_points": [],
+        "lessons": [
+          { "audio_id": "bysi-v3-hope-d7-lesson-1", "voice_key": "hope_teacher", "text": "Turn the concern into a next step the other person can accept, decline, or change." },
+          { "audio_id": "bysi-v3-hope-d7-lesson-2", "voice_key": "hope_teacher", "text": "Say what, who, and when. Skip the parts that don’t matter." },
+          { "audio_id": "bysi-v3-hope-d7-lesson-3", "voice_key": "hope_teacher", "text": "A request leaves room for an answer. It isn’t a loyalty test, and a yes isn’t guaranteed." }
+        ],
+        "quiz": {
+          "prompt": "Which one can the other person answer?",
+          "option_a": { "audio_id": "bysi-v3-hope-d7-quiz-a", "voice_key": "hope_teacher", "text": "I need you to care more and show up for this family." },
+          "option_b": { "audio_id": "bysi-v3-hope-d7-quiz-b", "voice_key": "hope_teacher", "text": "Can you own bedtime every Tuesday and Thursday, including pajamas, teeth, and lights out?" },
+          "stronger_option": "B",
+          "feedback_a": "A asks for a quality. B asks for a job, a person, and two nights.",
+          "feedback_b": "B gives the other person a clear request they can accept, decline, or change."
+        },
+        "scenario": {
+          "heading": "Tonight’s rep",
+          "scenario": "You want to ask Adam to own bedtime on two specific nights.",
+          "user_job": "Ask who will do what and on which nights.",
+          "attempt_prompt": "Ask who will do what and on which nights.",
+          "response_prompt": "Respond to the Thursday conflict. Adjust the nights or ask what would work."
+        },
+        "transfer": "Try the request in a smaller conversation, or save it for the conversation you have in mind.",
+        "finish_button": "Finish Day 7"
+      },
+      "practice": {
+        "reaction_level": 2,
+        "adam_line": { "audio_id": "bysi-v3-adam-d7-thursday", "voice_key": "adam_counterpart", "text": "Tuesday might work. Thursday I’m at work late." }
+      },
+      "evaluation": {
+        "priority_order": ["answerable_request"],
+        "success_criteria": ["One action or decision is identifiable", "The responsible person is clear", "A time or condition is present when relevant", "The request permits an answer"],
+        "prohibited_inferences": ["partner compliance", "that the request is a test of the partner’s love", "assertiveness", "refusal as communication failure"]
+      },
+      "retry": { "direction": "Ask who will do what and when. Leave room for a no or a different plan." }
+    },
+    {
+      "day": 8,
+      "phase_id": "get_clear_under_pressure",
+      "title": "Put the week into one opener",
+      "primary_behavior_id": "integrated_opener",
+      "duration_minutes": [5, 7],
+      "preserve_uncoached_attempt": true,
+      "copy": {
+        "eyebrow": "DAY 8 · GET CLEAR UNDER PRESSURE",
+        "heading": "Put the week into one opener",
+        "body": "Build one opener from the week, then respond to one pushback.",
+        "primary_button": "Start Day 8",
+        "secondary_button": "Use my conversation",
+        "practice_points": [],
+        "lessons": [
+          { "audio_id": "bysi-v3-hope-d8-lesson-1", "voice_key": "hope_teacher", "text": "No new skill today. Put the week’s pieces into a single opener." },
+          { "audio_id": "bysi-v3-hope-d8-lesson-2", "voice_key": "hope_teacher", "text": "Say what you want settled, what happened this week, the point you want to keep clear, and what you’re asking for." },
+          { "audio_id": "bysi-v3-hope-d8-lesson-3", "voice_key": "hope_teacher", "text": "Then let Adam answer. If he pushes back, respond and return to the request." }
+        ],
+        "quiz": {
+          "prompt": "Which opener is easier to answer?",
+          "option_a": { "audio_id": "bysi-v3-hope-d8-quiz-a", "voice_key": "hope_teacher", "text": "You always leave everything to me, and I’m tired of being the only adult who notices anything." },
+          "option_b": { "audio_id": "bysi-v3-hope-d8-quiz-b", "voice_key": "hope_teacher", "text": "Can we talk about bedtime? I handled it alone four nights this week. Can you take Tuesday and Thursday, from pajamas through lights out?" },
+          "stronger_option": "B",
+          "feedback_a": "A opens with a verdict on the person. B opens with a count, a point, and a question that can be answered.",
+          "feedback_b": "B gives a specific week and a request that can be answered."
+        },
+        "scenario": {
+          "heading": "Tonight’s rep",
+          "scenario": "Ask Adam to handle bedtime start to finish on two nights.",
+          "user_job": "In your own words, say what you want settled, what happened, the point you want to keep clear, and your request.",
+          "attempt_prompt": "In your own words, say what you want settled, what happened, the point you want to keep clear, and your request.",
+          "response_prompt": "Respond to Adam’s pushback without opening a second argument. Then return to your request."
+        },
+        "transfer": "Save one sentence from today’s practice for the real conversation.",
+        "finish_button": "Finish Day 8"
+      },
+      "practice": {
+        "reaction_level": 2,
+        "approved_pushback_bank": [
+          { "audio_id": "bysi-v3-adam-d8-serious", "voice_key": "adam_counterpart", "text": "I don’t think it’s that serious." },
+          { "audio_id": "bysi-v3-adam-d8-wait", "voice_key": "adam_counterpart", "text": "I’ve had a long day. Can this wait?" },
+          { "audio_id": "bysi-v3-adam-d8-you-too", "voice_key": "adam_counterpart", "text": "You do that too." },
+          { "audio_id": "bysi-v3-adam-d8-handled", "voice_key": "adam_counterpart", "text": "I thought we already handled this." }
+        ]
+      },
+      "evaluation": {
+        "priority_order": ["integrated_opener", "pushback_response"],
+        "success_criteria": ["The job is identifiable", "One observable example is present", "One point and request remain identifiable", "The learner leaves response space", "Pushback is acknowledged where appropriate", "No second case is introduced"],
+        "prohibited_inferences": ["partner future reaction", "relationship outcome", "emotional maturity", "global communication score"]
+      },
+      "retry": {
+        "direction": "Try that same moment again.",
+        "opener_direction": "Run the opener again. Say what you want settled, what happened, and what you’re asking for.",
+        "response_direction": "Answer that pushback again. Address a relevant concern, or set aside a deflection, then return to the request."
+      }
+    }
+  ]
+}

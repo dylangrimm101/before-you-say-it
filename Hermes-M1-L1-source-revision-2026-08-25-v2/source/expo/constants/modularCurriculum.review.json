@@ -1,0 +1,3305 @@
+{
+  "schema_version": "0.1",
+  "curriculum_version": "2026-08-11.1-review",
+  "implementation_authorized": false,
+  "public_launch_authorized": false,
+  "free_onboarding_rehearsal_is_baseline": true,
+  "paid_day_one_exists": false,
+  "calendar_locked": false,
+  "module_count": 8,
+  "runnable_practice_count": 43,
+  "gated_practice_count": 2,
+  "blocked_practice_count": 8,
+  "rork_audit_reconciliation": {
+    "reconciliation_version": "2026-08-11.1-review",
+    "audit_baseline": "3bed2b05dab5bbdd5ecb37a8643ffeeacf6deba1",
+    "implementation_authorized": false,
+    "public_launch_authorized": false,
+    "authoritative_decisions": {
+      "architecture": {
+        "reuse_existing_paid_practice_state_machine": true,
+        "second_state_machine_allowed": false,
+        "hardcoded_module_flows_allowed": false,
+        "legacy_pilot_curriculum_role": "read-only migration and approved-copy source",
+        "new_modular_config_role": "stable module membership, practice identity, content status, version, completion, and counterpart policy",
+        "free_onboarding_is_baseline": true,
+        "paid_day_one_exists": false,
+        "calendar_or_streak_gate_allowed": false
+      },
+      "module_completion": {
+        "internal_review_build": "A module completes after every runnable practice currently listed for that module is completed. Gated and blocked records never count.",
+        "production": "No production completion policy is authorized until practices are individually promoted to launch_eligible and Donald approves the required subset.",
+        "practice_completion_and_module_completion_are_distinct": true,
+        "revisiting_completed_practices_allowed": true
+      },
+      "legacy_day_migration": {
+        "day_1": {
+          "destination": "free_onboarding_baseline_history",
+          "paid_practice_completion": false
+        },
+        "day_2": {
+          "practice_id": "gtp_conversation_job",
+          "module_id": "get_to_the_point",
+          "completes_module": false
+        },
+        "day_3": {
+          "practice_id": "scp_notice_pressure_move",
+          "module_id": "stay_clear_under_pushback",
+          "completes_module": false
+        },
+        "day_4": {
+          "practice_id": "psb_create_choice",
+          "module_id": "pause_say_no_boundary",
+          "classification": "prerequisite_practice_evidence",
+          "completes_module": false
+        },
+        "day_5": {
+          "practice_id": "gtp_event_not_story",
+          "module_id": "get_to_the_point",
+          "completes_module": false
+        },
+        "day_6": {
+          "practice_id": "gtp_point_that_survives",
+          "module_id": "get_to_the_point",
+          "completes_module": false
+        },
+        "day_7": {
+          "practice_id": "mca_answerable_action",
+          "module_id": "make_a_clear_ask",
+          "completes_module": false
+        },
+        "day_8": {
+          "practice_id": "stc_mild_pushback",
+          "module_id": "start_the_conversation",
+          "non_completing_evidence_tags": [
+            "pushback_transfer"
+          ],
+          "completes_module": false,
+          "must_not_complete_modules": [
+            "repair_what_went_wrong",
+            "use_it_in_real_life",
+            "stay_clear_under_pushback"
+          ]
+        },
+        "idempotent": true,
+        "preserve_unknown_or_ambiguous_records": true,
+        "preserve_scored_practice_history_unchanged": true,
+        "existing_explicit_module_7_or_8_records": "Preserve as legacy historical records without coercing them into completion of the new Module 7 or Module 8 curriculum. Do not delete or rewrite the stored record.",
+        "user_visible_migration_copy_authorized": false
+      },
+      "day_3_rejection": {
+        "approved_branch": "existing neutral retry",
+        "transcript_correction_branch_required": false,
+        "rejected_note_must_be_cleared": true,
+        "rejected_note_must_not_reappear_after_restart_or_completion": true,
+        "accepted_note_fit_must_persist": true
+      },
+      "counterpart_and_voice": {
+        "hope_role": "teacher_and_coach_only",
+        "counterpart_identity_source": "scenario_or_run_context",
+        "universal_adam_allowed": false,
+        "adam_allowed_only_for_explicit_adam_authored_preset": true,
+        "name_substitution_alone_is_not_blanket_production_approval": true,
+        "semantic_identity_and_voice_profile_are_separate": true,
+        "same_turn_retry_immutable_fields": [
+          "text",
+          "counterpart_identity",
+          "turn_id",
+          "reaction_id",
+          "resolved_audio_id"
+        ],
+        "provider_or_audio_failure": "Preserve visible text and fail closed without regenerating the turn.",
+        "internal_review_audio": "Provider-generated TTS is acceptable for internal testing with visible text fallback.",
+        "production_audio": "Voice choice, pronunciation, and reusable audio require separate approval."
+      },
+      "safety": {
+        "automatic_spoken_content_classifier_authorized_in_this_revision": false,
+        "ordinary_paid_roleplay_route_changes_authorized": false,
+        "safety_contract_fields_in_curriculum": "Authoring exclusions and content-review gates, not authorization to classify ordinary spoken content or replace counterpart roleplay at runtime.",
+        "safety_sensitive_draft_practices": "Internal review only; launch_eligible remains false.",
+        "future_runtime_safety_change": "Requires a separate product decision, threat model, false-positive review, deterministic tests, and approved user-facing copy."
+      },
+      "comparison": {
+        "template": "First attempt: {concrete_first_observation}. Retry: {concrete_retry_change_or_held_behavior}.",
+        "must_describe_observable_change": true,
+        "one_coached_behavior_only": true,
+        "word_limit": 36,
+        "generic_wording_changed_copy_is_insufficient": true,
+        "new_model_call_required": false
+      },
+      "duration": {
+        "new_modular_config_may_contain_product_duration_fields": false,
+        "legacy_duration_fields": "Leave untouched in the legacy migration source during this implementation; never display or copy them into the modular config.",
+        "dialogue_constraints_such_as_ten_minutes_are_allowed": true
+      },
+      "content_visibility": {
+        "internal_review": "All 43 runnable practices are accessible and visibly marked as review content in non-production/internal builds.",
+        "gated": "Not runnable; display only in internal curriculum inventory, not as a tappable practice.",
+        "blocked": "Not runnable and never simulated with fake mechanics.",
+        "production": "Only separately promoted launch_eligible practices may appear to real users.",
+        "coming_later_copy_authorized": false
+      },
+      "persistence": {
+        "local_only_remains_authoritative_for_this_revision": true,
+        "cross_device_progress_is_out_of_scope": true,
+        "existing_attempts_transcripts_runs_and_internal_ids_preserved": true,
+        "copy_only_content_version_change_invalidates_progress": false,
+        "major_behavior_change_requires_explicit_migration_policy": true
+      },
+      "missing_package_artifacts": {
+        "machine_readable_days_2_8_source_in_original_zip": false,
+        "semantic_audio_map_in_original_zip": false,
+        "reaction_id_fixture_in_original_zip": false,
+        "policy": "Use the audited current pilotCurriculum.json as the exact machine source for approved Days 2–8 and the Markdown package as the human authority. Do not fabricate missing audio or fixture artifacts."
+      }
+    },
+    "implementation_stages": [
+      {
+        "stage": 1,
+        "name": "Schema and config validation",
+        "visible_behavior_change": false,
+        "deliverables": [
+          "Add versioned modular config and validators.",
+          "Preserve legacy pilotCurriculum.json unchanged as migration source.",
+          "Add stable practice IDs, module membership, statuses, content versions, counterpart policy, and completion declarations.",
+          "Prove all 53 IDs are unique and every module is revisitable."
+        ]
+      },
+      {
+        "stage": 2,
+        "name": "Read-only migration and identity correction",
+        "visible_behavior_change": false,
+        "deliverables": [
+          "Map historical day completion to practice evidence idempotently.",
+          "Remove duplicate Day 8 ownership from new module inference.",
+          "Preserve ambiguous and explicit legacy records without coercion.",
+          "Keep scored-practice history unchanged."
+        ]
+      },
+      {
+        "stage": 3,
+        "name": "Internal full-curriculum review build",
+        "visible_behavior_change": true,
+        "deliverables": [
+          "Wire 43 runnable review practices into the existing paid flow.",
+          "Keep two gated and eight blocked practices non-runnable.",
+          "Use contextual counterpart identity and immutable same-turn retry.",
+          "Use concrete observable comparison copy.",
+          "Expose no review draft to production users."
+        ]
+      },
+      {
+        "stage": 4,
+        "name": "Deterministic QA and evidence",
+        "visible_behavior_change": false,
+        "deliverables": [
+          "Run migration, restart, safety-boundary, comparison, contextual identity, persistence, Progress, and frozen-parity tests.",
+          "Generate route-mounted visual state evidence after tests pass.",
+          "Perform provider, audio, microphone, and native-device QA separately."
+        ]
+      },
+      {
+        "stage": 5,
+        "name": "Production promotion",
+        "authorized": false,
+        "deliverables": [
+          "Donald reviews hands-on curriculum behavior.",
+          "Revise content versions without changing stable IDs where behavior is unchanged.",
+          "Promote practices individually only after content, safety, audio, and product approval."
+        ]
+      }
+    ]
+  },
+  "modules": [
+    {
+      "schema_version": "0.1",
+      "curriculum_version": "2026-08-11.0-review",
+      "module_id": "get_to_the_point",
+      "title": "Get to the Point",
+      "promise": "Organize what you mean, identify the point that matters, and say it without burying it under explanations.",
+      "completion_capability": "I can identify the job, state one point, and keep it present when the conversation branches.",
+      "calendar_locked": false,
+      "revisitable": true,
+      "practices": [
+        {
+          "practice_id": "gtp_conversation_job",
+          "content_version": "days-2-v3-contextual-1",
+          "authoring_status": "approved_with_contextual_counterpart_adaptation",
+          "launch_eligible": false,
+          "source_lineage": [
+            "approved Days 2–8 V3: former Day 2"
+          ],
+          "primary_behavior_id": "conversation_job",
+          "title": "Give the conversation one job",
+          "preview": "Decide what this conversation is for, then whether now is a good time to have it.",
+          "what_you_will_practice": [
+            "Name the job of the conversation.",
+            "Hear a real constraint.",
+            "Decide whether to continue, narrow the topic, return later, or move it to writing."
+          ],
+          "lesson_cards": [
+            "A conversation gets harder when you’re asking it to do five things at once. Choose the one job it needs to do today.",
+            "The job might be to understand, decide, ask for something, repair what happened, set a limit, or share something hard.",
+            "Then look at the conditions. You can shrink the topic, move it to another time, or put it in writing.",
+            "You don’t have to finish a conversation just because you started it."
+          ],
+          "discrimination_check": {
+            "prompt": "Which version gives the conversation one clear job?",
+            "options": [
+              "I need you to understand why I’m upset, apologize, agree I’m right, and decide bedtime tonight.",
+              "I want us to decide who owns bedtime Tuesday and Thursday."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A is carrying four jobs. B asks for one decision: who owns bedtime Tuesday and Thursday.",
+              "B asks for a single decision: who owns bedtime Tuesday and Thursday."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "heading": "Bedtime needs an owner",
+            "briefing": "You want to decide who owns bedtime Tuesday and Thursday.",
+            "user_opening_objective": "Open by saying what you want decided.",
+            "counterpart_turn": "I can talk, but I have to leave in ten minutes.",
+            "user_response_objective": "You have ten minutes. Narrow the topic, set a time to finish, or move the conversation to text."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "conversation_job",
+              "conversation_conditions"
+            ],
+            "may_evaluate": [
+              "One primary job is identifiable.",
+              "The timing, scope, or channel choice is usable."
+            ],
+            "may_not_infer": [
+              "avoidance motive",
+              "confidence",
+              "counterpart motive"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Use the same ten-minute limit. Change only the part Hope named.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Next time something big is coming, ask yourself what you want the conversation to settle."
+        },
+        {
+          "practice_id": "gtp_event_not_story",
+          "content_version": "days-5-v3-contextual-1",
+          "authoring_status": "approved_with_contextual_counterpart_adaptation",
+          "launch_eligible": false,
+          "source_lineage": [
+            "approved Days 2–8 V3: former Day 5"
+          ],
+          "primary_behavior_id": "observation_not_story",
+          "title": "Separate what happened from the story",
+          "preview": "Say what happened so another person could point to the same event.",
+          "lesson_cards": [
+            "Start with something another person could point to: what was said, done, or agreed.",
+            "Stop before you turn what you think it means into a fact about them.",
+            "Your feelings can stay in. Leave out the verdict about what the event says about them."
+          ],
+          "discrimination_check": {
+            "prompt": "Which one starts with something that happened?",
+            "options": [
+              "You don’t care how exhausted I am.",
+              "I handled bedtime alone four nights this week after we agreed to split it."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A turns a motive into a fact. B gives a count and names the agreement.",
+              "B gives the other person something specific to answer."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "briefing": "You want to describe what this week has actually looked like.",
+            "counterpart_turn": "What actually happened this week?",
+            "user_response_objective": "Say what happened this week in a sentence or two. Stop before you say what it means about the other person."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "observation_not_story"
+            ],
+            "may_evaluate": [
+              "One observable event is present.",
+              "No motive or character claim is presented as fact.",
+              "No unnecessary evidence pile follows."
+            ],
+            "may_not_infer": [
+              "counterpart motive",
+              "relationship diagnosis",
+              "that a feeling was expressed incorrectly"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Give one thing that happened this week. Stop before you say what it proves.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Prepare one current example for the real conversation. Don’t build a historical case file."
+        },
+        {
+          "practice_id": "gtp_point_that_survives",
+          "content_version": "days-6-v3-contextual-1",
+          "authoring_status": "approved_with_contextual_counterpart_adaptation",
+          "launch_eligible": false,
+          "source_lineage": [
+            "approved Days 2–8 V3: former Day 6"
+          ],
+          "primary_behavior_id": "one_point",
+          "title": "Keep one point in the room",
+          "preview": "Stay with your point after an objection you need to address.",
+          "lesson_cards": [
+            "Pick the point you want to keep clear, even when the conversation gets uncomfortable.",
+            "One example is enough. Stack up three and the other person answers the stack instead of the point.",
+            "When the other person objects, say you heard it. Then go back to the same point."
+          ],
+          "discrimination_check": {
+            "prompt": "Which one is easier to stay on?",
+            "options": [
+              "This is about bedtime, the dishes, your phone, your mother visiting, and how we never spend time together.",
+              "The point I need to keep clear is that bedtime needs an owner, not another list I manage."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A opens five issues at once. B leaves one thing to answer.",
+              "B keeps one point in view without building a case."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "briefing": "You want bedtime to have a clear owner instead of another list you manage.",
+            "user_opening_objective": "Say the point once. Then hold it after the objection.",
+            "counterpart_turn": "I do bedtime when I can. Work has been all over the place.",
+            "user_response_objective": "Respond to the part about work, then come back to bedtime. Leave the other issues for later."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "one_point"
+            ],
+            "may_evaluate": [
+              "One central point is identifiable.",
+              "At most one supporting example is used.",
+              "The same point remains after resistance."
+            ],
+            "may_not_infer": [
+              "rambling personality",
+              "anxiety from length",
+              "a universal word limit for a good answer"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Answer the work concern briefly, then return to the bedtime request.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Say your one point out loud before the real conversation."
+        },
+        {
+          "practice_id": "gtp_keep_point_present",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 14",
+            "modular source teaching contract"
+          ],
+          "primary_behavior_id": "return_to_point",
+          "title": "Acknowledge once, then return",
+          "preview": "Respond to what matters without following every new branch.",
+          "lesson_cards": [
+            "Being responsive doesn’t mean following every new branch.",
+            "Acknowledge the part that matters. Then return to the request, boundary, or decision you started with.",
+            "If the new concern needs its own conversation, give it a real return point instead of arguing about both at once."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response acknowledges the concern and keeps the original decision visible?",
+            "options": [
+              "Okay, never mind. We can talk about my tone instead.",
+              "You’re right that I sounded sharp. I want to address that, and I also want to finish deciding who owns bedtime."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A drops the original decision. B acknowledges the concern and returns to it.",
+              "B makes room for the concern without losing the original decision."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "You’re talking about bedtime, but the way you brought it up was unfair.",
+            "user_response_objective": "Acknowledge what needs acknowledging, then return to the bedtime decision."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "acknowledge_and_return"
+            ],
+            "may_evaluate": [
+              "The concern is acknowledged.",
+              "The original point remains identifiable."
+            ],
+            "may_not_infer": [
+              "whether the complaint is fair",
+              "counterpart motive",
+              "relationship pattern"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Acknowledge once, then return to the one decision.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Prepare one return phrase that sounds like something you would actually say."
+        },
+        {
+          "practice_id": "gtp_stop_building_case",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 3, 5, 6, and 17",
+            "modular source teaching contract"
+          ],
+          "primary_behavior_id": "evidence_restraint",
+          "title": "Stop when the point is clear",
+          "preview": "Use enough detail to make the point understandable without building a case file.",
+          "lesson_cards": [
+            "More examples can make a clear point harder to answer.",
+            "Use one current example when it helps. Then stop and leave room for a response.",
+            "If the point is already understandable, another example usually changes the conversation into a trial."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response gives enough evidence without turning into a case?",
+            "options": [
+              "You did it Tuesday, last weekend, when your parents visited, and three times last month.",
+              "I handled bedtime alone four nights this week after we agreed to split it."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A keeps adding history. B gives one current example the other person can answer.",
+              "B gives enough detail to make the point discussable, then stops."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "repeated_unfinished_responsibility",
+            "counterpart_turn": "I understand this week was rough. Why are you bringing up everything from last month too?",
+            "user_response_objective": "Use one current example and return to the decision you need now."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "evidence_restraint"
+            ],
+            "may_evaluate": [
+              "One current example supports the point.",
+              "Historical evidence does not replace the current request."
+            ],
+            "may_not_infer": [
+              "anxiety",
+              "a rambling personality",
+              "dishonesty",
+              "counterpart guilt"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Use one current example, then return to what you need decided now.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Before a difficult conversation, choose the one example you actually need."
+        }
+      ],
+      "source_file": "module-01-get-to-the-point.v0.1.json"
+    },
+    {
+      "schema_version": "0.1",
+      "curriculum_version": "2026-08-11.0-review",
+      "module_id": "make_a_clear_ask",
+      "title": "Make a Clear Ask",
+      "promise": "Turn a vague need, frustration, or desired quality into something another person can actually answer.",
+      "completion_capability": "I can make a specific request without turning the answer into a test of whether the other person cares.",
+      "calendar_locked": false,
+      "revisitable": true,
+      "practices": [
+        {
+          "practice_id": "mca_find_hidden_ask",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "modular source",
+            "former Day 7"
+          ],
+          "primary_behavior_id": "hidden_ask",
+          "title": "Find the ask inside the frustration",
+          "preview": "Find the action or decision hiding underneath a broad complaint.",
+          "lesson_cards": [
+            "Frustration often points to something you want changed, but it doesn’t always name the change.",
+            "Ask what action, decision, or ownership would make the concern discussable.",
+            "Keep the feeling and concern. Replace the test of character with something that can be answered."
+          ],
+          "discrimination_check": {
+            "prompt": "Which version turns the frustration into something discussable?",
+            "options": [
+              "I need you to care more about this family.",
+              "I want us to decide who owns bedtime on Tuesday and Thursday."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A asks for a quality. B names the decision hidden inside the frustration.",
+              "B turns the frustration into one decision the other person can answer."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "What are you asking me to do differently?",
+            "user_response_objective": "Name the action or decision underneath the frustration."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "hidden_ask"
+            ],
+            "may_evaluate": [
+              "One action or decision can be identified."
+            ],
+            "may_not_infer": [
+              "whether the counterpart cares",
+              "the learner’s assertiveness",
+              "relationship commitment"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name the action or decision hiding underneath the frustration.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "When you hear yourself asking for a quality, look for the action underneath it."
+        },
+        {
+          "practice_id": "mca_answerable_action",
+          "content_version": "0.1-review",
+          "authoring_status": "approved_with_contextual_counterpart_adaptation",
+          "launch_eligible": false,
+          "source_lineage": [
+            "approved Days 2–8 V3: former Day 7"
+          ],
+          "primary_behavior_id": "answerable_request",
+          "title": "Make one answerable request",
+          "preview": "Ask for one next step the other person can answer.",
+          "lesson_cards": [
+            "Turn the concern into a next step the other person can accept, decline, or change.",
+            "Say what, who, and when. Skip the parts that don’t matter.",
+            "A request leaves room for an answer. It isn’t a loyalty test, and a yes isn’t guaranteed."
+          ],
+          "discrimination_check": {
+            "prompt": "Which one can the other person answer?",
+            "options": [
+              "I need you to care more and show up for this family.",
+              "Can you own bedtime every Tuesday and Thursday, including pajamas, teeth, and lights out?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A asks for a quality. B asks for a job, a person, and two nights.",
+              "B gives the other person a clear request they can accept, decline, or change."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "Tuesday might work. Thursday I’m at work late.",
+            "user_response_objective": "Respond to the Thursday conflict. Adjust the nights or ask what would work.",
+            "user_opening_objective": "Ask who will do what and on which nights."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "answerable_request"
+            ],
+            "may_evaluate": [
+              "One action or decision is identifiable.",
+              "The responsible person is clear.",
+              "Timing is present when relevant.",
+              "The request permits an answer."
+            ],
+            "may_not_infer": [
+              "counterpart compliance",
+              "love or loyalty",
+              "assertiveness",
+              "refusal as communication failure"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Ask who will do what and when. Leave room for a no or a different plan.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Try the request in a smaller conversation, or save it for the conversation you have in mind."
+        },
+        {
+          "practice_id": "mca_owner_and_timing",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 7 and 24"
+          ],
+          "primary_behavior_id": "request_owner_timing",
+          "title": "Make ownership and timing clear",
+          "preview": "Make the next step specific enough that both people know who owns it and when it happens.",
+          "lesson_cards": [
+            "A clear request makes ownership visible.",
+            "Add timing when timing changes whether the request can actually happen.",
+            "Skip details that don’t affect the answer."
+          ],
+          "discrimination_check": {
+            "prompt": "Which request makes ownership and timing clear?",
+            "options": [
+              "Can you help more with bedtime?",
+              "Can you own the full bedtime routine Tuesday and Thursday this week?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A leaves the task and timing open. B names the owner, task, and nights.",
+              "B makes the requested ownership and timing visible."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "repeated_unfinished_responsibility",
+            "counterpart_turn": "What exactly would I be responsible for?",
+            "user_response_objective": "Name the owner, the full task, and the timing that matters."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "request_owner_timing"
+            ],
+            "may_evaluate": [
+              "Owner is identifiable.",
+              "Action is concrete.",
+              "Timing is included when relevant."
+            ],
+            "may_not_infer": [
+              "fairness of the household split",
+              "counterpart willingness",
+              "mental-load diagnosis"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name the owner, the action, and the timing that matters.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Before making a request, check whether the owner and timing are actually clear."
+        },
+        {
+          "practice_id": "mca_room_for_answer",
+          "content_version": "0.1-review",
+          "authoring_status": "approved_behavior_copy_adaptation_required",
+          "launch_eligible": false,
+          "source_lineage": [
+            "approved former Day 7 behavior contract"
+          ],
+          "primary_behavior_id": "autonomy_support",
+          "title": "Leave room for an answer",
+          "preview": "Make the request without turning one answer into proof of whether the person cares.",
+          "lesson_cards": [
+            "A request can be accepted, declined, clarified, or changed.",
+            "Pressure begins when only one answer is allowed and every other answer becomes a character test.",
+            "Keep the need visible without pretending the other person has already agreed."
+          ],
+          "discrimination_check": {
+            "prompt": "Which request leaves room for a real answer?",
+            "options": [
+              "If you cared, you would take both nights.",
+              "Can you take Tuesday and Thursday, or tell me which two nights could work?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A makes agreement a test of caring. B keeps the request clear and allows a workable response.",
+              "B leaves room for yes, no, clarification, or another plan."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "I can’t promise both nights every week.",
+            "user_response_objective": "Keep the request clear while leaving room for a constraint or alternative."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "autonomy_support"
+            ],
+            "may_evaluate": [
+              "The request permits more than one legitimate answer."
+            ],
+            "may_not_infer": [
+              "whether refusal is loving",
+              "whether the request is morally owed",
+              "future cooperation"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Keep the request clear and leave room for a no, constraint, or alternative.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Listen for care tests such as “if you wanted to” and replace them with the actual request."
+        },
+        {
+          "practice_id": "mca_adjust_constraint",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 2 and 7"
+          ],
+          "primary_behavior_id": "constraint_response",
+          "title": "Adjust after a real constraint",
+          "preview": "Respond to a practical concern without dropping the need or forcing the original plan.",
+          "lesson_cards": [
+            "A real constraint does not automatically erase the request.",
+            "Answer the part that affects feasibility, then adjust the plan or ask what would work.",
+            "Changing the plan is different from abandoning the need."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response works with the constraint without losing the request?",
+            "options": [
+              "Fine. Forget the whole thing.",
+              "If Thursday runs late, which other night can you own from start to finish?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A abandons the request. B adjusts the timing while keeping the ownership need visible.",
+              "B responds to the constraint and asks for a workable alternative."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "Thursday I’m at work late.",
+            "user_response_objective": "Respond to the conflict and ask for a workable alternative."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "constraint_response"
+            ],
+            "may_evaluate": [
+              "The constraint is addressed.",
+              "The underlying request remains identifiable."
+            ],
+            "may_not_infer": [
+              "whether the constraint is an excuse",
+              "counterpart motive",
+              "desire to cooperate"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Address the constraint, then ask what workable alternative keeps the request intact.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "When a real constraint appears, adjust what can change without losing what still matters."
+        },
+        {
+          "practice_id": "mca_close_next_step",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 24"
+          ],
+          "primary_behavior_id": "explicit_close",
+          "title": "Close with the actual next step",
+          "preview": "End with what was decided, what remains open, and when it will be revisited.",
+          "lesson_cards": [
+            "A useful conversation can still end without a reliable next step.",
+            "Name what was actually decided. Do not inflate partial agreement.",
+            "If something remains open, say when or how it will be revisited."
+          ],
+          "discrimination_check": {
+            "prompt": "Which close makes the current decision visible?",
+            "options": [
+              "Okay, I guess we’ll both try harder.",
+              "You’ll own Tuesday bedtime. We’ll check Thursday on Wednesday night."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A does not name an owner or next check. B states the agreement and the unresolved part.",
+              "B makes the actual decision and next check visible."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "I can commit to Tuesday. I need to check Thursday.",
+            "user_response_objective": "State what was decided, what remains open, and when you will revisit it."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "explicit_close"
+            ],
+            "may_evaluate": [
+              "The actual agreement is stated.",
+              "The unresolved point and next check are visible."
+            ],
+            "may_not_infer": [
+              "relationship success",
+              "emotional resolution",
+              "future follow-through"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "State what was decided, what remains open, and when you will revisit it.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Close one coordination conversation by naming the owner, next action, or unresolved point."
+        }
+      ],
+      "source_file": "module-02-make-a-clear-ask.v0.1.json"
+    },
+    {
+      "schema_version": "0.1",
+      "curriculum_version": "2026-08-11.0-review",
+      "module_id": "start_the_conversation",
+      "title": "Start the Conversation",
+      "promise": "Bring something up clearly without ambushing, accusing, or delivering the entire case in the opening.",
+      "completion_capability": "I can begin clearly enough that the other person knows what we are discussing and why.",
+      "calendar_locked": false,
+      "revisitable": true,
+      "practices": [
+        {
+          "practice_id": "stc_timing_scope_channel",
+          "content_version": "0.1-review",
+          "authoring_status": "approved_behavior_contextual_adaptation_required",
+          "launch_eligible": false,
+          "source_lineage": [
+            "approved former Day 2 behavior contract"
+          ],
+          "primary_behavior_id": "conversation_conditions",
+          "title": "Choose timing, scope, and channel",
+          "preview": "Decide whether this conversation should happen now, later, or somewhere else.",
+          "lesson_cards": [
+            "Before you open the conversation, check whether the conditions can hold the job you are asking it to do.",
+            "You can narrow the topic, choose another time, or move the conversation to writing.",
+            "Delaying with a real return plan is different from making the issue disappear."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response makes a usable timing choice?",
+            "options": [
+              "We have to settle all of this before you leave.",
+              "This needs more than ten minutes. Can we talk after bedtime at 8:30?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A forces the full conversation into unusable timing. B names a concrete return.",
+              "B keeps the conversation alive while choosing better conditions."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "I have to leave in ten minutes.",
+            "user_response_objective": "Choose whether to narrow the topic, set a return, or change the channel."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "conversation_conditions"
+            ],
+            "may_evaluate": [
+              "The timing, scope, or channel choice is usable."
+            ],
+            "may_not_infer": [
+              "avoidance",
+              "commitment",
+              "counterpart availability beyond stated facts"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Choose a usable scope, return time, or channel for the same conversation.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Before opening something important, check whether the time and channel fit the job."
+        },
+        {
+          "practice_id": "stc_name_topic",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 2, 6, and 8"
+          ],
+          "primary_behavior_id": "topic_identification",
+          "title": "Name what this is about",
+          "preview": "Let the other person know the topic before you deliver the whole case.",
+          "lesson_cards": [
+            "A clear opening tells the other person what conversation they are entering.",
+            "Name the topic before adding examples or conclusions.",
+            "The topic can be brief: bedtime ownership, the comment at dinner, or how a decision will be made."
+          ],
+          "discrimination_check": {
+            "prompt": "Which opening names the topic?",
+            "options": [
+              "We need to talk about everything that has been going wrong.",
+              "Can we talk about who owns bedtime on weeknights?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A leaves the topic open-ended. B names the decision under discussion.",
+              "B makes the topic clear before adding the case."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "What do you want to talk about?",
+            "user_response_objective": "Name the topic in one sentence without opening every related issue."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "topic_identification"
+            ],
+            "may_evaluate": [
+              "The topic is identifiable."
+            ],
+            "may_not_infer": [
+              "importance of the topic",
+              "counterpart willingness",
+              "relationship pattern"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name the topic in one sentence without adding the whole case.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Prepare the sentence that tells the other person what conversation you are opening."
+        },
+        {
+          "practice_id": "stc_current_example",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 5 and 8"
+          ],
+          "primary_behavior_id": "current_observation",
+          "title": "Use one current example",
+          "preview": "Give one example that makes the topic concrete without prosecuting the person.",
+          "lesson_cards": [
+            "One current example can make an opening easier to understand.",
+            "Use what happened, not a verdict about what it proves.",
+            "Stop before the example turns into a list of every prior offense."
+          ],
+          "discrimination_check": {
+            "prompt": "Which example makes the topic concrete?",
+            "options": [
+              "You always leave everything to me.",
+              "I handled bedtime alone four nights this week after we agreed to split it."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A gives a global verdict. B gives one current event connected to the topic.",
+              "B makes the topic concrete without turning it into a character claim."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "What makes you want to change this now?",
+            "user_response_objective": "Give one current example and stop before explaining what it proves about the person."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "current_observation"
+            ],
+            "may_evaluate": [
+              "One current observable example is present."
+            ],
+            "may_not_infer": [
+              "counterpart motive",
+              "character",
+              "relationship diagnosis"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Give one current example, then stop before turning it into a verdict.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Choose the one current example that will help the other person understand the topic."
+        },
+        {
+          "practice_id": "stc_own_perspective",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 5, 8, and 13"
+          ],
+          "primary_behavior_id": "owned_perspective",
+          "title": "Say the impact without claiming motive",
+          "preview": "Describe your experience without presenting the other person’s intention as fact.",
+          "lesson_cards": [
+            "Your experience can be clear without claiming why the other person acted.",
+            "Name what happened and the effect it had on you or the decision.",
+            "Leave motive open unless the other person has actually stated it."
+          ],
+          "discrimination_check": {
+            "prompt": "Which sentence owns the speaker’s experience without claiming motive?",
+            "options": [
+              "You leave it to me because you don’t respect my time.",
+              "When bedtime comes back to me after we split it, I feel like I’m still managing the whole routine."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A presents a motive as fact. B connects the event to the speaker’s experience.",
+              "B makes the impact visible without claiming intention."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "repeated_unfinished_responsibility",
+            "counterpart_turn": "Are you saying I don’t care about your time?",
+            "user_response_objective": "Clarify your experience without claiming what the other person intended."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "owned_perspective"
+            ],
+            "may_evaluate": [
+              "Perspective or impact is owned.",
+              "Motive is not presented as fact."
+            ],
+            "may_not_infer": [
+              "the counterpart’s intention",
+              "the learner’s emotional state beyond their words",
+              "relationship quality"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name what happened and its impact without claiming why the other person did it.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Separate the impact you know from the motive you are guessing."
+        },
+        {
+          "practice_id": "stc_one_purpose_or_request",
+          "content_version": "0.1-review",
+          "authoring_status": "approved_behavior_copy_adaptation_required",
+          "launch_eligible": false,
+          "source_lineage": [
+            "approved former Days 2, 7, and 8 contracts"
+          ],
+          "primary_behavior_id": "integrated_opener",
+          "title": "Give the opening one purpose",
+          "preview": "Make it clear what you want this conversation to do.",
+          "lesson_cards": [
+            "An opening is easier to answer when it has one purpose.",
+            "Name the topic, one current example, and the decision or request.",
+            "Leave the rest of the history outside the opening."
+          ],
+          "discrimination_check": {
+            "prompt": "Which opening gives the conversation one purpose?",
+            "options": [
+              "We need to discuss why this keeps happening and what it says about us.",
+              "Can we decide who owns bedtime Tuesday and Thursday? I handled it alone four nights this week."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A opens several jobs and a relationship verdict. B makes one decision visible.",
+              "B names the topic, current example, and one purpose."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "What are you asking us to decide?",
+            "user_response_objective": "Give the opening one topic, one current example, and one purpose or request."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "integrated_opener"
+            ],
+            "may_evaluate": [
+              "The conversation purpose is identifiable.",
+              "One current example supports it."
+            ],
+            "may_not_infer": [
+              "likely agreement",
+              "relationship outcome",
+              "emotional maturity"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Use one topic, one current example, and one purpose or request.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Before the conversation, say the purpose of the opening in one sentence."
+        },
+        {
+          "practice_id": "stc_mild_pushback",
+          "content_version": "0.1-review",
+          "authoring_status": "approved_with_contextual_counterpart_adaptation",
+          "launch_eligible": false,
+          "source_lineage": [
+            "approved Days 2–8 V3: former Day 8"
+          ],
+          "primary_behavior_id": "opener_under_pushback",
+          "title": "Open clearly under mild pressure",
+          "preview": "Build one opener, then respond to one pushback without opening a second argument.",
+          "lesson_cards": [
+            "Put the pieces into a single opener.",
+            "Say what you want settled, what happened, the point you want to keep clear, and what you’re asking for.",
+            "Then let the other person answer. If they push back, respond and return to the request."
+          ],
+          "discrimination_check": {
+            "prompt": "Which opener is easier to answer?",
+            "options": [
+              "You always leave everything to me, and I’m tired of being the only adult who notices anything.",
+              "Can we talk about bedtime? I handled it alone four nights this week. Can you take Tuesday and Thursday, from pajamas through lights out?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A opens with a verdict on the person. B opens with a count, a point, and a question that can be answered.",
+              "B gives a specific week and a request that can be answered."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "I don’t think it’s that serious.",
+            "user_response_objective": "Respond to the pushback without opening a second argument. Then return to your request.",
+            "user_opening_objective": "Say what you want settled, what happened, the point you want to keep clear, and your request.",
+            "approved_pushback_bank": [
+              "I don’t think it’s that serious.",
+              "I’ve had a long day. Can this wait?",
+              "You do that too.",
+              "I thought we already handled this."
+            ]
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "opener_under_pushback"
+            ],
+            "may_evaluate": [
+              "The job is identifiable.",
+              "One current example is present.",
+              "One point and request remain identifiable.",
+              "Pushback is acknowledged where appropriate.",
+              "No second case is introduced."
+            ],
+            "may_not_infer": [
+              "counterpart future reaction",
+              "relationship outcome",
+              "emotional maturity",
+              "global communication score"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Retry the coached segment, then use the same selected pushback.",
+            "invitation": "Try that same moment again.",
+            "branches": {
+              "opener": "Reset before the opener, capture the revised opener, then play the same selected pushback.",
+              "pushback_response": "Replay the same selected pushback, then capture the revised response."
+            }
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Save one sentence from today’s practice for the real conversation."
+        }
+      ],
+      "source_file": "module-03-start-the-conversation.v0.1.json"
+    },
+    {
+      "schema_version": "0.1",
+      "curriculum_version": "2026-08-11.0-review",
+      "module_id": "listen_and_respond",
+      "title": "Listen and Respond",
+      "promise": "Understand what the other person actually said without immediately fixing, defending, correcting, or abandoning your own point.",
+      "completion_capability": "I can show what I heard before deciding whether to agree, clarify, disagree, or return to my point.",
+      "calendar_locked": false,
+      "revisitable": true,
+      "practices": [
+        {
+          "practice_id": "lar_genuine_question",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 9"
+          ],
+          "primary_behavior_id": "genuine_question",
+          "title": "Ask a question whose answer could matter",
+          "preview": "Ask before deciding you already know the explanation.",
+          "lesson_cards": [
+            "A useful question leaves room for information you do not already have.",
+            "An accusation with a question mark is still an accusation.",
+            "Use a direct yes-or-no question when the conversation genuinely needs a decision."
+          ],
+          "discrimination_check": {
+            "prompt": "Which question could change or clarify what you understand?",
+            "options": [
+              "Why do you never think about how this affects me?",
+              "What gets in the way of taking bedtime when you get home?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A assumes the answer and prosecutes it. B asks for information that could matter.",
+              "B asks for information without hiding an accusation inside the question."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "My schedule changes every week.",
+            "user_response_objective": "Ask one question before rebutting or proposing a solution."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "genuine_question"
+            ],
+            "may_evaluate": [
+              "The question seeks information.",
+              "The answer could change or clarify understanding."
+            ],
+            "may_not_infer": [
+              "counterpart motive",
+              "curiosity as a personality trait",
+              "whether the answer is truthful"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Ask one question whose answer you do not already assume.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Replace one anticipated motive with one real question in the next safe conversation."
+        },
+        {
+          "practice_id": "lar_reflect_and_check",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 10; V1.1 architecture approved, copy draft"
+          ],
+          "primary_behavior_id": "reflect_and_check",
+          "title": "Say back the concern and check it",
+          "preview": "Respond to what was stated, then leave room to be corrected.",
+          "lesson_cards": [
+            "Start with what the other person actually stated: a fact, constraint, priority, or request.",
+            "Say it back in your own words.",
+            "End as a check, not a verdict about what they really mean."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response reflects what was stated and leaves room for correction?",
+            "options": [
+              "You always have an excuse.",
+              "The schedule uncertainty is the part making fixed nights hard. Is that right?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A replaces the stated constraint with a judgment. B reflects the constraint and checks it.",
+              "B stays with the stated concern and leaves room for correction."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "My schedule changes every week.",
+            "user_response_objective": "Reflect the stated constraint in your own words and check whether you have it right."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "reflect_and_check"
+            ],
+            "may_evaluate": [
+              "The response is grounded in the stated words.",
+              "The check permits correction."
+            ],
+            "may_not_infer": [
+              "hidden fear",
+              "unstated need",
+              "emotion",
+              "motive"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Reflect the stated concern in your own words, then check whether you have it right.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Before answering, name whether you heard a fact, constraint, priority, or request."
+        },
+        {
+          "practice_id": "lar_receive_complaint",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 11; V1.1 architecture approved, copy draft"
+          ],
+          "primary_behavior_id": "contact_before_defense",
+          "title": "When the concern is about you",
+          "preview": "Make contact with a specific complaint before defending or counterattacking.",
+          "lesson_cards": [
+            "Receiving a complaint does not require agreeing with every detail.",
+            "Show what you heard before correcting, explaining, or raising your own complaint.",
+            "You can dispute facts after the specific concern has made contact."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response makes contact before defense?",
+            "options": [
+              "That is not what happened, and you do it to me too.",
+              "You are saying the correction in front of the kids landed as talking down to you. Which moment do you mean?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A defends and counterattacks before touching the complaint. B shows what was heard and asks for the specific moment.",
+              "B makes contact with the complaint before deciding whether to agree or clarify."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "feeling_dismissed",
+            "counterpart_turn": "When you corrected me in front of the kids, I felt talked down to.",
+            "user_response_objective": "Respond to the specific complaint before explaining, correcting, or raising another issue."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "contact_before_defense"
+            ],
+            "may_evaluate": [
+              "The specific complaint is acknowledged before defense."
+            ],
+            "may_not_infer": [
+              "whether the complaint is fair",
+              "whether it is factually correct",
+              "sincerity",
+              "relationship pattern"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Show what you heard before you explain, correct, or raise your own concern.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "When the concern is about you, show what landed before deciding what you think about it."
+        },
+        {
+          "practice_id": "lar_validate_without_agreeing",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 12"
+          ],
+          "primary_behavior_id": "validation_without_surrender",
+          "title": "Acknowledge without pretending to agree",
+          "preview": "Name the understandable part while keeping factual or practical disagreement available.",
+          "lesson_cards": [
+            "Validation means recognizing an understandable perspective or concern.",
+            "It does not require agreeing with every conclusion.",
+            "Name the part you can honestly acknowledge before adding the point that remains."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response acknowledges something real without pretending to agree?",
+            "options": [
+              "I hear you, but you always say that when you do not want to decide.",
+              "I understand why fixed nights feel risky with your schedule. I still need us to decide how bedtime gets owned."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A uses acknowledgment as a runway for an accusation. B names the understandable constraint and preserves the decision.",
+              "B acknowledges a real concern without giving up the original point."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "Fixed nights are hard when my schedule keeps changing.",
+            "user_response_objective": "Acknowledge one understandable part, then preserve the decision or request."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "validation_without_surrender"
+            ],
+            "may_evaluate": [
+              "One understandable part is acknowledged.",
+              "Agreement is not invented.",
+              "The original point may remain visible."
+            ],
+            "may_not_infer": [
+              "agreement",
+              "emotional state",
+              "counterpart motive",
+              "moral correctness"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name the understandable part first, then preserve the point in one sentence.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Look for one concern you can honestly acknowledge even when the decision remains open."
+        },
+        {
+          "practice_id": "lar_impact_before_intent",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 13"
+          ],
+          "primary_behavior_id": "impact_before_intent",
+          "title": "Hear impact before explaining intent",
+          "preview": "Make contact with the impact you were told about before describing what you meant.",
+          "lesson_cards": [
+            "Intent and impact can both matter.",
+            "Explaining intent first can make the described impact disappear.",
+            "Start with the impact you heard. Clarify intent after contact has been made."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response makes contact with impact first?",
+            "options": [
+              "I did not mean to leave you alone, so that is not fair.",
+              "I hear that leaving without a return time left you alone with the whole problem."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A uses intent to dismiss the impact. B reflects the described impact first.",
+              "B makes contact with the impact without claiming more than was stated."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "pause_without_disappearance",
+            "counterpart_turn": "When you left without saying when you would return, I felt alone with the whole problem.",
+            "user_response_objective": "Acknowledge the described impact before explaining what you intended."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "impact_before_intent"
+            ],
+            "may_evaluate": [
+              "The described impact is acknowledged before intent."
+            ],
+            "may_not_infer": [
+              "responsibility for all feelings",
+              "unspoken impact",
+              "counterpart motive",
+              "required agreement with disputed facts"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Start with the impact you heard. Save intent for the next sentence or a later turn.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "When intent defense appears, ask what impact the other person is trying to describe."
+        },
+        {
+          "practice_id": "lar_acknowledge_and_return",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 14"
+          ],
+          "primary_behavior_id": "acknowledge_and_return",
+          "title": "Respond without losing your own point",
+          "preview": "Acknowledge what matters without following every new branch.",
+          "lesson_cards": [
+            "Being responsive does not require following every branch.",
+            "Acknowledge the concern that belongs in the exchange.",
+            "Then return to the request, boundary, decision, or next step you started with."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response acknowledges and returns?",
+            "options": [
+              "Okay, never mind. We can talk about my tone instead.",
+              "You are right that I sounded sharp. I want to address that, and I also want to finish deciding who owns bedtime."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A drops the original decision. B acknowledges the concern and keeps the decision visible.",
+              "B uses two moves: acknowledge once, then return."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "The way you brought this up was unfair.",
+            "user_response_objective": "Acknowledge the concern, then return to the original decision."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "acknowledge_and_return"
+            ],
+            "may_evaluate": [
+              "The concern is acknowledged.",
+              "The original point remains identifiable."
+            ],
+            "may_not_infer": [
+              "whether the complaint is fair",
+              "counterpart motive",
+              "relationship pattern"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Acknowledge once, then return to the one decision.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Prepare one return phrase that sounds natural rather than scripted."
+        }
+      ],
+      "source_file": "module-04-listen-and-respond.v0.1.json"
+    },
+    {
+      "schema_version": "0.1",
+      "curriculum_version": "2026-08-11.0-review",
+      "module_id": "stay_clear_under_pushback",
+      "title": "Stay Clear Under Pushback",
+      "promise": "Keep the point when someone becomes defensive, minimizes, changes the subject, or pushes back.",
+      "completion_capability": "I can respond to resistance without attacking, proving everything, or abandoning the point.",
+      "calendar_locked": false,
+      "revisitable": true,
+      "practices": [
+        {
+          "practice_id": "scp_notice_pressure_move",
+          "content_version": "0.1-review",
+          "authoring_status": "approved_with_contextual_counterpart_adaptation",
+          "launch_eligible": false,
+          "source_lineage": [
+            "approved Days 2–8 V3: former Day 3"
+          ],
+          "primary_behavior_id": "pressure_pattern",
+          "title": "Spot what pressure makes you do",
+          "preview": "Notice the first move you make after someone pushes back.",
+          "lesson_cards": [
+            "Pressure can change what you do next. That move is behavior, not a personality type.",
+            "You might talk faster, pile on proof, attack, go quiet, apologize your way out, or rush to fix it.",
+            "Listen for a move in your own recording. After Hope’s note, choose whether it fits what happened."
+          ],
+          "discrimination_check": {
+            "prompt": "Which one names a move instead of a type?",
+            "options": [
+              "I’m just bad at conflict.",
+              "When I hear “you’re overreacting,” I start listing older examples."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A labels the person. B names the cue and the move that followed.",
+              "B names the cue and the move that followed it."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "Why is this suddenly such a big deal?",
+            "user_response_objective": "Answer the way you would actually answer, then review the first observable move you made."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "pressure_pattern"
+            ],
+            "may_evaluate": [
+              "One exact observable move is identified.",
+              "The learner can confirm or reject whether it fits."
+            ],
+            "may_not_infer": [
+              "fight-flight-freeze",
+              "trauma response",
+              "attachment style",
+              "nervous-system state",
+              "permanent communication type"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Answer the same objection. Change only the move Hope named.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Listen for the first thing you do after pushback.",
+          "learner_correction_state": {
+            "prompt": "Does that fit what happened?",
+            "accept": "Yes, that fits",
+            "reject": "Not quite",
+            "rejection_policy": "Do not preserve the observation as ground truth. Offer transcript correction or a neutral retry."
+          }
+        },
+        {
+          "practice_id": "scp_narrow_defensiveness",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 16"
+          ],
+          "primary_behavior_id": "defensive_reframe",
+          "title": "Narrow the all-or-nothing frame",
+          "preview": "Clarify the specific concern without counterattacking or accepting a global accusation.",
+          "lesson_cards": [
+            "Defensiveness can turn one concern into a claim about everything.",
+            "Clarify what you are not claiming.",
+            "Then restate the specific concern or request you are making now."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response narrows the frame?",
+            "options": [
+              "There you go making yourself the victim again.",
+              "I am not saying you never help. I am talking about who owns bedtime on these two nights."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A counterattacks. B rejects the global frame and keeps the current scope visible.",
+              "B clarifies the scope without surrendering or expanding the accusation."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "So now everything is my fault?",
+            "user_response_objective": "Clarify the scope, then restate the current issue."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "defensive_reframe"
+            ],
+            "may_evaluate": [
+              "The false global frame is narrowed.",
+              "The actual concern remains specific."
+            ],
+            "may_not_infer": [
+              "defensiveness as a trait",
+              "victim mentality",
+              "counterpart intent"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Clarify what you are not claiming, then restate what you are asking now.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "When an always-or-never defense appears, narrow the scope instead of expanding the case."
+        },
+        {
+          "practice_id": "scp_answer_minimizing",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 17"
+          ],
+          "primary_behavior_id": "minimizing_response",
+          "title": "Respond when the issue is minimized",
+          "preview": "Name why the issue matters without adding volume or history.",
+          "lesson_cards": [
+            "More volume and more history rarely make a minimized issue clearer.",
+            "Name the current impact once.",
+            "Then return to the request or decision."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response preserves importance without building a case?",
+            "options": [
+              "It is a big deal, and here are twelve reasons you never understand me.",
+              "It may feel small to you. For me, it determines whether I get predictable recovery time, so I still want a clear plan."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A adds volume and history. B names one impact and returns to the plan.",
+              "B explains why it matters without requiring the other person to feel the same weight."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "This is not that big a deal.",
+            "user_response_objective": "Use one impact sentence and return to the request."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "minimizing_response"
+            ],
+            "may_evaluate": [
+              "One current impact is stated.",
+              "The request remains visible.",
+              "No historical evidence pile follows."
+            ],
+            "may_not_infer": [
+              "counterpart values",
+              "learner sensitivity",
+              "importance as objective fact"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Use one impact sentence and one request. Do not add another example.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "When minimized, state why it matters to you without demanding equal emotional weight."
+        },
+        {
+          "practice_id": "scp_order_topic_switch",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 18"
+          ],
+          "primary_behavior_id": "topic_ordering",
+          "title": "Handle a counterattack without opening two arguments",
+          "preview": "Give a second issue a real return point, then finish the first job.",
+          "lesson_cards": [
+            "A new concern can be legitimate and still derail the current decision.",
+            "Acknowledge it and choose an order.",
+            "A real return point is different from dismissing it or arguing about both at once."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response gives both issues an order?",
+            "options": [
+              "Fine. Let us talk about everything you do wrong too.",
+              "I am willing to talk about that next. Can we finish the bedtime decision first, then take your concern?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A opens both arguments. B acknowledges the second concern and gives it a return point.",
+              "B protects the current job without dismissing the second issue."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "You keep criticizing my tone, but you interrupt me all the time.",
+            "user_response_objective": "Acknowledge the second issue, give it a return point, and finish the first job."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "topic_ordering"
+            ],
+            "may_evaluate": [
+              "The second issue is acknowledged.",
+              "A credible return point is offered.",
+              "The first job remains identifiable."
+            ],
+            "may_not_infer": [
+              "which complaint is more valid",
+              "counterpart motive",
+              "false equivalence"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Acknowledge the second issue, give it a return point, then finish the first job.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Use a brief parking place for a second issue rather than debating both at once."
+        },
+        {
+          "practice_id": "scp_vague_agreement_or_refusal",
+          "content_version": "0.1-review",
+          "authoring_status": "planned_safety_review_required",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 21, 22, and 26"
+          ],
+          "primary_behavior_id": "response_fit",
+          "title": "Respond to vague agreement or refusal",
+          "preview": "Choose a next move that fits instead of treating persistence as success.",
+          "lesson_cards": [
+            "Not every response needs another argument.",
+            "A vague yes may need clarification; a real no may need acceptance, negotiation, a boundary, or an ending.",
+            "Choose the next move based on the conversation job, authority, and safety."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response treats refusal as information instead of automatic failure?",
+            "options": [
+              "We cannot stop until you agree.",
+              "We do not agree tonight. Let us name what remains open and decide whether there is a legitimate next step."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A forces agreement. B names the current reality and leaves room for an appropriate next step.",
+              "B does not confuse persistence with skill."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "bedtime_ownership",
+            "counterpart_turn": "I am not agreeing to fixed nights.",
+            "user_response_objective": "Choose whether to clarify, negotiate, accept the no, pause, or name an appropriate boundary."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "response_fit"
+            ],
+            "may_evaluate": [
+              "The response fits the stated refusal and the learner’s authority."
+            ],
+            "may_not_infer": [
+              "refusal as lack of love",
+              "agreement as success",
+              "the safest ending without context"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name the current reality and choose one legitimate next step without forcing agreement.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Before a difficult conversation, identify which endings would still count as skillful."
+        }
+      ],
+      "blocked_practices": [
+        {
+          "practice_id": "scp_unannounced_reaction",
+          "title": "Choose a response you were not prompted to use",
+          "primary_behavior_id": "adaptive_response_selection",
+          "authoring_status": "mechanically_blocked",
+          "launch_eligible": false,
+          "technical_gate": "Requires a larger reaction bank, identical controlled retry, and separately labeled varied-reaction transfer state.",
+          "source_lineage": [
+            "former Day 22"
+          ]
+        }
+      ],
+      "source_file": "module-05-stay-clear-under-pushback.v0.1.json"
+    },
+    {
+      "schema_version": "0.1",
+      "curriculum_version": "2026-08-11.0-review",
+      "module_id": "pause_say_no_boundary",
+      "title": "Pause, Say No, or Set a Boundary",
+      "promise": "Slow or end a conversation cleanly, make a real boundary, and stop treating every disagreement as something that must be resolved immediately.",
+      "completion_capability": "I can pause, decline, set a limit, or end without disappearing, threatening, or forcing agreement.",
+      "calendar_locked": false,
+      "revisitable": true,
+      "practices": [
+        {
+          "practice_id": "psb_create_choice",
+          "content_version": "0.1-review",
+          "authoring_status": "approved_with_contextual_counterpart_adaptation",
+          "launch_eligible": false,
+          "source_lineage": [
+            "approved Days 2–8 V3: former Day 4"
+          ],
+          "primary_behavior_id": "choice_point",
+          "title": "Create enough space to choose",
+          "preview": "Take a moment after pushback, then pick one thing to say.",
+          "lesson_cards": [
+            "You don’t have to feel calm. Take enough time to choose what you say next.",
+            "After an objection, pick one move. Say a sentence, ask a question, or ask to come back to it.",
+            "Adding more words before you choose usually hides the move you meant to make."
+          ],
+          "discrimination_check": {
+            "prompt": "Which one leaves room to choose?",
+            "options": [
+              "No, listen, because last week you also, and the week before that…",
+              "(brief pause) The main thing I’m asking is whether you can own Tuesday bedtime."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A keeps adding evidence. B waits, then says one thing.",
+              "B waits, then makes one move the other person can answer."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "pause_without_disappearance",
+            "counterpart_turn": "I don’t see why we need a schedule. We’ve been figuring it out.",
+            "user_response_objective": "Take a moment. Then say one sentence, ask one question, or ask to come back to it."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "choice_point"
+            ],
+            "may_evaluate": [
+              "One conversational move is present.",
+              "The response does not pile on evidence.",
+              "The move is answerable or usable."
+            ],
+            "may_not_infer": [
+              "calmness",
+              "heart rate",
+              "confidence from pitch",
+              "intentional silence from recording latency or speech difference"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Take a moment after the objection. Then make one move.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "When you catch yourself piling on words, stop there and pick one thing to say.",
+          "safety_contract": [
+            "Ordinary rehearsal stops when credible fear, coercion, retaliation, or danger is disclosed."
+          ],
+          "audio_contract": {
+            "discrimination_option_b_has_brief_audible_pause": true,
+            "rehearsal_pause_duration_scored": false,
+            "manual_recording_latency_is_not_conversational_evidence": true
+          }
+        },
+        {
+          "practice_id": "psb_request_pause",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 20 segment 1"
+          ],
+          "primary_behavior_id": "pause_request_contract",
+          "title": "Ask for a pause with a return",
+          "preview": "Pause the conversation without making it disappear.",
+          "lesson_cards": [
+            "A useful pause names that the conversation is stopping for now.",
+            "Add a return time or readiness condition and say who will restart.",
+            "A pause is not a punishment, threat, or indefinite disappearance."
+          ],
+          "discrimination_check": {
+            "prompt": "Which pause contains a return?",
+            "options": [
+              "I cannot do this. I am done.",
+              "I need to pause. I will come back at 8:30 after bedtime and restart this."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A stops without a return. B names the pause, return time, and restart owner.",
+              "B protects the conversation without requiring it to continue now."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "pause_without_disappearance",
+            "counterpart_turn": "If we stop now, this is never going to get resolved.",
+            "user_response_objective": "Request a pause and name when or under what condition you will restart."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "pause_request_contract"
+            ],
+            "may_evaluate": [
+              "The pause is named.",
+              "A credible return condition is present.",
+              "The restart owner is visible."
+            ],
+            "may_not_infer": [
+              "calmness",
+              "avoidance",
+              "abandonment intent",
+              "a universal pause duration"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name the pause, the return condition, and who will restart.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Use a pause only when appropriate, state the return, and follow through.",
+          "safety_contract": [
+            "Do not prescribe a return when direct conversation is unsafe.",
+            "Do not universalize a twenty-minute pause."
+          ]
+        },
+        {
+          "practice_id": "psb_receive_pause",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 20 segment 2"
+          ],
+          "primary_behavior_id": "pause_receive_contract",
+          "title": "Receive a pause without chasing",
+          "preview": "Accept another person’s pause while making the return visible.",
+          "lesson_cards": [
+            "Receiving a pause does not require accepting indefinite disappearance.",
+            "Acknowledge the need to stop, then ask for a credible return condition.",
+            "Do not use pressure, pursuit, or catastrophe to force the conversation to continue."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response accepts the pause and protects the return?",
+            "options": [
+              "No. We are finishing this now.",
+              "Okay. When should we check back, and who will restart?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A refuses the pause. B accepts it and asks for a return contract.",
+              "B leaves room to stop while keeping the issue from silently disappearing."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "pause_without_disappearance",
+            "counterpart_turn": "I need to stop. I cannot keep talking right now.",
+            "user_response_objective": "Accept the pause and ask for a return condition without chasing or collapsing."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "pause_receive_contract"
+            ],
+            "may_evaluate": [
+              "The pause is accepted.",
+              "A return condition is requested.",
+              "The response does not force immediate continuation."
+            ],
+            "may_not_infer": [
+              "abandonment",
+              "counterpart emotional state",
+              "whether the pause is sincere",
+              "relationship pattern"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Accept the pause, then ask for a credible return condition.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "When someone asks to pause, protect both the stop and the return.",
+          "safety_contract": [
+            "Do not pressure a return when credible safety or retaliation concerns exist.",
+            "Do not interpret a pause request as abandonment."
+          ]
+        },
+        {
+          "practice_id": "psb_request_vs_boundary",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 21"
+          ],
+          "primary_behavior_id": "request_boundary_distinction",
+          "title": "Know whether this is a request or a boundary",
+          "preview": "Separate what you are asking them to do from what you will do.",
+          "lesson_cards": [
+            "A request asks what the other person will do.",
+            "A boundary states what you will do when a real limit is crossed.",
+            "A threat uses punishment or fear to force compliance."
+          ],
+          "discrimination_check": {
+            "prompt": "Which statement is controlled by the speaker?",
+            "options": [
+              "You have to stop insulting me or else.",
+              "If insults start again, I will pause and return when we can speak without them."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A demands control without naming the speaker’s action. B states the action the speaker will take.",
+              "B connects a user-controlled action to a real limit."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "pause_without_disappearance",
+            "counterpart_turn": "You are overreacting. We are finishing this conversation.",
+            "user_response_objective": "State the limit and the action you will take if it continues."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "request_boundary_distinction"
+            ],
+            "may_evaluate": [
+              "The limit is clear.",
+              "The action is controlled by the learner.",
+              "The consequence is connected to the limit."
+            ],
+            "may_not_infer": [
+              "ability to control the counterpart",
+              "whether the limit proves abuse",
+              "moral superiority",
+              "future enforcement"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "State what you will do, not what you will force them to do.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Use a boundary only where a real limit exists; do not turn every preference into one.",
+          "safety_contract": [
+            "Do not coach direct boundary announcement when credible coercion, violence, stalking, or retaliation is disclosed."
+          ]
+        },
+        {
+          "practice_id": "psb_say_no",
+          "content_version": "0.1-review",
+          "authoring_status": "planned_safety_review_required",
+          "launch_eligible": false,
+          "source_lineage": [
+            "modular source; planned curriculum"
+          ],
+          "primary_behavior_id": "concise_refusal",
+          "title": "Say no without a hostile essay",
+          "preview": "Decline clearly without inventing excuses or prosecuting the request.",
+          "lesson_cards": [
+            "A clear no does not need a long defense.",
+            "Give a brief reason only when it is useful and safe.",
+            "Declining a request does not require attacking the person who asked."
+          ],
+          "discrimination_check": {
+            "prompt": "Which refusal is clear without opening another argument?",
+            "options": [
+              "No, because you always ask at the worst time and never think about me.",
+              "No, I cannot take that on this week."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A turns the refusal into a prosecution. B gives a clear answer without a new case.",
+              "B is direct and leaves the request answered."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "pause_without_disappearance",
+            "counterpart_turn": "Can you take over both school drop-off and pickup this week?",
+            "user_response_objective": "Decline the request clearly without inventing an excuse or attacking the person."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "concise_refusal"
+            ],
+            "may_evaluate": [
+              "The refusal is identifiable.",
+              "No unnecessary counterattack or invented excuse is added."
+            ],
+            "may_not_infer": [
+              "guilt",
+              "selfishness",
+              "confidence",
+              "whether the refusal is morally correct"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Give a clear no. Add only the reason or alternative that actually matters.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Practice one concise no before a lower-stakes request where declining is legitimate.",
+          "safety_contract": [
+            "Ordinary rehearsal stops when credible fear, coercion, retaliation, or danger is disclosed."
+          ]
+        },
+        {
+          "practice_id": "psb_accept_no",
+          "content_version": "0.1-review",
+          "authoring_status": "planned_safety_review_required",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 7, 21, 22, and 26"
+          ],
+          "primary_behavior_id": "receive_refusal",
+          "title": "Accept no without forcing resolution",
+          "preview": "Respond to a refusal without treating persistence as proof of good communication.",
+          "lesson_cards": [
+            "A no is information, not automatic evidence that the request was badly communicated.",
+            "You may clarify, negotiate an alternative, name your own boundary, or accept the refusal.",
+            "Do not turn the answer into a test of love, loyalty, or character."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response treats no as information?",
+            "options": [
+              "If you cared, you would find a way.",
+              "Okay. Is there another arrangement you can commit to, or should I plan without this?"
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A converts refusal into a care test. B asks one legitimate follow-up and allows the no to remain real.",
+              "B keeps the practical need visible without forcing agreement."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "pause_without_disappearance",
+            "counterpart_turn": "No. I cannot commit to either night.",
+            "user_response_objective": "Choose one fitting response: clarify, ask for an alternative, accept the no, or state a real boundary."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "receive_refusal"
+            ],
+            "may_evaluate": [
+              "The response fits the refusal.",
+              "The counterpart is not pressured into agreement."
+            ],
+            "may_not_infer": [
+              "lack of love",
+              "bad communication",
+              "counterpart motive",
+              "which consequence is safe without context"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Respond to the no without turning agreement into a test of care.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Before asking, decide what you will do if the answer is no.",
+          "safety_contract": [
+            "Ordinary rehearsal stops when credible fear, coercion, retaliation, or danger is disclosed."
+          ]
+        },
+        {
+          "practice_id": "psb_choose_ending",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 26"
+          ],
+          "primary_behavior_id": "appropriate_ending",
+          "title": "Choose the right ending",
+          "preview": "End with the reality that exists instead of forcing resolution.",
+          "lesson_cards": [
+            "Agreement is only one possible ending.",
+            "Other endings include disagreement, pause, revisit, boundary, support, documentation, escalation, or exit.",
+            "The ending should fit the conversation job, authority, and safety."
+          ],
+          "discrimination_check": {
+            "prompt": "Which ending names reality without forcing agreement?",
+            "options": [
+              "We cannot stop until you admit I am right.",
+              "We do not agree tonight. Let us revisit the schedule Sunday after we check our commitments."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A forces resolution. B names the disagreement and a legitimate next step.",
+              "B treats unresolved disagreement as a possible ending."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "pause_without_disappearance",
+            "counterpart_turn": "I am not changing my answer tonight.",
+            "user_response_objective": "Name the current reality and one legitimate next step, including no further conversation when appropriate."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "appropriate_ending"
+            ],
+            "may_evaluate": [
+              "The ending fits the stated situation.",
+              "Agreement is not treated as the only successful outcome."
+            ],
+            "may_not_infer": [
+              "the safest ending without context",
+              "relationship prognosis",
+              "counterpart future behavior"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name the current reality and one legitimate next step without forcing agreement.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Before a real conversation, identify which endings would still count as skillful.",
+          "safety_contract": [
+            "Safety routing may replace ordinary closure with support, documentation, formal escalation, or exit."
+          ]
+        }
+      ],
+      "blocked_practices": [
+        {
+          "practice_id": "psb_reclaim_floor",
+          "title": "Reclaim one bounded sentence after interruption",
+          "primary_behavior_id": "bounded_floor_reclaim",
+          "authoring_status": "mechanically_blocked",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 19"
+          ],
+          "technical_gate": "Requires honest interruption or barge-in during an active learner turn, reliable timing, transcript segmentation, and safe duplex audio behavior. A post-recording clip is not an interruption."
+        }
+      ],
+      "source_file": "module-06-pause-say-no-boundary.v0.1.json"
+    },
+    {
+      "schema_version": "0.1",
+      "curriculum_version": "2026-08-11.0-review",
+      "module_id": "repair_what_went_wrong",
+      "title": "Repair What Went Wrong",
+      "promise": "Own what you said or did badly without erasing the issue that still needs attention.",
+      "completion_capability": "I can own the miss, name what I will change, and reopen the real issue without using it as an excuse.",
+      "calendar_locked": false,
+      "revisitable": true,
+      "practices": [
+        {
+          "practice_id": "rww_name_the_miss",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 23"
+          ],
+          "primary_behavior_id": "specific_repair_target",
+          "title": "Name the specific miss",
+          "preview": "Identify the action or delivery problem instead of apologizing for everything.",
+          "lesson_cards": [
+            "A useful repair starts with the specific thing that happened.",
+            "Name the words, action, or delivery problem.",
+            "Do not turn the repair into a global judgment about yourself."
+          ],
+          "discrimination_check": {
+            "prompt": "Which repair names the specific miss?",
+            "options": [
+              "I am sorry I am such a terrible partner.",
+              "I raised my voice and called you selfish."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A turns the repair into a global self-judgment. B names the behavior that needs repair.",
+              "B gives the other person a specific action to respond to."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "repair_after_harsh_delivery",
+            "counterpart_turn": "What exactly are you apologizing for?",
+            "user_response_objective": "Name the specific words, action, or delivery problem."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "specific_repair_target"
+            ],
+            "may_evaluate": [
+              "A specific repair target is identifiable."
+            ],
+            "may_not_infer": [
+              "personality",
+              "global blameworthiness",
+              "counterpart forgiveness",
+              "relationship damage"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name the specific words, action, or delivery problem without judging your whole character.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "When repair is needed, name the bounded miss before explaining anything else.",
+          "safety_contract": [
+            "Ordinary rehearsal stops when credible fear, coercion, retaliation, or danger is disclosed."
+          ]
+        },
+        {
+          "practice_id": "rww_own_without_but",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 23"
+          ],
+          "primary_behavior_id": "unqualified_ownership",
+          "title": "Own it without “but”",
+          "preview": "Take responsibility without using the underlying issue as a justification.",
+          "lesson_cards": [
+            "The original issue may still matter. It does not excuse harmful delivery.",
+            "Own the specific behavior before reopening the issue.",
+            "A “but” inside the apology usually turns ownership back into blame."
+          ],
+          "discrimination_check": {
+            "prompt": "Which statement owns the miss without making it the other person’s fault?",
+            "options": [
+              "I am sorry I yelled, but you pushed me there.",
+              "I raised my voice and called you selfish. That was unfair."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A makes the other person responsible for the behavior. B owns it directly.",
+              "B names and owns the behavior without adding a justification."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "repair_after_harsh_delivery",
+            "counterpart_turn": "Are you saying this was my fault too?",
+            "user_response_objective": "Own the behavior without adding a justification or counter-blame."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "unqualified_ownership"
+            ],
+            "may_evaluate": [
+              "The learner owns the behavior without qualification."
+            ],
+            "may_not_infer": [
+              "equal contribution",
+              "counterpart provocation",
+              "required self-condemnation",
+              "forgiveness"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Remove the justification. Own the specific behavior in one sentence.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Listen for “but” after an apology and separate the repair from the unresolved issue.",
+          "safety_contract": [
+            "Ordinary rehearsal stops when credible fear, coercion, retaliation, or danger is disclosed."
+          ]
+        },
+        {
+          "practice_id": "rww_acknowledge_impact",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 13 and 23"
+          ],
+          "primary_behavior_id": "repair_impact_contact",
+          "title": "Acknowledge the impact you were told about",
+          "preview": "Make contact with described impact without pretending to know more than was said.",
+          "lesson_cards": [
+            "Repair includes the impact the other person actually described.",
+            "Use their stated experience rather than inventing what they must have felt.",
+            "You can acknowledge impact without agreeing to facts that remain disputed."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response acknowledges stated impact without mind-reading?",
+            "options": [
+              "I know I destroyed your trust completely.",
+              "You said the name-calling made it harder to talk about the actual problem."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A invents a total relationship outcome. B stays with the impact that was stated.",
+              "B acknowledges the described impact without claiming more than the evidence supports."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "repair_after_harsh_delivery",
+            "counterpart_turn": "The name-calling made me stop listening to the actual issue.",
+            "user_response_objective": "Acknowledge the impact that was stated without adding an inferred feeling or outcome."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "repair_impact_contact"
+            ],
+            "may_evaluate": [
+              "The stated impact is acknowledged.",
+              "No unspoken impact is presented as fact."
+            ],
+            "may_not_infer": [
+              "hidden feelings",
+              "relationship prognosis",
+              "trust damage beyond stated words",
+              "required agreement"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Acknowledge the impact you were told about without adding an outcome they did not state.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "In a repair, use the impact that was described rather than the one you imagine.",
+          "safety_contract": [
+            "Ordinary rehearsal stops when credible fear, coercion, retaliation, or danger is disclosed."
+          ]
+        },
+        {
+          "practice_id": "rww_changed_behavior",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 23"
+          ],
+          "primary_behavior_id": "changed_behavior_commitment",
+          "title": "Say what will be different next time",
+          "preview": "Make the repair actionable by naming one behavior you will change.",
+          "lesson_cards": [
+            "An apology describes the miss. Repair also names what changes next.",
+            "Choose one behavior under your control.",
+            "Do not promise a personality transformation or a perfect future."
+          ],
+          "discrimination_check": {
+            "prompt": "Which statement names an observable change?",
+            "options": [
+              "I promise I will be a better communicator.",
+              "If I start labeling you, I will stop and return to one request."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A promises a broad identity change. B names a behavior the speaker can perform.",
+              "B makes the next behavior visible and controllable."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "repair_after_harsh_delivery",
+            "counterpart_turn": "What will you do differently when we restart?",
+            "user_response_objective": "Name one observable behavior you will use instead."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "changed_behavior_commitment"
+            ],
+            "may_evaluate": [
+              "One changed behavior is observable and controlled by the learner."
+            ],
+            "may_not_infer": [
+              "future perfection",
+              "sincerity",
+              "counterpart acceptance",
+              "personality change"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name one behavior you will use instead when the same pressure appears.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "A repair becomes credible through the next observable action, not a bigger promise.",
+          "safety_contract": [
+            "Ordinary rehearsal stops when credible fear, coercion, retaliation, or danger is disclosed."
+          ]
+        },
+        {
+          "practice_id": "rww_reopen_issue",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 23 and 24"
+          ],
+          "primary_behavior_id": "repair_and_reopen",
+          "title": "Reopen the issue without using it as an excuse",
+          "preview": "Return to the legitimate concern only after the repair has made contact.",
+          "lesson_cards": [
+            "Repair does not require abandoning the issue underneath it.",
+            "Finish the ownership before reopening the concern.",
+            "Reopen with one point or request, not a renewed prosecution."
+          ],
+          "discrimination_check": {
+            "prompt": "Which response repairs first and then reopens the issue?",
+            "options": [
+              "I should not have yelled, but the bedtime problem is still your fault.",
+              "Calling you selfish was unfair. I want to restart and make one clear request about bedtime."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A uses the issue to qualify the repair. B completes ownership and then reopens with one purpose.",
+              "B keeps repair and the underlying issue separate enough for both to remain visible."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "repair_after_harsh_delivery",
+            "counterpart_turn": "Are you apologizing, or are you trying to restart the argument?",
+            "user_response_objective": "Complete the ownership, then reopen with one point or request."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "repair_and_reopen"
+            ],
+            "may_evaluate": [
+              "The repair is not qualified.",
+              "The underlying issue is reopened as one discussable point."
+            ],
+            "may_not_infer": [
+              "forgiveness",
+              "relationship repair",
+              "counterpart readiness",
+              "shared blame"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Finish the ownership first. Then reopen with one point or request.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "When you reopen, demonstrate the changed behavior instead of repeating the original delivery.",
+          "safety_contract": [
+            "Ordinary rehearsal stops when credible fear, coercion, retaliation, or danger is disclosed."
+          ]
+        }
+      ],
+      "gated_practices": [
+        {
+          "practice_id": "rww_follow_through",
+          "title": "Let follow-through complete the repair",
+          "primary_behavior_id": "repair_follow_through",
+          "authoring_status": "planned_requires_saved_action_state",
+          "launch_eligible": false,
+          "source_lineage": [
+            "modular source",
+            "former Day 28"
+          ],
+          "teaching_contract": "Review whether the learner completed the specific changed behavior they selected, without inferring forgiveness or relationship repair.",
+          "technical_gate": "Requires persisted repair commitment, later check-in state, no-action branch, and adverse-event/safety routing."
+        }
+      ],
+      "source_file": "module-07-repair-what-went-wrong.v0.1.json"
+    },
+    {
+      "schema_version": "0.1",
+      "curriculum_version": "2026-08-11.0-review",
+      "module_id": "use_it_in_real_life",
+      "title": "Use It in Real Life",
+      "promise": "Combine the skills, prepare for a real conversation, review what happened, and build a personal playbook.",
+      "completion_capability": "I can select and apply the right behavior in a realistic situation rather than rely on one memorized script.",
+      "calendar_locked": false,
+      "revisitable": true,
+      "practices": [
+        {
+          "practice_id": "uir_choose_conditions",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 2 and 27"
+          ],
+          "primary_behavior_id": "transfer_conditions",
+          "title": "Choose conditions that can hold the conversation",
+          "preview": "Select a safe time, place, channel, and scope before rehearsing the plan.",
+          "lesson_cards": [
+            "The same words can land differently depending on timing, privacy, channel, and power.",
+            "Choose conditions that can hold the job you want the conversation to do.",
+            "Delay, document, seek support, or do not proceed when direct conversation is not appropriate."
+          ],
+          "discrimination_check": {
+            "prompt": "Which plan chooses usable conditions?",
+            "options": [
+              "I will bring it up in the car when neither of us can leave.",
+              "I will ask after bedtime when we have privacy, and I will move it to writing if timing changes."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A removes choice and safe exit. B names usable conditions and an alternative channel.",
+              "B makes timing, privacy, and an alternate channel visible."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "real_conversation_plan",
+            "counterpart_turn": "When and how do you want to have this conversation?",
+            "user_response_objective": "Name a safe time, place, channel, and alternate route."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "transfer_conditions"
+            ],
+            "may_evaluate": [
+              "Conditions are specific and context-appropriate.",
+              "A safe alternate route is available when needed."
+            ],
+            "may_not_infer": [
+              "safety from timing alone",
+              "counterpart reaction",
+              "relationship readiness",
+              "whether direct conversation is required"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Choose a safer time, place, channel, or alternate route for the same conversation.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Before a real conversation, check timing, privacy, channel, and whether direct conversation is appropriate.",
+          "safety_contract": [
+            "Credible fear, coercion, retaliation, legal sensitivity, or danger routes away from ordinary rehearsal."
+          ]
+        },
+        {
+          "practice_id": "uir_process_goal",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 27"
+          ],
+          "primary_behavior_id": "process_goal",
+          "title": "Choose one goal under your control",
+          "preview": "Decide what behavior you want available even if the other person does not agree.",
+          "lesson_cards": [
+            "An outcome goal depends on both people. A process goal names what you will do.",
+            "Choose one behavior you want available at the hardest moment.",
+            "Agreement may happen, but it cannot be the skill the app asks you to control."
+          ],
+          "discrimination_check": {
+            "prompt": "Which goal is controlled by the learner?",
+            "options": [
+              "Make them finally understand and agree.",
+              "State one request and return to it after one objection."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A requires the other person’s agreement. B names behavior the learner can perform.",
+              "B remains measurable even if the counterpart disagrees."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "real_conversation_plan",
+            "counterpart_turn": "What do you want to be able to do when the conversation gets difficult?",
+            "user_response_objective": "Name one process goal under your control."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "process_goal"
+            ],
+            "may_evaluate": [
+              "One observable learner behavior is identified."
+            ],
+            "may_not_infer": [
+              "agreement",
+              "counterpart understanding",
+              "relationship outcome",
+              "confidence"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Name one behavior you want available regardless of the other person’s answer.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Before the conversation, choose one behavior you can control instead of an outcome you cannot.",
+          "safety_contract": [
+            "Ordinary rehearsal stops when credible fear, coercion, retaliation, or danger is disclosed."
+          ]
+        },
+        {
+          "practice_id": "uir_if_then_plan",
+          "content_version": "0.1-review",
+          "authoring_status": "review_ready_draft",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 22 and 27"
+          ],
+          "primary_behavior_id": "implementation_intention",
+          "title": "Build one if–then response",
+          "preview": "Connect one likely cue to one behavior you have practiced.",
+          "lesson_cards": [
+            "A plan is easier to use when it links a cue to one response.",
+            "Name the pressure moment you expect, then the behavior you will try.",
+            "Keep the plan specific enough to rehearse and flexible enough to say in your own words."
+          ],
+          "discrimination_check": {
+            "prompt": "Which plan connects one cue to one observable response?",
+            "options": [
+              "If it goes badly, I will communicate better.",
+              "If the conversation shifts to everything I do wrong, I will give that issue a return point and finish the bedtime decision first."
+            ],
+            "stronger_option_index": 1,
+            "feedback": [
+              "A does not name the cue or behavior. B links one likely cue to a practiced response.",
+              "B creates a response that can be rehearsed before the real moment."
+            ],
+            "scored": false
+          },
+          "preset_scenario": {
+            "scenario_key": "real_conversation_plan",
+            "counterpart_turn": "What reaction are you most likely to hear?",
+            "user_response_objective": "Complete one plan: If this cue happens, then I will use this behavior."
+          },
+          "coaching_contract": {
+            "priority_order": [
+              "implementation_intention"
+            ],
+            "may_evaluate": [
+              "One cue and one observable response are present."
+            ],
+            "may_not_infer": [
+              "whether the reaction will occur",
+              "counterpart motive",
+              "transfer success",
+              "relationship outcome"
+            ],
+            "exact_confirmed_quote_required": true,
+            "one_behavior_only": true,
+            "note_word_limit": 32,
+            "retry_instruction_word_limit": 20,
+            "combined_word_limit": 48
+          },
+          "retry": {
+            "same_pressure_turn_required": true,
+            "direction": "Use one specific cue and one behavior you can perform when it appears.",
+            "invitation": "Try that same moment again."
+          },
+          "comparison": {
+            "one_behavior_only": true,
+            "word_limit": 36
+          },
+          "transfer_cue": "Save one if–then plan for the moment most likely to pull you off your point.",
+          "safety_contract": [
+            "Ordinary rehearsal stops when credible fear, coercion, retaliation, or danger is disclosed."
+          ]
+        }
+      ],
+      "gated_practices": [
+        {
+          "practice_id": "uir_real_or_equivalent_attempt",
+          "title": "Use the plan or choose a high-fidelity rehearsal",
+          "primary_behavior_id": "real_world_transfer",
+          "authoring_status": "safety_review_required_requires_saved_plan_state",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 27 and 28"
+          ],
+          "teaching_contract": "The learner chooses whether and when to attempt the real conversation; postponing or declining is not failure. A saved-scenario rehearsal is always available.",
+          "technical_gate": "Requires persisted plan, user-selected window, no-conversation branch, adverse-event capture, and safety routing."
+        }
+      ],
+      "blocked_practices": [
+        {
+          "practice_id": "uir_alternate_reaction",
+          "title": "Rehearse a different plausible reaction",
+          "primary_behavior_id": "transfer_variation",
+          "authoring_status": "mechanically_blocked",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Days 22 and 29"
+          ],
+          "technical_gate": "Requires separate controlled-retry and varied-transfer attempt types so the second stimulus cannot contaminate comparison."
+        },
+        {
+          "practice_id": "uir_debrief",
+          "title": "Review what actually happened",
+          "primary_behavior_id": "observable_debrief",
+          "authoring_status": "mechanically_blocked",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 28"
+          ],
+          "technical_gate": "Requires saved plan, did-not-happen branch, user/counterpart/outcome separation, adverse-event capture, and safety review."
+        },
+        {
+          "practice_id": "uir_replay_hardest_moment",
+          "title": "Replay the hardest moment with one adjustment",
+          "primary_behavior_id": "debrief_retry",
+          "authoring_status": "mechanically_blocked",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 28"
+          ],
+          "technical_gate": "Requires a confirmed debrief moment and a deterministic reconstruction that does not claim the simulation is the real conversation."
+        },
+        {
+          "practice_id": "uir_personal_playbook",
+          "title": "Build a playbook from choices you made",
+          "primary_behavior_id": "learner_authored_playbook",
+          "authoring_status": "mechanically_blocked",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 29"
+          ],
+          "technical_gate": "Every item must be learner-authored or explicitly selected; Hope may use consented exact quotes but may not infer frequency, personality, or patterns."
+        },
+        {
+          "practice_id": "uir_novel_rehearsal",
+          "title": "Apply the skill in a new scenario",
+          "primary_behavior_id": "novel_transfer",
+          "authoring_status": "mechanically_blocked",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 29"
+          ],
+          "technical_gate": "Requires novel comparable-scenario state, an unprompted first attempt, stable reaction identity, and separate transfer evidence."
+        },
+        {
+          "practice_id": "uir_baseline_comparison",
+          "title": "Compare with the preserved baseline",
+          "primary_behavior_id": "baseline_equivalent_comparison",
+          "authoring_status": "mechanically_blocked",
+          "launch_eligible": false,
+          "source_lineage": [
+            "former Day 30"
+          ],
+          "technical_gate": "Requires durable uncoached onboarding artifact, matched-condition metadata, condition-aware comparison, and a separately validated multi-dimension contract."
+        }
+      ],
+      "source_file": "module-08-use-it-in-real-life.v0.1.json"
+    }
+  ]
+}
