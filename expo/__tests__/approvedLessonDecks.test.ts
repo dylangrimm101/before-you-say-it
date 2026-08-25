@@ -113,6 +113,9 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).toContain('contentPane.style.webkitOverflowScrolling = "touch"');
     expect(deckScreen).toContain('contentPane.setAttribute("data-bysi-scrollable-content", "true")');
     expect(deckScreen).toContain("protectScrollableCardContent();");
+    expect(deckScreen).toContain("animation-duration:.001ms!important");
+    expect(deckScreen).toContain('document.getElementById("__bundler_err")');
+    expect(deckScreen).toContain("suppressArtifactHostDiagnostic();");
   });
 
   test("keeps the catalog and deck route fail-closed outside development", async () => {

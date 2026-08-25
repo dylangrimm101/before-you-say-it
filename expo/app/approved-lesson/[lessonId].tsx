@@ -102,7 +102,7 @@ export default function ApprovedLessonDeckScreen() {
           if (!document.getElementById("bysi-rork-review-style")) {
             var style = document.createElement("style");
             style.id = "bysi-rork-review-style";
-            style.textContent = "body *{visibility:hidden!important}[data-bysi=deck],[data-bysi=deck] *{visibility:visible!important}html,body{margin:0!important;padding:0!important;width:100%!important;height:100%!important;overflow:hidden!important;background:#F2EDE4!important}";
+            style.textContent = "body *{visibility:hidden!important}[data-bysi=deck],[data-bysi=deck] *{visibility:visible!important}[data-bysi=deck] *{animation-duration:.001ms!important;animation-delay:0ms!important}#__bundler_err{display:none!important}html,body{margin:0!important;padding:0!important;width:100%!important;height:100%!important;overflow:hidden!important;background:#F2EDE4!important}";
             document.head.appendChild(style);
           }
           var scale = Math.min(window.innerWidth / 393, window.innerHeight / 852);
@@ -115,6 +115,10 @@ export default function ApprovedLessonDeckScreen() {
           deck.style.transform = "scale(" + scale + ")";
           deck.style.borderRadius = "0";
           deck.style.boxShadow = "none";
+        }
+        function suppressArtifactHostDiagnostic() {
+          var diagnostic = document.getElementById("__bundler_err");
+          if (diagnostic) diagnostic.remove();
         }
         function disableDeferredActions() {
           var controls = Array.prototype.slice.call(document.querySelectorAll("button, [role=button]"));
@@ -180,6 +184,7 @@ export default function ApprovedLessonDeckScreen() {
           return true;
         }, true);
         function enforce() {
+          suppressArtifactHostDiagnostic();
           fitApprovedFrame();
           disableDeferredActions();
           enableApprovedMoveCompletion();
