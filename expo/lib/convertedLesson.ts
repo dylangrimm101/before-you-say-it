@@ -171,14 +171,10 @@ export function evidenceQuoteFor(dimension: M1L1DimensionId, transcript: string)
 
 function flag(dimension: M1L1DimensionId, status: M1L1BehaviorFlag["status"], transcript: string): M1L1BehaviorFlag {
   if (status === "not_assessable") return { dimension, status, evidenceQuote: null };
-  let evidenceQuote = evidenceQuoteFor(dimension, transcript);
-  if (!evidenceQuote && status === "met" && (dimension === "motive_character_language" || dimension === "evidence_discipline")) {
-    evidenceQuote = evidenceQuoteFor("grounding_concreteness", transcript);
-  }
-  if (!evidenceQuote && status === "met" && dimension === "issue_count") {
-    evidenceQuote = evidenceQuoteFor("point_placement", transcript);
-  }
-  return evidenceQuote ? { dimension, status, evidenceQuote } : { dimension, status: "not_assessable", evidenceQuote: null };
+  const evidenceQuote = evidenceQuoteFor(dimension, transcript);
+  return evidenceQuote && transcript.includes(evidenceQuote)
+    ? { dimension, status, evidenceQuote }
+    : { dimension, status: "not_assessable", evidenceQuote: null };
 }
 
 export const M1L1_PUSHBACK_ONE_DEFINITIONS = M1_L1_CONVERSION.pushbackOneBank.map((text, index) => ({
@@ -245,8 +241,9 @@ export function hasCanonicalM1L1PressureSequence(run: PilotDayRun): boolean {
 
 /** Scoreless transcript-observable flags for one confirmed learner segment. */
 export function m1L1BehaviorFlags(confirmedTranscript: string, coachedBeat: 1 | 3 | 5): M1L1BehaviorFlag[] {
-  const transcript = cleanTranscript(confirmedTranscript);
-  if (transcript.length < 2) return DIMENSION_PRIORITY.map((dimension) => flag(dimension, "not_assessable", transcript));
+  const originalTranscript = confirmedTranscript;
+  const transcript = cleanTranscript(originalTranscript);
+  if (transcript.length < 2) return DIMENSION_PRIORITY.map((dimension) => flag(dimension, "not_assessable", originalTranscript));
   const lower = transcript.toLowerCase();
   const firstSentence = transcript.split(/(?<=[.!?])\s+/)[0] ?? transcript;
   const sentenceCount = transcript.split(/[.!?]+/).filter((part) => part.trim().length > 0).length;
@@ -259,13 +256,13 @@ export function m1L1BehaviorFlags(confirmedTranscript: string, coachedBeat: 1 | 
   const parksAndReturns = /\b(i hear|that's fair|i understand|i get that)\b/.test(lower) && /\b(still|my point|the handoff|the file|what i need)\b/.test(lower);
   const evidenceDiscipline = coachedBeat === 5 ? !caseBuilding && !motiveClaim : !caseBuilding;
   return [
-    flag("point_placement", directPoint ? "met" : "not_met", transcript),
-    flag("issue_count", caseBuilding ? "not_met" : "met", transcript),
-    flag("grounding_concreteness", grounded ? "met" : "not_met", transcript),
-    flag("motive_character_language", motiveClaim ? "not_met" : "met", transcript),
-    flag("move_clarity", answerableMove ? "met" : "not_met", transcript),
-    flag("evidence_discipline", evidenceDiscipline ? "met" : "not_met", transcript),
-    flag("park_and_return", coachedBeat === 3 || coachedBeat === 5 ? (parksAndReturns ? "met" : "not_met") : "not_assessable", transcript),
+    flag("point_placement", directPoint ? "met" : "not_met", originalTranscript),
+    flag("issue_count", caseBuilding ? "not_met" : "met", originalTranscript),
+    flag("grounding_concreteness", grounded ? "met" : "not_met", originalTranscript),
+    flag("motive_character_language", motiveClaim ? "not_met" : "met", originalTranscript),
+    flag("move_clarity", answerableMove ? "met" : "not_met", originalTranscript),
+    flag("evidence_discipline", evidenceDiscipline ? "met" : "not_met", originalTranscript),
+    flag("park_and_return", coachedBeat === 3 || coachedBeat === 5 ? (parksAndReturns ? "met" : "not_met") : "not_assessable", originalTranscript),
   ];
 }
 

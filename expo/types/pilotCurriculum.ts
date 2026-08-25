@@ -180,7 +180,7 @@ export interface ScenarioPracticeContext {
   counterpartLabel: string;
   counterpartRole: string;
   /** Voice resolved when the run is created so resume cannot change counterpart identity. */
-  contextualPersona?: import("@/types/convo").PersonaVoice;
+  contextualPersona: import("@/types/convo").PersonaVoice;
 }
 
 /** One authored or provider-generated pressure turn reused for the retry. */
@@ -226,7 +226,7 @@ export interface M1L1RehearsalState {
   replayIsFinal?: boolean;
   replayRequestedAt?: number;
   replayAudioId?: string;
-  replayProof?: "playback_started" | "text_fallback_acknowledged" | "top_of_scene_reset";
+  replayProof?: "playback_completed" | "text_fallback_acknowledged" | "top_of_scene_reset";
   replayCompletedAt?: number;
   finalRetryPressureReplayedAt?: number;
   finalRetryPressureAudioId?: string;
@@ -246,6 +246,8 @@ export interface PilotDayRun {
   scenarioMode: "preset" | "carried_context";
   /** Present only when a scenario enters this canonical paid-practice run. */
   scenarioContext?: ScenarioPracticeContext;
+  /** Voice fixed when a modular run is created; contextual playback never re-resolves it. */
+  contextualPersona?: import("@/types/convo").PersonaVoice;
   counterpartTurn?: ScenarioCounterpartTurn;
   counterpartIdentity?: string;
   counterpartReactionId?: string;

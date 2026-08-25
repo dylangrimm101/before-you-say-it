@@ -9,14 +9,10 @@ export interface NativeRecordingCleanupAdapter {
 
 /** Stops/releases native capture and deletes content even when stop itself fails. */
 export async function cleanupNativeRecordingStrict(adapter: NativeRecordingCleanupAdapter): Promise<void> {
-  let stopError: unknown;
-  try { await adapter.stop(); } catch (error) { stopError = error; }
+  await adapter.stop();
   const uri = adapter.uri();
-  let deletionError: unknown;
-  try { if (uri) await adapter.discard(uri); } catch (error) { deletionError = error; }
-  try { await adapter.releaseAudioMode(); } catch (error) { if (!stopError) stopError = error; }
-  if (deletionError) throw deletionError;
-  if (stopError) throw stopError;
+  await adapter.releaseAudioMode();
+  if (uri) await adapter.discard(uri);
 }
 
 export interface WebRecordingCleanupAdapter {
@@ -28,8 +24,17 @@ export interface WebRecordingCleanupAdapter {
 /** Browser cleanup keeps buffered content pending unless stop and discard both succeed. */
 export async function cleanupWebRecordingStrict(adapter: WebRecordingCleanupAdapter): Promise<void> {
   await adapter.stop();
-  await adapter.discardBufferedContent();
   adapter.releaseTracks();
+  await adapter.discardBufferedContent();
+}
+
+/** Runs the navigation boundary only after the hook confirms all pending recorder cleanup. */
+export async function leaveAfterStrictDictationCleanup(
+  cancel: () => Promise<void>,
+  navigate: () => void,
+): Promise<void> {
+  await cancel();
+  navigate();
 }
 
 /** Strictly deletes one temporary recording and verifies native content is absent. */

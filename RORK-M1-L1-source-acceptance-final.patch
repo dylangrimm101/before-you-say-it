@@ -1,0 +1,1512 @@
+diff --git a/expo/__tests__/baselineAudio.test.ts b/expo/__tests__/baselineAudio.test.ts
+index ee8f199..c2fdd77 100644
+--- a/expo/__tests__/baselineAudio.test.ts
++++ b/expo/__tests__/baselineAudio.test.ts
+@@ -87,7 +87,7 @@ const {
+   hasBaselineAudio,
+   keepBaselineAudio,
+ } = await import("@/lib/baselineAudio");
+-const { cleanupNativeRecordingStrict, cleanupWebRecordingStrict, discardTemporaryRecordingStrict } = await import("@/lib/temporaryRecording");
++const { cleanupNativeRecordingStrict, cleanupWebRecordingStrict, discardTemporaryRecordingStrict, leaveAfterStrictDictationCleanup } = await import("@/lib/temporaryRecording");
+ 
+ beforeEach(() => {
+   disk.clear();
+@@ -155,7 +155,7 @@ describe("baseline audio lifecycle", () => {
+     expect(disk.has(uri)).toBe(true);
+   });
+ 
+-  it("native stop failure still deletes created content and reports the stop failure", async () => {
++  it("native stop failure retains URI-backed content and release work for retry", async () => {
+     let deleted = false;
+     let released = false;
+     await expect(cleanupNativeRecordingStrict({
+@@ -164,8 +164,8 @@ describe("baseline audio lifecycle", () => {
+       discard: async () => { deleted = true; },
+       releaseAudioMode: async () => { released = true; },
+     })).rejects.toThrow("native stop failed");
+-    expect(deleted).toBe(true);
+-    expect(released).toBe(true);
++    expect(deleted).toBe(false);
++    expect(released).toBe(false);
+   });
+ 
+   it("native delete failure remains rejected after stop and release", async () => {
+@@ -190,6 +190,19 @@ describe("baseline audio lifecycle", () => {
+     expect(released).toBe(false);
+   });
+ 
++  it("the screen navigation boundary remains blocked and retryable until hook cleanup succeeds", async () => {
++    let attempts = 0;
++    let navigations = 0;
++    const cancel = async (): Promise<void> => {
++      attempts += 1;
++      if (attempts < 2) throw new Error("pending cleanup");
++    };
++    await expect(leaveAfterStrictDictationCleanup(cancel, () => { navigations += 1; })).rejects.toThrow("pending cleanup");
++    expect(navigations).toBe(0);
++    await leaveAfterStrictDictationCleanup(cancel, () => { navigations += 1; });
++    expect(navigations).toBe(1);
++  });
++
+   it("strict deletion fails closed and leaves retained content visibly pending", async () => {
+     disk.set("file:///app/Caches/rec-1.m4a", { uri: "file:///app/Caches/rec-1.m4a", exists: true });
+     await keepBaselineAudio("s-1", "file:///app/Caches/rec-1.m4a");
+diff --git a/expo/__tests__/clientEnvGuard.test.ts b/expo/__tests__/clientEnvGuard.test.ts
+index 810b6e0..637aae0 100644
+--- a/expo/__tests__/clientEnvGuard.test.ts
++++ b/expo/__tests__/clientEnvGuard.test.ts
+@@ -33,19 +33,24 @@ describe("client environment repopulation guard", () => {
+     expect(() => guardClientProcessEnv({ EXPO_PUBLIC_NEW_SECRET_TOKEN: "secret" })).toThrow("Unknown secret-like client variables");
+   });
+ 
+-  test("canonical package lifecycles all invoke the environment guard", async () => {
++  test("canonical lifecycles use the wrapper that sanitizes the actual downstream process", async () => {
+     const pkg = JSON.parse(await Bun.file(`${import.meta.dir}/../package.json`).text()) as { scripts?: Record<string, string> };
+-    expect(pkg.scripts?.["env:guard"]).toBe("bun scripts/sanitize-client-env.ts");
+     for (const name of ["start", "start-web", "start-web-dev", "test", "lint", "check", "export"]) {
+-      expect(pkg.scripts?.[name], `${name} must guard before work`).toStartWith("bun run env:guard &&");
++      expect(pkg.scripts?.[name], `${name} must use one sanitizing parent`).toBe(`bun scripts/run-client-command.ts ${name}`);
+     }
+-    const child = Bun.spawn(["bun", "run", "env:guard"], {
++    const probe = Bun.spawn(["bun", "scripts/run-client-command.ts", "probe"], {
+       cwd: `${import.meta.dir}/..`,
+-      env: { ...process.env, OPENAI_API_KEY: "fixture-private", EXPO_PUBLIC_UNKNOWN_SECRET_TOKEN: "fixture-public-secret" },
++      env: { ...process.env, OPENAI_API_KEY: "fixture-private", SUPABASE_ACCESS_TOKEN: "fixture-token", EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY: "fixture-public" },
+       stdout: "pipe", stderr: "pipe",
+     });
+-    expect(await child.exited).not.toBe(0);
+-    expect(await new Response(child.stderr).text()).toContain("Unknown secret-like client variables");
++    expect(await probe.exited).toBe(0);
++    expect(await new Response(probe.stdout).text()).toContain("DOWNSTREAM_SECRET_ABSENT");
++
++    const rejected = Bun.spawn(["bun", "scripts/run-client-command.ts", "probe"], {
++      cwd: `${import.meta.dir}/..`, env: { ...process.env, EXPO_PUBLIC_UNKNOWN_SECRET_TOKEN: "fixture" }, stdout: "pipe", stderr: "pipe",
++    });
++    expect(await rejected.exited).not.toBe(0);
++    expect(await new Response(rejected.stderr).text()).toContain("Unknown secret-like client variables");
+   });
+ 
+   test("Metro sanitizes process and file values before creating its Expo client configuration", async () => {
+diff --git a/expo/__tests__/convertedCompletionJournal.test.ts b/expo/__tests__/convertedCompletionJournal.test.ts
+index 991609a..906f180 100644
+--- a/expo/__tests__/convertedCompletionJournal.test.ts
++++ b/expo/__tests__/convertedCompletionJournal.test.ts
+@@ -45,13 +45,15 @@ async function pending(storage: MemoryCompletionStorage): Promise<void> {
+ }
+ 
+ describe("converted completion phase-aware crash journal", () => {
+-  test("before private deletion remains non-visible and does not clear active content", async () => {
++  test("restart resumes awaiting private cleanup before clearing and promoting", async () => {
+     resetConvertedProgressQueueForTests();
+     const storage = new MemoryCompletionStorage();
+     await pending(storage);
+-    expect(await recoverPendingConvertedCompletion(storage)).toBeNull();
+-    expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(true);
+-    expect(storage.values.has(CONVERTED_PROGRESS_KEY)).toBe(false);
++    const deleted: string[] = [];
++    expect(await recoverPendingConvertedCompletion(storage, async (runId) => { deleted.push(runId); })).toHaveLength(1);
++    expect(deleted).toEqual(["run-journal"]);
++    expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(false);
++    expect(storage.values.has(CONVERTED_PROGRESS_KEY)).toBe(true);
+   });
+ 
+   test("after strict deletion, restart clears the exact active revision and promotes once", async () => {
+@@ -59,11 +61,11 @@ describe("converted completion phase-aware crash journal", () => {
+     const storage = new MemoryCompletionStorage();
+     await pending(storage);
+     await markPendingPrivateContentDeleted(storage, "run-journal");
+-    const recovered = await recoverPendingConvertedCompletion(storage);
++    const recovered = await recoverPendingConvertedCompletion(storage, async () => {});
+     expect(recovered).toHaveLength(1);
+     expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(false);
+     expect(storage.values.has(CONVERTED_COMPLETION_PENDING_KEY)).toBe(false);
+-    expect(await recoverPendingConvertedCompletion(storage)).toBeNull();
++    expect(await recoverPendingConvertedCompletion(storage, async () => {})).toBeNull();
+   });
+ 
+   test("active-key removal failure remains recoverable without repeating visible completion", async () => {
+@@ -72,9 +74,9 @@ describe("converted completion phase-aware crash journal", () => {
+     await pending(storage);
+     await markPendingPrivateContentDeleted(storage, "run-journal");
+     storage.failRemoveKey = ACTIVE_SCENARIO_RUN_KEY;
+-    await expect(recoverPendingConvertedCompletion(storage)).rejects.toThrow("crash removing");
++    await expect(recoverPendingConvertedCompletion(storage, async () => {})).rejects.toThrow("crash removing");
+     expect(storage.values.has(CONVERTED_PROGRESS_KEY)).toBe(false);
+-    expect(await recoverPendingConvertedCompletion(storage)).toHaveLength(1);
++    expect(await recoverPendingConvertedCompletion(storage, async () => {})).toHaveLength(1);
+   });
+ 
+   test("progress-write then journal-cleanup failure is idempotent", async () => {
+@@ -86,19 +88,20 @@ describe("converted completion phase-aware crash journal", () => {
+     storage.failRemoveKey = CONVERTED_COMPLETION_PENDING_KEY;
+     await expect(promotePendingConvertedCompletion(storage, "run-journal")).rejects.toThrow("crash removing");
+     expect(JSON.parse(storage.values.get(CONVERTED_PROGRESS_KEY) ?? "[]")).toHaveLength(1);
+-    expect(await recoverPendingConvertedCompletion(storage)).toHaveLength(1);
++    expect(await recoverPendingConvertedCompletion(storage, async () => {})).toHaveLength(1);
+     expect(JSON.parse(storage.values.get(CONVERTED_PROGRESS_KEY) ?? "[]")).toHaveLength(1);
+   });
+ 
+-  test("malformed active JSON is quarantined only after private deletion proof", async () => {
++  test("malformed active JSON is quarantined only after restart audio cleanup uses journal identity", async () => {
+     resetConvertedProgressQueueForTests();
+     const storage = new MemoryCompletionStorage();
+     await pending(storage);
+     storage.values.set(ACTIVE_SCENARIO_RUN_KEY, "{bad json");
+-    expect(await recoverPendingConvertedCompletion(storage)).toBeNull();
+-    expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(true);
+-    await markPendingPrivateContentDeleted(storage, "run-journal");
+-    expect(await recoverPendingConvertedCompletion(storage)).toHaveLength(1);
++    const order: string[] = [];
++    const recovered = await recoverPendingConvertedCompletion(storage, async (runId) => { order.push(`delete:${runId}`); });
++    expect(recovered).toHaveLength(1);
++    expect(order).toEqual(["delete:run-journal"]);
++    expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(false);
+     expect(storage.values.has(QUARANTINED_SCENARIO_RUN_KEY)).toBe(true);
+   });
+ 
+diff --git a/expo/__tests__/convertedLesson.test.ts b/expo/__tests__/convertedLesson.test.ts
+index 88dc370..5e50df4 100644
+--- a/expo/__tests__/convertedLesson.test.ts
++++ b/expo/__tests__/convertedLesson.test.ts
+@@ -32,6 +32,7 @@ import {
+   attachM1L1PushbackOne,
+   attachM1L1PushbackTwo,
+   confirmM1L1PressureReplay,
++  completeM1L1PressureReplay,
+   createScenarioPracticeRun,
+   initializeM1L1Run,
+   normalizeScenarioPracticeRun,
+@@ -63,7 +64,7 @@ function acceptedRun(id = "accepted-run"): PersistedScenarioPracticeRun {
+   const note = m1L1CoachNote(value.run.m1L1!.secondResponseAttempt!.transcript, 5)!;
+   value = attachM1L1Coaching(value, `${note.worked} ${note.change}`, note.retryDirection, 5, note.flags, note.selectedDimension, 8);
+   value = stageM1L1PressureReplay(value, false, 9);
+-  value = confirmM1L1PressureReplay(value, "playback_started", 10);
++  value = confirmM1L1PressureReplay(value, "playback_completed", 10);
+   value = preserveM1L1Retry(value, "I hear that. Yesterday the file arrived at 4:20. Can we move the handoff to noon?", 10);
+   const comparison = m1L1Comparison(value.run.m1L1!.secondResponseAttempt!.transcript, value.run.retryAttempt!.transcript, note.selectedDimension, 5);
+   return { ...value, run: { ...value.run, state: "attempt_comparison", comparison } };
+@@ -137,7 +138,7 @@ describe("accepted M1 L1 narrow correction", () => {
+     value = stageM1L1PressureReplay(value, true, 12);
+     expect(value.run.m1L1?.beat).toBe(7);
+     expect(preserveM1L1Retry(value, "Blocked until replay proof.", 13)).toEqual(value);
+-    value = confirmM1L1PressureReplay(value, "playback_started", 14);
++    value = confirmM1L1PressureReplay(value, "playback_completed", 14);
+     value = preserveM1L1Retry(value, "Second and final retry.", 15);
+     const capped = preserveM1L1Retry(value, "A forbidden third retry.", 14);
+     expect(value.run.m1L1?.retryCount).toBe(2);
+@@ -153,21 +154,27 @@ describe("accepted M1 L1 narrow correction", () => {
+       expect(staged.run.state).toBe("replay_pending");
+       expect(staged.run.m1L1?.replayTarget).toBe(beat === 1 ? "top_of_scene" : beat === 3 ? "pushback_one" : "evidence_trap");
+       expect(preserveM1L1Retry(staged, "Capture must remain blocked.", 101)).toEqual(staged);
+-      const wrongProof = confirmM1L1PressureReplay(staged, beat === 1 ? "playback_started" : "top_of_scene_reset", 102);
++      const wrongProof = confirmM1L1PressureReplay(staged, beat === 1 ? "playback_completed" : "top_of_scene_reset", 102);
+       expect(wrongProof).toEqual(staged);
+-      const confirmed = confirmM1L1PressureReplay(staged, beat === 1 ? "top_of_scene_reset" : "playback_started", 103);
++      const confirmed = confirmM1L1PressureReplay(staged, beat === 1 ? "top_of_scene_reset" : "playback_completed", 103);
+       expect(confirmed.run.state).toBe("ready_for_retry");
+       expect(confirmed.run.m1L1?.replayCompletedAt).toBeDefined();
+     }
+   });
+ 
+-  test("failed or interrupted final replay never unlocks capture without explicit text acknowledgement", () => {
++  test("real start-then-interrupt replay path stays locked until completion or exact-text acknowledgement", async () => {
+     const completed = acceptedRun("replay-failure");
+     const available = { ...completed, run: { ...completed.run, state: "final_retry_available" as const } };
+     const staged = stageM1L1PressureReplay(available, true, 200);
++    let interrupt!: (outcome: "interrupted") => void;
++    const startedThenInterrupted = completeM1L1PressureReplay(staged, () => new Promise((resolve) => { interrupt = resolve; }), 201);
+     expect(staged.run.state).toBe("replay_pending");
+     expect(preserveM1L1Retry(staged, "Still blocked.", 201)).toEqual(staged);
+-    const acknowledged = confirmM1L1PressureReplay(staged, "text_fallback_acknowledged", 202);
++    interrupt("interrupted");
++    expect(await startedThenInterrupted).toEqual(staged);
++    const playedToEnd = await completeM1L1PressureReplay(staged, async () => "completed", 202);
++    expect(playedToEnd.run.state).toBe("ready_for_final_retry_capture");
++    const acknowledged = confirmM1L1PressureReplay(staged, "text_fallback_acknowledged", 203);
+     expect(acknowledged.run.state).toBe("ready_for_final_retry_capture");
+     expect(acknowledged.run.m1L1?.replayProof).toBe("text_fallback_acknowledged");
+   });
+@@ -195,7 +202,7 @@ describe("accepted M1 L1 narrow correction", () => {
+     expect(caseBuilding.find((f) => f.dimension === "evidence_discipline")?.status).toBe("not_met");
+     expect(motive.find((f) => f.dimension === "motive_character_language")?.status).toBe("not_met");
+     expect(noMove.find((f) => f.dimension === "move_clarity")?.status).toBe("not_assessable");
+-    expect(clean.find((f) => f.dimension === "evidence_discipline")?.status).toBe("met");
++    expect(clean.find((f) => f.dimension === "evidence_discipline")?.status).toBe("not_assessable");
+     expect(clean.find((f) => f.dimension === "move_clarity")?.status).toBe("met");
+     expect(clean.find((f) => f.dimension === "park_and_return")?.status).toBe("met");
+   });
+@@ -212,17 +219,26 @@ describe("accepted M1 L1 narrow correction", () => {
+ 
+   test("derives every comparison transition truthfully from the same selected flag", () => {
+     const met = "Yesterday the handoff arrived at 4:20. Can we move it to noon?";
+-    const notMet = "You never care about the handoff.";
++    const notMet = "Maybe there is a handoff problem.";
+     const cases = [
+       [notMet, met, /improved/i], [met, met, /held/i], [met, notMet, /regressed/i],
+       [notMet, notMet, /still did not/i], ["", met, /not assessable/i], [met, "", /not assessable/i],
+       ["", notMet, /not assessable/i], [notMet, "", /not assessable/i], ["", "", /not assessable/i],
+     ] as const;
+     cases.forEach(([before, after, expected]) => {
+-      expect(m1L1Comparison(before, after, "motive_character_language", 5).text).toMatch(expected);
++      expect(m1L1Comparison(before, after, "point_placement", 5).text).toMatch(expected);
+     });
+   });
+ 
++  test("production flags, coaching, and comparison preserve exact Unicode and multiline source spans", () => {
++    const original = "I hear that.\nYesterday\u00a0the file arrived\tat 4:20!\nCan we move the handoff to noon? Yesterday the file arrived again.";
++    const flags = m1L1BehaviorFlags(original, 5);
++    for (const item of flags) if (item.evidenceQuote !== null) expect(original.includes(item.evidenceQuote)).toBe(true);
++    const note = m1L1CoachNote(original, 5);
++    if (note) expect(original.includes(note.evidenceQuote)).toBe(true);
++    expect(m1L1Comparison(original, original, "grounding_concreteness", 5).text).toMatch(/held|not assessable/i);
++  });
++
+   test("chooses coaching evidence across opener, Beat 3, and Beat 5", () => {
+     const note = m1L1CoachExchange({
+       opener: "You never respect my review time. Can we move it to noon?",
+@@ -250,6 +266,10 @@ describe("accepted M1 L1 narrow correction", () => {
+     expect(normalized).not.toHaveProperty("ignoredWrapper");
+     expect(normalized?.run).not.toHaveProperty("ignoredRun");
+     expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, attempt: { ...valid.run.attempt!, confirmedAt: "2" } } })).toBeNull();
++    expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, attempt: { ...valid.run.attempt!, id: "other-run-opener" } } })).toBeNull();
++    expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, scenarioContext: { ...valid.run.scenarioContext!, reaction: "invented" } } })).toBeNull();
++    expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, noteFit: "maybe" } })).toBeNull();
++    expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, m1L1: { ...valid.run.m1L1!, replayProof: "playback_completed", replayCompletedAt: undefined } } })).toBeNull();
+     expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, m1L1: { ...valid.run.m1L1!, pushbackOne: { ...valid.run.m1L1!.pushbackOne!, authoredAt: Number.NaN } } } })).toBeNull();
+   });
+ 
+diff --git a/expo/__tests__/personas.test.ts b/expo/__tests__/personas.test.ts
+index 17d583d..27b016d 100644
+--- a/expo/__tests__/personas.test.ts
++++ b/expo/__tests__/personas.test.ts
+@@ -13,6 +13,7 @@ import {
+   voiceIdFor,
+ } from "@/constants/personas";
+ import { SCENARIOS } from "@/constants/scenarios";
++import { playRunBoundPilotAudio } from "@/lib/moduleAudio";
+ import { playSharedScenarioPressure } from "@/lib/scenarioAudio";
+ import type { PersonaVoice } from "@/types/convo";
+ 
+@@ -133,6 +134,26 @@ describe("the selected Hope or Adam role reaches speech", () => {
+     expect(calls).toEqual(personas);
+   });
+ 
++  it("executes work, partner, family, and friends through the modular run-bound player", async () => {
++    const calls: PersonaVoice[] = [];
++    const player = async (_line: { audio_id: string; voice_key: "contextual_counterpart"; text: string }, options: { contextualPersona?: PersonaVoice }) => {
++      if (options.contextualPersona) calls.push(options.contextualPersona);
++      return "played" as const;
++    };
++    const categories = ["work", "partner", "family", "friends"] as const;
++    const personas: PersonaVoice[] = ["man-adam", "woman-hope", "man-adam", "woman-hope"];
++    for (const [index, category] of categories.entries()) {
++      const outcome = await playRunBoundPilotAudio(
++        { contextualPersona: personas[index]! },
++        { audio_id: `${category}-audio`, voice_key: "contextual_counterpart", text: `${category} pressure` },
++        {},
++        player,
++      );
++      expect(outcome).toBe("played");
++    }
++    expect(calls).toEqual(personas);
++  });
++
+   it("treats the explicit onboarding choice as authoritative during navigation", () => {
+     expect(isPersonaVoice("woman-hope")).toBe(true);
+     expect(isPersonaVoice("man-adam")).toBe(true);
+@@ -160,7 +181,7 @@ describe("the selected Hope or Adam role reaches speech", () => {
+     expect(rehearsal).toContain("await speak(spoken, persona");
+     expect(rehearsal.indexOf("reveal(res.reply, res.nudge);")).toBeLessThan(rehearsal.indexOf("await speak(spoken, persona, { muted: !voiceOnRef.current });"));
+     expect(rehearsal).not.toContain("speakPilotAudio");
+-    expect(dailyModule).toContain("speakPilotAudio");
++    expect(dailyModule).toContain("playRunBoundPilotAudio");
+     expect(dailyModule).toContain('voice_key: "adam_counterpart"');
+   });
+ 
+diff --git a/expo/app/module/[day].tsx b/expo/app/module/[day].tsx
+index 7130696..1ebfa38 100644
+--- a/expo/app/module/[day].tsx
++++ b/expo/app/module/[day].tsx
+@@ -11,6 +11,7 @@ import { curriculumModule, isModuleId, practiceDayForRoute, type ModuleId } from
+ import { evaluatePilotAttempt, nextPilotCounterpart } from "@/lib/ai";
+ import { canContinuePilot } from "@/lib/access";
+ import { DEFAULT_CURRICULUM_VISIBILITY, reviewPracticeRuntime, visiblePracticesForModule } from "@/lib/modularCurriculum";
++import { playRunBoundPilotAudio } from "@/lib/moduleAudio";
+ import { microphoneRecoveryPresentation } from "@/lib/nativeCommerce";
+ import { paidActivityForState } from "@/lib/paidProduct";
+ import {
+@@ -80,6 +81,12 @@ export default function PilotModuleScreen() {
+   const [error, setError] = useState<string>("");
+   const counterpartLabel = session?.counterpartDisplayLabel ?? session?.counterpart ?? (session?.counterpartRelationship ? `Your ${session.counterpartRelationship.toLowerCase()}` : "Practice partner");
+   const responseTarget = counterpartLabel.replace(/^Your /, "your ");
++  const playAudio = useCallback((line: PilotAudioLine, sourceRun: PilotDayRun | null = run) => playRunBoundPilotAudio(
++    sourceRun ?? { contextualPersona: session?.persona ?? "woman-hope" },
++    line,
++    { muted: isMuted },
++    speakPilotAudio,
++  ), [isMuted, run, session?.persona]);
+ 
+   useEffect(() => {
+     if (!activePracticeSession || activePracticeSession.id === session?.id) return;
+@@ -217,7 +224,7 @@ export default function PilotModuleScreen() {
+           adamAudioId: response.audioId ?? line.audio_id,
+         };
+         await persistRun(withCounterpart);
+-        const playback = await speakPilotAudio(line, { muted: isMuted });
++        const playback = await playRunBoundPilotAudio(withCounterpart, line, { muted: isMuted }, speakPilotAudio);
+         if (playback === "failed" || playback === "empty") {
+           setError("The audio would not play. The counterpart’s words remain visible.");
+           await persistRun(transitionPilotRun(withCounterpart, "playback_error"));
+@@ -289,7 +296,7 @@ export default function PilotModuleScreen() {
+       updatedAt: Date.now(),
+     };
+     await persistRun(withAdam);
+-    const playback = await speakPilotAudio(line, { muted: isMuted });
++    const playback = await playRunBoundPilotAudio(withAdam, line, { muted: isMuted }, speakPilotAudio);
+     if (playback === "failed" || playback === "empty") {
+       setError("The audio would not play. The counterpart’s words remain visible.");
+       await persistRun(transitionPilotRun(withAdam, "playback_error"));
+@@ -343,20 +350,20 @@ export default function PilotModuleScreen() {
+       return;
+     }
+     const adamLine = adamLineForRun(run, module);
+-    if (adamLine) await speakPilotAudio(adamLine, { muted: isMuted });
++    if (adamLine) await playAudio(adamLine);
+     setActiveCapture("retry");
+     await persistRun(transitionPilotRun(run, "ready_for_retry"));
+-  }, [isMuted, module, persistRun, run]);
++  }, [module, persistRun, playAudio, run]);
+ 
+   const acceptDayThreeNote = useCallback(async (): Promise<void> => {
+     if (!module || !run) return;
+     const accepted = { ...run, noteFit: "accepted" as const };
+     const line = adamLineForRun(accepted, module);
+     await persistRun(accepted);
+-    if (line) await speakPilotAudio(line, { muted: isMuted });
++    if (line) await playAudio(line);
+     setActiveCapture("retry");
+     await persistRun(transitionPilotRun(accepted, "ready_for_retry"));
+-  }, [isMuted, module, persistRun, run]);
++  }, [module, persistRun, playAudio, run]);
+ 
+   const rejectDayThreeNote = useCallback(async (): Promise<void> => {
+     if (!run) return;
+@@ -387,12 +394,12 @@ export default function PilotModuleScreen() {
+     const comparison = comparePilotAttempts(behavior, original, preserved.retryAttempt?.transcript ?? retryText);
+     if (retrySegmentForRun(module, preserved) === "opener") {
+       const line = adamLineForRun(preserved, module);
+-      if (line) await speakPilotAudio(line, { muted: isMuted });
++      if (line) await playAudio(line);
+       await persistRun({ ...preserved, comparison, state: "play_adam_after_opener_retry", updatedAt: Date.now() });
+       return;
+     }
+     await persistRun({ ...transitionPilotRun(preserved, "attempt_comparison"), comparison });
+-  }, [attemptText, day, isMuted, module, persistRun, retryText, run, saveActivePracticeSession, session]);
++  }, [attemptText, day, module, persistRun, playAudio, retryText, run, saveActivePracticeSession, session]);
+ 
+   const showTransfer = useCallback(async (): Promise<void> => {
+     if (day === 1) {
+@@ -473,38 +480,38 @@ export default function PilotModuleScreen() {
+             <Reveal><Eyebrow color={C.purple}>{module.copy.eyebrow}</Eyebrow><Text style={styles.title}>{module.copy.heading}</Text><Text style={styles.lede}>{module.copy.body}</Text>{module.copy.practice_points.length ? <GlassCard style={styles.card}>{module.copy.practice_points.map((point) => <Text key={point} style={styles.point}>• {point}</Text>)}</GlassCard> : null}<PrimaryButton label={module.copy.primary_button} onPress={startDay} style={styles.actionTop} /><GhostButton label={session?.scenarioSource === "user_supplied" ? "Use my saved conversation" : "Build from my situation"} onPress={chooseCarriedContext} style={styles.secondaryAction} /></Reveal>
+           ) : null}
+ 
+-          {effectiveState === "hope_lesson" ? <Lesson line={module.copy.lessons[lessonIndex]} index={lessonIndex} total={module.copy.lessons.length} heading={module.copy.heading} quiz={module.copy.quiz} onPlay={(line) => speakPilotAudio(line)} onContinue={nextLesson} /> : null}
+-          {effectiveState === "quiz" && module.copy.quiz ? <Quiz quiz={module.copy.quiz} selected={quizChoice} onChoose={chooseQuiz} onSubmit={submitQuiz} /> : null}
++          {effectiveState === "hope_lesson" ? <Lesson line={module.copy.lessons[lessonIndex]} index={lessonIndex} total={module.copy.lessons.length} heading={module.copy.heading} quiz={module.copy.quiz} onPlay={(line) => playAudio(line)} onContinue={nextLesson} /> : null}
++          {effectiveState === "quiz" && module.copy.quiz ? <Quiz quiz={module.copy.quiz} selected={quizChoice} onChoose={chooseQuiz} onSubmit={submitQuiz} onPlay={(line) => void playAudio(line)} /> : null}
+           {effectiveState === "quiz_feedback" && module.copy.quiz && quizChoice ? <PracticeFeedback quiz={module.copy.quiz} choice={quizChoice} onContinue={() => run && persistRun(transitionPilotRun(run, "preset_scenario"))} onTryAgain={() => run && persistRun(transitionPilotRun(run, "quiz"))} /> : null}
+ 
+           {effectiveState === "preset_scenario" && module.copy.scenario ? <RehearsalBriefing heading={module.copy.scenario.heading} title={module.copy.scenario.title ?? curriculum?.name ?? module.copy.heading} context={run?.scenarioMode === "carried_context" && session?.scenarioSource === "user_supplied" && session.topic ? session.topic : contextualizeCounterpart(module.copy.scenario.scenario, counterpartLabel)} target={contextualizeCounterpart(module.copy.scenario.user_job, counterpartLabel)} pressure={contextualizeCounterpart(module.practice.adam_line?.text ?? module.practice.approved_pushback_bank?.[0]?.text ?? "The counterpart will respond with realistic pressure.", counterpartLabel)} counterpart={counterpartLabel} onStart={startRehearsal} onUseMine={chooseCarriedContext} useMineLabel={session?.scenarioSource === "user_supplied" ? "Use my saved conversation" : "Build from my situation"} /> : null}
+ 
+           {effectiveState === "ready_for_attempt" ? <AttemptReady prompt={module.copy.scenario?.attempt_prompt ?? module.copy.scenario?.user_job ?? ""} value={attemptText} onChange={setAttemptText} onStart={() => startCapture("opener")} onReview={() => run && persistRun(transitionPilotRun(run, "confirm_attempt_transcript"))} button="I’m ready to speak" /> : null}
+-          {effectiveState === "ready_for_response" ? <><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><AttemptReady prompt={module.copy.scenario?.response_prompt ?? `Respond to ${responseTarget}`} value={responseText} onChange={setResponseText} onStart={() => startCapture("response")} onReview={() => run && persistRun(transitionPilotRun(run, "confirm_response_transcript"))} button="I’m ready to speak" /></> : null}
+-          {effectiveState === "ready_for_retry" ? <><CounterpartContext role={counterpartLabel} line={day === 1 && session?.originalAdamResponse ? { audio_id: session.originalAdamResponse.resolvedAudioId, voice_key: "adam_counterpart", text: session.originalAdamResponse.text } : adamLine} onPlay={day === 1 && session?.originalAdamResponse ? () => speakPilotAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }, { muted: isMuted }) : adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><AttemptReady prompt={retryDirection(module, run, session)} value={retryText} onChange={setRetryText} onStart={() => startCapture("retry")} onReview={async () => { if (day === 1) { await persistLegacyDayOne({ nextState: "confirm_retry_transcript" }); setState("confirm_retry_transcript"); } else if (run) await persistRun(transitionPilotRun(run, "confirm_retry_transcript")); }} button="I’m ready to retry" /></> : null}
++          {effectiveState === "ready_for_response" ? <><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => playAudio(adamLine) : undefined} /><AttemptReady prompt={module.copy.scenario?.response_prompt ?? `Respond to ${responseTarget}`} value={responseText} onChange={setResponseText} onStart={() => startCapture("response")} onReview={() => run && persistRun(transitionPilotRun(run, "confirm_response_transcript"))} button="I’m ready to speak" /></> : null}
++          {effectiveState === "ready_for_retry" ? <><CounterpartContext role={counterpartLabel} line={day === 1 && session?.originalAdamResponse ? { audio_id: session.originalAdamResponse.resolvedAudioId, voice_key: "adam_counterpart", text: session.originalAdamResponse.text } : adamLine} onPlay={day === 1 && session?.originalAdamResponse ? () => playAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }) : adamLine ? () => playAudio(adamLine) : undefined} /><AttemptReady prompt={retryDirection(module, run, session)} value={retryText} onChange={setRetryText} onStart={() => startCapture("retry")} onReview={async () => { if (day === 1) { await persistLegacyDayOne({ nextState: "confirm_retry_transcript" }); setState("confirm_retry_transcript"); } else if (run) await persistRun(transitionPilotRun(run, "confirm_retry_transcript")); }} button="I’m ready to retry" /></> : null}
+ 
+           {effectiveState === "listening_attempt" || effectiveState === "listening_response" || effectiveState === "listening_retry" ? <Listening level={dictation.level} onStop={stopCapture} /> : null}
+           {effectiveState === "confirm_attempt_transcript" ? <TranscriptReview value={attemptText} onChange={setAttemptText} onSubmit={confirmAttempt} /> : null}
+           {effectiveState === "confirm_response_transcript" ? <TranscriptReview value={responseText} onChange={setResponseText} onSubmit={confirmResponse} /> : null}
+           {effectiveState === "confirm_retry_transcript" ? <TranscriptReview value={retryText} onChange={setRetryText} onSubmit={confirmRetry} /> : null}
+ 
+-          {effectiveState === "hope_coaching" && day === 1 && activeCoach ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow>{session?.originalAdamResponse ? <RoleCard role={counterpartLabel} text={session.originalAdamResponse.text} onPlay={() => speakPilotAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }, { muted: isMuted })} /> : null}<CoachCard coach={activeCoach} /><PrimaryButton label="Replay the counterpart response" onPress={async () => { await persistLegacyDayOne({ nextState: "replay_original_adam_response" }); setState("adam_response"); }} style={styles.actionTop} /></Reveal> : null}
+-          {effectiveState === "adam_response" && day === 1 && session?.originalAdamResponse ? <Reveal><Text style={styles.title}>Listen once more, then try your part again.</Text><RoleCard role={counterpartLabel} text={session.originalAdamResponse.text} onPlay={async () => { const outcome = await speakPilotAudio({ audio_id: session.originalAdamResponse?.id ?? `${session.id}-adam-response-1`, voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }); if (outcome !== "failed" && outcome !== "empty") setHasReplayedDayOneAdam(true); }} /><PrimaryButton label="I’m ready to retry" disabled={!hasReplayedDayOneAdam} onPress={async () => { await persistLegacyDayOne({ nextState: "spoken_retry" }); setActiveCapture("retry"); setState("ready_for_retry"); }} style={styles.actionTop} /></Reveal> : null}
++          {effectiveState === "hope_coaching" && day === 1 && activeCoach ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow>{session?.originalAdamResponse ? <RoleCard role={counterpartLabel} text={session.originalAdamResponse.text} onPlay={() => playAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" })} /> : null}<CoachCard coach={activeCoach} /><PrimaryButton label="Replay the counterpart response" onPress={async () => { await persistLegacyDayOne({ nextState: "replay_original_adam_response" }); setState("adam_response"); }} style={styles.actionTop} /></Reveal> : null}
++          {effectiveState === "adam_response" && day === 1 && session?.originalAdamResponse ? <Reveal><Text style={styles.title}>Listen once more, then try your part again.</Text><RoleCard role={counterpartLabel} text={session.originalAdamResponse.text} onPlay={async () => { const outcome = await playAudio({ audio_id: session.originalAdamResponse?.id ?? `${session.id}-adam-response-1`, voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }); if (outcome !== "failed" && outcome !== "empty") setHasReplayedDayOneAdam(true); }} /><PrimaryButton label="I’m ready to retry" disabled={!hasReplayedDayOneAdam} onPress={async () => { await persistLegacyDayOne({ nextState: "spoken_retry" }); setActiveCapture("retry"); setState("ready_for_retry"); }} style={styles.actionTop} /></Reveal> : null}
+ 
+-          {effectiveState === "hope_coaching" && day !== 1 && activeCoach ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><CoachCard coach={activeCoach} /><PrimaryButton label="I’m ready to retry" onPress={beginRetry} style={styles.actionTop} /></Reveal> : null}
++          {effectiveState === "hope_coaching" && day !== 1 && activeCoach ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => playAudio(adamLine) : undefined} /><CoachCard coach={activeCoach} /><PrimaryButton label="I’m ready to retry" onPress={beginRetry} style={styles.actionTop} /></Reveal> : null}
+           {effectiveState === "day3_note_check" && activeCoach ? <Reveal><CoachCard coach={activeCoach} /><Text style={styles.title}>Does that fit what happened?</Text><PrimaryButton label="Yes, that fits" onPress={acceptDayThreeNote} style={styles.actionTop} /><GhostButton label="Not quite" onPress={rejectDayThreeNote} style={styles.secondaryAction} /></Reveal> : null}
+           {effectiveState === "day3_neutral_retry" ? <Reveal><Text style={styles.title}>Try that same moment again.</Text><PrimaryButton label="I’m ready to retry" onPress={beginRetry} style={styles.actionTop} /></Reveal> : null}
+           {busy ? <View style={styles.busyCard}><ActivityIndicator color={C.purple} /><Text style={styles.cardText}>Hope is checking one moment</Text></View> : null}
+ 
+-          {effectiveState === "play_adam_after_opener_retry" && adamLine ? <Reveal><RoleCard role={counterpartLabel} text={adamLine.text} onPlay={() => speakPilotAudio(adamLine)} /><PrimaryButton label="Continue" onPress={() => run && persistRun(transitionPilotRun(run, "attempt_comparison"))} style={styles.actionTop} /></Reveal> : null}
+-          {effectiveState === "attempt_comparison" && comparisonPresentation ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.lessonHeading}>What changed</Text><Text style={styles.progressiveNote}>Both transcripts below were approved for the same counterpart turn. No score increase is inferred.</Text><CounterpartMoment role={counterpartLabel} presentation={comparisonPresentation} onPlay={day === 1 && session?.originalAdamResponse ? () => speakPilotAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }, { muted: isMuted }) : adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><PrimaryButton label="Continue review" onPress={showTransfer} containerStyle={styles.actionTop} /></Reveal> : null}
++          {effectiveState === "play_adam_after_opener_retry" && adamLine ? <Reveal><RoleCard role={counterpartLabel} text={adamLine.text} onPlay={() => void playAudio(adamLine)} /><PrimaryButton label="Continue" onPress={() => run && persistRun(transitionPilotRun(run, "attempt_comparison"))} style={styles.actionTop} /></Reveal> : null}
++          {effectiveState === "attempt_comparison" && comparisonPresentation ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.lessonHeading}>What changed</Text><Text style={styles.progressiveNote}>Both transcripts below were approved for the same counterpart turn. No score increase is inferred.</Text><CounterpartMoment role={counterpartLabel} presentation={comparisonPresentation} onPlay={day === 1 && session?.originalAdamResponse ? () => playAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }) : adamLine ? () => playAudio(adamLine) : undefined} /><PrimaryButton label="Continue review" onPress={showTransfer} containerStyle={styles.actionTop} /></Reveal> : null}
+           {effectiveState === "attempt_comparison" && !comparisonPresentation ? <Reveal><Text style={styles.title}>Finish and approve your retry first.</Text><Text style={styles.lede}>A comparison appears only after both approved transcripts are available for the same counterpart moment.</Text></Reveal> : null}
+           {effectiveState === "transfer_cue" ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><Text style={styles.title}>{module.copy.transfer}</Text><PrimaryButton label={module.copy.finish_button} onPress={complete} style={styles.actionTop} /></Reveal> : null}
+           {effectiveState === "complete" ? <Reveal><StatusPill label="Practice complete" tone="green" /><Text style={styles.lessonHeading}>You practiced the same moment twice.</Text><Text style={styles.lede}>Your saved checkpoint is complete. Today now reflects the finished module activity.</Text><PrimaryButton label="Back to Today" onPress={() => router.navigate("/(tabs)")} containerStyle={styles.actionTop} /></Reveal> : null}
+           {effectiveState === "microphone_error" ? <Reveal><Eyebrow color={C.clay}>{microphoneRecovery.title}</Eyebrow><Text style={styles.title}>{error || dictation.error || "Microphone access is off."}</Text><Text style={styles.lede}>Turn microphone access on in device Settings, try again, or type this turn instead. Nothing submits until you approve the transcript.</Text><PrimaryButton label={microphoneRecovery.actions[0]} onPress={() => void Linking.openSettings()} style={styles.actionTop} /><GhostButton label={microphoneRecovery.actions[1]} onPress={() => startCapture(activeCapture)} style={styles.secondaryAction} /><GhostButton label={microphoneRecovery.actions[2]} onPress={() => void openTypedFallback()} style={styles.secondaryAction} /></Reveal> : null}
+           {effectiveState === "no_speech" ? <RecoveryState eyebrow="Nothing heard" title="We didn’t catch any words." body="Check that the microphone is clear, then try the same turn again. You can type instead without losing the checkpoint." primary="Try the turn again" onPrimary={() => startCapture(activeCapture)} secondary="Type this turn instead" onSecondary={() => void openTypedFallback()} /> : null}
+           {effectiveState === "transcription_error" ? <RecoveryState eyebrow="Transcript" title="We couldn’t turn that recording into text." body="Your module checkpoint is saved. Try the turn again, or type the words you want approved." primary="Try the turn again" onPrimary={() => startCapture(activeCapture)} secondary="Type this turn instead" onSecondary={() => void openTypedFallback()} /> : null}
+-          {effectiveState === "playback_error" ? <RecoveryState eyebrow="Playback" title="The audio wouldn’t play." body={error || "The counterpart’s reply is written on screen, so audio never blocks the rehearsal."} primary="Try audio again" onPrimary={async () => { if (adamLine) { const outcome = await speakPilotAudio(adamLine, { muted: isMuted }); if (outcome !== "failed" && outcome !== "empty" && run) await persistRun(transitionPilotRun(run, "ready_for_response")); } }} secondary="Continue reading" onSecondary={() => run && persistRun(transitionPilotRun(run, "ready_for_response"))} /> : null}
++          {effectiveState === "playback_error" ? <RecoveryState eyebrow="Playback" title="The audio wouldn’t play." body={error || "The counterpart’s reply is written on screen, so audio never blocks the rehearsal."} primary="Try audio again" onPrimary={async () => { if (adamLine) { const outcome = await playAudio(adamLine); if (outcome !== "failed" && outcome !== "empty" && run) await persistRun(transitionPilotRun(run, "ready_for_response")); } }} secondary="Continue reading" onSecondary={() => run && persistRun(transitionPilotRun(run, "ready_for_response"))} /> : null}
+           {effectiveState === "network_error" ? <RecoveryState eyebrow="Connection" title="The counterpart response wasn’t reached." body={error || "Your approved turn and module checkpoint are saved on this device."} primary="Try again" onPrimary={() => run && playAdam(run, run.attempt?.transcript ?? attemptText)} secondary="Save and exit" onSecondary={() => router.navigate("/(tabs)")} /> : null}
+           {effectiveState === "model_error" ? <RecoveryState eyebrow="Feedback" title="Hope couldn’t finish the feedback." body={error || "Your approved transcripts are saved. Retry when the connection is ready."} primary="Try feedback again" onPrimary={() => void confirmResponse()} secondary="Save and exit" onSecondary={() => router.navigate("/(tabs)")} /> : null}
+         </ScrollView>
+@@ -567,12 +574,12 @@ function Lesson({ line, index, total, heading, quiz, onPlay, onContinue }: { lin
+   return <Reveal><StatusPill label={`Lesson · ${index + 1} of ${total}`} tone="purple" /><Text style={styles.lessonHeading}>{heading}</Text><Text style={styles.lessonProposition}>{line.text}</Text>{quiz ? <><View style={styles.contrast}><View style={styles.contrastCell}><SectionLabel tone={C.clay}>Less effective here</SectionLabel><Text style={styles.contrastText}>{quiz.option_a.text}</Text></View><View style={[styles.contrastCell, styles.contrastStrong]}><SectionLabel tone={C.sage}>More effective here</SectionLabel><Text style={styles.contrastText}>{quiz.option_b.text}</Text></View></View><ProductCard style={styles.conceptCard}><SectionLabel tone={C.purple}>Observable difference</SectionLabel><Text style={styles.conceptText}>{isFinal ? quiz.feedback_b : line.text}</Text><Pressable onPress={() => onPlay(line)} style={styles.audioAction} accessibilityRole="button" accessibilityLabel="Hear Hope explain this lesson"><Volume2 size={17} color={C.purple} /><Text style={styles.audioLabel}>Hear Hope explain it</Text></Pressable></ProductCard></> : <ProductCard accent style={styles.conceptCard}><SectionLabel tone={C.purple}>Notice this move</SectionLabel><Text style={styles.conceptText}>{line.text}</Text></ProductCard>}<Text style={styles.progressiveNote}>{isFinal ? "Next, choose between the same two concrete responses in Practice." : "Continue when this distinction is clear. One part is disclosed at a time."}</Text><PrimaryButton label={isFinal ? "Continue to Practice" : "Continue lesson"} onPress={onContinue} containerStyle={styles.actionTop} /></Reveal>;
+ }
+ 
+-function Quiz({ quiz, selected, onChoose, onSubmit }: { quiz: NonNullable<NonNullable<ReturnType<typeof pilotModule>>["copy"]["quiz"]>; selected: "A" | "B" | null; onChoose: (choice: "A" | "B") => void; onSubmit: () => void }) {
+-  return <Reveal><StatusPill label="Practice" tone="purple" /><Text style={styles.lessonHeading}>Hear the difference</Text><Text style={styles.lede}>{quiz.prompt}</Text><View style={styles.optionList}><AudioOption label="A" line={quiz.option_a} selected={selected === "A"} onChoose={() => onChoose("A")} /><AudioOption label="B" line={quiz.option_b} selected={selected === "B"} onChoose={() => onChoose("B")} /></View><Text style={styles.progressiveNote}>{selected ? `Answer ${selected} selected. Check it when you’re ready.` : "Choose the response that best matches the lesson. Nothing is checked until you confirm."}</Text><PrimaryButton label="Check answer" disabled={!selected} onPress={onSubmit} containerStyle={styles.actionTop} /></Reveal>;
++function Quiz({ quiz, selected, onChoose, onSubmit, onPlay }: { quiz: NonNullable<NonNullable<ReturnType<typeof pilotModule>>["copy"]["quiz"]>; selected: "A" | "B" | null; onChoose: (choice: "A" | "B") => void; onSubmit: () => void; onPlay: (line: PilotAudioLine) => void }) {
++  return <Reveal><StatusPill label="Practice" tone="purple" /><Text style={styles.lessonHeading}>Hear the difference</Text><Text style={styles.lede}>{quiz.prompt}</Text><View style={styles.optionList}><AudioOption label="A" line={quiz.option_a} selected={selected === "A"} onChoose={() => onChoose("A")} onPlay={() => onPlay(quiz.option_a)} /><AudioOption label="B" line={quiz.option_b} selected={selected === "B"} onChoose={() => onChoose("B")} onPlay={() => onPlay(quiz.option_b)} /></View><Text style={styles.progressiveNote}>{selected ? `Answer ${selected} selected. Check it when you’re ready.` : "Choose the response that best matches the lesson. Nothing is checked until you confirm."}</Text><PrimaryButton label="Check answer" disabled={!selected} onPress={onSubmit} containerStyle={styles.actionTop} /></Reveal>;
+ }
+ 
+-function AudioOption({ label, line, selected, onChoose }: { label: "A" | "B"; line: PilotAudioLine; selected: boolean; onChoose: () => void }) {
+-  return <Pressable onPress={onChoose} style={({ pressed }) => [styles.answer, selected && styles.answerSelected, pressed && styles.answerPressed]} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Choose ${label}. ${line.text}`}><View style={[styles.answerLetter, selected && styles.answerLetterSelected]}><Text style={[styles.answerLetterText, selected && styles.answerLetterTextSelected]}>{selected ? "✓" : label}</Text></View><Text style={styles.answerText}>{line.text}</Text><Pressable onPress={() => speakPilotAudio(line)} style={styles.answerAudio} accessibilityRole="button" accessibilityLabel={`Play answer ${label}`}><Play size={15} color={C.purple} /></Pressable></Pressable>;
++function AudioOption({ label, line, selected, onChoose, onPlay }: { label: "A" | "B"; line: PilotAudioLine; selected: boolean; onChoose: () => void; onPlay: () => void }) {
++  return <Pressable onPress={onChoose} style={({ pressed }) => [styles.answer, selected && styles.answerSelected, pressed && styles.answerPressed]} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Choose ${label}. ${line.text}`}><View style={[styles.answerLetter, selected && styles.answerLetterSelected]}><Text style={[styles.answerLetterText, selected && styles.answerLetterTextSelected]}>{selected ? "✓" : label}</Text></View><Text style={styles.answerText}>{line.text}</Text><Pressable onPress={onPlay} style={styles.answerAudio} accessibilityRole="button" accessibilityLabel={`Play answer ${label}`}><Play size={15} color={C.purple} /></Pressable></Pressable>;
+ }
+ 
+ function PracticeFeedback({ quiz, choice, onContinue, onTryAgain }: { quiz: NonNullable<NonNullable<ReturnType<typeof pilotModule>>["copy"]["quiz"]>; choice: "A" | "B"; onContinue: () => void; onTryAgain: () => void }) {
+diff --git a/expo/app/rehearse/[id].tsx b/expo/app/rehearse/[id].tsx
+index cba8e40..faa5f6a 100644
+--- a/expo/app/rehearse/[id].tsx
++++ b/expo/app/rehearse/[id].tsx
+@@ -752,8 +752,8 @@ function LegacyRehearse() {
+   }, [analyzeApprovedTranscript, reviewDrafts, turns]);
+ 
+   const exitRehearsal = useCallback(async (): Promise<void> => {
+-    await cancelDictation().catch(() => {});
+-    await resetSpeech().catch(() => {});
++    await cancelDictation();
++    await resetSpeech();
+     if (params.entry === "onboarding") {
+       if (activePracticeSession?.id === params.practiceSessionId) {
+         await saveActivePracticeSession(null);
+@@ -770,7 +770,10 @@ function LegacyRehearse() {
+ 
+   const leave = useCallback(() => {
+     const act = (): void => {
+-      void exitRehearsal();
++      void exitRehearsal().catch((caught: unknown) => {
++        safeLog("[rehearse] exit blocked by pending recording cleanup", errorShape(caught));
++        setError("Recording cleanup is still pending. Try leaving again after cleanup succeeds.");
++      });
+     };
+     if (turns.filter((t) => t.role === "user").length === 0 || Platform.OS === "web") {
+       act();
+diff --git a/expo/components/M1L1PaidPractice.tsx b/expo/components/M1L1PaidPractice.tsx
+index 0e84323..80c73cc 100644
+--- a/expo/components/M1L1PaidPractice.tsx
++++ b/expo/components/M1L1PaidPractice.tsx
+@@ -20,6 +20,7 @@ import {
+   advanceM1L1FirstResponse,
+   attachM1L1Coaching,
+   confirmM1L1PressureReplay,
++  completeM1L1PressureReplay,
+   attachM1L1PushbackOne,
+   attachM1L1PushbackTwo,
+   preserveM1L1Retry,
+@@ -30,8 +31,9 @@ import {
+   transitionScenarioPracticeRun,
+   type PersistedScenarioPracticeRun,
+ } from "@/lib/scenarioPractice";
++import { leaveAfterStrictDictationCleanup } from "@/lib/temporaryRecording";
+ import { useDictation } from "@/lib/useDictation";
+-import { replaySpeech, resetSpeech, speakPilotAudio, useSpeech } from "@/lib/voice";
++import { replaySpeech, resetSpeech, speakPilotAudio, speakPilotAudioToCompletion, useSpeech } from "@/lib/voice";
+ import { useStore } from "@/providers/store";
+ 
+ interface M1L1PaidPracticeProps {
+@@ -220,18 +222,16 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
+       return;
+     }
+     if (!currentPressure) return;
+-    const outcome = await speakPilotAudio(lineFor(currentPressure));
+-    if (outcome !== "played") return;
+-    const confirmed = confirmM1L1PressureReplay(staged, "playback_started", Date.now());
++    const confirmed = await completeM1L1PressureReplay(staged, () => speakPilotAudioToCompletion(lineFor(currentPressure)), Date.now());
++    if (confirmed === staged) return;
+     await replaceActiveScenarioRunStrict(confirmed, activeRunRevision(staged));
+     setValue(confirmed);
+   }, [currentPressure, lesson?.coachedBeat, replaceActiveScenarioRunStrict, value]);
+ 
+   const retryPendingReplay = useCallback(async (): Promise<void> => {
+     if (!value || value.run.state !== "replay_pending" || !currentPressure) return;
+-    const outcome = await speakPilotAudio(lineFor(currentPressure));
+-    if (outcome !== "played") return;
+-    const confirmed = confirmM1L1PressureReplay(value, "playback_started", Date.now());
++    const confirmed = await completeM1L1PressureReplay(value, () => speakPilotAudioToCompletion(lineFor(currentPressure)), Date.now());
++    if (confirmed === value) return;
+     await replaceActiveScenarioRunStrict(confirmed, activeRunRevision(value));
+     setValue(confirmed);
+   }, [currentPressure, replaceActiveScenarioRunStrict, value]);
+@@ -244,6 +244,14 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
+     setValue(confirmed);
+   }, [replaceActiveScenarioRunStrict, value]);
+ 
++  const saveAndLeave = useCallback(async (): Promise<void> => {
++    try {
++      await leaveAfterStrictDictationCleanup(dictation.cancel, () => router.back());
++    } catch {
++      Alert.alert("Recording cleanup is pending", "Try again before leaving this rehearsal.");
++    }
++  }, [dictation, router]);
++
+   const discard = useCallback(async (): Promise<void> => {
+     try {
+       await dictation.cancel();
+@@ -271,7 +279,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
+ 
+   return <View style={styles.root}><Backdrop />
+     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+-      <Pressable onPress={() => Alert.alert("Leave this rehearsal?", "Your active rehearsal stays saved unless you explicitly discard it.", [{ text: "Keep practicing", style: "cancel" }, { text: "Save and leave", onPress: () => router.back() }, { text: "Discard", style: "destructive", onPress: () => void discard() }])} style={styles.hit} accessibilityRole="button" accessibilityLabel="Leave rehearsal"><X size={21} color={C.textSoft} /></Pressable>
++      <Pressable onPress={() => Alert.alert("Leave this rehearsal?", "Your active rehearsal stays saved unless you explicitly discard it.", [{ text: "Keep practicing", style: "cancel" }, { text: "Save and leave", onPress: () => { void saveAndLeave(); } }, { text: "Discard", style: "destructive", onPress: () => void discard() }])} style={styles.hit} accessibilityRole="button" accessibilityLabel="Leave rehearsal"><X size={21} color={C.textSoft} /></Pressable>
+       <View style={styles.headerCopy}><Text style={styles.headerTitle}>Adam · your colleague</Text><Text style={styles.headerMeta}>{progressLabel}</Text></View><View style={styles.hit} />
+     </View>
+     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+diff --git a/expo/components/ScenarioPaidPractice.tsx b/expo/components/ScenarioPaidPractice.tsx
+index ce11ff1..6637c70 100644
+--- a/expo/components/ScenarioPaidPractice.tsx
++++ b/expo/components/ScenarioPaidPractice.tsx
+@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
+ import { M1L1PaidPractice } from "@/components/M1L1PaidPractice";
+ import { ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
+ import { Backdrop, MicControl, PrimaryButton, Reveal, StateDock } from "@/components/ui";
+-import { voiceForScenario } from "@/constants/personas";
+ import { DIFFICULTY } from "@/constants/scenarios";
+ import { C, GUTTER, T, font, radius } from "@/constants/theme";
+ import { generateDebrief, nextCounterpartTurn } from "@/lib/ai";
+@@ -25,6 +24,7 @@ import {
+   type ScenarioCounterpartPresentation,
+ } from "@/lib/scenarioPractice";
+ import { playSharedScenarioPressure } from "@/lib/scenarioAudio";
++import { leaveAfterStrictDictationCleanup } from "@/lib/temporaryRecording";
+ import { useDictation } from "@/lib/useDictation";
+ import { replaySpeech, resetSpeech, speakPilotAudio, useSpeech } from "@/lib/voice";
+ import { useStore } from "@/providers/store";
+@@ -56,8 +56,7 @@ export function ScenarioPaidPractice(props: ScenarioPaidPracticeProps): React.JS
+ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson, onReturnToDeck, onDiscard, onSafetyExit }: ScenarioPaidPracticeProps) {
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+-  const { activeScenarioRun, profile, replaceActiveScenarioRunStrict, upsertSession } = useStore();
+-  const fallbackVoice = voiceForScenario(scenario, profile?.persona ?? "woman-hope");
++  const { activeScenarioRun, replaceActiveScenarioRunStrict, upsertSession } = useStore();
+   const restored = scenarioRunForRoute(activeScenarioRun, scenario.id);
+   const [value, setValue] = useState<PersistedScenarioPracticeRun | null>(
+     restored && (!requestedRunId || restored.run.id === requestedRunId) ? restored : null,
+@@ -93,12 +92,18 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
+   const context = run?.scenarioContext;
+   const state = run?.state;
+   const pressure = run?.counterpartTurn;
+-  const counterpartVoice = context?.contextualPersona ?? fallbackVoice;
+   const presentation = scenarioPracticePresentation(value);
+   const counterpartPresentation = presentation.isAvailable ? presentation.counterpart : undefined;
++  const leaveAfterCleanup = useCallback(async (): Promise<void> => {
++    try {
++      await leaveAfterStrictDictationCleanup(dictation.cancel, () => router.back());
++    } catch {
++      setError("Recording cleanup is still pending. Try leaving again after cleanup succeeds.");
++    }
++  }, [dictation, router]);
+   const handleClose = useCallback((): void => {
+     if (!convertedLesson) {
+-      router.back();
++      void leaveAfterCleanup();
+       return;
+     }
+     Alert.alert(
+@@ -106,11 +111,11 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
+       "Your lesson progress is saved. Your current rehearsal stays here on this device until you finish or discard it.",
+       [
+         { text: "Keep practicing", style: "cancel" },
+-        { text: "Save and leave", onPress: () => router.back() },
++        { text: "Save and leave", onPress: () => { void leaveAfterCleanup(); } },
+         { text: "Discard this rehearsal", style: "destructive", onPress: () => { void onDiscard?.(); } },
+       ],
+     );
+-  }, [convertedLesson, onDiscard, router]);
++  }, [convertedLesson, leaveAfterCleanup, onDiscard]);
+   const difficultyLabel = context ? DIFFICULTY[context.difficulty].label : "";
+ 
+   const startRecording = useCallback(async (kind: "opener" | "response" | "retry"): Promise<void> => {
+@@ -187,14 +192,14 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
+       }, Date.now());
+       setDraft("");
+       await persist(transitionScenarioPracticeRun(withPressure, "ready_for_response", Date.now()));
+-      await playSharedScenarioPressure(withPressure.run.counterpartTurn!, counterpartVoice, speakPilotAudio);
++      await playSharedScenarioPressure(withPressure.run.counterpartTurn!, context.contextualPersona, speakPilotAudio);
+     } catch {
+       setError(`${context.counterpartName}'s response did not come through. Your approved transcript is saved.`);
+       await persist(transitionScenarioPracticeRun(approved, "network_error", Date.now()));
+     } finally {
+       setBusy(false);
+     }
+-  }, [context, convertedLesson, counterpartVoice, draft, persist, scenario, value]);
++  }, [context, convertedLesson, draft, persist, scenario, value]);
+ 
+   const confirmResponse = useCallback(async (): Promise<void> => {
+     if (!value || !context || !pressure || draft.trim().length < 2) return;
+@@ -292,7 +297,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
+         {isListening ? <View style={styles.listening}><Text style={styles.title}>Recording your {state === "listening_attempt" ? "opening" : state === "listening_response" ? "response" : "retry"}.</Text><MicControl state="listening" level={dictation.level} onPress={() => void stopRecording()} glyph={<Square size={24} color={C.onAccent} fill={C.onAccent} />} accessibilityLabel="Done speaking" /><Text style={styles.body}>Tap when you are done. Nothing advances until you approve the transcript.</Text></View> : null}
+         {showReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve your {reviewKind}.</Text>{reviewKind !== "opening" && pressure ? <CounterpartCard presentation={counterpartPresentation} /> : null}<TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel={`Edit ${reviewKind} transcript`} /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2 || busy} onPress={() => void (reviewKind === "opening" ? confirmOpening() : reviewKind === "response" ? confirmResponse() : confirmRetry())} containerStyle={styles.action} />{busy ? <ActivityIndicator color={C.purple} style={styles.busy} /> : null}</Reveal> : null}
+         {state === "ready_for_response" && pressure ? <Reveal><CounterpartCard presentation={counterpartPresentation} />{speech.phase === "speaking" || speech.phase === "generating" ? <Text style={styles.speaking}>{context.counterpartName} is speaking…</Text> : speech.phase === "failed" ? <PrimaryButton label="Try audio again" onPress={() => void replaySpeech()} containerStyle={styles.action} /> : null}<Text style={styles.title}>Respond to the pressure.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("response")} onType={() => void openTypedReview("confirm_response_transcript")} /></Reveal> : null}
+-        {state === "hope_coaching" && pressure ? <Reveal><StatusPill label="Hope · coaching" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><ProductCard accent style={styles.coachCard}><SectionLabel tone={C.purple}>Hope noticed</SectionLabel><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Same-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={`Retry the same ${context.counterpartName} moment`} onPress={async () => { await persist(transitionScenarioPracticeRun(value, "ready_for_retry", Date.now())); await playSharedScenarioPressure(pressure, counterpartVoice, speakPilotAudio); }} containerStyle={styles.action} /></Reveal> : null}
++        {state === "hope_coaching" && pressure ? <Reveal><StatusPill label="Hope · coaching" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><ProductCard accent style={styles.coachCard}><SectionLabel tone={C.purple}>Hope noticed</SectionLabel><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Same-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={`Retry the same ${context.counterpartName} moment`} onPress={async () => { await persist(transitionScenarioPracticeRun(value, "ready_for_retry", Date.now())); await playSharedScenarioPressure(pressure, context.contextualPersona, speakPilotAudio); }} containerStyle={styles.action} /></Reveal> : null}
+         {state === "ready_for_retry" && pressure ? <Reveal><StatusPill label="Same-moment retry" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Answer the exact same turn again.</Text><Text style={styles.body}>{run.retryInstruction}</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("retry")} onType={() => void openTypedReview("confirm_retry_transcript")} /></Reveal> : null}
+         {state === "attempt_comparison" && pressure && run.responseAttempt && run.retryAttempt && run.comparison ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="First approved response" text={run.responseAttempt.transcript} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label="Continue" onPress={() => { if (convertedLesson && onReturnToDeck) onReturnToDeck(run.id); else void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now())); }} containerStyle={styles.action} /></Reveal> : null}
+         {state === "transfer_cue" ? <Reveal><StatusPill label="Hope · wrap-up" tone="purple" /><Text style={styles.title}>Take the clearer wording into the real conversation.</Text><Text style={styles.body}>This completion belongs to {context.title}, with {context.counterpartName} as {context.counterpartRole}. No unrelated practice fixture was used.</Text><PrimaryButton label="Complete scenario" onPress={() => void finish()} containerStyle={styles.action} /></Reveal> : null}
+diff --git a/expo/lib/convertedCompletionJournal.ts b/expo/lib/convertedCompletionJournal.ts
+index 96f6029..22b3730 100644
+--- a/expo/lib/convertedCompletionJournal.ts
++++ b/expo/lib/convertedCompletionJournal.ts
+@@ -1,6 +1,7 @@
+ import { ACTIVE_SCENARIO_RUN_KEY, QUARANTINED_SCENARIO_RUN_KEY, type ActiveRunRevision } from "@/lib/activeScenarioRunRepository";
+ import { normalizeConvertedLessonProgress, type ConvertedLessonProgress } from "@/lib/convertedLesson";
+ import { commitConvertedProgress, type ConvertedProgressStorage } from "@/lib/convertedProgressRepository";
++import { deleteBaselineAudioStrict } from "@/lib/baselineAudio";
+ import { normalizeScenarioPracticeRun } from "@/lib/scenarioPractice";
+ 
+ export const CONVERTED_COMPLETION_PENDING_KEY = "cc.convertedCompletionPending.v1";
+@@ -82,10 +83,19 @@ async function clearExpectedActiveKeyAfterDeletion(storage: ConvertedCompletionS
+   await storage.removeItem(ACTIVE_SCENARIO_RUN_KEY);
+ }
+ 
+-/** Recovers exactly once from every boundary after strict private-content deletion. */
+-export async function recoverPendingConvertedCompletion(storage: ConvertedCompletionStorage): Promise<ConvertedLessonProgress[] | null> {
+-  const pending = await readPendingConvertedCompletion(storage);
+-  if (!pending || pending.phase === "awaiting_private_cleanup") return null;
++/** Resumes strict private cleanup first, then clears/quarantines the expected active bytes and promotes exactly once. */
++export async function recoverPendingConvertedCompletion(
++  storage: ConvertedCompletionStorage,
++  strictPrivateCleanup: (runId: string) => Promise<void> = deleteBaselineAudioStrict,
++): Promise<ConvertedLessonProgress[] | null> {
++  let pending = await readPendingConvertedCompletion(storage);
++  if (!pending) return null;
++  if (pending.phase === "awaiting_private_cleanup") {
++    await strictPrivateCleanup(pending.expectedActiveRevision.runId);
++    await markPendingPrivateContentDeleted(storage, pending.record.runId);
++    pending = await readPendingConvertedCompletion(storage);
++    if (!pending) throw new Error("Pending completion disappeared after private cleanup");
++  }
+   await clearExpectedActiveKeyAfterDeletion(storage, pending);
+   return promotePendingConvertedCompletion(storage, pending.record.runId);
+ }
+diff --git a/expo/lib/convertedLesson.ts b/expo/lib/convertedLesson.ts
+index fbb9cbb..c4b25c6 100644
+--- a/expo/lib/convertedLesson.ts
++++ b/expo/lib/convertedLesson.ts
+@@ -171,14 +171,10 @@ export function evidenceQuoteFor(dimension: M1L1DimensionId, transcript: string)
+ 
+ function flag(dimension: M1L1DimensionId, status: M1L1BehaviorFlag["status"], transcript: string): M1L1BehaviorFlag {
+   if (status === "not_assessable") return { dimension, status, evidenceQuote: null };
+-  let evidenceQuote = evidenceQuoteFor(dimension, transcript);
+-  if (!evidenceQuote && status === "met" && (dimension === "motive_character_language" || dimension === "evidence_discipline")) {
+-    evidenceQuote = evidenceQuoteFor("grounding_concreteness", transcript);
+-  }
+-  if (!evidenceQuote && status === "met" && dimension === "issue_count") {
+-    evidenceQuote = evidenceQuoteFor("point_placement", transcript);
+-  }
+-  return evidenceQuote ? { dimension, status, evidenceQuote } : { dimension, status: "not_assessable", evidenceQuote: null };
++  const evidenceQuote = evidenceQuoteFor(dimension, transcript);
++  return evidenceQuote && transcript.includes(evidenceQuote)
++    ? { dimension, status, evidenceQuote }
++    : { dimension, status: "not_assessable", evidenceQuote: null };
+ }
+ 
+ export const M1L1_PUSHBACK_ONE_DEFINITIONS = M1_L1_CONVERSION.pushbackOneBank.map((text, index) => ({
+@@ -245,8 +241,9 @@ export function hasCanonicalM1L1PressureSequence(run: PilotDayRun): boolean {
+ 
+ /** Scoreless transcript-observable flags for one confirmed learner segment. */
+ export function m1L1BehaviorFlags(confirmedTranscript: string, coachedBeat: 1 | 3 | 5): M1L1BehaviorFlag[] {
+-  const transcript = cleanTranscript(confirmedTranscript);
+-  if (transcript.length < 2) return DIMENSION_PRIORITY.map((dimension) => flag(dimension, "not_assessable", transcript));
++  const originalTranscript = confirmedTranscript;
++  const transcript = cleanTranscript(originalTranscript);
++  if (transcript.length < 2) return DIMENSION_PRIORITY.map((dimension) => flag(dimension, "not_assessable", originalTranscript));
+   const lower = transcript.toLowerCase();
+   const firstSentence = transcript.split(/(?<=[.!?])\s+/)[0] ?? transcript;
+   const sentenceCount = transcript.split(/[.!?]+/).filter((part) => part.trim().length > 0).length;
+@@ -259,13 +256,13 @@ export function m1L1BehaviorFlags(confirmedTranscript: string, coachedBeat: 1 |
+   const parksAndReturns = /\b(i hear|that's fair|i understand|i get that)\b/.test(lower) && /\b(still|my point|the handoff|the file|what i need)\b/.test(lower);
+   const evidenceDiscipline = coachedBeat === 5 ? !caseBuilding && !motiveClaim : !caseBuilding;
+   return [
+-    flag("point_placement", directPoint ? "met" : "not_met", transcript),
+-    flag("issue_count", caseBuilding ? "not_met" : "met", transcript),
+-    flag("grounding_concreteness", grounded ? "met" : "not_met", transcript),
+-    flag("motive_character_language", motiveClaim ? "not_met" : "met", transcript),
+-    flag("move_clarity", answerableMove ? "met" : "not_met", transcript),
+-    flag("evidence_discipline", evidenceDiscipline ? "met" : "not_met", transcript),
+-    flag("park_and_return", coachedBeat === 3 || coachedBeat === 5 ? (parksAndReturns ? "met" : "not_met") : "not_assessable", transcript),
++    flag("point_placement", directPoint ? "met" : "not_met", originalTranscript),
++    flag("issue_count", caseBuilding ? "not_met" : "met", originalTranscript),
++    flag("grounding_concreteness", grounded ? "met" : "not_met", originalTranscript),
++    flag("motive_character_language", motiveClaim ? "not_met" : "met", originalTranscript),
++    flag("move_clarity", answerableMove ? "met" : "not_met", originalTranscript),
++    flag("evidence_discipline", evidenceDiscipline ? "met" : "not_met", originalTranscript),
++    flag("park_and_return", coachedBeat === 3 || coachedBeat === 5 ? (parksAndReturns ? "met" : "not_met") : "not_assessable", originalTranscript),
+   ];
+ }
+ 
+diff --git a/expo/lib/practiceSession.ts b/expo/lib/practiceSession.ts
+index c171043..58f7c52 100644
+--- a/expo/lib/practiceSession.ts
++++ b/expo/lib/practiceSession.ts
+@@ -362,6 +362,7 @@ export function createPilotDayRun(
+     curriculumVersion: practiceId ? "2026-08-11.1-review" : PILOT_PROGRAM.curriculum_version,
+     state: "module_preview",
+     scenarioMode: "preset",
++    contextualPersona: session.persona ?? "woman-hope",
+     lessonIndex: 0,
+     createdAt: now,
+     updatedAt: now,
+@@ -378,6 +379,7 @@ function protectPilotDayRun(existing: PilotDayRun, incoming: PilotDayRun): Pilot
+     ...(existing.responseAttempt ? { responseAttempt: existing.responseAttempt } : {}),
+     ...(existing.retryAttempt ? { retryAttempt: existing.retryAttempt } : {}),
+     ...(existing.scenarioContext ? { scenarioContext: existing.scenarioContext } : {}),
++    ...(existing.contextualPersona ? { contextualPersona: existing.contextualPersona } : {}),
+     ...(existing.counterpartTurn ? { counterpartTurn: existing.counterpartTurn } : {}),
+     ...(existing.counterpartIdentity ? { counterpartIdentity: existing.counterpartIdentity } : {}),
+     ...(existing.counterpartReactionId ? { counterpartReactionId: existing.counterpartReactionId } : {}),
+diff --git a/expo/lib/scenarioPractice.ts b/expo/lib/scenarioPractice.ts
+index 3c82b77..ec7e66e 100644
+--- a/expo/lib/scenarioPractice.ts
++++ b/expo/lib/scenarioPractice.ts
+@@ -13,6 +13,7 @@ import type {
+ const SCENARIO_RUN_VERSION = 1 as const;
+ const SCENARIO_DAY = 7;
+ const SCENARIO_CURRICULUM_VERSION = "scenario-paid-practice-v1";
++const REACTIONS: ReadonlySet<ReactionPattern> = new Set(["defensive", "hears-criticism", "minimizes", "quiet", "louder", "turns-back", "agrees-without-changing", "not-sure"]);
+ const SCENARIO_STATES: ReadonlySet<PilotModuleState> = new Set([
+   "ready_for_attempt", "listening_attempt", "confirm_attempt_transcript", "ready_for_response",
+   "listening_response", "confirm_response_transcript", "ready_for_second_pressure", "ready_for_second_response",
+@@ -67,7 +68,7 @@ export function createScenarioPracticeRun(
+   reaction: ReactionPattern,
+   id: string,
+   now: number = Date.now(),
+-  contextualPersona?: PersonaVoice,
++  contextualPersona: PersonaVoice = scenario.counterpartGender === "man" ? "man-adam" : "woman-hope",
+ ): PersistedScenarioPracticeRun {
+   const parts = counterpartParts(scenario.counterpart);
+   const context: ScenarioPracticeContext = {
+@@ -82,7 +83,7 @@ export function createScenarioPracticeRun(
+     counterpartName: parts.name,
+     counterpartLabel: scenario.counterpart,
+     counterpartRole: parts.role,
+-    ...(contextualPersona ? { contextualPersona } : {}),
++    contextualPersona,
+   };
+   return {
+     version: SCENARIO_RUN_VERSION,
+@@ -102,11 +103,11 @@ export function createScenarioPracticeRun(
+ 
+ function nonEmpty(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0; }
+ function timestamp(value: unknown): value is number { return Number.isSafeInteger(value) && (value as number) >= 0; }
+-function attempt(value: unknown, expectedKind?: "opener" | "response" | "retry"): PilotDayRun["attempt"] | null {
++function attempt(value: unknown, expectedKind: "opener" | "response" | "retry", expectedId: string): PilotDayRun["attempt"] | null {
+   if (!value || typeof value !== "object") return null;
+   const item = value as Record<string, unknown>;
+-  if (!nonEmpty(item.id) || !nonEmpty(item.transcript) || item.representation !== "confirmed_transcript" || !timestamp(item.confirmedAt)) return null;
+-  if (!["opener", "response", "retry"].includes(String(item.kind)) || (expectedKind && item.kind !== expectedKind)) return null;
++  if (item.id !== expectedId || !nonEmpty(item.transcript) || item.representation !== "confirmed_transcript" || !timestamp(item.confirmedAt)) return null;
++  if (item.kind !== expectedKind) return null;
+   return { id: item.id, kind: item.kind as "opener" | "response" | "retry", transcript: item.transcript, representation: "confirmed_transcript", confirmedAt: item.confirmedAt };
+ }
+ function counterpartTurn(value: unknown): ScenarioCounterpartTurn | null {
+@@ -133,11 +134,14 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
+   const required = ["scenarioId", "category", "title", "situation", "objective", "difficulty", "reaction", "counterpartId", "counterpartName", "counterpartLabel", "counterpartRole"] as const;
+   if (required.some((key) => !nonEmpty(context[key]))) return null;
+   if (!["partner", "family", "work", "friends"].includes(String(context.category)) || !["gentle", "steady", "challenging"].includes(String(context.difficulty))) return null;
+-  if (context.contextualPersona !== undefined && !["woman-hope", "man-adam"].includes(String(context.contextualPersona))) return null;
++  if (!["woman-hope", "man-adam"].includes(String(context.contextualPersona)) || !REACTIONS.has(context.reaction as ReactionPattern)) return null;
+   if (!nonEmpty(run.id) || !timestamp(run.createdAt) || !timestamp(run.updatedAt) || (run.updatedAt as number) < (run.createdAt as number)) return null;
+   if (!SCENARIO_STATES.has(run.state as PilotModuleState) || !Number.isSafeInteger(run.day) || !Number.isSafeInteger(run.lessonIndex)) return null;
+   if (!nonEmpty(run.curriculumVersion) || !["preset", "carried_context"].includes(String(run.scenarioMode))) return null;
+-  const parseOptionalAttempt = (key: "attempt" | "responseAttempt" | "retryAttempt", kind: "opener" | "response" | "retry") => run[key] === undefined ? undefined : attempt(run[key], kind);
++  const parseOptionalAttempt = (key: "attempt" | "responseAttempt" | "retryAttempt", kind: "opener" | "response" | "retry") => {
++    const expectedId = key === "retryAttempt" && run.m1L1 ? `${String(run.id)}-m1-l1-retry-1` : `${String(run.id)}-${kind}`;
++    return run[key] === undefined ? undefined : attempt(run[key], kind, expectedId);
++  };
+   const opener = parseOptionalAttempt("attempt", "opener");
+   const response = parseOptionalAttempt("responseAttempt", "response");
+   const retry = parseOptionalAttempt("retryAttempt", "retry");
+@@ -149,7 +153,7 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
+     situation: context.situation as string, objective: context.objective as string, difficulty: context.difficulty as Difficulty,
+     reaction: context.reaction as ReactionPattern, counterpartId: context.counterpartId as string, counterpartName: context.counterpartName as string,
+     counterpartLabel: context.counterpartLabel as string, counterpartRole: context.counterpartRole as string,
+-    ...(context.contextualPersona ? { contextualPersona: context.contextualPersona as PersonaVoice } : {}),
++    contextualPersona: context.contextualPersona as PersonaVoice,
+   };
+   const canonicalRun: PilotDayRun = {
+     id: run.id, day: run.day as number, curriculumVersion: run.curriculumVersion, state: run.state as PilotModuleState,
+@@ -160,8 +164,10 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
+     ...(nonEmpty(run.practiceId) ? { practiceId: run.practiceId } : {}), ...(nonEmpty(run.contentVersion) ? { contentVersion: run.contentVersion } : {}),
+     ...(pressure ? { counterpartTurn: pressure } : {}), ...(opener ? { attempt: opener } : {}), ...(response ? { responseAttempt: response } : {}), ...(retry ? { retryAttempt: retry } : {}),
+   };
+-  const stringFields = ["counterpartIdentity", "counterpartReactionId", "resolvedAudioId", "adamReactionId", "adamAudioId", "coachedBehaviorId", "coachedSegment", "retryResetId", "coachNote", "retryInstruction", "noteFit"] as const;
++  const stringFields = ["counterpartIdentity", "counterpartReactionId", "resolvedAudioId", "adamReactionId", "adamAudioId", "coachedBehaviorId", "retryResetId", "coachNote", "retryInstruction"] as const;
+   for (const key of stringFields) { if (run[key] !== undefined) { if (!nonEmpty(run[key])) return null; (canonicalRun as unknown as Record<string, unknown>)[key] = run[key]; } }
++  if (run.coachedSegment !== undefined) { if (run.coachedSegment !== "opener" && run.coachedSegment !== "pushback_response") return null; canonicalRun.coachedSegment = run.coachedSegment; }
++  if (run.noteFit !== undefined) { if (run.noteFit !== "accepted" && run.noteFit !== "rejected") return null; canonicalRun.noteFit = run.noteFit; }
+   if (run.comparison !== undefined) {
+     if (!run.comparison || typeof run.comparison !== "object") return null;
+     const comparison = run.comparison as Record<string, unknown>;
+@@ -174,14 +180,15 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
+     if (!Number.isSafeInteger(item.beat) || (item.beat as number) < 1 || (item.beat as number) > 8 || ![0, 1, 2].includes(item.retryCount as number)) return null;
+     const pushbackOne = item.pushbackOne === undefined ? undefined : counterpartTurn(item.pushbackOne);
+     const pushbackTwo = item.pushbackTwo === undefined ? undefined : counterpartTurn(item.pushbackTwo);
+-    const second = item.secondResponseAttempt === undefined ? undefined : attempt(item.secondResponseAttempt, "response");
+-    const final = item.finalRetryAttempt === undefined ? undefined : attempt(item.finalRetryAttempt, "retry");
++    const second = item.secondResponseAttempt === undefined ? undefined : attempt(item.secondResponseAttempt, "response", `${String(run.id)}-m1-l1-response-2`);
++    const finalExpectedId = `${String(run.id)}-m1-l1-retry-${String(item.retryCount)}`;
++    const final = item.finalRetryAttempt === undefined ? undefined : attempt(item.finalRetryAttempt, "retry", finalExpectedId);
+     if (pushbackOne === null || pushbackTwo === null || second === null || final === null) return null;
+     const timestampFields = ["approvedMoveSavedAt", "replayRequestedAt", "replayCompletedAt", "finalRetryPressureReplayedAt"] as const;
+     if (timestampFields.some((key) => item[key] !== undefined && !timestamp(item[key]))) return null;
+     if (item.coachedBeat !== undefined && ![1, 3, 5].includes(item.coachedBeat as number)) return null;
+     if (item.replayTarget !== undefined && !["top_of_scene", "pushback_one", "evidence_trap"].includes(String(item.replayTarget))) return null;
+-    if (item.replayProof !== undefined && !["playback_started", "text_fallback_acknowledged", "top_of_scene_reset"].includes(String(item.replayProof))) return null;
++    if (item.replayProof !== undefined && !["playback_completed", "text_fallback_acknowledged", "top_of_scene_reset"].includes(String(item.replayProof))) return null;
+     if (item.selectedDimension !== undefined && !["point_placement", "issue_count", "grounding_concreteness", "motive_character_language", "move_clarity", "evidence_discipline", "park_and_return"].includes(String(item.selectedDimension))) return null;
+     let flags: NonNullable<PilotDayRun["m1L1"]>["flags"];
+     if (item.flags !== undefined) {
+@@ -215,6 +222,14 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
+     if (item.replayIsFinal !== undefined && typeof item.replayIsFinal !== "boolean") return null;
+     if (item.replayAudioId !== undefined && !nonEmpty(item.replayAudioId)) return null;
+     if (item.finalRetryPressureAudioId !== undefined && !nonEmpty(item.finalRetryPressureAudioId)) return null;
++    const hasReplayRequest = Boolean(lesson.replayTarget && lesson.replayRequestedAt && lesson.replayAudioId);
++    const hasReplayCompletion = Boolean(lesson.replayProof && lesson.replayCompletedAt);
++    if ((lesson.replayTarget || lesson.replayRequestedAt || lesson.replayAudioId) && !hasReplayRequest) return null;
++    if ((lesson.replayProof || lesson.replayCompletedAt) && !hasReplayCompletion) return null;
++    if (run.state === "replay_pending" && (!hasReplayRequest || hasReplayCompletion)) return null;
++    if (lesson.replayTarget === "top_of_scene" && hasReplayCompletion && lesson.replayProof !== "top_of_scene_reset" && lesson.replayProof !== "text_fallback_acknowledged") return null;
++    if (lesson.replayTarget !== "top_of_scene" && lesson.replayProof === "top_of_scene_reset") return null;
++    if (lesson.replayIsFinal === true && hasReplayCompletion && (lesson.finalRetryPressureReplayedAt !== lesson.replayCompletedAt || lesson.finalRetryPressureAudioId !== lesson.replayAudioId)) return null;
+     canonicalRun.m1L1 = lesson;
+   }
+   if (run.completedAt !== undefined) { if (!timestamp(run.completedAt)) return null; canonicalRun.completedAt = run.completedAt; }
+@@ -385,10 +400,10 @@ export function stageM1L1PressureReplay(value: PersistedScenarioPracticeRun, isF
+   };
+ }
+ 
+-/** Unlocks retry capture only after playback starts or the learner explicitly accepts the text fallback. */
++/** Unlocks retry capture only after exact playback completes or the learner explicitly accepts the text fallback. */
+ export function confirmM1L1PressureReplay(
+   value: PersistedScenarioPracticeRun,
+-  proof: "playback_started" | "text_fallback_acknowledged" | "top_of_scene_reset",
++  proof: "playback_completed" | "text_fallback_acknowledged" | "top_of_scene_reset",
+   now: number,
+ ): PersistedScenarioPracticeRun {
+   const lesson = value.run.m1L1;
+@@ -412,6 +427,17 @@ export function confirmM1L1PressureReplay(
+   };
+ }
+ 
++/** Executes the replay completion boundary used by the screen; started/interrupted audio never unlocks capture. */
++export async function completeM1L1PressureReplay(
++  value: PersistedScenarioPracticeRun,
++  playToCompletion: () => Promise<"completed" | "interrupted" | "failed" | "blocked" | "empty" | "muted">,
++  now: number = Date.now(),
++): Promise<PersistedScenarioPracticeRun> {
++  if (value.run.state !== "replay_pending") return value;
++  const outcome = await playToCompletion();
++  return outcome === "completed" ? confirmM1L1PressureReplay(value, "playback_completed", now) : value;
++}
++
+ /** Records retry count with a hard cap of two and rejects final capture before exact replay. */
+ export function preserveM1L1Retry(value: PersistedScenarioPracticeRun, transcript: string, now: number): PersistedScenarioPracticeRun {
+   const lesson = value.run.m1L1;
+diff --git a/expo/lib/temporaryRecording.ts b/expo/lib/temporaryRecording.ts
+index 62c27c2..973f5b3 100644
+--- a/expo/lib/temporaryRecording.ts
++++ b/expo/lib/temporaryRecording.ts
+@@ -9,14 +9,10 @@ export interface NativeRecordingCleanupAdapter {
+ 
+ /** Stops/releases native capture and deletes content even when stop itself fails. */
+ export async function cleanupNativeRecordingStrict(adapter: NativeRecordingCleanupAdapter): Promise<void> {
+-  let stopError: unknown;
+-  try { await adapter.stop(); } catch (error) { stopError = error; }
++  await adapter.stop();
+   const uri = adapter.uri();
+-  let deletionError: unknown;
+-  try { if (uri) await adapter.discard(uri); } catch (error) { deletionError = error; }
+-  try { await adapter.releaseAudioMode(); } catch (error) { if (!stopError) stopError = error; }
+-  if (deletionError) throw deletionError;
+-  if (stopError) throw stopError;
++  await adapter.releaseAudioMode();
++  if (uri) await adapter.discard(uri);
+ }
+ 
+ export interface WebRecordingCleanupAdapter {
+@@ -28,8 +24,17 @@ export interface WebRecordingCleanupAdapter {
+ /** Browser cleanup keeps buffered content pending unless stop and discard both succeed. */
+ export async function cleanupWebRecordingStrict(adapter: WebRecordingCleanupAdapter): Promise<void> {
+   await adapter.stop();
+-  await adapter.discardBufferedContent();
+   adapter.releaseTracks();
++  await adapter.discardBufferedContent();
++}
++
++/** Runs the navigation boundary only after the hook confirms all pending recorder cleanup. */
++export async function leaveAfterStrictDictationCleanup(
++  cancel: () => Promise<void>,
++  navigate: () => void,
++): Promise<void> {
++  await cancel();
++  navigate();
+ }
+ 
+ /** Strictly deletes one temporary recording and verifies native content is absent. */
+diff --git a/expo/lib/useDictation.ts b/expo/lib/useDictation.ts
+index b7bd304..245dd69 100644
+--- a/expo/lib/useDictation.ts
++++ b/expo/lib/useDictation.ts
+@@ -20,6 +20,8 @@ import {
+ 
+ export type DictationStatus = "idle" | "recording" | "transcribing" | "denied" | "error";
+ 
++let retryDetachedCleanup: (() => Promise<void>) | null = null;
++
+ const NATIVE_RECORDING_OPTIONS = {
+   ...RecordingPresets.HIGH_QUALITY,
+   isMeteringEnabled: true,
+@@ -124,8 +126,8 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
+         recorder.ondataavailable = (event: BlobEvent): void => {
+           if (event.data.size > 0) webChunksRef.current.push(event.data);
+         };
+-        recorder.start();
+         webRecorderRef.current = recorder;
++        recorder.start();
+         setLevel(0.45);
+         setStatus("recording");
+         tap("medium");
+@@ -144,8 +146,8 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
+         playsInSilentMode: true,
+       });
+       await nativeRecorder.prepareToRecordAsync();
+-      nativeRecorder.record();
+       nativeRecordingRef.current = true;
++      nativeRecorder.record();
+       setStatus("recording");
+       tap("medium");
+     } catch (e) {
+@@ -159,16 +161,35 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
+       setError(Platform.OS === "web"
+         ? "Microphone access is unavailable in this preview. Allow it in your browser, or type this turn instead."
+         : "Could not start the microphone.");
+-      webStreamRef.current?.getTracks().forEach((track) => track.stop());
+-      webStreamRef.current = null;
+-      if (Platform.OS !== "web") {
+-        const uri = nativeRecorder.uri;
+-        if (uri) {
+-          temporaryUriRef.current = uri;
+-          await discard(uri);
+-          temporaryUriRef.current = null;
++      try {
++        if (Platform.OS === "web" && webRecorderRef.current) {
++          const recorder = webRecorderRef.current;
++          await cleanupWebRecordingStrict({
++            stop: async () => stopWebRecorder(recorder),
++            releaseTracks: () => webStreamRef.current?.getTracks().forEach((track) => track.stop()),
++            discardBufferedContent: async () => { webChunksRef.current = []; },
++          });
++          webStreamRef.current = null;
++          webRecorderRef.current = null;
++        } else if (Platform.OS === "web" && webStreamRef.current) {
++          webStreamRef.current.getTracks().forEach((track) => track.stop());
++          webStreamRef.current = null;
++        } else if (Platform.OS !== "web") {
++          if (nativeRecordingRef.current) {
++            await cleanupNativeRecordingStrict({
++              stop: async () => nativeRecorder.stop(),
++              uri: () => nativeRecorder.uri ?? temporaryUriRef.current,
++              releaseAudioMode: async () => setAudioModeAsync({ allowsRecording: false }),
++              discard: async (uri) => { temporaryUriRef.current = uri; await discard(uri); },
++            });
++            nativeRecordingRef.current = false;
++            temporaryUriRef.current = null;
++          }
+         }
+-        await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
++      } catch (cleanupError) {
++        setStatus("error");
++        setError("Recording cleanup is still pending. Try again before leaving.");
++        throw cleanupError;
+       }
+     } finally {
+       operationRef.current = false;
+@@ -204,9 +225,9 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
+           discard: async (capturedUri) => {
+             temporaryUriRef.current = capturedUri;
+             await discard(capturedUri);
+-            temporaryUriRef.current = null;
+           },
+         });
++        temporaryUriRef.current = null;
+         uri = null;
+       }
+       if (uri) {
+@@ -234,9 +255,16 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
+     resetState();
+   }, [cancel, resetState]);
+ 
+-  useEffect(() => () => {
+-    mountedRef.current = false;
+-    void cancel().catch((caught: unknown) => safeLog("[dictation] unmount cleanup remains pending", errorShape(caught)));
++  useEffect(() => {
++    const detached = retryDetachedCleanup;
++    if (detached) void detached().catch((caught: unknown) => safeLog("[dictation] detached cleanup retry remains pending", errorShape(caught)));
++    return () => {
++      mountedRef.current = false;
++      void cancel().catch((caught: unknown) => {
++        retryDetachedCleanup = cancel;
++        safeLog("[dictation] unmount cleanup remains pending", errorShape(caught));
++      });
++    };
+   }, [cancel]);
+ 
+   const stop = useCallback(async (turn: TranscriptionTurn): Promise<string | null> => {
+@@ -245,67 +273,84 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
+     const webRecorder = webRecorderRef.current;
+     if (!hasNativeRecording && !webRecorder) return null;
+     operationRef.current = true;
+-    nativeRecordingRef.current = false;
+-    webRecorderRef.current = null;
+-
+     setStatus("transcribing");
+     setLevel(0);
+-    let uri: string | null = null;
++    let uri: string | null = temporaryUriRef.current;
++    let captureStopped = false;
++    let audioModeReleased = Platform.OS === "web";
++    let result: string | null = null;
++    let operationError: unknown;
+     try {
+       if (webRecorder) {
+         await stopWebRecorder(webRecorder);
+-        webStreamRef.current?.getTracks().forEach((track) => track.stop());
+-        webStreamRef.current = null;
++        captureStopped = true;
+         const mimeType = webRecorder.mimeType || "audio/webm";
+         const blob = new Blob(webChunksRef.current, { type: mimeType });
+-        webChunksRef.current = [];
+-        if (blob.size > 0) uri = URL.createObjectURL(blob);
++        if (blob.size > 0) {
++          uri = URL.createObjectURL(blob);
++          temporaryUriRef.current = uri;
++        }
+       } else if (hasNativeRecording) {
+         await nativeRecorder.stop();
+-        uri = nativeRecorder.uri;
++        captureStopped = true;
++        uri = nativeRecorder.uri ?? temporaryUriRef.current;
+         temporaryUriRef.current = uri;
+         await setAudioModeAsync({ allowsRecording: false });
++        audioModeReleased = true;
+       }
+-
+-      if (!uri) {
+-        setStatus("error");
+-        setError("No recording was captured.");
+-        return null;
+-      }
+-
++      if (!uri) throw new Error("No recording was captured");
+       const mediaType = webRecorder?.mimeType || "audio/mp4";
+-      const text = await transcribeRecording(uri, mediaType, turn);
+-      setStatus("idle");
+-      tap("success");
+-      return text;
+-    } catch (e) {
++      result = await transcribeRecording(uri, mediaType, turn);
++    } catch (caught) {
++      operationError = caught;
++      uri = uri ?? nativeRecorder.uri ?? temporaryUriRef.current;
++      temporaryUriRef.current = uri;
+       safeLog("[dictation] stop or transcribe failed", {
+-        ...errorShape(e),
+-        ...(e instanceof TranscriptionUnavailableError ? { status: e.status } : {}),
++        ...errorShape(caught),
++        ...(caught instanceof TranscriptionUnavailableError ? { status: caught.status } : {}),
+       });
+-      setStatus("error");
+-      setError(e instanceof TranscriptionUnavailableError
+-        ? "Voice transcription is temporarily unavailable. Type this turn instead."
+-        : "Could not transcribe that. Try again.");
+-      return null;
+-    } finally {
+-      // The audio file is transient. It is only ever retained when the user
+-      // opted in for this specific session.
+-      try {
+-        if (uri) {
+-          if (keepAudioAs) await keepBaselineAudio(keepAudioAs, uri);
+-          await discard(uri);
+-          temporaryUriRef.current = null;
+-        }
+-      } catch (cleanupError) {
+-        if (mountedRef.current) {
+-          setStatus("error");
+-          setError("Recording cleanup is still pending. Try again before leaving.");
++    }
++
++    try {
++      if (uri) {
++        if (keepAudioAs && result) await keepBaselineAudio(keepAudioAs, uri);
++        await discard(uri);
++      }
++      if (!captureStopped) throw operationError ?? new Error("Recording stop was not confirmed");
++      if (!audioModeReleased) {
++        await setAudioModeAsync({ allowsRecording: false });
++        audioModeReleased = true;
++      }
++      webStreamRef.current?.getTracks().forEach((track) => track.stop());
++      webStreamRef.current = null;
++      webChunksRef.current = [];
++      temporaryUriRef.current = null;
++      nativeRecordingRef.current = false;
++      webRecorderRef.current = null;
++      retryDetachedCleanup = null;
++      if (result) {
++        setStatus("idle");
++        setError("");
++        tap("success");
++      } else {
++        setStatus("error");
++        if (operationError instanceof Error && operationError.message === "No recording was captured") {
++          setError("No recording was captured.");
++        } else {
++          setError(operationError instanceof TranscriptionUnavailableError
++            ? "Voice transcription is temporarily unavailable. Type this turn instead."
++            : "Could not transcribe that. Try again.");
+         }
+-        throw cleanupError;
+-      } finally {
+-        operationRef.current = false;
+       }
++      return result;
++    } catch (cleanupError) {
++      if (mountedRef.current) {
++        setStatus("error");
++        setError("Recording cleanup is still pending. Try again before leaving.");
++      }
++      throw cleanupError;
++    } finally {
++      operationRef.current = false;
+     }
+   }, [keepAudioAs, nativeRecorder]);
+ 
+diff --git a/expo/lib/voice.ts b/expo/lib/voice.ts
+index 0d24f1f..0ba7c09 100644
+--- a/expo/lib/voice.ts
++++ b/expo/lib/voice.ts
+@@ -59,6 +59,8 @@ let token = 0;
+ let lastUtterance: Utterance | null = null;
+ let currentPlayer: AudioPlayer | null = null;
+ let currentPlaybackCleanup: (() => void) | null = null;
++type PlaybackCompletion = "completed" | "interrupted";
++let activeCompletion: { id: number; promise: Promise<PlaybackCompletion>; resolve: (value: PlaybackCompletion) => void } | null = null;
+ let webUnlocked = false;
+ let webEl: HTMLAudioElement | null = null;
+ const webStaticCache = new Map<string, string>();
+@@ -240,6 +242,20 @@ async function teardownSound(): Promise<void> {
+   }
+ }
+ 
++function beginCompletion(id: number): Promise<PlaybackCompletion> {
++  activeCompletion?.resolve("interrupted");
++  let resolve!: (value: PlaybackCompletion) => void;
++  const promise = new Promise<PlaybackCompletion>((done) => { resolve = done; });
++  activeCompletion = { id, promise, resolve };
++  return promise;
++}
++
++function settleCompletion(id: number, value: PlaybackCompletion): void {
++  if (activeCompletion?.id !== id) return;
++  activeCompletion.resolve(value);
++  activeCompletion = null;
++}
++
+ function stopWeb(): void {
+   const el = webEl;
+   if (!el) return;
+@@ -253,6 +269,8 @@ function stopWeb(): void {
+ 
+ /** Stop playback now. The last line stays available to replay. */
+ export async function stopSpeech(): Promise<void> {
++  activeCompletion?.resolve("interrupted");
++  activeCompletion = null;
+   token += 1;
+   stopWeb();
+   await teardownSound();
+@@ -276,6 +294,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
+     const el = webElement();
+     if (!el) return "failed";
+     el.src = source;
++    beginCompletion(id);
+     el.onended = () => {
+       if (id !== token) return;
+       safeLog("[evidence] BYSI TTS playback completed", {
+@@ -283,6 +302,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
+         role: lastUtterance ? roleForPersona(lastUtterance.persona) : "unknown",
+         status: "completed",
+       });
++      settleCompletion(id, "completed");
+       publish({ phase: "idle" });
+     };
+     try {
+@@ -294,6 +314,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
+         return "blocked";
+       }
+       safeLog("[voice] web playback failed", errorShape(e));
++      settleCompletion(id, "interrupted");
+       publish({ phase: "failed" });
+       return "failed";
+     }
+@@ -364,6 +385,8 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
+     return "empty";
+   }
+ 
++  const completionPromise = beginCompletion(id);
++  void completionPromise;
+   let hasStarted = false;
+   let isSettled = false;
+   let removeStatusListener: (() => void) | null = null;
+@@ -382,6 +405,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
+       // Already released by an explicit stop or a newer playback request.
+     }
+     if (id !== token) return;
++    settleCompletion(id, status === "completed" ? "completed" : "interrupted");
+     safeLog("[evidence] BYSI TTS playback completed", {
+       platform: Platform.OS,
+       role,
+@@ -543,6 +567,18 @@ export async function speakPilotAudio(
+   return await playUtterance();
+ }
+ 
++/** Resolves as completed only after the exact staged audio reaches its terminal end event. */
++export async function speakPilotAudioToCompletion(
++  line: PilotAudioLine,
++  options: { muted?: boolean; contextualPersona?: PersonaVoice } = {},
++): Promise<"completed" | "interrupted" | Exclude<SpeakOutcome, "played">> {
++  const outcome = await speakPilotAudio(line, options);
++  if (outcome !== "played") return outcome;
++  const completion = activeCompletion;
++  if (!completion) return "interrupted";
++  return await completion.promise;
++}
++
+ export async function replaySpeech(): Promise<SpeakOutcome> {
+   if (!lastUtterance) return "empty";
+   await unlockAudioPlayback();
+diff --git a/expo/package.json b/expo/package.json
+index aeb3952..5c486a5 100644
+--- a/expo/package.json
++++ b/expo/package.json
+@@ -4,14 +4,14 @@
+   "private": true,
+   "main": "expo-router/entry",
+   "scripts": {
+-    "start": "bun run env:guard && bunx rork start -p 8fc4qwsqaurkxk0pimyvx",
+-    "start-web": "bun run env:guard && bunx rork start -p 8fc4qwsqaurkxk0pimyvx --web",
+-    "start-web-dev": "bun run env:guard && DEBUG=expo* bunx rork start -p 8fc4qwsqaurkxk0pimyvx --web",
+-    "lint": "bun run env:guard && expo lint",
++    "start": "bun scripts/run-client-command.ts start",
++    "start-web": "bun scripts/run-client-command.ts start-web",
++    "start-web-dev": "bun scripts/run-client-command.ts start-web-dev",
++    "lint": "bun scripts/run-client-command.ts lint",
+     "env:guard": "bun scripts/sanitize-client-env.ts",
+-    "test": "bun run env:guard && bun test",
+-    "check": "bun run env:guard && bunx tsc --noEmit && bun run lint",
+-    "export": "bun run env:guard && bunx expo export --platform all"
++    "test": "bun scripts/run-client-command.ts test",
++    "check": "bun scripts/run-client-command.ts check",
++    "export": "bun scripts/run-client-command.ts export"
+   },
+   "dependencies": {
+     "@expo/vector-icons": "^15.0.3",
+diff --git a/expo/providers/store.tsx b/expo/providers/store.tsx
+index b04adef..ca56015 100644
+--- a/expo/providers/store.tsx
++++ b/expo/providers/store.tsx
+@@ -156,14 +156,19 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+         const stableAnonymousId = anonymousId?.trim() || newAnonymousUserId();
+         setAnonymousUserId(stableAnonymousId);
+         if (!anonymousId) await AsyncStorage.setItem(KEYS.anonymousUserId, stableAnonymousId);
++        // Completion recovery owns the active bytes while its journal exists. It must
++        // resume strict audio deletion before generic parsing can quarantine identity.
++        const recoveredProgress = await recoverPendingConvertedCompletion(AsyncStorage);
+         let normalizedScenarioRun: PersistedScenarioPracticeRun | null = null;
+-        try {
+-          normalizedScenarioRun = await readActiveScenarioRunStrict(AsyncStorage);
+-        } catch (error: unknown) {
+-          safeLog("[store] malformed active run quarantined", errorShape(error));
++        if (!recoveredProgress) {
++          try {
++            normalizedScenarioRun = await readActiveScenarioRunStrict(AsyncStorage);
++          } catch (error: unknown) {
++            safeLog("[store] malformed active run quarantined", errorShape(error));
++          }
+         }
+         setActiveScenarioRun(normalizedScenarioRun);
+-        if (convertedProgress) {
++        if (convertedProgress && !recoveredProgress) {
+           const parsedConvertedProgress = JSON.parse(convertedProgress) as unknown;
+           const normalizedConvertedProgress = normalizeConvertedLessonProgress(parsedConvertedProgress);
+           setConvertedLessonProgress(normalizedConvertedProgress);
+@@ -171,11 +176,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+             await AsyncStorage.setItem(KEYS.convertedLessonProgress, JSON.stringify(normalizedConvertedProgress));
+           }
+         }
+-        const recoveredProgress = await recoverPendingConvertedCompletion(AsyncStorage);
+-        if (recoveredProgress) {
+-          setActiveScenarioRun(null);
+-          setConvertedLessonProgress(recoveredProgress);
+-        }
++        if (recoveredProgress) setConvertedLessonProgress(recoveredProgress);
+         if (practiceSession) {
+           const normalized = normalizePracticeSession(JSON.parse(practiceSession) as unknown);
+           setActivePracticeSession(normalized);
+diff --git a/expo/test-results/.last-run.json b/expo/test-results/.last-run.json
+deleted file mode 100644
+index 5fca3f8..0000000
+--- a/expo/test-results/.last-run.json
++++ /dev/null
+@@ -1,4 +0,0 @@
+-{
+-  "status": "failed",
+-  "failedTests": []
+-}
+\ No newline at end of file
+diff --git a/expo/types/pilotCurriculum.ts b/expo/types/pilotCurriculum.ts
+index 2347af1..1e0167d 100644
+--- a/expo/types/pilotCurriculum.ts
++++ b/expo/types/pilotCurriculum.ts
+@@ -180,7 +180,7 @@ export interface ScenarioPracticeContext {
+   counterpartLabel: string;
+   counterpartRole: string;
+   /** Voice resolved when the run is created so resume cannot change counterpart identity. */
+-  contextualPersona?: import("@/types/convo").PersonaVoice;
++  contextualPersona: import("@/types/convo").PersonaVoice;
+ }
+ 
+ /** One authored or provider-generated pressure turn reused for the retry. */
+@@ -226,7 +226,7 @@ export interface M1L1RehearsalState {
+   replayIsFinal?: boolean;
+   replayRequestedAt?: number;
+   replayAudioId?: string;
+-  replayProof?: "playback_started" | "text_fallback_acknowledged" | "top_of_scene_reset";
++  replayProof?: "playback_completed" | "text_fallback_acknowledged" | "top_of_scene_reset";
+   replayCompletedAt?: number;
+   finalRetryPressureReplayedAt?: number;
+   finalRetryPressureAudioId?: string;
+@@ -246,6 +246,8 @@ export interface PilotDayRun {
+   scenarioMode: "preset" | "carried_context";
+   /** Present only when a scenario enters this canonical paid-practice run. */
+   scenarioContext?: ScenarioPracticeContext;
++  /** Voice fixed when a modular run is created; contextual playback never re-resolves it. */
++  contextualPersona?: import("@/types/convo").PersonaVoice;
+   counterpartTurn?: ScenarioCounterpartTurn;
+   counterpartIdentity?: string;
+   counterpartReactionId?: string;
+diff --git a/expo/lib/moduleAudio.ts b/expo/lib/moduleAudio.ts
+new file mode 100644
+index 0000000..22a4816
+--- /dev/null
++++ b/expo/lib/moduleAudio.ts
+@@ -0,0 +1,19 @@
++import type { SpeakOutcome } from "@/lib/speech";
++import type { PersonaVoice } from "@/types/convo";
++import type { PilotAudioLine, PilotDayRun } from "@/types/pilotCurriculum";
++
++export type PilotAudioPlayer = (
++  line: PilotAudioLine,
++  options: { muted?: boolean; contextualPersona?: PersonaVoice },
++) => Promise<SpeakOutcome>;
++
++/** Plays a modular line with the persona fixed on the run that authored the checkpoint. */
++export function playRunBoundPilotAudio(
++  run: Pick<PilotDayRun, "contextualPersona">,
++  line: PilotAudioLine,
++  options: { muted?: boolean } = {},
++  player: PilotAudioPlayer,
++): Promise<SpeakOutcome> {
++  if (line.voice_key === "contextual_counterpart" && !run.contextualPersona) return Promise.resolve("failed");
++  return player(line, { ...options, contextualPersona: run.contextualPersona });
++}
+diff --git a/expo/scripts/run-client-checks.ts b/expo/scripts/run-client-checks.ts
+new file mode 100644
+index 0000000..20f69cc
+--- /dev/null
++++ b/expo/scripts/run-client-checks.ts
+@@ -0,0 +1,13 @@
++import { spawn } from "node:child_process";
++
++async function run(command: string, args: string[]): Promise<void> {
++  const child = spawn(command, args, { cwd: process.cwd(), env: process.env, stdio: "inherit" });
++  const code = await new Promise<number>((resolve, reject) => {
++    child.once("error", reject);
++    child.once("exit", (value) => resolve(value ?? 1));
++  });
++  if (code !== 0) process.exit(code);
++}
++
++await run("bunx", ["tsc", "--noEmit"]);
++await run("bunx", ["expo", "lint"]);
+diff --git a/expo/scripts/run-client-command.ts b/expo/scripts/run-client-command.ts
+new file mode 100644
+index 0000000..83db920
+--- /dev/null
++++ b/expo/scripts/run-client-command.ts
+@@ -0,0 +1,48 @@
++import { spawn } from "node:child_process";
++import { existsSync } from "node:fs";
++import { readFile, writeFile } from "node:fs/promises";
++import path from "node:path";
++
++import { guardClientProcessEnv, sanitizeClientEnv } from "../lib/clientEnvGuard";
++
++type LifecycleName = "start" | "start-web" | "start-web-dev" | "test" | "lint" | "check" | "export" | "probe";
++
++const commands: Record<LifecycleName, readonly string[]> = {
++  start: ["bunx", "rork", "start", "-p", "8fc4qwsqaurkxk0pimyvx"],
++  "start-web": ["bunx", "rork", "start", "-p", "8fc4qwsqaurkxk0pimyvx", "--web"],
++  "start-web-dev": ["bunx", "rork", "start", "-p", "8fc4qwsqaurkxk0pimyvx", "--web"],
++  test: ["bun", "test"],
++  lint: ["bunx", "expo", "lint"],
++  check: ["bun", "scripts/run-client-checks.ts"],
++  export: ["bunx", "expo", "export", "--platform", "all"],
++  probe: ["bun", "-e", "if(process.env.OPENAI_API_KEY||process.env.SUPABASE_ACCESS_TOKEN||process.env.EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY)throw new Error('DOWNSTREAM_SECRET_PRESENT');console.log('DOWNSTREAM_SECRET_ABSENT')"],
++};
++
++async function sanitizeEnvironmentFile(root: string): Promise<void> {
++  const envPath = path.join(root, ".env");
++  if (!existsSync(envPath)) return;
++  const original = await readFile(envPath, "utf8");
++  const sanitized = sanitizeClientEnv(original);
++  if (sanitized.rejectedNames.length > 0) throw new Error(`Unknown secret-like client variables: ${sanitized.rejectedNames.sort().join(", ")}`);
++  await writeFile(envPath, sanitized.content, { mode: 0o600 });
++}
++
++/** Runs a canonical lifecycle with the sanitized environment inherited by the actual downstream process. */
++export async function runSanitizedClientCommand(name: LifecycleName): Promise<number> {
++  const command = commands[name];
++  if (!command) throw new Error(`Unsupported client lifecycle: ${name}`);
++  const root = process.cwd();
++  await sanitizeEnvironmentFile(root);
++  const downstreamEnv: Record<string, string | undefined> = { ...process.env };
++  guardClientProcessEnv(downstreamEnv);
++  if (name === "start-web-dev") downstreamEnv.DEBUG = "expo*";
++  const child = spawn(command[0]!, [...command.slice(1)], { cwd: root, env: downstreamEnv as NodeJS.ProcessEnv, stdio: "inherit" });
++  return await new Promise<number>((resolve, reject) => {
++    child.once("error", reject);
++    child.once("exit", (code, signal) => resolve(code ?? (signal ? 1 : 0)));
++  });
++}
++
++const name = process.argv[2] as LifecycleName | undefined;
++if (!name) throw new Error("A client lifecycle name is required");
++process.exitCode = await runSanitizedClientCommand(name);

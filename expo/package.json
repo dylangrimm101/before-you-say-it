@@ -4,14 +4,14 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "start": "bun run env:guard && bunx rork start -p 8fc4qwsqaurkxk0pimyvx",
-    "start-web": "bun run env:guard && bunx rork start -p 8fc4qwsqaurkxk0pimyvx --web",
-    "start-web-dev": "bun run env:guard && DEBUG=expo* bunx rork start -p 8fc4qwsqaurkxk0pimyvx --web",
-    "lint": "bun run env:guard && expo lint",
+    "start": "bun scripts/run-client-command.ts start",
+    "start-web": "bun scripts/run-client-command.ts start-web",
+    "start-web-dev": "bun scripts/run-client-command.ts start-web-dev",
+    "lint": "bun scripts/run-client-command.ts lint",
     "env:guard": "bun scripts/sanitize-client-env.ts",
-    "test": "bun run env:guard && bun test",
-    "check": "bun run env:guard && bunx tsc --noEmit && bun run lint",
-    "export": "bun run env:guard && bunx expo export --platform all"
+    "test": "bun scripts/run-client-command.ts test",
+    "check": "bun scripts/run-client-command.ts check",
+    "export": "bun scripts/run-client-command.ts export"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

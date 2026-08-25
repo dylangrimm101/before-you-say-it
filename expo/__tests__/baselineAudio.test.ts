@@ -87,7 +87,7 @@ const {
   hasBaselineAudio,
   keepBaselineAudio,
 } = await import("@/lib/baselineAudio");
-const { cleanupNativeRecordingStrict, cleanupWebRecordingStrict, discardTemporaryRecordingStrict } = await import("@/lib/temporaryRecording");
+const { cleanupNativeRecordingStrict, cleanupWebRecordingStrict, discardTemporaryRecordingStrict, leaveAfterStrictDictationCleanup } = await import("@/lib/temporaryRecording");
 
 beforeEach(() => {
   disk.clear();
@@ -155,7 +155,7 @@ describe("baseline audio lifecycle", () => {
     expect(disk.has(uri)).toBe(true);
   });
 
-  it("native stop failure still deletes created content and reports the stop failure", async () => {
+  it("native stop failure retains URI-backed content and release work for retry", async () => {
     let deleted = false;
     let released = false;
     await expect(cleanupNativeRecordingStrict({
@@ -164,8 +164,8 @@ describe("baseline audio lifecycle", () => {
       discard: async () => { deleted = true; },
       releaseAudioMode: async () => { released = true; },
     })).rejects.toThrow("native stop failed");
-    expect(deleted).toBe(true);
-    expect(released).toBe(true);
+    expect(deleted).toBe(false);
+    expect(released).toBe(false);
   });
 
   it("native delete failure remains rejected after stop and release", async () => {
@@ -188,6 +188,19 @@ describe("baseline audio lifecycle", () => {
     })).rejects.toThrow("browser stop failed");
     expect(discarded).toBe(false);
     expect(released).toBe(false);
+  });
+
+  it("the screen navigation boundary remains blocked and retryable until hook cleanup succeeds", async () => {
+    let attempts = 0;
+    let navigations = 0;
+    const cancel = async (): Promise<void> => {
+      attempts += 1;
+      if (attempts < 2) throw new Error("pending cleanup");
+    };
+    await expect(leaveAfterStrictDictationCleanup(cancel, () => { navigations += 1; })).rejects.toThrow("pending cleanup");
+    expect(navigations).toBe(0);
+    await leaveAfterStrictDictationCleanup(cancel, () => { navigations += 1; });
+    expect(navigations).toBe(1);
   });
 
   it("strict deletion fails closed and leaves retained content visibly pending", async () => {

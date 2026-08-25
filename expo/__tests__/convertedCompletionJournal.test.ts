@@ -45,13 +45,15 @@ async function pending(storage: MemoryCompletionStorage): Promise<void> {
 }
 
 describe("converted completion phase-aware crash journal", () => {
-  test("before private deletion remains non-visible and does not clear active content", async () => {
+  test("restart resumes awaiting private cleanup before clearing and promoting", async () => {
     resetConvertedProgressQueueForTests();
     const storage = new MemoryCompletionStorage();
     await pending(storage);
-    expect(await recoverPendingConvertedCompletion(storage)).toBeNull();
-    expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(true);
-    expect(storage.values.has(CONVERTED_PROGRESS_KEY)).toBe(false);
+    const deleted: string[] = [];
+    expect(await recoverPendingConvertedCompletion(storage, async (runId) => { deleted.push(runId); })).toHaveLength(1);
+    expect(deleted).toEqual(["run-journal"]);
+    expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(false);
+    expect(storage.values.has(CONVERTED_PROGRESS_KEY)).toBe(true);
   });
 
   test("after strict deletion, restart clears the exact active revision and promotes once", async () => {
@@ -59,11 +61,11 @@ describe("converted completion phase-aware crash journal", () => {
     const storage = new MemoryCompletionStorage();
     await pending(storage);
     await markPendingPrivateContentDeleted(storage, "run-journal");
-    const recovered = await recoverPendingConvertedCompletion(storage);
+    const recovered = await recoverPendingConvertedCompletion(storage, async () => {});
     expect(recovered).toHaveLength(1);
     expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(false);
     expect(storage.values.has(CONVERTED_COMPLETION_PENDING_KEY)).toBe(false);
-    expect(await recoverPendingConvertedCompletion(storage)).toBeNull();
+    expect(await recoverPendingConvertedCompletion(storage, async () => {})).toBeNull();
   });
 
   test("active-key removal failure remains recoverable without repeating visible completion", async () => {
@@ -72,9 +74,9 @@ describe("converted completion phase-aware crash journal", () => {
     await pending(storage);
     await markPendingPrivateContentDeleted(storage, "run-journal");
     storage.failRemoveKey = ACTIVE_SCENARIO_RUN_KEY;
-    await expect(recoverPendingConvertedCompletion(storage)).rejects.toThrow("crash removing");
+    await expect(recoverPendingConvertedCompletion(storage, async () => {})).rejects.toThrow("crash removing");
     expect(storage.values.has(CONVERTED_PROGRESS_KEY)).toBe(false);
-    expect(await recoverPendingConvertedCompletion(storage)).toHaveLength(1);
+    expect(await recoverPendingConvertedCompletion(storage, async () => {})).toHaveLength(1);
   });
 
   test("progress-write then journal-cleanup failure is idempotent", async () => {
@@ -86,19 +88,20 @@ describe("converted completion phase-aware crash journal", () => {
     storage.failRemoveKey = CONVERTED_COMPLETION_PENDING_KEY;
     await expect(promotePendingConvertedCompletion(storage, "run-journal")).rejects.toThrow("crash removing");
     expect(JSON.parse(storage.values.get(CONVERTED_PROGRESS_KEY) ?? "[]")).toHaveLength(1);
-    expect(await recoverPendingConvertedCompletion(storage)).toHaveLength(1);
+    expect(await recoverPendingConvertedCompletion(storage, async () => {})).toHaveLength(1);
     expect(JSON.parse(storage.values.get(CONVERTED_PROGRESS_KEY) ?? "[]")).toHaveLength(1);
   });
 
-  test("malformed active JSON is quarantined only after private deletion proof", async () => {
+  test("malformed active JSON is quarantined only after restart audio cleanup uses journal identity", async () => {
     resetConvertedProgressQueueForTests();
     const storage = new MemoryCompletionStorage();
     await pending(storage);
     storage.values.set(ACTIVE_SCENARIO_RUN_KEY, "{bad json");
-    expect(await recoverPendingConvertedCompletion(storage)).toBeNull();
-    expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(true);
-    await markPendingPrivateContentDeleted(storage, "run-journal");
-    expect(await recoverPendingConvertedCompletion(storage)).toHaveLength(1);
+    const order: string[] = [];
+    const recovered = await recoverPendingConvertedCompletion(storage, async (runId) => { order.push(`delete:${runId}`); });
+    expect(recovered).toHaveLength(1);
+    expect(order).toEqual(["delete:run-journal"]);
+    expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(false);
     expect(storage.values.has(QUARANTINED_SCENARIO_RUN_KEY)).toBe(true);
   });
 

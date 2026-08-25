@@ -1,6 +1,7 @@
 import { ACTIVE_SCENARIO_RUN_KEY, QUARANTINED_SCENARIO_RUN_KEY, type ActiveRunRevision } from "@/lib/activeScenarioRunRepository";
 import { normalizeConvertedLessonProgress, type ConvertedLessonProgress } from "@/lib/convertedLesson";
 import { commitConvertedProgress, type ConvertedProgressStorage } from "@/lib/convertedProgressRepository";
+import { deleteBaselineAudioStrict } from "@/lib/baselineAudio";
 import { normalizeScenarioPracticeRun } from "@/lib/scenarioPractice";
 
 export const CONVERTED_COMPLETION_PENDING_KEY = "cc.convertedCompletionPending.v1";
@@ -82,10 +83,19 @@ async function clearExpectedActiveKeyAfterDeletion(storage: ConvertedCompletionS
   await storage.removeItem(ACTIVE_SCENARIO_RUN_KEY);
 }
 
-/** Recovers exactly once from every boundary after strict private-content deletion. */
-export async function recoverPendingConvertedCompletion(storage: ConvertedCompletionStorage): Promise<ConvertedLessonProgress[] | null> {
-  const pending = await readPendingConvertedCompletion(storage);
-  if (!pending || pending.phase === "awaiting_private_cleanup") return null;
+/** Resumes strict private cleanup first, then clears/quarantines the expected active bytes and promotes exactly once. */
+export async function recoverPendingConvertedCompletion(
+  storage: ConvertedCompletionStorage,
+  strictPrivateCleanup: (runId: string) => Promise<void> = deleteBaselineAudioStrict,
+): Promise<ConvertedLessonProgress[] | null> {
+  let pending = await readPendingConvertedCompletion(storage);
+  if (!pending) return null;
+  if (pending.phase === "awaiting_private_cleanup") {
+    await strictPrivateCleanup(pending.expectedActiveRevision.runId);
+    await markPendingPrivateContentDeleted(storage, pending.record.runId);
+    pending = await readPendingConvertedCompletion(storage);
+    if (!pending) throw new Error("Pending completion disappeared after private cleanup");
+  }
   await clearExpectedActiveKeyAfterDeletion(storage, pending);
   return promotePendingConvertedCompletion(storage, pending.record.runId);
 }

@@ -11,6 +11,7 @@ import { curriculumModule, isModuleId, practiceDayForRoute, type ModuleId } from
 import { evaluatePilotAttempt, nextPilotCounterpart } from "@/lib/ai";
 import { canContinuePilot } from "@/lib/access";
 import { DEFAULT_CURRICULUM_VISIBILITY, reviewPracticeRuntime, visiblePracticesForModule } from "@/lib/modularCurriculum";
+import { playRunBoundPilotAudio } from "@/lib/moduleAudio";
 import { microphoneRecoveryPresentation } from "@/lib/nativeCommerce";
 import { paidActivityForState } from "@/lib/paidProduct";
 import {
@@ -80,6 +81,12 @@ export default function PilotModuleScreen() {
   const [error, setError] = useState<string>("");
   const counterpartLabel = session?.counterpartDisplayLabel ?? session?.counterpart ?? (session?.counterpartRelationship ? `Your ${session.counterpartRelationship.toLowerCase()}` : "Practice partner");
   const responseTarget = counterpartLabel.replace(/^Your /, "your ");
+  const playAudio = useCallback((line: PilotAudioLine, sourceRun: PilotDayRun | null = run) => playRunBoundPilotAudio(
+    sourceRun ?? { contextualPersona: session?.persona ?? "woman-hope" },
+    line,
+    { muted: isMuted },
+    speakPilotAudio,
+  ), [isMuted, run, session?.persona]);
 
   useEffect(() => {
     if (!activePracticeSession || activePracticeSession.id === session?.id) return;
@@ -217,7 +224,7 @@ export default function PilotModuleScreen() {
           adamAudioId: response.audioId ?? line.audio_id,
         };
         await persistRun(withCounterpart);
-        const playback = await speakPilotAudio(line, { muted: isMuted });
+        const playback = await playRunBoundPilotAudio(withCounterpart, line, { muted: isMuted }, speakPilotAudio);
         if (playback === "failed" || playback === "empty") {
           setError("The audio would not play. The counterpart’s words remain visible.");
           await persistRun(transitionPilotRun(withCounterpart, "playback_error"));
@@ -289,7 +296,7 @@ export default function PilotModuleScreen() {
       updatedAt: Date.now(),
     };
     await persistRun(withAdam);
-    const playback = await speakPilotAudio(line, { muted: isMuted });
+    const playback = await playRunBoundPilotAudio(withAdam, line, { muted: isMuted }, speakPilotAudio);
     if (playback === "failed" || playback === "empty") {
       setError("The audio would not play. The counterpart’s words remain visible.");
       await persistRun(transitionPilotRun(withAdam, "playback_error"));
@@ -343,20 +350,20 @@ export default function PilotModuleScreen() {
       return;
     }
     const adamLine = adamLineForRun(run, module);
-    if (adamLine) await speakPilotAudio(adamLine, { muted: isMuted });
+    if (adamLine) await playAudio(adamLine);
     setActiveCapture("retry");
     await persistRun(transitionPilotRun(run, "ready_for_retry"));
-  }, [isMuted, module, persistRun, run]);
+  }, [module, persistRun, playAudio, run]);
 
   const acceptDayThreeNote = useCallback(async (): Promise<void> => {
     if (!module || !run) return;
     const accepted = { ...run, noteFit: "accepted" as const };
     const line = adamLineForRun(accepted, module);
     await persistRun(accepted);
-    if (line) await speakPilotAudio(line, { muted: isMuted });
+    if (line) await playAudio(line);
     setActiveCapture("retry");
     await persistRun(transitionPilotRun(accepted, "ready_for_retry"));
-  }, [isMuted, module, persistRun, run]);
+  }, [module, persistRun, playAudio, run]);
 
   const rejectDayThreeNote = useCallback(async (): Promise<void> => {
     if (!run) return;
@@ -387,12 +394,12 @@ export default function PilotModuleScreen() {
     const comparison = comparePilotAttempts(behavior, original, preserved.retryAttempt?.transcript ?? retryText);
     if (retrySegmentForRun(module, preserved) === "opener") {
       const line = adamLineForRun(preserved, module);
-      if (line) await speakPilotAudio(line, { muted: isMuted });
+      if (line) await playAudio(line);
       await persistRun({ ...preserved, comparison, state: "play_adam_after_opener_retry", updatedAt: Date.now() });
       return;
     }
     await persistRun({ ...transitionPilotRun(preserved, "attempt_comparison"), comparison });
-  }, [attemptText, day, isMuted, module, persistRun, retryText, run, saveActivePracticeSession, session]);
+  }, [attemptText, day, module, persistRun, playAudio, retryText, run, saveActivePracticeSession, session]);
 
   const showTransfer = useCallback(async (): Promise<void> => {
     if (day === 1) {
@@ -473,38 +480,38 @@ export default function PilotModuleScreen() {
             <Reveal><Eyebrow color={C.purple}>{module.copy.eyebrow}</Eyebrow><Text style={styles.title}>{module.copy.heading}</Text><Text style={styles.lede}>{module.copy.body}</Text>{module.copy.practice_points.length ? <GlassCard style={styles.card}>{module.copy.practice_points.map((point) => <Text key={point} style={styles.point}>• {point}</Text>)}</GlassCard> : null}<PrimaryButton label={module.copy.primary_button} onPress={startDay} style={styles.actionTop} /><GhostButton label={session?.scenarioSource === "user_supplied" ? "Use my saved conversation" : "Build from my situation"} onPress={chooseCarriedContext} style={styles.secondaryAction} /></Reveal>
           ) : null}
 
-          {effectiveState === "hope_lesson" ? <Lesson line={module.copy.lessons[lessonIndex]} index={lessonIndex} total={module.copy.lessons.length} heading={module.copy.heading} quiz={module.copy.quiz} onPlay={(line) => speakPilotAudio(line)} onContinue={nextLesson} /> : null}
-          {effectiveState === "quiz" && module.copy.quiz ? <Quiz quiz={module.copy.quiz} selected={quizChoice} onChoose={chooseQuiz} onSubmit={submitQuiz} /> : null}
+          {effectiveState === "hope_lesson" ? <Lesson line={module.copy.lessons[lessonIndex]} index={lessonIndex} total={module.copy.lessons.length} heading={module.copy.heading} quiz={module.copy.quiz} onPlay={(line) => playAudio(line)} onContinue={nextLesson} /> : null}
+          {effectiveState === "quiz" && module.copy.quiz ? <Quiz quiz={module.copy.quiz} selected={quizChoice} onChoose={chooseQuiz} onSubmit={submitQuiz} onPlay={(line) => void playAudio(line)} /> : null}
           {effectiveState === "quiz_feedback" && module.copy.quiz && quizChoice ? <PracticeFeedback quiz={module.copy.quiz} choice={quizChoice} onContinue={() => run && persistRun(transitionPilotRun(run, "preset_scenario"))} onTryAgain={() => run && persistRun(transitionPilotRun(run, "quiz"))} /> : null}
 
           {effectiveState === "preset_scenario" && module.copy.scenario ? <RehearsalBriefing heading={module.copy.scenario.heading} title={module.copy.scenario.title ?? curriculum?.name ?? module.copy.heading} context={run?.scenarioMode === "carried_context" && session?.scenarioSource === "user_supplied" && session.topic ? session.topic : contextualizeCounterpart(module.copy.scenario.scenario, counterpartLabel)} target={contextualizeCounterpart(module.copy.scenario.user_job, counterpartLabel)} pressure={contextualizeCounterpart(module.practice.adam_line?.text ?? module.practice.approved_pushback_bank?.[0]?.text ?? "The counterpart will respond with realistic pressure.", counterpartLabel)} counterpart={counterpartLabel} onStart={startRehearsal} onUseMine={chooseCarriedContext} useMineLabel={session?.scenarioSource === "user_supplied" ? "Use my saved conversation" : "Build from my situation"} /> : null}
 
           {effectiveState === "ready_for_attempt" ? <AttemptReady prompt={module.copy.scenario?.attempt_prompt ?? module.copy.scenario?.user_job ?? ""} value={attemptText} onChange={setAttemptText} onStart={() => startCapture("opener")} onReview={() => run && persistRun(transitionPilotRun(run, "confirm_attempt_transcript"))} button="I’m ready to speak" /> : null}
-          {effectiveState === "ready_for_response" ? <><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><AttemptReady prompt={module.copy.scenario?.response_prompt ?? `Respond to ${responseTarget}`} value={responseText} onChange={setResponseText} onStart={() => startCapture("response")} onReview={() => run && persistRun(transitionPilotRun(run, "confirm_response_transcript"))} button="I’m ready to speak" /></> : null}
-          {effectiveState === "ready_for_retry" ? <><CounterpartContext role={counterpartLabel} line={day === 1 && session?.originalAdamResponse ? { audio_id: session.originalAdamResponse.resolvedAudioId, voice_key: "adam_counterpart", text: session.originalAdamResponse.text } : adamLine} onPlay={day === 1 && session?.originalAdamResponse ? () => speakPilotAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }, { muted: isMuted }) : adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><AttemptReady prompt={retryDirection(module, run, session)} value={retryText} onChange={setRetryText} onStart={() => startCapture("retry")} onReview={async () => { if (day === 1) { await persistLegacyDayOne({ nextState: "confirm_retry_transcript" }); setState("confirm_retry_transcript"); } else if (run) await persistRun(transitionPilotRun(run, "confirm_retry_transcript")); }} button="I’m ready to retry" /></> : null}
+          {effectiveState === "ready_for_response" ? <><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => playAudio(adamLine) : undefined} /><AttemptReady prompt={module.copy.scenario?.response_prompt ?? `Respond to ${responseTarget}`} value={responseText} onChange={setResponseText} onStart={() => startCapture("response")} onReview={() => run && persistRun(transitionPilotRun(run, "confirm_response_transcript"))} button="I’m ready to speak" /></> : null}
+          {effectiveState === "ready_for_retry" ? <><CounterpartContext role={counterpartLabel} line={day === 1 && session?.originalAdamResponse ? { audio_id: session.originalAdamResponse.resolvedAudioId, voice_key: "adam_counterpart", text: session.originalAdamResponse.text } : adamLine} onPlay={day === 1 && session?.originalAdamResponse ? () => playAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }) : adamLine ? () => playAudio(adamLine) : undefined} /><AttemptReady prompt={retryDirection(module, run, session)} value={retryText} onChange={setRetryText} onStart={() => startCapture("retry")} onReview={async () => { if (day === 1) { await persistLegacyDayOne({ nextState: "confirm_retry_transcript" }); setState("confirm_retry_transcript"); } else if (run) await persistRun(transitionPilotRun(run, "confirm_retry_transcript")); }} button="I’m ready to retry" /></> : null}
 
           {effectiveState === "listening_attempt" || effectiveState === "listening_response" || effectiveState === "listening_retry" ? <Listening level={dictation.level} onStop={stopCapture} /> : null}
           {effectiveState === "confirm_attempt_transcript" ? <TranscriptReview value={attemptText} onChange={setAttemptText} onSubmit={confirmAttempt} /> : null}
           {effectiveState === "confirm_response_transcript" ? <TranscriptReview value={responseText} onChange={setResponseText} onSubmit={confirmResponse} /> : null}
           {effectiveState === "confirm_retry_transcript" ? <TranscriptReview value={retryText} onChange={setRetryText} onSubmit={confirmRetry} /> : null}
 
-          {effectiveState === "hope_coaching" && day === 1 && activeCoach ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow>{session?.originalAdamResponse ? <RoleCard role={counterpartLabel} text={session.originalAdamResponse.text} onPlay={() => speakPilotAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }, { muted: isMuted })} /> : null}<CoachCard coach={activeCoach} /><PrimaryButton label="Replay the counterpart response" onPress={async () => { await persistLegacyDayOne({ nextState: "replay_original_adam_response" }); setState("adam_response"); }} style={styles.actionTop} /></Reveal> : null}
-          {effectiveState === "adam_response" && day === 1 && session?.originalAdamResponse ? <Reveal><Text style={styles.title}>Listen once more, then try your part again.</Text><RoleCard role={counterpartLabel} text={session.originalAdamResponse.text} onPlay={async () => { const outcome = await speakPilotAudio({ audio_id: session.originalAdamResponse?.id ?? `${session.id}-adam-response-1`, voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }); if (outcome !== "failed" && outcome !== "empty") setHasReplayedDayOneAdam(true); }} /><PrimaryButton label="I’m ready to retry" disabled={!hasReplayedDayOneAdam} onPress={async () => { await persistLegacyDayOne({ nextState: "spoken_retry" }); setActiveCapture("retry"); setState("ready_for_retry"); }} style={styles.actionTop} /></Reveal> : null}
+          {effectiveState === "hope_coaching" && day === 1 && activeCoach ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow>{session?.originalAdamResponse ? <RoleCard role={counterpartLabel} text={session.originalAdamResponse.text} onPlay={() => playAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" })} /> : null}<CoachCard coach={activeCoach} /><PrimaryButton label="Replay the counterpart response" onPress={async () => { await persistLegacyDayOne({ nextState: "replay_original_adam_response" }); setState("adam_response"); }} style={styles.actionTop} /></Reveal> : null}
+          {effectiveState === "adam_response" && day === 1 && session?.originalAdamResponse ? <Reveal><Text style={styles.title}>Listen once more, then try your part again.</Text><RoleCard role={counterpartLabel} text={session.originalAdamResponse.text} onPlay={async () => { const outcome = await playAudio({ audio_id: session.originalAdamResponse?.id ?? `${session.id}-adam-response-1`, voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }); if (outcome !== "failed" && outcome !== "empty") setHasReplayedDayOneAdam(true); }} /><PrimaryButton label="I’m ready to retry" disabled={!hasReplayedDayOneAdam} onPress={async () => { await persistLegacyDayOne({ nextState: "spoken_retry" }); setActiveCapture("retry"); setState("ready_for_retry"); }} style={styles.actionTop} /></Reveal> : null}
 
-          {effectiveState === "hope_coaching" && day !== 1 && activeCoach ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><CoachCard coach={activeCoach} /><PrimaryButton label="I’m ready to retry" onPress={beginRetry} style={styles.actionTop} /></Reveal> : null}
+          {effectiveState === "hope_coaching" && day !== 1 && activeCoach ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><CounterpartContext role={counterpartLabel} line={adamLine} onPlay={adamLine ? () => playAudio(adamLine) : undefined} /><CoachCard coach={activeCoach} /><PrimaryButton label="I’m ready to retry" onPress={beginRetry} style={styles.actionTop} /></Reveal> : null}
           {effectiveState === "day3_note_check" && activeCoach ? <Reveal><CoachCard coach={activeCoach} /><Text style={styles.title}>Does that fit what happened?</Text><PrimaryButton label="Yes, that fits" onPress={acceptDayThreeNote} style={styles.actionTop} /><GhostButton label="Not quite" onPress={rejectDayThreeNote} style={styles.secondaryAction} /></Reveal> : null}
           {effectiveState === "day3_neutral_retry" ? <Reveal><Text style={styles.title}>Try that same moment again.</Text><PrimaryButton label="I’m ready to retry" onPress={beginRetry} style={styles.actionTop} /></Reveal> : null}
           {busy ? <View style={styles.busyCard}><ActivityIndicator color={C.purple} /><Text style={styles.cardText}>Hope is checking one moment</Text></View> : null}
 
-          {effectiveState === "play_adam_after_opener_retry" && adamLine ? <Reveal><RoleCard role={counterpartLabel} text={adamLine.text} onPlay={() => speakPilotAudio(adamLine)} /><PrimaryButton label="Continue" onPress={() => run && persistRun(transitionPilotRun(run, "attempt_comparison"))} style={styles.actionTop} /></Reveal> : null}
-          {effectiveState === "attempt_comparison" && comparisonPresentation ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.lessonHeading}>What changed</Text><Text style={styles.progressiveNote}>Both transcripts below were approved for the same counterpart turn. No score increase is inferred.</Text><CounterpartMoment role={counterpartLabel} presentation={comparisonPresentation} onPlay={day === 1 && session?.originalAdamResponse ? () => speakPilotAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }, { muted: isMuted }) : adamLine ? () => speakPilotAudio(adamLine, { muted: isMuted }) : undefined} /><PrimaryButton label="Continue review" onPress={showTransfer} containerStyle={styles.actionTop} /></Reveal> : null}
+          {effectiveState === "play_adam_after_opener_retry" && adamLine ? <Reveal><RoleCard role={counterpartLabel} text={adamLine.text} onPlay={() => void playAudio(adamLine)} /><PrimaryButton label="Continue" onPress={() => run && persistRun(transitionPilotRun(run, "attempt_comparison"))} style={styles.actionTop} /></Reveal> : null}
+          {effectiveState === "attempt_comparison" && comparisonPresentation ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.lessonHeading}>What changed</Text><Text style={styles.progressiveNote}>Both transcripts below were approved for the same counterpart turn. No score increase is inferred.</Text><CounterpartMoment role={counterpartLabel} presentation={comparisonPresentation} onPlay={day === 1 && session?.originalAdamResponse ? () => playAudio({ audio_id: session.originalAdamResponse?.resolvedAudioId ?? session.originalAdamResponse?.id ?? "", voice_key: "adam_counterpart", text: session.originalAdamResponse?.text ?? "" }) : adamLine ? () => playAudio(adamLine) : undefined} /><PrimaryButton label="Continue review" onPress={showTransfer} containerStyle={styles.actionTop} /></Reveal> : null}
           {effectiveState === "attempt_comparison" && !comparisonPresentation ? <Reveal><Text style={styles.title}>Finish and approve your retry first.</Text><Text style={styles.lede}>A comparison appears only after both approved transcripts are available for the same counterpart moment.</Text></Reveal> : null}
           {effectiveState === "transfer_cue" ? <Reveal><Eyebrow color={C.purple}>Hope</Eyebrow><Text style={styles.title}>{module.copy.transfer}</Text><PrimaryButton label={module.copy.finish_button} onPress={complete} style={styles.actionTop} /></Reveal> : null}
           {effectiveState === "complete" ? <Reveal><StatusPill label="Practice complete" tone="green" /><Text style={styles.lessonHeading}>You practiced the same moment twice.</Text><Text style={styles.lede}>Your saved checkpoint is complete. Today now reflects the finished module activity.</Text><PrimaryButton label="Back to Today" onPress={() => router.navigate("/(tabs)")} containerStyle={styles.actionTop} /></Reveal> : null}
           {effectiveState === "microphone_error" ? <Reveal><Eyebrow color={C.clay}>{microphoneRecovery.title}</Eyebrow><Text style={styles.title}>{error || dictation.error || "Microphone access is off."}</Text><Text style={styles.lede}>Turn microphone access on in device Settings, try again, or type this turn instead. Nothing submits until you approve the transcript.</Text><PrimaryButton label={microphoneRecovery.actions[0]} onPress={() => void Linking.openSettings()} style={styles.actionTop} /><GhostButton label={microphoneRecovery.actions[1]} onPress={() => startCapture(activeCapture)} style={styles.secondaryAction} /><GhostButton label={microphoneRecovery.actions[2]} onPress={() => void openTypedFallback()} style={styles.secondaryAction} /></Reveal> : null}
           {effectiveState === "no_speech" ? <RecoveryState eyebrow="Nothing heard" title="We didn’t catch any words." body="Check that the microphone is clear, then try the same turn again. You can type instead without losing the checkpoint." primary="Try the turn again" onPrimary={() => startCapture(activeCapture)} secondary="Type this turn instead" onSecondary={() => void openTypedFallback()} /> : null}
           {effectiveState === "transcription_error" ? <RecoveryState eyebrow="Transcript" title="We couldn’t turn that recording into text." body="Your module checkpoint is saved. Try the turn again, or type the words you want approved." primary="Try the turn again" onPrimary={() => startCapture(activeCapture)} secondary="Type this turn instead" onSecondary={() => void openTypedFallback()} /> : null}
-          {effectiveState === "playback_error" ? <RecoveryState eyebrow="Playback" title="The audio wouldn’t play." body={error || "The counterpart’s reply is written on screen, so audio never blocks the rehearsal."} primary="Try audio again" onPrimary={async () => { if (adamLine) { const outcome = await speakPilotAudio(adamLine, { muted: isMuted }); if (outcome !== "failed" && outcome !== "empty" && run) await persistRun(transitionPilotRun(run, "ready_for_response")); } }} secondary="Continue reading" onSecondary={() => run && persistRun(transitionPilotRun(run, "ready_for_response"))} /> : null}
+          {effectiveState === "playback_error" ? <RecoveryState eyebrow="Playback" title="The audio wouldn’t play." body={error || "The counterpart’s reply is written on screen, so audio never blocks the rehearsal."} primary="Try audio again" onPrimary={async () => { if (adamLine) { const outcome = await playAudio(adamLine); if (outcome !== "failed" && outcome !== "empty" && run) await persistRun(transitionPilotRun(run, "ready_for_response")); } }} secondary="Continue reading" onSecondary={() => run && persistRun(transitionPilotRun(run, "ready_for_response"))} /> : null}
           {effectiveState === "network_error" ? <RecoveryState eyebrow="Connection" title="The counterpart response wasn’t reached." body={error || "Your approved turn and module checkpoint are saved on this device."} primary="Try again" onPrimary={() => run && playAdam(run, run.attempt?.transcript ?? attemptText)} secondary="Save and exit" onSecondary={() => router.navigate("/(tabs)")} /> : null}
           {effectiveState === "model_error" ? <RecoveryState eyebrow="Feedback" title="Hope couldn’t finish the feedback." body={error || "Your approved transcripts are saved. Retry when the connection is ready."} primary="Try feedback again" onPrimary={() => void confirmResponse()} secondary="Save and exit" onSecondary={() => router.navigate("/(tabs)")} /> : null}
         </ScrollView>
@@ -567,12 +574,12 @@ function Lesson({ line, index, total, heading, quiz, onPlay, onContinue }: { lin
   return <Reveal><StatusPill label={`Lesson · ${index + 1} of ${total}`} tone="purple" /><Text style={styles.lessonHeading}>{heading}</Text><Text style={styles.lessonProposition}>{line.text}</Text>{quiz ? <><View style={styles.contrast}><View style={styles.contrastCell}><SectionLabel tone={C.clay}>Less effective here</SectionLabel><Text style={styles.contrastText}>{quiz.option_a.text}</Text></View><View style={[styles.contrastCell, styles.contrastStrong]}><SectionLabel tone={C.sage}>More effective here</SectionLabel><Text style={styles.contrastText}>{quiz.option_b.text}</Text></View></View><ProductCard style={styles.conceptCard}><SectionLabel tone={C.purple}>Observable difference</SectionLabel><Text style={styles.conceptText}>{isFinal ? quiz.feedback_b : line.text}</Text><Pressable onPress={() => onPlay(line)} style={styles.audioAction} accessibilityRole="button" accessibilityLabel="Hear Hope explain this lesson"><Volume2 size={17} color={C.purple} /><Text style={styles.audioLabel}>Hear Hope explain it</Text></Pressable></ProductCard></> : <ProductCard accent style={styles.conceptCard}><SectionLabel tone={C.purple}>Notice this move</SectionLabel><Text style={styles.conceptText}>{line.text}</Text></ProductCard>}<Text style={styles.progressiveNote}>{isFinal ? "Next, choose between the same two concrete responses in Practice." : "Continue when this distinction is clear. One part is disclosed at a time."}</Text><PrimaryButton label={isFinal ? "Continue to Practice" : "Continue lesson"} onPress={onContinue} containerStyle={styles.actionTop} /></Reveal>;
 }
 
-function Quiz({ quiz, selected, onChoose, onSubmit }: { quiz: NonNullable<NonNullable<ReturnType<typeof pilotModule>>["copy"]["quiz"]>; selected: "A" | "B" | null; onChoose: (choice: "A" | "B") => void; onSubmit: () => void }) {
-  return <Reveal><StatusPill label="Practice" tone="purple" /><Text style={styles.lessonHeading}>Hear the difference</Text><Text style={styles.lede}>{quiz.prompt}</Text><View style={styles.optionList}><AudioOption label="A" line={quiz.option_a} selected={selected === "A"} onChoose={() => onChoose("A")} /><AudioOption label="B" line={quiz.option_b} selected={selected === "B"} onChoose={() => onChoose("B")} /></View><Text style={styles.progressiveNote}>{selected ? `Answer ${selected} selected. Check it when you’re ready.` : "Choose the response that best matches the lesson. Nothing is checked until you confirm."}</Text><PrimaryButton label="Check answer" disabled={!selected} onPress={onSubmit} containerStyle={styles.actionTop} /></Reveal>;
+function Quiz({ quiz, selected, onChoose, onSubmit, onPlay }: { quiz: NonNullable<NonNullable<ReturnType<typeof pilotModule>>["copy"]["quiz"]>; selected: "A" | "B" | null; onChoose: (choice: "A" | "B") => void; onSubmit: () => void; onPlay: (line: PilotAudioLine) => void }) {
+  return <Reveal><StatusPill label="Practice" tone="purple" /><Text style={styles.lessonHeading}>Hear the difference</Text><Text style={styles.lede}>{quiz.prompt}</Text><View style={styles.optionList}><AudioOption label="A" line={quiz.option_a} selected={selected === "A"} onChoose={() => onChoose("A")} onPlay={() => onPlay(quiz.option_a)} /><AudioOption label="B" line={quiz.option_b} selected={selected === "B"} onChoose={() => onChoose("B")} onPlay={() => onPlay(quiz.option_b)} /></View><Text style={styles.progressiveNote}>{selected ? `Answer ${selected} selected. Check it when you’re ready.` : "Choose the response that best matches the lesson. Nothing is checked until you confirm."}</Text><PrimaryButton label="Check answer" disabled={!selected} onPress={onSubmit} containerStyle={styles.actionTop} /></Reveal>;
 }
 
-function AudioOption({ label, line, selected, onChoose }: { label: "A" | "B"; line: PilotAudioLine; selected: boolean; onChoose: () => void }) {
-  return <Pressable onPress={onChoose} style={({ pressed }) => [styles.answer, selected && styles.answerSelected, pressed && styles.answerPressed]} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Choose ${label}. ${line.text}`}><View style={[styles.answerLetter, selected && styles.answerLetterSelected]}><Text style={[styles.answerLetterText, selected && styles.answerLetterTextSelected]}>{selected ? "✓" : label}</Text></View><Text style={styles.answerText}>{line.text}</Text><Pressable onPress={() => speakPilotAudio(line)} style={styles.answerAudio} accessibilityRole="button" accessibilityLabel={`Play answer ${label}`}><Play size={15} color={C.purple} /></Pressable></Pressable>;
+function AudioOption({ label, line, selected, onChoose, onPlay }: { label: "A" | "B"; line: PilotAudioLine; selected: boolean; onChoose: () => void; onPlay: () => void }) {
+  return <Pressable onPress={onChoose} style={({ pressed }) => [styles.answer, selected && styles.answerSelected, pressed && styles.answerPressed]} accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`Choose ${label}. ${line.text}`}><View style={[styles.answerLetter, selected && styles.answerLetterSelected]}><Text style={[styles.answerLetterText, selected && styles.answerLetterTextSelected]}>{selected ? "✓" : label}</Text></View><Text style={styles.answerText}>{line.text}</Text><Pressable onPress={onPlay} style={styles.answerAudio} accessibilityRole="button" accessibilityLabel={`Play answer ${label}`}><Play size={15} color={C.purple} /></Pressable></Pressable>;
 }
 
 function PracticeFeedback({ quiz, choice, onContinue, onTryAgain }: { quiz: NonNullable<NonNullable<ReturnType<typeof pilotModule>>["copy"]["quiz"]>; choice: "A" | "B"; onContinue: () => void; onTryAgain: () => void }) {

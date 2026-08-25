@@ -32,6 +32,7 @@ import {
   attachM1L1PushbackOne,
   attachM1L1PushbackTwo,
   confirmM1L1PressureReplay,
+  completeM1L1PressureReplay,
   createScenarioPracticeRun,
   initializeM1L1Run,
   normalizeScenarioPracticeRun,
@@ -63,7 +64,7 @@ function acceptedRun(id = "accepted-run"): PersistedScenarioPracticeRun {
   const note = m1L1CoachNote(value.run.m1L1!.secondResponseAttempt!.transcript, 5)!;
   value = attachM1L1Coaching(value, `${note.worked} ${note.change}`, note.retryDirection, 5, note.flags, note.selectedDimension, 8);
   value = stageM1L1PressureReplay(value, false, 9);
-  value = confirmM1L1PressureReplay(value, "playback_started", 10);
+  value = confirmM1L1PressureReplay(value, "playback_completed", 10);
   value = preserveM1L1Retry(value, "I hear that. Yesterday the file arrived at 4:20. Can we move the handoff to noon?", 10);
   const comparison = m1L1Comparison(value.run.m1L1!.secondResponseAttempt!.transcript, value.run.retryAttempt!.transcript, note.selectedDimension, 5);
   return { ...value, run: { ...value.run, state: "attempt_comparison", comparison } };
@@ -137,7 +138,7 @@ describe("accepted M1 L1 narrow correction", () => {
     value = stageM1L1PressureReplay(value, true, 12);
     expect(value.run.m1L1?.beat).toBe(7);
     expect(preserveM1L1Retry(value, "Blocked until replay proof.", 13)).toEqual(value);
-    value = confirmM1L1PressureReplay(value, "playback_started", 14);
+    value = confirmM1L1PressureReplay(value, "playback_completed", 14);
     value = preserveM1L1Retry(value, "Second and final retry.", 15);
     const capped = preserveM1L1Retry(value, "A forbidden third retry.", 14);
     expect(value.run.m1L1?.retryCount).toBe(2);
@@ -153,21 +154,27 @@ describe("accepted M1 L1 narrow correction", () => {
       expect(staged.run.state).toBe("replay_pending");
       expect(staged.run.m1L1?.replayTarget).toBe(beat === 1 ? "top_of_scene" : beat === 3 ? "pushback_one" : "evidence_trap");
       expect(preserveM1L1Retry(staged, "Capture must remain blocked.", 101)).toEqual(staged);
-      const wrongProof = confirmM1L1PressureReplay(staged, beat === 1 ? "playback_started" : "top_of_scene_reset", 102);
+      const wrongProof = confirmM1L1PressureReplay(staged, beat === 1 ? "playback_completed" : "top_of_scene_reset", 102);
       expect(wrongProof).toEqual(staged);
-      const confirmed = confirmM1L1PressureReplay(staged, beat === 1 ? "top_of_scene_reset" : "playback_started", 103);
+      const confirmed = confirmM1L1PressureReplay(staged, beat === 1 ? "top_of_scene_reset" : "playback_completed", 103);
       expect(confirmed.run.state).toBe("ready_for_retry");
       expect(confirmed.run.m1L1?.replayCompletedAt).toBeDefined();
     }
   });
 
-  test("failed or interrupted final replay never unlocks capture without explicit text acknowledgement", () => {
+  test("real start-then-interrupt replay path stays locked until completion or exact-text acknowledgement", async () => {
     const completed = acceptedRun("replay-failure");
     const available = { ...completed, run: { ...completed.run, state: "final_retry_available" as const } };
     const staged = stageM1L1PressureReplay(available, true, 200);
+    let interrupt!: (outcome: "interrupted") => void;
+    const startedThenInterrupted = completeM1L1PressureReplay(staged, () => new Promise((resolve) => { interrupt = resolve; }), 201);
     expect(staged.run.state).toBe("replay_pending");
     expect(preserveM1L1Retry(staged, "Still blocked.", 201)).toEqual(staged);
-    const acknowledged = confirmM1L1PressureReplay(staged, "text_fallback_acknowledged", 202);
+    interrupt("interrupted");
+    expect(await startedThenInterrupted).toEqual(staged);
+    const playedToEnd = await completeM1L1PressureReplay(staged, async () => "completed", 202);
+    expect(playedToEnd.run.state).toBe("ready_for_final_retry_capture");
+    const acknowledged = confirmM1L1PressureReplay(staged, "text_fallback_acknowledged", 203);
     expect(acknowledged.run.state).toBe("ready_for_final_retry_capture");
     expect(acknowledged.run.m1L1?.replayProof).toBe("text_fallback_acknowledged");
   });
@@ -195,7 +202,7 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(caseBuilding.find((f) => f.dimension === "evidence_discipline")?.status).toBe("not_met");
     expect(motive.find((f) => f.dimension === "motive_character_language")?.status).toBe("not_met");
     expect(noMove.find((f) => f.dimension === "move_clarity")?.status).toBe("not_assessable");
-    expect(clean.find((f) => f.dimension === "evidence_discipline")?.status).toBe("met");
+    expect(clean.find((f) => f.dimension === "evidence_discipline")?.status).toBe("not_assessable");
     expect(clean.find((f) => f.dimension === "move_clarity")?.status).toBe("met");
     expect(clean.find((f) => f.dimension === "park_and_return")?.status).toBe("met");
   });
@@ -212,15 +219,24 @@ describe("accepted M1 L1 narrow correction", () => {
 
   test("derives every comparison transition truthfully from the same selected flag", () => {
     const met = "Yesterday the handoff arrived at 4:20. Can we move it to noon?";
-    const notMet = "You never care about the handoff.";
+    const notMet = "Maybe there is a handoff problem.";
     const cases = [
       [notMet, met, /improved/i], [met, met, /held/i], [met, notMet, /regressed/i],
       [notMet, notMet, /still did not/i], ["", met, /not assessable/i], [met, "", /not assessable/i],
       ["", notMet, /not assessable/i], [notMet, "", /not assessable/i], ["", "", /not assessable/i],
     ] as const;
     cases.forEach(([before, after, expected]) => {
-      expect(m1L1Comparison(before, after, "motive_character_language", 5).text).toMatch(expected);
+      expect(m1L1Comparison(before, after, "point_placement", 5).text).toMatch(expected);
     });
+  });
+
+  test("production flags, coaching, and comparison preserve exact Unicode and multiline source spans", () => {
+    const original = "I hear that.\nYesterday\u00a0the file arrived\tat 4:20!\nCan we move the handoff to noon? Yesterday the file arrived again.";
+    const flags = m1L1BehaviorFlags(original, 5);
+    for (const item of flags) if (item.evidenceQuote !== null) expect(original.includes(item.evidenceQuote)).toBe(true);
+    const note = m1L1CoachNote(original, 5);
+    if (note) expect(original.includes(note.evidenceQuote)).toBe(true);
+    expect(m1L1Comparison(original, original, "grounding_concreteness", 5).text).toMatch(/held|not assessable/i);
   });
 
   test("chooses coaching evidence across opener, Beat 3, and Beat 5", () => {
@@ -250,6 +266,10 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(normalized).not.toHaveProperty("ignoredWrapper");
     expect(normalized?.run).not.toHaveProperty("ignoredRun");
     expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, attempt: { ...valid.run.attempt!, confirmedAt: "2" } } })).toBeNull();
+    expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, attempt: { ...valid.run.attempt!, id: "other-run-opener" } } })).toBeNull();
+    expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, scenarioContext: { ...valid.run.scenarioContext!, reaction: "invented" } } })).toBeNull();
+    expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, noteFit: "maybe" } })).toBeNull();
+    expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, m1L1: { ...valid.run.m1L1!, replayProof: "playback_completed", replayCompletedAt: undefined } } })).toBeNull();
     expect(normalizeScenarioPracticeRun({ ...valid, run: { ...valid.run, m1L1: { ...valid.run.m1L1!, pushbackOne: { ...valid.run.m1L1!.pushbackOne!, authoredAt: Number.NaN } } } })).toBeNull();
   });
 

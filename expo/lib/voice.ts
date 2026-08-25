@@ -59,6 +59,8 @@ let token = 0;
 let lastUtterance: Utterance | null = null;
 let currentPlayer: AudioPlayer | null = null;
 let currentPlaybackCleanup: (() => void) | null = null;
+type PlaybackCompletion = "completed" | "interrupted";
+let activeCompletion: { id: number; promise: Promise<PlaybackCompletion>; resolve: (value: PlaybackCompletion) => void } | null = null;
 let webUnlocked = false;
 let webEl: HTMLAudioElement | null = null;
 const webStaticCache = new Map<string, string>();
@@ -240,6 +242,20 @@ async function teardownSound(): Promise<void> {
   }
 }
 
+function beginCompletion(id: number): Promise<PlaybackCompletion> {
+  activeCompletion?.resolve("interrupted");
+  let resolve!: (value: PlaybackCompletion) => void;
+  const promise = new Promise<PlaybackCompletion>((done) => { resolve = done; });
+  activeCompletion = { id, promise, resolve };
+  return promise;
+}
+
+function settleCompletion(id: number, value: PlaybackCompletion): void {
+  if (activeCompletion?.id !== id) return;
+  activeCompletion.resolve(value);
+  activeCompletion = null;
+}
+
 function stopWeb(): void {
   const el = webEl;
   if (!el) return;
@@ -253,6 +269,8 @@ function stopWeb(): void {
 
 /** Stop playback now. The last line stays available to replay. */
 export async function stopSpeech(): Promise<void> {
+  activeCompletion?.resolve("interrupted");
+  activeCompletion = null;
   token += 1;
   stopWeb();
   await teardownSound();
@@ -276,6 +294,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
     const el = webElement();
     if (!el) return "failed";
     el.src = source;
+    beginCompletion(id);
     el.onended = () => {
       if (id !== token) return;
       safeLog("[evidence] BYSI TTS playback completed", {
@@ -283,6 +302,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
         role: lastUtterance ? roleForPersona(lastUtterance.persona) : "unknown",
         status: "completed",
       });
+      settleCompletion(id, "completed");
       publish({ phase: "idle" });
     };
     try {
@@ -294,6 +314,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
         return "blocked";
       }
       safeLog("[voice] web playback failed", errorShape(e));
+      settleCompletion(id, "interrupted");
       publish({ phase: "failed" });
       return "failed";
     }
@@ -364,6 +385,8 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
     return "empty";
   }
 
+  const completionPromise = beginCompletion(id);
+  void completionPromise;
   let hasStarted = false;
   let isSettled = false;
   let removeStatusListener: (() => void) | null = null;
@@ -382,6 +405,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
       // Already released by an explicit stop or a newer playback request.
     }
     if (id !== token) return;
+    settleCompletion(id, status === "completed" ? "completed" : "interrupted");
     safeLog("[evidence] BYSI TTS playback completed", {
       platform: Platform.OS,
       role,
@@ -541,6 +565,18 @@ export async function speakPilotAudio(
   publish({ canReplay: true });
   if (options.muted === true) return "muted";
   return await playUtterance();
+}
+
+/** Resolves as completed only after the exact staged audio reaches its terminal end event. */
+export async function speakPilotAudioToCompletion(
+  line: PilotAudioLine,
+  options: { muted?: boolean; contextualPersona?: PersonaVoice } = {},
+): Promise<"completed" | "interrupted" | Exclude<SpeakOutcome, "played">> {
+  const outcome = await speakPilotAudio(line, options);
+  if (outcome !== "played") return outcome;
+  const completion = activeCompletion;
+  if (!completion) return "interrupted";
+  return await completion.promise;
 }
 
 export async function replaySpeech(): Promise<SpeakOutcome> {

@@ -20,6 +20,7 @@ import {
   advanceM1L1FirstResponse,
   attachM1L1Coaching,
   confirmM1L1PressureReplay,
+  completeM1L1PressureReplay,
   attachM1L1PushbackOne,
   attachM1L1PushbackTwo,
   preserveM1L1Retry,
@@ -30,8 +31,9 @@ import {
   transitionScenarioPracticeRun,
   type PersistedScenarioPracticeRun,
 } from "@/lib/scenarioPractice";
+import { leaveAfterStrictDictationCleanup } from "@/lib/temporaryRecording";
 import { useDictation } from "@/lib/useDictation";
-import { replaySpeech, resetSpeech, speakPilotAudio, useSpeech } from "@/lib/voice";
+import { replaySpeech, resetSpeech, speakPilotAudio, speakPilotAudioToCompletion, useSpeech } from "@/lib/voice";
 import { useStore } from "@/providers/store";
 
 interface M1L1PaidPracticeProps {
@@ -220,18 +222,16 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       return;
     }
     if (!currentPressure) return;
-    const outcome = await speakPilotAudio(lineFor(currentPressure));
-    if (outcome !== "played") return;
-    const confirmed = confirmM1L1PressureReplay(staged, "playback_started", Date.now());
+    const confirmed = await completeM1L1PressureReplay(staged, () => speakPilotAudioToCompletion(lineFor(currentPressure)), Date.now());
+    if (confirmed === staged) return;
     await replaceActiveScenarioRunStrict(confirmed, activeRunRevision(staged));
     setValue(confirmed);
   }, [currentPressure, lesson?.coachedBeat, replaceActiveScenarioRunStrict, value]);
 
   const retryPendingReplay = useCallback(async (): Promise<void> => {
     if (!value || value.run.state !== "replay_pending" || !currentPressure) return;
-    const outcome = await speakPilotAudio(lineFor(currentPressure));
-    if (outcome !== "played") return;
-    const confirmed = confirmM1L1PressureReplay(value, "playback_started", Date.now());
+    const confirmed = await completeM1L1PressureReplay(value, () => speakPilotAudioToCompletion(lineFor(currentPressure)), Date.now());
+    if (confirmed === value) return;
     await replaceActiveScenarioRunStrict(confirmed, activeRunRevision(value));
     setValue(confirmed);
   }, [currentPressure, replaceActiveScenarioRunStrict, value]);
@@ -243,6 +243,14 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
     await replaceActiveScenarioRunStrict(confirmed, activeRunRevision(value));
     setValue(confirmed);
   }, [replaceActiveScenarioRunStrict, value]);
+
+  const saveAndLeave = useCallback(async (): Promise<void> => {
+    try {
+      await leaveAfterStrictDictationCleanup(dictation.cancel, () => router.back());
+    } catch {
+      Alert.alert("Recording cleanup is pending", "Try again before leaving this rehearsal.");
+    }
+  }, [dictation, router]);
 
   const discard = useCallback(async (): Promise<void> => {
     try {
@@ -271,7 +279,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
 
   return <View style={styles.root}><Backdrop />
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-      <Pressable onPress={() => Alert.alert("Leave this rehearsal?", "Your active rehearsal stays saved unless you explicitly discard it.", [{ text: "Keep practicing", style: "cancel" }, { text: "Save and leave", onPress: () => router.back() }, { text: "Discard", style: "destructive", onPress: () => void discard() }])} style={styles.hit} accessibilityRole="button" accessibilityLabel="Leave rehearsal"><X size={21} color={C.textSoft} /></Pressable>
+      <Pressable onPress={() => Alert.alert("Leave this rehearsal?", "Your active rehearsal stays saved unless you explicitly discard it.", [{ text: "Keep practicing", style: "cancel" }, { text: "Save and leave", onPress: () => { void saveAndLeave(); } }, { text: "Discard", style: "destructive", onPress: () => void discard() }])} style={styles.hit} accessibilityRole="button" accessibilityLabel="Leave rehearsal"><X size={21} color={C.textSoft} /></Pressable>
       <View style={styles.headerCopy}><Text style={styles.headerTitle}>Adam · your colleague</Text><Text style={styles.headerMeta}>{progressLabel}</Text></View><View style={styles.hit} />
     </View>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>

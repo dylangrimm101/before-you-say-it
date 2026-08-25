@@ -752,8 +752,8 @@ function LegacyRehearse() {
   }, [analyzeApprovedTranscript, reviewDrafts, turns]);
 
   const exitRehearsal = useCallback(async (): Promise<void> => {
-    await cancelDictation().catch(() => {});
-    await resetSpeech().catch(() => {});
+    await cancelDictation();
+    await resetSpeech();
     if (params.entry === "onboarding") {
       if (activePracticeSession?.id === params.practiceSessionId) {
         await saveActivePracticeSession(null);
@@ -770,7 +770,10 @@ function LegacyRehearse() {
 
   const leave = useCallback(() => {
     const act = (): void => {
-      void exitRehearsal();
+      void exitRehearsal().catch((caught: unknown) => {
+        safeLog("[rehearse] exit blocked by pending recording cleanup", errorShape(caught));
+        setError("Recording cleanup is still pending. Try leaving again after cleanup succeeds.");
+      });
     };
     if (turns.filter((t) => t.role === "user").length === 0 || Platform.OS === "web") {
       act();

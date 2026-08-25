@@ -20,6 +20,8 @@ import {
 
 export type DictationStatus = "idle" | "recording" | "transcribing" | "denied" | "error";
 
+let retryDetachedCleanup: (() => Promise<void>) | null = null;
+
 const NATIVE_RECORDING_OPTIONS = {
   ...RecordingPresets.HIGH_QUALITY,
   isMeteringEnabled: true,
@@ -124,8 +126,8 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         recorder.ondataavailable = (event: BlobEvent): void => {
           if (event.data.size > 0) webChunksRef.current.push(event.data);
         };
-        recorder.start();
         webRecorderRef.current = recorder;
+        recorder.start();
         setLevel(0.45);
         setStatus("recording");
         tap("medium");
@@ -144,8 +146,8 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         playsInSilentMode: true,
       });
       await nativeRecorder.prepareToRecordAsync();
-      nativeRecorder.record();
       nativeRecordingRef.current = true;
+      nativeRecorder.record();
       setStatus("recording");
       tap("medium");
     } catch (e) {
@@ -159,16 +161,35 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       setError(Platform.OS === "web"
         ? "Microphone access is unavailable in this preview. Allow it in your browser, or type this turn instead."
         : "Could not start the microphone.");
-      webStreamRef.current?.getTracks().forEach((track) => track.stop());
-      webStreamRef.current = null;
-      if (Platform.OS !== "web") {
-        const uri = nativeRecorder.uri;
-        if (uri) {
-          temporaryUriRef.current = uri;
-          await discard(uri);
-          temporaryUriRef.current = null;
+      try {
+        if (Platform.OS === "web" && webRecorderRef.current) {
+          const recorder = webRecorderRef.current;
+          await cleanupWebRecordingStrict({
+            stop: async () => stopWebRecorder(recorder),
+            releaseTracks: () => webStreamRef.current?.getTracks().forEach((track) => track.stop()),
+            discardBufferedContent: async () => { webChunksRef.current = []; },
+          });
+          webStreamRef.current = null;
+          webRecorderRef.current = null;
+        } else if (Platform.OS === "web" && webStreamRef.current) {
+          webStreamRef.current.getTracks().forEach((track) => track.stop());
+          webStreamRef.current = null;
+        } else if (Platform.OS !== "web") {
+          if (nativeRecordingRef.current) {
+            await cleanupNativeRecordingStrict({
+              stop: async () => nativeRecorder.stop(),
+              uri: () => nativeRecorder.uri ?? temporaryUriRef.current,
+              releaseAudioMode: async () => setAudioModeAsync({ allowsRecording: false }),
+              discard: async (uri) => { temporaryUriRef.current = uri; await discard(uri); },
+            });
+            nativeRecordingRef.current = false;
+            temporaryUriRef.current = null;
+          }
         }
-        await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
+      } catch (cleanupError) {
+        setStatus("error");
+        setError("Recording cleanup is still pending. Try again before leaving.");
+        throw cleanupError;
       }
     } finally {
       operationRef.current = false;
@@ -204,9 +225,9 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
           discard: async (capturedUri) => {
             temporaryUriRef.current = capturedUri;
             await discard(capturedUri);
-            temporaryUriRef.current = null;
           },
         });
+        temporaryUriRef.current = null;
         uri = null;
       }
       if (uri) {
@@ -234,9 +255,16 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
     resetState();
   }, [cancel, resetState]);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    void cancel().catch((caught: unknown) => safeLog("[dictation] unmount cleanup remains pending", errorShape(caught)));
+  useEffect(() => {
+    const detached = retryDetachedCleanup;
+    if (detached) void detached().catch((caught: unknown) => safeLog("[dictation] detached cleanup retry remains pending", errorShape(caught)));
+    return () => {
+      mountedRef.current = false;
+      void cancel().catch((caught: unknown) => {
+        retryDetachedCleanup = cancel;
+        safeLog("[dictation] unmount cleanup remains pending", errorShape(caught));
+      });
+    };
   }, [cancel]);
 
   const stop = useCallback(async (turn: TranscriptionTurn): Promise<string | null> => {
@@ -245,67 +273,84 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
     const webRecorder = webRecorderRef.current;
     if (!hasNativeRecording && !webRecorder) return null;
     operationRef.current = true;
-    nativeRecordingRef.current = false;
-    webRecorderRef.current = null;
-
     setStatus("transcribing");
     setLevel(0);
-    let uri: string | null = null;
+    let uri: string | null = temporaryUriRef.current;
+    let captureStopped = false;
+    let audioModeReleased = Platform.OS === "web";
+    let result: string | null = null;
+    let operationError: unknown;
     try {
       if (webRecorder) {
         await stopWebRecorder(webRecorder);
-        webStreamRef.current?.getTracks().forEach((track) => track.stop());
-        webStreamRef.current = null;
+        captureStopped = true;
         const mimeType = webRecorder.mimeType || "audio/webm";
         const blob = new Blob(webChunksRef.current, { type: mimeType });
-        webChunksRef.current = [];
-        if (blob.size > 0) uri = URL.createObjectURL(blob);
+        if (blob.size > 0) {
+          uri = URL.createObjectURL(blob);
+          temporaryUriRef.current = uri;
+        }
       } else if (hasNativeRecording) {
         await nativeRecorder.stop();
-        uri = nativeRecorder.uri;
+        captureStopped = true;
+        uri = nativeRecorder.uri ?? temporaryUriRef.current;
         temporaryUriRef.current = uri;
         await setAudioModeAsync({ allowsRecording: false });
+        audioModeReleased = true;
       }
-
-      if (!uri) {
-        setStatus("error");
-        setError("No recording was captured.");
-        return null;
-      }
-
+      if (!uri) throw new Error("No recording was captured");
       const mediaType = webRecorder?.mimeType || "audio/mp4";
-      const text = await transcribeRecording(uri, mediaType, turn);
-      setStatus("idle");
-      tap("success");
-      return text;
-    } catch (e) {
+      result = await transcribeRecording(uri, mediaType, turn);
+    } catch (caught) {
+      operationError = caught;
+      uri = uri ?? nativeRecorder.uri ?? temporaryUriRef.current;
+      temporaryUriRef.current = uri;
       safeLog("[dictation] stop or transcribe failed", {
-        ...errorShape(e),
-        ...(e instanceof TranscriptionUnavailableError ? { status: e.status } : {}),
+        ...errorShape(caught),
+        ...(caught instanceof TranscriptionUnavailableError ? { status: caught.status } : {}),
       });
-      setStatus("error");
-      setError(e instanceof TranscriptionUnavailableError
-        ? "Voice transcription is temporarily unavailable. Type this turn instead."
-        : "Could not transcribe that. Try again.");
-      return null;
-    } finally {
-      // The audio file is transient. It is only ever retained when the user
-      // opted in for this specific session.
-      try {
-        if (uri) {
-          if (keepAudioAs) await keepBaselineAudio(keepAudioAs, uri);
-          await discard(uri);
-          temporaryUriRef.current = null;
-        }
-      } catch (cleanupError) {
-        if (mountedRef.current) {
-          setStatus("error");
-          setError("Recording cleanup is still pending. Try again before leaving.");
-        }
-        throw cleanupError;
-      } finally {
-        operationRef.current = false;
+    }
+
+    try {
+      if (uri) {
+        if (keepAudioAs && result) await keepBaselineAudio(keepAudioAs, uri);
+        await discard(uri);
       }
+      if (!captureStopped) throw operationError ?? new Error("Recording stop was not confirmed");
+      if (!audioModeReleased) {
+        await setAudioModeAsync({ allowsRecording: false });
+        audioModeReleased = true;
+      }
+      webStreamRef.current?.getTracks().forEach((track) => track.stop());
+      webStreamRef.current = null;
+      webChunksRef.current = [];
+      temporaryUriRef.current = null;
+      nativeRecordingRef.current = false;
+      webRecorderRef.current = null;
+      retryDetachedCleanup = null;
+      if (result) {
+        setStatus("idle");
+        setError("");
+        tap("success");
+      } else {
+        setStatus("error");
+        if (operationError instanceof Error && operationError.message === "No recording was captured") {
+          setError("No recording was captured.");
+        } else {
+          setError(operationError instanceof TranscriptionUnavailableError
+            ? "Voice transcription is temporarily unavailable. Type this turn instead."
+            : "Could not transcribe that. Try again.");
+        }
+      }
+      return result;
+    } catch (cleanupError) {
+      if (mountedRef.current) {
+        setStatus("error");
+        setError("Recording cleanup is still pending. Try again before leaving.");
+      }
+      throw cleanupError;
+    } finally {
+      operationRef.current = false;
     }
   }, [keepAudioAs, nativeRecorder]);
 

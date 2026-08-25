@@ -13,6 +13,7 @@ import {
   voiceIdFor,
 } from "@/constants/personas";
 import { SCENARIOS } from "@/constants/scenarios";
+import { playRunBoundPilotAudio } from "@/lib/moduleAudio";
 import { playSharedScenarioPressure } from "@/lib/scenarioAudio";
 import type { PersonaVoice } from "@/types/convo";
 
@@ -133,6 +134,26 @@ describe("the selected Hope or Adam role reaches speech", () => {
     expect(calls).toEqual(personas);
   });
 
+  it("executes work, partner, family, and friends through the modular run-bound player", async () => {
+    const calls: PersonaVoice[] = [];
+    const player = async (_line: { audio_id: string; voice_key: "contextual_counterpart"; text: string }, options: { contextualPersona?: PersonaVoice }) => {
+      if (options.contextualPersona) calls.push(options.contextualPersona);
+      return "played" as const;
+    };
+    const categories = ["work", "partner", "family", "friends"] as const;
+    const personas: PersonaVoice[] = ["man-adam", "woman-hope", "man-adam", "woman-hope"];
+    for (const [index, category] of categories.entries()) {
+      const outcome = await playRunBoundPilotAudio(
+        { contextualPersona: personas[index]! },
+        { audio_id: `${category}-audio`, voice_key: "contextual_counterpart", text: `${category} pressure` },
+        {},
+        player,
+      );
+      expect(outcome).toBe("played");
+    }
+    expect(calls).toEqual(personas);
+  });
+
   it("treats the explicit onboarding choice as authoritative during navigation", () => {
     expect(isPersonaVoice("woman-hope")).toBe(true);
     expect(isPersonaVoice("man-adam")).toBe(true);
@@ -160,7 +181,7 @@ describe("the selected Hope or Adam role reaches speech", () => {
     expect(rehearsal).toContain("await speak(spoken, persona");
     expect(rehearsal.indexOf("reveal(res.reply, res.nudge);")).toBeLessThan(rehearsal.indexOf("await speak(spoken, persona, { muted: !voiceOnRef.current });"));
     expect(rehearsal).not.toContain("speakPilotAudio");
-    expect(dailyModule).toContain("speakPilotAudio");
+    expect(dailyModule).toContain("playRunBoundPilotAudio");
     expect(dailyModule).toContain('voice_key: "adam_counterpart"');
   });
 

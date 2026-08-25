@@ -13,6 +13,7 @@ import type {
 const SCENARIO_RUN_VERSION = 1 as const;
 const SCENARIO_DAY = 7;
 const SCENARIO_CURRICULUM_VERSION = "scenario-paid-practice-v1";
+const REACTIONS: ReadonlySet<ReactionPattern> = new Set(["defensive", "hears-criticism", "minimizes", "quiet", "louder", "turns-back", "agrees-without-changing", "not-sure"]);
 const SCENARIO_STATES: ReadonlySet<PilotModuleState> = new Set([
   "ready_for_attempt", "listening_attempt", "confirm_attempt_transcript", "ready_for_response",
   "listening_response", "confirm_response_transcript", "ready_for_second_pressure", "ready_for_second_response",
@@ -67,7 +68,7 @@ export function createScenarioPracticeRun(
   reaction: ReactionPattern,
   id: string,
   now: number = Date.now(),
-  contextualPersona?: PersonaVoice,
+  contextualPersona: PersonaVoice = scenario.counterpartGender === "man" ? "man-adam" : "woman-hope",
 ): PersistedScenarioPracticeRun {
   const parts = counterpartParts(scenario.counterpart);
   const context: ScenarioPracticeContext = {
@@ -82,7 +83,7 @@ export function createScenarioPracticeRun(
     counterpartName: parts.name,
     counterpartLabel: scenario.counterpart,
     counterpartRole: parts.role,
-    ...(contextualPersona ? { contextualPersona } : {}),
+    contextualPersona,
   };
   return {
     version: SCENARIO_RUN_VERSION,
@@ -102,11 +103,11 @@ export function createScenarioPracticeRun(
 
 function nonEmpty(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0; }
 function timestamp(value: unknown): value is number { return Number.isSafeInteger(value) && (value as number) >= 0; }
-function attempt(value: unknown, expectedKind?: "opener" | "response" | "retry"): PilotDayRun["attempt"] | null {
+function attempt(value: unknown, expectedKind: "opener" | "response" | "retry", expectedId: string): PilotDayRun["attempt"] | null {
   if (!value || typeof value !== "object") return null;
   const item = value as Record<string, unknown>;
-  if (!nonEmpty(item.id) || !nonEmpty(item.transcript) || item.representation !== "confirmed_transcript" || !timestamp(item.confirmedAt)) return null;
-  if (!["opener", "response", "retry"].includes(String(item.kind)) || (expectedKind && item.kind !== expectedKind)) return null;
+  if (item.id !== expectedId || !nonEmpty(item.transcript) || item.representation !== "confirmed_transcript" || !timestamp(item.confirmedAt)) return null;
+  if (item.kind !== expectedKind) return null;
   return { id: item.id, kind: item.kind as "opener" | "response" | "retry", transcript: item.transcript, representation: "confirmed_transcript", confirmedAt: item.confirmedAt };
 }
 function counterpartTurn(value: unknown): ScenarioCounterpartTurn | null {
@@ -133,11 +134,14 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
   const required = ["scenarioId", "category", "title", "situation", "objective", "difficulty", "reaction", "counterpartId", "counterpartName", "counterpartLabel", "counterpartRole"] as const;
   if (required.some((key) => !nonEmpty(context[key]))) return null;
   if (!["partner", "family", "work", "friends"].includes(String(context.category)) || !["gentle", "steady", "challenging"].includes(String(context.difficulty))) return null;
-  if (context.contextualPersona !== undefined && !["woman-hope", "man-adam"].includes(String(context.contextualPersona))) return null;
+  if (!["woman-hope", "man-adam"].includes(String(context.contextualPersona)) || !REACTIONS.has(context.reaction as ReactionPattern)) return null;
   if (!nonEmpty(run.id) || !timestamp(run.createdAt) || !timestamp(run.updatedAt) || (run.updatedAt as number) < (run.createdAt as number)) return null;
   if (!SCENARIO_STATES.has(run.state as PilotModuleState) || !Number.isSafeInteger(run.day) || !Number.isSafeInteger(run.lessonIndex)) return null;
   if (!nonEmpty(run.curriculumVersion) || !["preset", "carried_context"].includes(String(run.scenarioMode))) return null;
-  const parseOptionalAttempt = (key: "attempt" | "responseAttempt" | "retryAttempt", kind: "opener" | "response" | "retry") => run[key] === undefined ? undefined : attempt(run[key], kind);
+  const parseOptionalAttempt = (key: "attempt" | "responseAttempt" | "retryAttempt", kind: "opener" | "response" | "retry") => {
+    const expectedId = key === "retryAttempt" && run.m1L1 ? `${String(run.id)}-m1-l1-retry-1` : `${String(run.id)}-${kind}`;
+    return run[key] === undefined ? undefined : attempt(run[key], kind, expectedId);
+  };
   const opener = parseOptionalAttempt("attempt", "opener");
   const response = parseOptionalAttempt("responseAttempt", "response");
   const retry = parseOptionalAttempt("retryAttempt", "retry");
@@ -149,7 +153,7 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
     situation: context.situation as string, objective: context.objective as string, difficulty: context.difficulty as Difficulty,
     reaction: context.reaction as ReactionPattern, counterpartId: context.counterpartId as string, counterpartName: context.counterpartName as string,
     counterpartLabel: context.counterpartLabel as string, counterpartRole: context.counterpartRole as string,
-    ...(context.contextualPersona ? { contextualPersona: context.contextualPersona as PersonaVoice } : {}),
+    contextualPersona: context.contextualPersona as PersonaVoice,
   };
   const canonicalRun: PilotDayRun = {
     id: run.id, day: run.day as number, curriculumVersion: run.curriculumVersion, state: run.state as PilotModuleState,
@@ -160,8 +164,10 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
     ...(nonEmpty(run.practiceId) ? { practiceId: run.practiceId } : {}), ...(nonEmpty(run.contentVersion) ? { contentVersion: run.contentVersion } : {}),
     ...(pressure ? { counterpartTurn: pressure } : {}), ...(opener ? { attempt: opener } : {}), ...(response ? { responseAttempt: response } : {}), ...(retry ? { retryAttempt: retry } : {}),
   };
-  const stringFields = ["counterpartIdentity", "counterpartReactionId", "resolvedAudioId", "adamReactionId", "adamAudioId", "coachedBehaviorId", "coachedSegment", "retryResetId", "coachNote", "retryInstruction", "noteFit"] as const;
+  const stringFields = ["counterpartIdentity", "counterpartReactionId", "resolvedAudioId", "adamReactionId", "adamAudioId", "coachedBehaviorId", "retryResetId", "coachNote", "retryInstruction"] as const;
   for (const key of stringFields) { if (run[key] !== undefined) { if (!nonEmpty(run[key])) return null; (canonicalRun as unknown as Record<string, unknown>)[key] = run[key]; } }
+  if (run.coachedSegment !== undefined) { if (run.coachedSegment !== "opener" && run.coachedSegment !== "pushback_response") return null; canonicalRun.coachedSegment = run.coachedSegment; }
+  if (run.noteFit !== undefined) { if (run.noteFit !== "accepted" && run.noteFit !== "rejected") return null; canonicalRun.noteFit = run.noteFit; }
   if (run.comparison !== undefined) {
     if (!run.comparison || typeof run.comparison !== "object") return null;
     const comparison = run.comparison as Record<string, unknown>;
@@ -174,14 +180,15 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
     if (!Number.isSafeInteger(item.beat) || (item.beat as number) < 1 || (item.beat as number) > 8 || ![0, 1, 2].includes(item.retryCount as number)) return null;
     const pushbackOne = item.pushbackOne === undefined ? undefined : counterpartTurn(item.pushbackOne);
     const pushbackTwo = item.pushbackTwo === undefined ? undefined : counterpartTurn(item.pushbackTwo);
-    const second = item.secondResponseAttempt === undefined ? undefined : attempt(item.secondResponseAttempt, "response");
-    const final = item.finalRetryAttempt === undefined ? undefined : attempt(item.finalRetryAttempt, "retry");
+    const second = item.secondResponseAttempt === undefined ? undefined : attempt(item.secondResponseAttempt, "response", `${String(run.id)}-m1-l1-response-2`);
+    const finalExpectedId = `${String(run.id)}-m1-l1-retry-${String(item.retryCount)}`;
+    const final = item.finalRetryAttempt === undefined ? undefined : attempt(item.finalRetryAttempt, "retry", finalExpectedId);
     if (pushbackOne === null || pushbackTwo === null || second === null || final === null) return null;
     const timestampFields = ["approvedMoveSavedAt", "replayRequestedAt", "replayCompletedAt", "finalRetryPressureReplayedAt"] as const;
     if (timestampFields.some((key) => item[key] !== undefined && !timestamp(item[key]))) return null;
     if (item.coachedBeat !== undefined && ![1, 3, 5].includes(item.coachedBeat as number)) return null;
     if (item.replayTarget !== undefined && !["top_of_scene", "pushback_one", "evidence_trap"].includes(String(item.replayTarget))) return null;
-    if (item.replayProof !== undefined && !["playback_started", "text_fallback_acknowledged", "top_of_scene_reset"].includes(String(item.replayProof))) return null;
+    if (item.replayProof !== undefined && !["playback_completed", "text_fallback_acknowledged", "top_of_scene_reset"].includes(String(item.replayProof))) return null;
     if (item.selectedDimension !== undefined && !["point_placement", "issue_count", "grounding_concreteness", "motive_character_language", "move_clarity", "evidence_discipline", "park_and_return"].includes(String(item.selectedDimension))) return null;
     let flags: NonNullable<PilotDayRun["m1L1"]>["flags"];
     if (item.flags !== undefined) {
@@ -215,6 +222,14 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
     if (item.replayIsFinal !== undefined && typeof item.replayIsFinal !== "boolean") return null;
     if (item.replayAudioId !== undefined && !nonEmpty(item.replayAudioId)) return null;
     if (item.finalRetryPressureAudioId !== undefined && !nonEmpty(item.finalRetryPressureAudioId)) return null;
+    const hasReplayRequest = Boolean(lesson.replayTarget && lesson.replayRequestedAt && lesson.replayAudioId);
+    const hasReplayCompletion = Boolean(lesson.replayProof && lesson.replayCompletedAt);
+    if ((lesson.replayTarget || lesson.replayRequestedAt || lesson.replayAudioId) && !hasReplayRequest) return null;
+    if ((lesson.replayProof || lesson.replayCompletedAt) && !hasReplayCompletion) return null;
+    if (run.state === "replay_pending" && (!hasReplayRequest || hasReplayCompletion)) return null;
+    if (lesson.replayTarget === "top_of_scene" && hasReplayCompletion && lesson.replayProof !== "top_of_scene_reset" && lesson.replayProof !== "text_fallback_acknowledged") return null;
+    if (lesson.replayTarget !== "top_of_scene" && lesson.replayProof === "top_of_scene_reset") return null;
+    if (lesson.replayIsFinal === true && hasReplayCompletion && (lesson.finalRetryPressureReplayedAt !== lesson.replayCompletedAt || lesson.finalRetryPressureAudioId !== lesson.replayAudioId)) return null;
     canonicalRun.m1L1 = lesson;
   }
   if (run.completedAt !== undefined) { if (!timestamp(run.completedAt)) return null; canonicalRun.completedAt = run.completedAt; }
@@ -385,10 +400,10 @@ export function stageM1L1PressureReplay(value: PersistedScenarioPracticeRun, isF
   };
 }
 
-/** Unlocks retry capture only after playback starts or the learner explicitly accepts the text fallback. */
+/** Unlocks retry capture only after exact playback completes or the learner explicitly accepts the text fallback. */
 export function confirmM1L1PressureReplay(
   value: PersistedScenarioPracticeRun,
-  proof: "playback_started" | "text_fallback_acknowledged" | "top_of_scene_reset",
+  proof: "playback_completed" | "text_fallback_acknowledged" | "top_of_scene_reset",
   now: number,
 ): PersistedScenarioPracticeRun {
   const lesson = value.run.m1L1;
@@ -410,6 +425,17 @@ export function confirmM1L1PressureReplay(
       updatedAt: completedAt,
     },
   };
+}
+
+/** Executes the replay completion boundary used by the screen; started/interrupted audio never unlocks capture. */
+export async function completeM1L1PressureReplay(
+  value: PersistedScenarioPracticeRun,
+  playToCompletion: () => Promise<"completed" | "interrupted" | "failed" | "blocked" | "empty" | "muted">,
+  now: number = Date.now(),
+): Promise<PersistedScenarioPracticeRun> {
+  if (value.run.state !== "replay_pending") return value;
+  const outcome = await playToCompletion();
+  return outcome === "completed" ? confirmM1L1PressureReplay(value, "playback_completed", now) : value;
 }
 
 /** Records retry count with a hard cap of two and rejects final capture before exact replay. */

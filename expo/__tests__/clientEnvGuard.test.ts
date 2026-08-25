@@ -33,19 +33,24 @@ describe("client environment repopulation guard", () => {
     expect(() => guardClientProcessEnv({ EXPO_PUBLIC_NEW_SECRET_TOKEN: "secret" })).toThrow("Unknown secret-like client variables");
   });
 
-  test("canonical package lifecycles all invoke the environment guard", async () => {
+  test("canonical lifecycles use the wrapper that sanitizes the actual downstream process", async () => {
     const pkg = JSON.parse(await Bun.file(`${import.meta.dir}/../package.json`).text()) as { scripts?: Record<string, string> };
-    expect(pkg.scripts?.["env:guard"]).toBe("bun scripts/sanitize-client-env.ts");
     for (const name of ["start", "start-web", "start-web-dev", "test", "lint", "check", "export"]) {
-      expect(pkg.scripts?.[name], `${name} must guard before work`).toStartWith("bun run env:guard &&");
+      expect(pkg.scripts?.[name], `${name} must use one sanitizing parent`).toBe(`bun scripts/run-client-command.ts ${name}`);
     }
-    const child = Bun.spawn(["bun", "run", "env:guard"], {
+    const probe = Bun.spawn(["bun", "scripts/run-client-command.ts", "probe"], {
       cwd: `${import.meta.dir}/..`,
-      env: { ...process.env, OPENAI_API_KEY: "fixture-private", EXPO_PUBLIC_UNKNOWN_SECRET_TOKEN: "fixture-public-secret" },
+      env: { ...process.env, OPENAI_API_KEY: "fixture-private", SUPABASE_ACCESS_TOKEN: "fixture-token", EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY: "fixture-public" },
       stdout: "pipe", stderr: "pipe",
     });
-    expect(await child.exited).not.toBe(0);
-    expect(await new Response(child.stderr).text()).toContain("Unknown secret-like client variables");
+    expect(await probe.exited).toBe(0);
+    expect(await new Response(probe.stdout).text()).toContain("DOWNSTREAM_SECRET_ABSENT");
+
+    const rejected = Bun.spawn(["bun", "scripts/run-client-command.ts", "probe"], {
+      cwd: `${import.meta.dir}/..`, env: { ...process.env, EXPO_PUBLIC_UNKNOWN_SECRET_TOKEN: "fixture" }, stdout: "pipe", stderr: "pipe",
+    });
+    expect(await rejected.exited).not.toBe(0);
+    expect(await new Response(rejected.stderr).text()).toContain("Unknown secret-like client variables");
   });
 
   test("Metro sanitizes process and file values before creating its Expo client configuration", async () => {

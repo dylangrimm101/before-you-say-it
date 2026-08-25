@@ -156,14 +156,19 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         const stableAnonymousId = anonymousId?.trim() || newAnonymousUserId();
         setAnonymousUserId(stableAnonymousId);
         if (!anonymousId) await AsyncStorage.setItem(KEYS.anonymousUserId, stableAnonymousId);
+        // Completion recovery owns the active bytes while its journal exists. It must
+        // resume strict audio deletion before generic parsing can quarantine identity.
+        const recoveredProgress = await recoverPendingConvertedCompletion(AsyncStorage);
         let normalizedScenarioRun: PersistedScenarioPracticeRun | null = null;
-        try {
-          normalizedScenarioRun = await readActiveScenarioRunStrict(AsyncStorage);
-        } catch (error: unknown) {
-          safeLog("[store] malformed active run quarantined", errorShape(error));
+        if (!recoveredProgress) {
+          try {
+            normalizedScenarioRun = await readActiveScenarioRunStrict(AsyncStorage);
+          } catch (error: unknown) {
+            safeLog("[store] malformed active run quarantined", errorShape(error));
+          }
         }
         setActiveScenarioRun(normalizedScenarioRun);
-        if (convertedProgress) {
+        if (convertedProgress && !recoveredProgress) {
           const parsedConvertedProgress = JSON.parse(convertedProgress) as unknown;
           const normalizedConvertedProgress = normalizeConvertedLessonProgress(parsedConvertedProgress);
           setConvertedLessonProgress(normalizedConvertedProgress);
@@ -171,11 +176,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
             await AsyncStorage.setItem(KEYS.convertedLessonProgress, JSON.stringify(normalizedConvertedProgress));
           }
         }
-        const recoveredProgress = await recoverPendingConvertedCompletion(AsyncStorage);
-        if (recoveredProgress) {
-          setActiveScenarioRun(null);
-          setConvertedLessonProgress(recoveredProgress);
-        }
+        if (recoveredProgress) setConvertedLessonProgress(recoveredProgress);
         if (practiceSession) {
           const normalized = normalizePracticeSession(JSON.parse(practiceSession) as unknown);
           setActivePracticeSession(normalized);
