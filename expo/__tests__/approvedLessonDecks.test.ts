@@ -92,6 +92,10 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(page).toContain("window.ReactDOM");
     expect(page).toContain("class Component extends DCLogic");
     expect(page).toContain("data:font/woff2;base64,");
+    expect(page).toContain('id="bysi-native-deck-shell"');
+    expect(page).toContain('body *{visibility:hidden!important}');
+    expect(page).toContain('[data-bysi="deck"],[data-bysi="deck"] *{visibility:visible!important}');
+    expect(page).toContain('position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important');
     expect(page).not.toContain("__bundler_loading");
     expect(page).not.toContain('type="__bundler/manifest"');
     expect(page).not.toMatch(/<script\s+src=/i);

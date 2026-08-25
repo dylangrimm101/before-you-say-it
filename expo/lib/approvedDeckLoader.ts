@@ -96,6 +96,19 @@ function inlineScript(source: string): string {
   return `<script>${source.replace(/<\/script/gi, "<\\/script")}<\/script>`;
 }
 
+const NATIVE_DECK_SHELL = `<style id="bysi-native-deck-shell">
+html,body{margin:0!important;padding:0!important;width:100%!important;height:100%!important;overflow:hidden!important;background:#FAF7F2!important}
+body *{visibility:hidden!important}
+[data-bysi="deck"],[data-bysi="deck"] *{visibility:visible!important}
+[data-bysi="deck"]{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;transform:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;margin:0!important}
+</style>`;
+
+function isolateNativeDeck(template: string): string {
+  if (!template.includes('data-bysi="deck"')) throw new Error("Approved lesson frame is missing");
+  if (!template.includes("</head>")) throw new Error("Approved lesson document head is missing");
+  return template.replace("</head>", `${NATIVE_DECK_SHELL}</head>`);
+}
+
 /** Flattens the approved artifact into one same-origin page for native WebViews. */
 export function materializeApprovedDeckHtml(bundleHtml: string): string {
   const templateEncoded = bundleHtml.match(TEMPLATE_PATTERN)?.[1];
@@ -124,7 +137,7 @@ export function materializeApprovedDeckHtml(bundleHtml: string): string {
     template = template.split(uuid).join(`data:${entry.mime};base64,${entry.data}`);
   });
   if (template.includes("__bundler_loading") || /<script\s+src="blob:/i.test(template)) throw new Error("Approved lesson page was not fully materialized");
-  return template;
+  return isolateNativeDeck(template);
 }
 
 function replaceEncodedTemplate(rawHtml: string, transform: (template: string) => string): string {
