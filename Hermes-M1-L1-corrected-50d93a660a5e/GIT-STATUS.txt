@@ -1,0 +1,23 @@
+ M expo/__tests__/convertedLesson.test.ts
+ M expo/app/(tabs)/progress.tsx
+ M expo/app/approved-lesson/[lessonId].tsx
+ M expo/app/approved-rehearsal/[lessonId].tsx
+ M expo/app/paywall.tsx
+ M expo/bun.lock
+ M expo/components/ScenarioPaidPractice.tsx
+ M expo/lib/approvedDeckLoader.ts
+ M expo/lib/convertedLesson.ts
+ M expo/lib/curriculum.ts
+ M expo/lib/scenarioPractice.ts
+ M expo/metro.config.js
+ M expo/package.json
+ M expo/providers/store.tsx
+ M expo/types/convo.ts
+ M expo/types/pilotCurriculum.ts
+?? Hermes-M1-L1-corrected-50d93a660a5e/
+?? expo/__tests__/clientEnvGuard.test.ts
+?? expo/components/M1L1PaidPractice.tsx
+?? expo/lib/clientEnvGuard.ts
+?? expo/lib/convertedCompletion.ts
+?? expo/lib/convertedProgressRepository.ts
+?? expo/scripts/

@@ -1,0 +1,1780 @@
+diff --git a/expo/__tests__/convertedLesson.test.ts b/expo/__tests__/convertedLesson.test.ts
+index 1ca5756..292dcfe 100644
+--- a/expo/__tests__/convertedLesson.test.ts
++++ b/expo/__tests__/convertedLesson.test.ts
+@@ -1,119 +1,237 @@
+ import { describe, expect, test } from "bun:test";
+-import { readFile } from "node:fs/promises";
+-import path from "node:path";
+ 
+-import { convertedHandoffDeckHtml, returnedDeckHtml } from "@/lib/approvedDeckLoader";
+-import { M1_L1_CONVERSION, m1L1CoachNote, m1L1Comparison } from "@/lib/convertedLesson";
++import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
+ import {
+-  attachScenarioCoaching,
+-  attachScenarioCounterpartTurn,
+-  completeScenarioComparison,
++  M1_L1_CONVERSION,
++  approvedCustomWording,
++  convertedProgressFacts,
++  m1L1BehaviorFlags,
++  m1L1CoachNote,
++  m1L1Comparison,
++  m1L1EvidenceTrap,
++  normalizeConvertedLessonProgress,
++  routeForM1L1Safety,
++  selectM1L1PushbackOne,
++  semanticVoiceForScenario,
++  validateM1L1Completion,
++  type ConvertedLessonProgress,
++} from "@/lib/convertedLesson";
++import {
++  commitConvertedProgress,
++  resetConvertedProgressQueueForTests,
++  type ConvertedProgressStorage,
++} from "@/lib/convertedProgressRepository";
++import { convertedHandoffDeckHtml, isApprovedM1L1DeckDigest, returnedDeckHtml } from "@/lib/approvedDeckLoader";
++import {
++  advanceM1L1FirstResponse,
++  attachM1L1Coaching,
++  attachM1L1PushbackOne,
++  attachM1L1PushbackTwo,
+   createScenarioPracticeRun,
++  initializeM1L1Run,
++  preserveM1L1Retry,
++  preserveM1L1SecondResponse,
+   preserveScenarioAttempt,
+ } from "@/lib/scenarioPractice";
++import type { PersistedScenarioPracticeRun } from "@/lib/scenarioPractice";
++
++function fixtureDeck(): string {
++  const cards = Array.from({ length: 22 }, (_, index) => `  { n:${index + 1}, type:'Card ${index + 1}' }`).join(",\n");
++  const template = `const CARDS = [\n${cards}\n];\nclass Component {\n  state = { i:0, picks:{} };\n  view() { return { openHandoff:() => { this.setState({ handoffOpen:true }); }, handoffContinue:() => {} }; }\n}`;
++  return `<html><script type="__bundler/template">${JSON.stringify(template)}</script></html>`;
++}
+ 
+-const ROOT = path.resolve(import.meta.dir, "..");
++function acceptedRun(id = "accepted-run"): PersistedScenarioPracticeRun {
++  let value = initializeM1L1Run(createScenarioPracticeRun(M1_L1_CONVERSION.scenario, "steady", "defensive", id, 1), 1);
++  const context = value.run.scenarioContext!;
++  value = { ...value, run: { ...value.run, convertedModuleId: M1_L1_CONVERSION.moduleId, practiceId: M1_L1_CONVERSION.practiceId, contentVersion: M1_L1_CONVERSION.contentVersion, scenarioContext: { ...context, counterpartId: "adam", counterpartName: "Adam", counterpartRole: "your colleague", category: "work" } } };
++  value = preserveScenarioAttempt(value, "opener", "The file handoff is too late. Yesterday it arrived at 4:20. Can we move it to noon?", 2);
++  value = attachM1L1PushbackOne(value, selectM1L1PushbackOne(value.run.attempt!.transcript, id), 3);
++  value = preserveScenarioAttempt(value, "response", "I hear quarter close is heavy. The handoff is still the point. Can we move it to noon?", 4);
++  value = advanceM1L1FirstResponse(value, 5);
++  value = attachM1L1PushbackTwo(value, m1L1EvidenceTrap(id), 6);
++  value = preserveM1L1SecondResponse(value, "I hear that. Yesterday the file arrived at 4:20. Can we move the handoff to noon?", 7);
++  const note = m1L1CoachNote(value.run.m1L1!.secondResponseAttempt!.transcript, 5)!;
++  value = attachM1L1Coaching(value, `${note.worked} ${note.change}`, note.retryDirection, 5, note.flags, note.selectedDimension, 8);
++  value = preserveM1L1Retry(value, "I hear that. Yesterday the file arrived at 4:20. Can we move the handoff to noon?", 9);
++  const comparison = m1L1Comparison(value.run.m1L1!.secondResponseAttempt!.transcript, value.run.retryAttempt!.transcript, note.selectedDimension, 5);
++  return { ...value, run: { ...value.run, state: "attempt_comparison", comparison } };
++}
+ 
+-function source(relativePath: string): Promise<string> {
+-  return readFile(path.join(ROOT, relativePath), "utf8");
++function progress(overrides: Partial<ConvertedLessonProgress> = {}): ConvertedLessonProgress {
++  return {
++    lessonId: "m1-l1",
++    moduleId: "bysi_m01_get_to_the_point",
++    practiceId: "bysi_m01_l01_buried_point",
++    contentVersion: "m1-l1-v2.1-2026-08-24",
++    runId: "run-1",
++    lessonCardCheckpoint: 22,
++    quizGatesCompleted: true,
++    rehearsalCompleted: true,
++    retryCompleted: true,
++    comparisonViewed: true,
++    savedMoveId: "one-point-one-proof-one-move",
++    transferChoice: "say",
++    completedAt: 100,
++    sourceLineage: "approved-html-deck-pinned",
++    ...overrides,
++  };
+ }
+ 
+-function fixtureDeck(): string {
+-  const template = `const CARDS = [
+-  { n:20, type:'Rehearsal handoff' },
+-  { n:21, type:'Saved move' },
+-  { n:22, type:'Transfer cue' }
+-];
+-class Component {
+-  state = { i:0, picks:{} };
+-  view() { return { openHandoff:() => { this.setState({ handoffOpen:true }); }, handoffContinue:() => {} }; }
+-}`;
+-  return `<html><script type="__bundler/template">${JSON.stringify(template)}</script></html>`;
++class MemoryStorage implements ConvertedProgressStorage {
++  value: string | null = null;
++  async getItem(): Promise<string | null> { return this.value; }
++  async setItem(_key: string, value: string): Promise<void> { this.value = value; }
+ }
+ 
+-describe("M1 L1 conversion vertical slice", () => {
+-  test("binds stable manifest identity and deck-relative return cards", () => {
+-    expect(M1_L1_CONVERSION.practiceId).toBe("gtp_conversation_job");
+-    expect(M1_L1_CONVERSION.contentVersion).toBe("m1-l1-v2.1-2026-08-24");
+-    expect(M1_L1_CONVERSION.rehearsalHandoffCard).toBe(20);
+-    expect(M1_L1_CONVERSION.returnCard).toBe(21);
+-    expect(M1_L1_CONVERSION.completionCard).toBe(22);
++describe("accepted M1 L1 narrow correction", () => {
++  test("uses the accepted identity, work context, no invented duration, and remains development-only", () => {
++    expect(M1_L1_CONVERSION.moduleId).toBe("bysi_m01_get_to_the_point");
++    expect(M1_L1_CONVERSION.practiceId).toBe("bysi_m01_l01_buried_point");
++    expect(M1_L1_CONVERSION.coachedBehaviorId).toBe("point_proof_move");
++    expect(M1_L1_CONVERSION.context).toBe("work");
++    expect(M1_L1_CONVERSION.counterpartId).toBe("adam");
++    expect(M1_L1_CONVERSION.scenario.minutes).toBeUndefined();
+     expect(M1_L1_CONVERSION.launchEligible).toBe(false);
+   });
+ 
+-  test("converts the handoff without packaging post-rehearsal cards early", () => {
+-    const html = convertedHandoffDeckHtml(fixtureDeck(), 20);
+-    expect(html).toContain("start-rehearsal");
+-    expect(html).not.toContain("{ n:21, type:");
+-    expect(html).not.toContain("{ n:22, type:");
+-  });
+-
+-  test("returns to the exact manifest card after a real rehearsal", () => {
+-    const html = returnedDeckHtml(fixtureDeck(), M1_L1_CONVERSION.returnCard);
+-    expect(html).toContain("state = { i:20,");
+-    expect(html).toContain("{ n:21, type:'Saved move' }");
+-    expect(html).toContain("{ n:22, type:'Transfer cue' }");
+-  });
+-
+-  test("persists and reuses the exact authored pressure turn for retry", () => {
+-    let value = createScenarioPracticeRun(M1_L1_CONVERSION.scenario, "steady", "defensive", "run-1", 1);
+-    value = { ...value, run: { ...value.run, practiceId: M1_L1_CONVERSION.practiceId, contentVersion: M1_L1_CONVERSION.contentVersion } };
+-    value = preserveScenarioAttempt(value, "opener", "I want to change how we split bedtime.", 2);
+-    value = attachScenarioCounterpartTurn(value, { id: "pressure-1", text: M1_L1_CONVERSION.authoredPressureText, source: "authored" }, 3);
+-    value = preserveScenarioAttempt(value, "response", "The last three nights I did bedtime alone.", 4);
+-    value = attachScenarioCoaching(value, "One observable note.", M1_L1_CONVERSION.retryDirection, "conversation_job", 5);
+-    value = preserveScenarioAttempt(value, "retry", "Bedtime is the point. I did the last three nights. Can you take Tuesday and Thursday?", 6);
+-    value = completeScenarioComparison(value, 7);
+-
+-    expect(value.run.counterpartTurn?.text).toBe("You're acting like this happens all the time.");
+-    expect(value.run.adamReactionId).toBe("pressure-1");
+-    expect(value.run.retryAttempt?.transcript).toContain("Bedtime is the point");
+-    expect(JSON.stringify(value)).not.toMatch(/"scores?"|communicationIndex|xp|streak/i);
+-  });
+-
+-  test("keeps Hope feedback transcript-grounded, single-behavior, and bounded", () => {
+-    const transcript = "I want to keep this on bedtime. I handled the last three nights. Can you take Tuesday and Thursday?";
+-    const note = m1L1CoachNote(transcript);
+-    expect(note).not.toBeNull();
+-    expect(transcript).toContain(note?.evidenceQuote ?? "missing");
+-    expect(note?.coachedBehaviorId).toBe("conversation_job");
+-    expect(`${note?.worked} ${note?.change}`.trim().split(/\s+/).length).toBeLessThanOrEqual(32);
+-    expect(note?.retryDirection.trim().split(/\s+/).length).toBeLessThanOrEqual(20);
+-    expect(`${note?.worked} ${note?.change} ${note?.retryDirection}`.trim().split(/\s+/).length).toBeLessThanOrEqual(48);
+-  });
+-
+-  test("compares only concrete opening wording without producing a score", () => {
+-    const comparison = m1L1Comparison(
+-      "I know this is complicated, but I wanted to discuss bedtime and a lot of other things.",
+-      "I want to change how we split bedtime. Can you take Tuesday and Thursday?",
+-    );
+-    expect(comparison.split(/\s+/).length).toBeLessThanOrEqual(36);
+-    expect(comparison).toContain("First attempt began");
+-    expect(comparison).toContain("Retry began");
+-    expect(comparison).not.toMatch(/score|percent|grade|improved/i);
+-  });
+-
+-  test("keeps safety answers ephemeral and completion separate from legacy scores", async () => {
+-    const route = await source("app/approved-rehearsal/[lessonId].tsx");
+-    const store = await source("providers/store.tsx");
+-    const deck = await source("app/approved-lesson/[lessonId].tsx");
+-    expect(route).toContain("I'm not sure.");
+-    expect(route).toContain("A DIFFERENT ROUTE MAY FIT BETTER");
+-    expect(route).not.toContain("safetyAnswer");
+-    expect(store).toContain('convertedLessonProgress: "cc.convertedLessonProgress.v1"');
+-    expect(store).toContain("commitConvertedLessonProgress");
+-    expect(deck).toContain("saveActiveScenarioRun(null)");
+-    expect(deck).not.toContain("saveScoredPracticeRecord");
+-  });
+-
+-  test("implements explicit transcript approval, typed fallback, TTS, and cleanup", async () => {
+-    const practice = await source("components/ScenarioPaidPractice.tsx");
+-    expect(practice).toContain("Use your voice for this rehearsal");
+-    expect(practice).toContain("Type this turn instead");
+-    expect(practice).toContain("Approve this transcript");
+-    expect(practice).toContain("await speak(pressureText, \"man-adam\")");
+-    expect(practice).toContain("await speak(pressure.text, \"man-adam\")");
+-    expect(practice).toContain("resetSpeech().catch");
+-    expect(practice).toContain("This doesn’t feel safe to practice");
++  test("selects one approved Pushback 1 only from observable opening features and keeps stable identity", () => {
++    const direct = selectM1L1PushbackOne("The handoff is late. Yesterday it came at 4:20. Can we move it to noon.", "r");
++    const indirect = selectM1L1PushbackOne("Do you think maybe the handoff could change?", "r");
++    const motive = selectM1L1PushbackOne("You never respect my review time.", "r");
++    expect([direct.text, indirect.text, motive.text]).toEqual([...M1_L1_CONVERSION.pushbackOneBank]);
++    expect(selectM1L1PushbackOne("You never respect my review time.", "r")).toEqual(motive);
++    expect(motive.resolvedAudioId).toBe("m1-l1-v2-1-r-pushback-1-3");
++  });
++
++  test("executes all eight authored beats with two pressures and two pre-coaching responses", () => {
++    const value = acceptedRun();
++    expect(value.run.attempt).toBeDefined();
++    expect(value.run.m1L1?.pushbackOne?.text).toBe(M1_L1_CONVERSION.pushbackOneBank[1]);
++    expect(value.run.responseAttempt).toBeDefined();
++    expect(value.run.m1L1?.pushbackTwo?.text).toBe("You're acting like this happens all the time.");
++    expect(value.run.m1L1?.secondResponseAttempt).toBeDefined();
++    expect(value.run.m1L1?.coachedBeat).toBe(5);
++    expect(value.run.m1L1?.beat).toBe(8);
++    expect(value.run.m1L1?.retryCount).toBe(1);
++  });
++
++  test("hard-caps retries at two and preserves exact pressure/audio identity", () => {
++    let value = acceptedRun();
++    const pressure = value.run.m1L1?.pushbackTwo;
++    value = preserveM1L1Retry(value, "Second and final retry.", 10);
++    const capped = preserveM1L1Retry(value, "A forbidden third retry.", 11);
++    expect(value.run.m1L1?.retryCount).toBe(2);
++    expect(capped).toEqual(value);
++    expect(value.run.m1L1?.pushbackTwo).toEqual(pressure);
++  });
++
++  test("routes all four ephemeral safety choices deterministically", () => {
++    expect(routeForM1L1Safety("direct")).toBe("scene");
++    expect(routeForM1L1Safety("unsure")).toBe("different-route");
++    expect(routeForM1L1Safety("yes")).toBe("different-route");
++    expect(routeForM1L1Safety("prefer_not")).toBe("different-route");
++  });
++
++  test("isolates Adam from partner, family, and non-converted scenarios", () => {
++    expect(semanticVoiceForScenario(M1_L1_CONVERSION.scenario, M1_L1_CONVERSION)).toBe("adam_counterpart");
++    expect(semanticVoiceForScenario({ ...M1_L1_CONVERSION.scenario, id: "partner", category: "partner" }, M1_L1_CONVERSION)).toBe("contextual_counterpart");
++    expect(semanticVoiceForScenario({ ...M1_L1_CONVERSION.scenario, id: "family", category: "family" }, undefined)).toBe("contextual_counterpart");
++  });
++
++  test("produces scoreless flags for vague, case-building, motive, no-move, and clean turns", () => {
++    const vague = m1L1BehaviorFlags("Maybe there is sort of a problem here.", 5);
++    const caseBuilding = m1L1BehaviorFlags("Yesterday was late and Monday was late and the budget was wrong and everyone noticed.", 5);
++    const motive = m1L1BehaviorFlags("You never care about my time.", 5);
++    const noMove = m1L1BehaviorFlags("Yesterday the file arrived at 4:20.", 5);
++    const clean = m1L1BehaviorFlags("I hear that. Yesterday the file arrived at 4:20. Can we move the handoff to noon?", 5);
++    expect(vague.find((f) => f.dimension === "grounding_concreteness")?.status).toBe("not_met");
++    expect(caseBuilding.find((f) => f.dimension === "evidence_discipline")?.status).toBe("not_met");
++    expect(motive.find((f) => f.dimension === "motive_character_language")?.status).toBe("not_met");
++    expect(noMove.find((f) => f.dimension === "move_clarity")?.status).toBe("not_met");
++    expect(clean.find((f) => f.dimension === "evidence_discipline")?.status).toBe("met");
++    expect(clean.find((f) => f.dimension === "move_clarity")?.status).toBe("met");
++    expect(clean.find((f) => f.dimension === "park_and_return")?.status).toBe("met");
++  });
++
++  test("keeps Hope's exact quote and bounded 32/20/48-word output", () => {
++    const transcript = "I hear that. Yesterday the file arrived at 4:20. Can we move the handoff to noon?";
++    const note = m1L1CoachNote(transcript, 5)!;
++    expect(transcript).toContain(note.evidenceQuote);
++    expect(`${note.worked} ${note.change}`.split(/\s+/).length).toBeLessThanOrEqual(32);
++    expect(note.retryDirection.split(/\s+/).length).toBeLessThanOrEqual(20);
++    expect(`${note.worked} ${note.change} ${note.retryDirection}`.split(/\s+/).length).toBeLessThanOrEqual(48);
++    expect(JSON.stringify(note)).not.toMatch(/score|percent|grade|mastery/i);
++  });
++
++  test("derives comparison truthfully from the same selected flag", () => {
++    const result = m1L1Comparison("You never care about the handoff.", "Yesterday it arrived at 4:20. Can we move it to noon?", "motive_character_language", 5);
++    expect(result.criterionChanged).toBe(true);
++    expect(result.selectedDimension).toBe("motive_character_language");
++    expect(result.text.split(/\s+/).length).toBeLessThanOrEqual(36);
++  });
++
++  test("rejects query-only, unrelated, stale-version, and incomplete completion", () => {
++    const valid = acceptedRun();
++    expect(validateM1L1Completion(valid.run, valid.run.id).isValid).toBe(true);
++    expect(validateM1L1Completion(valid.run, "other").reason).toBe("run_id");
++    expect(validateM1L1Completion({ ...valid.run, contentVersion: "old" }, valid.run.id).reason).toBe("manifest_identity");
++    expect(validateM1L1Completion({ ...valid.run, m1L1: { ...valid.run.m1L1!, secondResponseAttempt: undefined } }, valid.run.id).reason).toBe("turn_plan");
++  });
++
++  test("pins executable deck authenticity to M1 L1 path, version, and SHA-256", () => {
++    const path = "BYSI-Rork-Handoff/decks/M1-L1-Buried-Point.html";
++    const digest = "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e";
++    expect(isApprovedM1L1DeckDigest(path, M1_L1_CONVERSION.contentVersion, digest)).toBe(true);
++    expect(isApprovedM1L1DeckDigest(path, "old-version", digest)).toBe(false);
++    expect(isApprovedM1L1DeckDigest(path, M1_L1_CONVERSION.contentVersion, "tampered")).toBe(false);
++    expect(isApprovedM1L1DeckDigest("other.html", M1_L1_CONVERSION.contentVersion, digest)).toBe(false);
++  });
++
++  test("slices handoff before rehearsal and authorizes only Cards 21–22 after return", () => {
++    const handoff = convertedHandoffDeckHtml(fixtureDeck(), 20);
++    const returned = returnedDeckHtml(fixtureDeck(), 21, 22);
++    expect(handoff).toContain("start-rehearsal");
++    expect(handoff).not.toContain("{ n:21, type:");
++    expect(returned).not.toContain("{ n:20, type:");
++    expect(returned).toContain("{ n:21, type:");
++    expect(returned).toContain("{ n:22, type:");
++  });
++
++  test("strictly normalizes mixed progress and preserves prior versions", () => {
++    const old = progress({ contentVersion: "m1-l1-v2.0", completedAt: 50 });
++    const malformed = { ...progress(), transferChoice: "score_me" };
++    const valid = normalizeConvertedLessonProgress([old, malformed, progress()]);
++    expect(valid).toHaveLength(2);
++    expect(valid.map((item) => item.contentVersion)).toEqual(["m1-l1-v2.0", "m1-l1-v2.1-2026-08-24"]);
++  });
++
++  test("serializes stale/interleaved writes against latest durable data without regression", async () => {
++    resetConvertedProgressQueueForTests();
++    const storage = new MemoryStorage();
++    const newer = progress({ completedAt: 200, transferChoice: "write" });
++    const stale = progress({ completedAt: 100, transferChoice: "say" });
++    await Promise.all([commitConvertedProgress(storage, newer), commitConvertedProgress(storage, stale)]);
++    const records = normalizeConvertedLessonProgress(JSON.parse(storage.value ?? "[]"));
++    expect(records).toHaveLength(1);
++    expect(records[0]?.completedAt).toBe(200);
++    expect(records[0]?.transferChoice).toBe("write");
++  });
++
++  test("strict deletion failure rejects completion and leaves legacy scored bytes untouched", async () => {
++    const scoredBytes = '[{"id":"legacy","overallIndex":72}]';
++    let committed = false;
++    await expect(finalizeConvertedLesson(progress(), {
++      commit: async () => { committed = true; },
++      clearActiveRunStrict: async () => { throw new Error("remove failed"); },
++    })).rejects.toThrow("remove failed");
++    expect(committed).toBe(true);
++    expect(scoredBytes).toBe('[{"id":"legacy","overallIndex":72}]');
++  });
++
++  test("requires explicit custom wording consent and exposes countable scoreless facts", () => {
++    expect(approvedCustomWording("  My chosen line.  ")).toBe("My chosen line.");
++    expect(approvedCustomWording(" ")).toBeNull();
++    expect(convertedProgressFacts(progress())).toEqual(["Practice completed", "Retry completed", "Move saved", "Lesson completed"]);
+   });
+ });
+diff --git a/expo/app/(tabs)/progress.tsx b/expo/app/(tabs)/progress.tsx
+index 10a44b6..39f9f47 100644
+--- a/expo/app/(tabs)/progress.tsx
++++ b/expo/app/(tabs)/progress.tsx
+@@ -8,13 +8,14 @@ import { ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductU
+ import { Backdrop, Meter, PressCard, Reveal } from "@/components/ui";
+ import { curriculumModule } from "@/constants/modules";
+ import { C, GUTTER, T, font, radius } from "@/constants/theme";
++import { convertedProgressFacts } from "@/lib/convertedLesson";
+ import { progressHistoryPresentation } from "@/lib/scoredPracticeHistory";
+ import { useStore } from "@/providers/store";
+ 
+ export default function ProgressScreen() {
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+-  const { completed, pilotProgress, scoredPracticeHistory, deleteSession } = useStore();
++  const { completed, convertedLessonProgress, pilotProgress, scoredPracticeHistory, deleteSession } = useStore();
+   const evidence = useMemo(() => progressHistoryPresentation(scoredPracticeHistory), [scoredPracticeHistory]);
+   const isReturning = evidence.recordCount >= 2;
+   const confirmDelete = (id: string, title: string): void => {
+@@ -28,8 +29,9 @@ export default function ProgressScreen() {
+     <Reveal index={1}><ProductCard accent style={styles.indexCard}><View style={styles.indexTop}><View><SectionLabel>{isReturning ? "Communication Index" : "Starting profile"}</SectionLabel><View style={styles.valueRow}><Text style={styles.indexValue}>{evidence.indexValue ?? "—"}</Text>{evidence.indexValue !== null ? <Text style={styles.outOf}>/ 100</Text> : null}</View></View><View style={styles.coverage}><Text style={styles.coverageValue}>{evidence.observedCount}</Text><Text style={styles.coverageLabel}>OF 6 SIGNALS{`\n`}OBSERVED</Text></View></View><IndexChart values={evidence.chartValues} /><Text style={styles.indexNote}>{evidence.indexValue === null ? "There is not enough approved evidence for an Index value yet." : "Observed signals only. Unobserved signals are not treated as zero."}</Text><PressCard onPress={() => router.push("/progress/how-it-works")} style={styles.howLink} accessibilityLabel="How the Communication Index works"><Info size={15} color={C.purple} /><Text style={styles.howText}>How this is calculated</Text></PressCard></ProductCard></Reveal>
+     <Reveal index={2} style={styles.section}><SectionLabel>Six signals</SectionLabel><View style={styles.signalList}>{evidence.rows.map((row) => { const observed = row.value !== null; return <PressCard key={row.key} onPress={() => router.push(`/progress/dimension/${row.key}`)} accessibilityLabel={`${row.label}. ${row.value ?? "Not observed"}`}><View style={styles.signalRow}><View style={styles.signalHeading}>{observed ? <Check size={15} color={C.sage} strokeWidth={2.8} /> : <Circle size={15} color={C.track} />}<Text style={[styles.signalName, observed && styles.signalObserved]}>{row.label}</Text><Text style={styles.signalValue}>{row.value ?? "Not observed"}</Text><ChevronRight size={16} color={C.dim} /></View>{observed ? <><Meter value={row.value ?? 0} tone={C.purple} height={5} /><Text style={styles.evidenceMeta}>{row.evidenceTurnIds.length} approved evidence reference{row.evidenceTurnIds.length === 1 ? "" : "s"}</Text></> : null}</View></PressCard>; })}</View></Reveal>
+     <Reveal index={3}><ProductCard style={styles.focusCard}><Target size={20} color={C.purple} /><View style={styles.focusCopy}><SectionLabel tone={C.purple}>Current focus</SectionLabel><Text style={styles.focusTitle}>{evidence.currentFocus ?? "No evidence-backed focus yet"}</Text><Text style={styles.focusMeta}>{evidence.currentFocus ? "From the latest genuinely scored practice." : "Complete an approved scored rehearsal to establish a focus."}</Text></View></ProductCard></Reveal>
+-    <Reveal index={4} style={styles.section}><SectionLabel>Practice record</SectionLabel><View style={styles.stats}><View style={styles.stat}><Text style={styles.statValue}>{evidence.recordCount}</Text><Text style={styles.statLabel}>SCORED PRACTICES</Text></View><View style={styles.statRule} /><View style={styles.stat}><Text style={styles.statValue}>{pilotProgress.length}</Text><Text style={styles.statLabel}>COMPLETED MODULES</Text></View></View>{scoredPracticeHistory.length === 0 ? <View style={styles.empty}><Text style={styles.emptyTitle}>No scored practice history yet</Text><Text style={styles.emptyBody}>Completion alone never creates an Index point. A chart point appears only when a genuine scored result exists.</Text></View> : <View style={styles.history}>{[...scoredPracticeHistory].sort((a, b) => b.completedAt - a.completedAt).map((entry) => <View key={entry.id} style={styles.historyRow}><View style={styles.historyDot} /><View style={styles.historyCopy}><Text style={styles.historyTitle}>{entry.scenarioTitle ?? (entry.moduleId ? curriculumModule(entry.moduleId)?.name : null) ?? "Scored practice"}</Text><Text style={styles.historyMeta}>{new Date(entry.completedAt).toLocaleDateString()} · {entry.observedSignals.length} of 6 signals observed</Text></View><StatusPill label={`${entry.overallIndex} / 100`} tone="purple" /></View>)}</View>}</Reveal>
+-    <Reveal index={5} style={styles.section}><SectionLabel>Saved rehearsal records</SectionLabel>{completed.length === 0 ? <View style={styles.empty}><Text style={styles.emptyTitle}>No saved records yet</Text><Text style={styles.emptyBody}>Completed rehearsal records appear here without retaining full transcript text.</Text></View> : <View style={styles.history}>{completed.map((record) => { const label = record.title ?? "Your conversation"; return <View key={record.id} style={styles.savedRow}><PressCard onPress={() => router.push(`/debrief/${record.id}`)} containerStyle={styles.savedMain} accessibilityLabel={`Open ${label}`}><View style={styles.historyCopy}><Text style={styles.historyTitle}>{label}</Text><Text style={styles.historyMeta}>{new Date(record.endedAt ?? record.startedAt).toLocaleDateString()}</Text></View></PressCard><PressCard onPress={() => confirmDelete(record.id, label)} style={styles.deleteHit} accessibilityLabel={`Delete ${label}`}><Trash2 size={16} color={C.dim} /></PressCard><ChevronRight size={17} color={C.dim} /></View>; })}</View>}</Reveal>
++    <Reveal index={4} style={styles.section}><SectionLabel>Scoreless lesson facts</SectionLabel>{convertedLessonProgress.length === 0 ? <View style={styles.empty}><Text style={styles.emptyTitle}>No converted lesson facts yet</Text><Text style={styles.emptyBody}>M1 L1 completion, retry, and saved-move facts appear here without a score.</Text></View> : <View style={styles.history}>{[...convertedLessonProgress].sort((a, b) => b.completedAt - a.completedAt).map((entry) => <ProductCard key={`${entry.practiceId}:${entry.contentVersion}:${entry.runId}`} style={styles.factCard}><Text style={styles.historyTitle}>When the Point Gets Buried</Text><Text style={styles.historyMeta}>{new Date(entry.completedAt).toLocaleDateString()} · content {entry.contentVersion}</Text>{convertedProgressFacts(entry).map((fact) => <View key={fact} style={styles.factRow}><Check size={15} color={C.sage} strokeWidth={2.8} /><Text style={styles.factText}>{fact}</Text></View>)}</ProductCard>)}</View>}</Reveal>
++    <Reveal index={5} style={styles.section}><SectionLabel>Practice record</SectionLabel><View style={styles.stats}><View style={styles.stat}><Text style={styles.statValue}>{evidence.recordCount}</Text><Text style={styles.statLabel}>SCORED PRACTICES</Text></View><View style={styles.statRule} /><View style={styles.stat}><Text style={styles.statValue}>{pilotProgress.length}</Text><Text style={styles.statLabel}>COMPLETED MODULES</Text></View></View>{scoredPracticeHistory.length === 0 ? <View style={styles.empty}><Text style={styles.emptyTitle}>No scored practice history yet</Text><Text style={styles.emptyBody}>Completion alone never creates an Index point. A chart point appears only when a genuine scored result exists.</Text></View> : <View style={styles.history}>{[...scoredPracticeHistory].sort((a, b) => b.completedAt - a.completedAt).map((entry) => <View key={entry.id} style={styles.historyRow}><View style={styles.historyDot} /><View style={styles.historyCopy}><Text style={styles.historyTitle}>{entry.scenarioTitle ?? (entry.moduleId ? curriculumModule(entry.moduleId)?.name : null) ?? "Scored practice"}</Text><Text style={styles.historyMeta}>{new Date(entry.completedAt).toLocaleDateString()} · {entry.observedSignals.length} of 6 signals observed</Text></View><StatusPill label={`${entry.overallIndex} / 100`} tone="purple" /></View>)}</View>}</Reveal>
++    <Reveal index={6} style={styles.section}><SectionLabel>Saved rehearsal records</SectionLabel>{completed.length === 0 ? <View style={styles.empty}><Text style={styles.emptyTitle}>No saved records yet</Text><Text style={styles.emptyBody}>Completed rehearsal records appear here without retaining full transcript text.</Text></View> : <View style={styles.history}>{completed.map((record) => { const label = record.title ?? "Your conversation"; return <View key={record.id} style={styles.savedRow}><PressCard onPress={() => router.push(`/debrief/${record.id}`)} containerStyle={styles.savedMain} accessibilityLabel={`Open ${label}`}><View style={styles.historyCopy}><Text style={styles.historyTitle}>{label}</Text><Text style={styles.historyMeta}>{new Date(record.endedAt ?? record.startedAt).toLocaleDateString()}</Text></View></PressCard><PressCard onPress={() => confirmDelete(record.id, label)} style={styles.deleteHit} accessibilityLabel={`Delete ${label}`}><Trash2 size={16} color={C.dim} /></PressCard><ChevronRight size={17} color={C.dim} /></View>; })}</View>}</Reveal>
+   </ScrollView></View>;
+ }
+ 
+@@ -40,5 +42,5 @@ const styles = StyleSheet.create({
+   indexCard: { marginTop: 20 }, indexTop: { flexDirection: "row", justifyContent: "space-between" }, valueRow: { flexDirection: "row", alignItems: "flex-end", gap: 6, marginTop: 8 }, indexValue: { fontFamily: font.bold, fontSize: 50, lineHeight: 54, color: C.purple }, outOf: { ...T.support, paddingBottom: 6 }, coverage: { alignItems: "flex-end" }, coverageValue: { fontFamily: font.semi, fontSize: 28, color: C.text }, coverageLabel: { fontFamily: font.semi, fontSize: 9, lineHeight: 13, letterSpacing: 1, color: C.dim, textAlign: "right" },
+   chartWrap: { height: 86, marginTop: 6 }, chart: { height: 58, flexDirection: "row", alignItems: "flex-end", gap: 6 }, chartTrack: { flex: 1, height: "100%", borderRadius: 5, backgroundColor: "rgba(81,40,136,0.07)", overflow: "hidden", justifyContent: "flex-end" }, chartBar: { width: "100%", borderRadius: 5, backgroundColor: "rgba(81,40,136,0.25)" }, chartCurrent: { backgroundColor: C.purple }, chartCaption: { ...T.caption, fontSize: 11, marginTop: 5 }, indexNote: { ...T.caption, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line }, howLink: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start" }, howText: { fontFamily: font.semi, fontSize: 13, color: C.purple },
+   section: { marginTop: 28, gap: 10 }, signalList: { gap: 8 }, signalRow: { minHeight: 66, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.68)", borderWidth: 1, borderColor: C.line, padding: 14 }, signalHeading: { flexDirection: "row", alignItems: "center", gap: 9 }, signalName: { ...T.support, color: C.dim, flex: 1 }, signalObserved: { color: C.text, fontFamily: font.semi }, signalValue: { fontFamily: font.semi, fontSize: 13, color: C.purple }, evidenceMeta: { ...T.caption, fontSize: 11, marginTop: 6 },
+-  focusCard: { marginTop: 26, flexDirection: "row", alignItems: "flex-start", gap: 12 }, focusCopy: { flex: 1 }, focusTitle: { ...T.title, fontSize: 18, marginTop: 6 }, focusMeta: { ...T.caption, marginTop: 5 }, stats: { flexDirection: "row", paddingVertical: 16, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: C.line }, stat: { flex: 1, alignItems: "center" }, statValue: { fontFamily: font.semi, fontSize: 26, color: C.text }, statLabel: { fontFamily: font.semi, fontSize: 9, letterSpacing: 1, color: C.dim, marginTop: 5 }, statRule: { width: StyleSheet.hairlineWidth, backgroundColor: C.line }, empty: { borderRadius: 20, borderWidth: 1, borderStyle: "dashed", borderColor: C.lineStrong, padding: 18 }, emptyTitle: { ...T.support, fontFamily: font.semi, color: C.text }, emptyBody: { ...T.caption, marginTop: 5 }, history: { gap: 4 }, historyRow: { minHeight: 70, flexDirection: "row", alignItems: "center", gap: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line }, historyDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.purple }, historyCopy: { flex: 1 }, historyTitle: { ...T.support, fontFamily: font.semi, color: C.text }, historyMeta: { ...T.caption, marginTop: 3 }, savedRow: { minHeight: 70, flexDirection: "row", alignItems: "center", gap: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line }, savedMain: { flex: 1 }, deleteHit: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
++  focusCard: { marginTop: 26, flexDirection: "row", alignItems: "flex-start", gap: 12 }, focusCopy: { flex: 1 }, focusTitle: { ...T.title, fontSize: 18, marginTop: 6 }, focusMeta: { ...T.caption, marginTop: 5 }, factCard: { gap: 6 }, factRow: { minHeight: 30, flexDirection: "row", alignItems: "center", gap: 8 }, factText: { ...T.support, color: C.text }, stats: { flexDirection: "row", paddingVertical: 16, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: C.line }, stat: { flex: 1, alignItems: "center" }, statValue: { fontFamily: font.semi, fontSize: 26, color: C.text }, statLabel: { fontFamily: font.semi, fontSize: 9, letterSpacing: 1, color: C.dim, marginTop: 5 }, statRule: { width: StyleSheet.hairlineWidth, backgroundColor: C.line }, empty: { borderRadius: 20, borderWidth: 1, borderStyle: "dashed", borderColor: C.lineStrong, padding: 18 }, emptyTitle: { ...T.support, fontFamily: font.semi, color: C.text }, emptyBody: { ...T.caption, marginTop: 5 }, history: { gap: 4 }, historyRow: { minHeight: 70, flexDirection: "row", alignItems: "center", gap: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line }, historyDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.purple }, historyCopy: { flex: 1 }, historyTitle: { ...T.support, fontFamily: font.semi, color: C.text }, historyMeta: { ...T.caption, marginTop: 3 }, savedRow: { minHeight: 70, flexDirection: "row", alignItems: "center", gap: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line }, savedMain: { flex: 1 }, deleteHit: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+ });
+diff --git a/expo/app/approved-lesson/[lessonId].tsx b/expo/app/approved-lesson/[lessonId].tsx
+index 2f405f1..f2e4133 100644
+--- a/expo/app/approved-lesson/[lessonId].tsx
++++ b/expo/app/approved-lesson/[lessonId].tsx
+@@ -1,14 +1,15 @@
+ import { useLocalSearchParams, useRouter } from "expo-router";
+ import { ArrowLeft, ShieldCheck } from "lucide-react-native";
+ import React, { useCallback, useEffect, useMemo, useState } from "react";
+-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
++import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+ import { useSafeAreaInsets } from "react-native-safe-area-context";
+ import { WebView } from "react-native-webview";
+ 
+ import { approvedLessonDeck } from "@/constants/approvedLessons";
+ import { C, GUTTER, T, font, shadow } from "@/constants/theme";
+ import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
+-import { conversionRuntimeEnabled, M1_L1_CONVERSION, type TransferChoice } from "@/lib/convertedLesson";
++import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
++import { approvedCustomWording, conversionRuntimeEnabled, M1_L1_CONVERSION, validateM1L1Completion, type TransferChoice } from "@/lib/convertedLesson";
+ import { errorShape, safeLog } from "@/lib/redact";
+ import { useStore } from "@/providers/store";
+ 
+@@ -16,16 +17,28 @@ import { useStore } from "@/providers/store";
+ export default function ApprovedLessonDeckScreen() {
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+-  const params = useLocalSearchParams<{ lessonId?: string; returnFromRehearsal?: string }>();
++  const params = useLocalSearchParams<{ lessonId?: string; returnFromRehearsal?: string; runId?: string }>();
+   const lesson = approvedLessonDeck(params.lessonId);
+-  const { activeScenarioRun, commitConvertedLessonProgress, saveActiveScenarioRun } = useStore();
++  const { activeScenarioRun, clearActiveScenarioRunStrict, commitConvertedLessonProgress, replaceActiveScenarioRunStrict } = useStore();
+   const isConverted = conversionRuntimeEnabled(params.lessonId);
+   const isReturning = isConverted && params.returnFromRehearsal === "1";
+-  const [savedMoveHandled, setSavedMoveHandled] = useState<boolean>(false);
++  const [customDraft, setCustomDraft] = useState<string>("");
++  const [customWording, setCustomWording] = useState<string | null>(null);
++  const [showWordingConsent, setShowWordingConsent] = useState<boolean>(isReturning);
+   const [completionCommitted, setCompletionCommitted] = useState<boolean>(false);
+   const [deckHtml, setDeckHtml] = useState<string | null>(null);
+   const [loadError, setLoadError] = useState<boolean>(false);
+ 
++  useEffect(() => {
++    const run = activeScenarioRun?.run;
++    if (!isReturning || !activeScenarioRun || !run || run.m1L1?.approvedMoveSavedAt) return;
++    if (!validateM1L1Completion(run, params.runId).isValid) return;
++    void replaceActiveScenarioRunStrict({ ...activeScenarioRun, run: { ...run, m1L1: { ...run.m1L1!, approvedMoveSavedAt: Date.now() }, updatedAt: Date.now() } }).catch((error: unknown) => {
++      safeLog("[converted-lesson] approved move auto-save failed", errorShape(error));
++      Alert.alert("We couldn’t save the approved move", "Stay on this screen and try returning from the rehearsal again.");
++    });
++  }, [activeScenarioRun, isReturning, params.runId, replaceActiveScenarioRunStrict]);
++
+   useEffect(() => {
+     let isActive = true;
+     setDeckHtml(null);
+@@ -33,7 +46,7 @@ export default function ApprovedLessonDeckScreen() {
+     if (!__DEV__ || !lesson) return () => { isActive = false; };
+ 
+     const loader = isReturning
+-      ? loadReturnedDeckHtml(lesson.archivePath, M1_L1_CONVERSION.returnCard)
++      ? loadReturnedDeckHtml(lesson.archivePath, M1_L1_CONVERSION.returnCard, M1_L1_CONVERSION.completionCard)
+       : isConverted
+         ? loadConvertedHandoffDeckHtml(lesson.archivePath, M1_L1_CONVERSION.rehearsalHandoffCard)
+         : loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard);
+@@ -56,6 +69,7 @@ export default function ApprovedLessonDeckScreen() {
+         var total = ${total};
+         var stopDeckNavigation = ${shouldStopDeckNavigation ? "true" : "false"};
+         var blockedLabels = ${isConverted ? "[]" : '["start rehearsal", "start voice rehearsal", "continue lesson preview"]'};
++        var expectedRunId = ${JSON.stringify(params.runId ?? "")};
+         function textOf(node) {
+           return String(node && (node.innerText || node.textContent) || "").trim().toLowerCase();
+         }
+@@ -128,10 +142,8 @@ export default function ApprovedLessonDeckScreen() {
+           }
+           if (${isReturning ? "true" : "false"}) {
+             window.setTimeout(function () {
+-              var counter = currentCounter();
+               var message = null;
+-              if (counter === "21 / 22" && document.body.innerText.indexOf("___") < 0) message = { type:"saved-move-handled" };
+-              if (counter === "22 / 22" && ["say it", "write it", "save it for later"].indexOf(label) >= 0) message = { type:"transfer-selected", label:label };
++              if (["say it", "write it", "save it for later"].indexOf(label) >= 0) message = { type:"transfer-selected", label:label, runId:expectedRunId };
+               if (message && window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(message));
+             }, 80);
+           }
+@@ -148,12 +160,12 @@ export default function ApprovedLessonDeckScreen() {
+       })();
+       true;
+     `;
+-  }, [isConverted, isReturning, lesson]);
++  }, [isConverted, isReturning, lesson, params.runId]);
+ 
+   const handleDeckMessage = useCallback(async (raw: string): Promise<void> => {
+-    let message: { type?: unknown; label?: unknown };
++    let message: { type?: unknown; label?: unknown; runId?: unknown };
+     try {
+-      message = JSON.parse(raw) as { type?: unknown; label?: unknown };
++      message = JSON.parse(raw) as { type?: unknown; label?: unknown; runId?: unknown };
+     } catch {
+       return;
+     }
+@@ -161,37 +173,39 @@ export default function ApprovedLessonDeckScreen() {
+       router.push({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: M1_L1_CONVERSION.lessonId } });
+       return;
+     }
+-    if (message.type === "saved-move-handled" && isReturning) {
+-      setSavedMoveHandled(true);
+-      return;
+-    }
+-    if (message.type !== "transfer-selected" || !isReturning || completionCommitted) return;
++    const run = activeScenarioRun?.run;
++    const completion = validateM1L1Completion(run, params.runId);
++    if (message.type !== "transfer-selected" || !isReturning || message.runId !== params.runId || !completion.isValid || completionCommitted) return;
+     const transferByLabel: Record<string, TransferChoice> = { "say it": "say", "write it": "write", "save it for later": "save_later" };
+     const transferChoice = typeof message.label === "string" ? transferByLabel[message.label] : undefined;
+-    const run = activeScenarioRun?.run;
+-    if (!transferChoice || !savedMoveHandled || !run?.retryAttempt || !run.comparison) return;
++    if (!transferChoice || !run) return;
+     try {
+-      await commitConvertedLessonProgress({
++      await finalizeConvertedLesson({
+         lessonId: M1_L1_CONVERSION.lessonId,
++        moduleId: M1_L1_CONVERSION.moduleId,
+         practiceId: M1_L1_CONVERSION.practiceId,
+         contentVersion: M1_L1_CONVERSION.contentVersion,
++        runId: run.id,
+         lessonCardCheckpoint: M1_L1_CONVERSION.completionCard,
+         quizGatesCompleted: true,
+         rehearsalCompleted: true,
+         retryCompleted: true,
+         comparisonViewed: true,
+         savedMoveId: M1_L1_CONVERSION.namedMoveId,
++        ...(customWording ? { customWording } : {}),
+         transferChoice,
+         completedAt: Date.now(),
+-        sourceLineage: "approved-html-deck",
++        sourceLineage: "approved-html-deck-pinned",
++      }, {
++        commit: commitConvertedLessonProgress,
++        clearActiveRunStrict: clearActiveScenarioRunStrict,
+       });
+-      await saveActiveScenarioRun(null);
+       setCompletionCommitted(true);
+     } catch (error: unknown) {
+       safeLog("[converted-lesson] progress commit failed", errorShape(error));
+-      Alert.alert("We couldn’t save your progress", "Stay on this screen and try again.");
++      Alert.alert("We couldn’t finish securely", "Progress or rehearsal deletion did not complete. Stay on this screen and try again.");
+     }
+-  }, [activeScenarioRun?.run, commitConvertedLessonProgress, completionCommitted, isConverted, isReturning, router, saveActiveScenarioRun, savedMoveHandled]);
++  }, [activeScenarioRun?.run, clearActiveScenarioRunStrict, commitConvertedLessonProgress, completionCommitted, customWording, isConverted, isReturning, params.runId, router]);
+ 
+   if (!__DEV__) {
+     return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
+@@ -233,8 +247,9 @@ export default function ApprovedLessonDeckScreen() {
+       >
+         <ArrowLeft size={20} color={C.text} />
+       </Pressable>
++      {showWordingConsent && !completionCommitted ? <View style={[styles.wordingPanel, { bottom: insets.bottom + 18 }]}><Text style={styles.wordingTitle}>Optional custom wording</Text><Text style={styles.wordingBody}>The approved move is already saved. Custom text is retained only if you choose Save this wording.</Text><TextInput value={customDraft} onChangeText={setCustomDraft} maxLength={240} placeholder="Optional wording" style={styles.wordingInput} /><Pressable onPress={() => { const approved = approvedCustomWording(customDraft); if (approved) { setCustomWording(approved); setShowWordingConsent(false); } }} style={styles.wordingPrimary} accessibilityRole="button"><Text style={styles.wordingPrimaryText}>Save this wording</Text></Pressable><Pressable onPress={() => setShowWordingConsent(false)} style={styles.wordingSecondary} accessibilityRole="button"><Text style={styles.wordingSecondaryText}>Keep the approved move only</Text></Pressable></View> : null}
+       <View pointerEvents="none" style={[styles.qaBadge, { top: insets.top + 9 }]}>
+-        <Text style={styles.qaBadgeText}>{completionCommitted ? "PRACTICE COMPLETE" : isReturning ? "REHEARSAL COMPLETE" : "INTERNAL QA"}</Text>
++        <Text style={styles.qaBadgeText}>{completionCommitted ? (customWording ? "COMPLETE · ONLY SAVED WORDING RETAINED" : "COMPLETE · TRANSCRIPT DELETED") : isReturning ? "REHEARSAL COMPLETE" : "INTERNAL QA"}</Text>
+       </View>
+     </View>
+   );
+@@ -258,6 +273,8 @@ const styles = StyleSheet.create({
+   backButton: { position: "absolute", left: 12, zIndex: 4, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
+   qaBadge: { position: "absolute", right: 14, zIndex: 3, minHeight: 32, borderRadius: 16, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line },
+   qaBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.1, color: C.purple },
++  wordingPanel: { position: "absolute", left: 18, right: 18, zIndex: 6, borderRadius: 20, padding: 16, backgroundColor: "rgba(255,255,255,0.98)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
++  wordingTitle: { ...T.support, color: C.text, fontFamily: font.bold }, wordingBody: { ...T.caption, marginTop: 5 }, wordingInput: { ...T.body, minHeight: 44, marginTop: 10, borderWidth: 1, borderColor: C.line, borderRadius: 12, paddingHorizontal: 12, backgroundColor: C.surfaceHigh }, wordingPrimary: { minHeight: 44, marginTop: 10, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: C.purple }, wordingPrimaryText: { fontFamily: font.bold, fontSize: 13, color: C.onAccent }, wordingSecondary: { minHeight: 44, alignItems: "center", justifyContent: "center" }, wordingSecondaryText: { fontFamily: font.semi, fontSize: 12, color: C.purple },
+   unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
+   unavailableTitle: { ...T.title, textAlign: "center", marginTop: 16 },
+   unavailableBody: { ...T.support, textAlign: "center", marginTop: 8 },
+diff --git a/expo/app/approved-rehearsal/[lessonId].tsx b/expo/app/approved-rehearsal/[lessonId].tsx
+index 1089cbf..1976abe 100644
+--- a/expo/app/approved-rehearsal/[lessonId].tsx
++++ b/expo/app/approved-rehearsal/[lessonId].tsx
+@@ -1,118 +1,140 @@
+ import { useLocalSearchParams, useRouter } from "expo-router";
+ import { ArrowLeft, ShieldCheck } from "lucide-react-native";
+ import React, { useCallback, useMemo, useState } from "react";
+-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
++import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+ import { useSafeAreaInsets } from "react-native-safe-area-context";
+ 
+ import { ScenarioPaidPractice } from "@/components/ScenarioPaidPractice";
+ import { Backdrop, GlassCard, PrimaryButton } from "@/components/ui";
+ import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
+-import { conversionRuntimeEnabled, M1_L1_CONVERSION } from "@/lib/convertedLesson";
+-import { createScenarioPracticeRun } from "@/lib/scenarioPractice";
++import { conversionRuntimeEnabled, M1_L1_CONVERSION, routeForM1L1Safety, type SafetyChoice } from "@/lib/convertedLesson";
++import { createScenarioPracticeRun, initializeM1L1Run } from "@/lib/scenarioPractice";
+ import { useStore } from "@/providers/store";
+ 
+ export default function ApprovedRehearsalRoute(): React.JSX.Element {
+   const params = useLocalSearchParams<{ lessonId?: string }>();
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+-  const { activeScenarioRun, saveActiveScenarioRun } = useStore();
++  const {
++    activeScenarioRun,
++    archiveActiveScenarioRunStrict,
++    clearActiveScenarioRunStrict,
++    replaceActiveScenarioRunStrict,
++  } = useStore();
+   const isAvailable = conversionRuntimeEnabled(params.lessonId);
+-  const resumable = isAvailable
+-    && activeScenarioRun?.run.practiceId === M1_L1_CONVERSION.practiceId
+-    && activeScenarioRun.run.contentVersion === M1_L1_CONVERSION.contentVersion
+-    && activeScenarioRun.run.state !== "complete";
+-  const hasVersionMismatch = isAvailable
+-    && activeScenarioRun?.run.practiceId === M1_L1_CONVERSION.practiceId
+-    && activeScenarioRun.run.contentVersion !== M1_L1_CONVERSION.contentVersion;
+-  const [step, setStep] = useState<"safety" | "different-route" | "scene" | "runtime">(resumable ? "runtime" : "safety");
++  const run = activeScenarioRun?.run;
++  const isAcceptedIdentity = run?.convertedModuleId === M1_L1_CONVERSION.moduleId
++    && run.practiceId === M1_L1_CONVERSION.practiceId
++    && run.contentVersion === M1_L1_CONVERSION.contentVersion
++    && run.scenarioContext?.scenarioId === M1_L1_CONVERSION.scenario.id
++    && run.scenarioContext.counterpartId === M1_L1_CONVERSION.counterpartId;
++  const resumable = isAvailable && isAcceptedIdentity && run?.state !== "complete";
++  const hasConflict = isAvailable && Boolean(activeScenarioRun) && !resumable;
++  const hasVersionMismatch = run?.practiceId === M1_L1_CONVERSION.practiceId && run.contentVersion !== M1_L1_CONVERSION.contentVersion;
++  const [step, setStep] = useState<"conflict" | "safety" | "different-route" | "scene" | "runtime">(resumable ? "runtime" : hasConflict ? "conflict" : "safety");
++
++  const createAcceptedRun = useCallback(async (): Promise<void> => {
++    const created = initializeM1L1Run(
++      createScenarioPracticeRun(M1_L1_CONVERSION.scenario, "steady", "defensive", `lesson-${M1_L1_CONVERSION.lessonId}-${Date.now().toString(36)}`),
++      Date.now(),
++    );
++    const context = created.run.scenarioContext;
++    if (!context) throw new Error("M1 L1 work context is unavailable");
++    await replaceActiveScenarioRunStrict({
++      ...created,
++      run: {
++        ...created.run,
++        convertedModuleId: M1_L1_CONVERSION.moduleId,
++        practiceId: M1_L1_CONVERSION.practiceId,
++        contentVersion: M1_L1_CONVERSION.contentVersion,
++        counterpartIdentity: M1_L1_CONVERSION.counterpartId,
++        scenarioContext: {
++          ...context,
++          category: M1_L1_CONVERSION.context,
++          counterpartId: M1_L1_CONVERSION.counterpartId,
++          counterpartName: "Adam",
++          counterpartLabel: M1_L1_CONVERSION.scenario.counterpart,
++          counterpartRole: "your colleague",
++        },
++      },
++    });
++    setStep("runtime");
++  }, [replaceActiveScenarioRunStrict]);
+ 
+   const startRuntime = useCallback(async (): Promise<void> => {
+     if (!isAvailable) return;
+-    if (!resumable) {
+-      const created = createScenarioPracticeRun(M1_L1_CONVERSION.scenario, "steady", "defensive", `lesson-${M1_L1_CONVERSION.lessonId}-${Date.now().toString(36)}`);
+-      await saveActiveScenarioRun({
+-        ...created,
+-        run: {
+-          ...created.run,
+-          moduleId: "get_to_the_point",
+-          practiceId: M1_L1_CONVERSION.practiceId,
+-          contentVersion: M1_L1_CONVERSION.contentVersion,
+-        },
+-      });
++    if (resumable) {
++      setStep("runtime");
++      return;
+     }
+-    setStep("runtime");
+-  }, [isAvailable, resumable, saveActiveScenarioRun]);
++    try {
++      await createAcceptedRun();
++    } catch {
++      Alert.alert("We couldn’t start this rehearsal", "No existing rehearsal was overwritten. Try again.");
++    }
++  }, [createAcceptedRun, isAvailable, resumable]);
++
++  const preserveAndRestart = useCallback(async (): Promise<void> => {
++    try {
++      await archiveActiveScenarioRunStrict();
++      setStep("safety");
++    } catch {
++      Alert.alert("We couldn’t preserve the saved rehearsal", "The existing rehearsal remains active. Nothing was overwritten.");
++    }
++  }, [archiveActiveScenarioRunStrict]);
++
++  const discardAndRestart = useCallback(async (): Promise<void> => {
++    try {
++      await clearActiveScenarioRunStrict();
++      setStep("safety");
++    } catch {
++      Alert.alert("We couldn’t delete the saved rehearsal", "It remains active on this device. Nothing new was started.");
++    }
++  }, [clearActiveScenarioRunStrict]);
++
++  const handleSafetyChoice = useCallback((choice: SafetyChoice): void => {
++    setStep(routeForM1L1Safety(choice));
++  }, []);
+ 
+   const runtimeKey = useMemo(() => activeScenarioRun?.run.id ?? "new-run", [activeScenarioRun?.run.id]);
+ 
+   if (!isAvailable) return <Unavailable />;
+-  if (step === "runtime") {
+-    return (
+-      <ScenarioPaidPractice
+-        key={runtimeKey}
+-        scenario={M1_L1_CONVERSION.scenario}
+-        requestedRunId={activeScenarioRun?.run.id}
+-        convertedLesson={M1_L1_CONVERSION}
+-        onReturnToDeck={() => router.replace({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: M1_L1_CONVERSION.lessonId, returnFromRehearsal: "1" } })}
+-        onDiscard={async () => { await saveActiveScenarioRun(null); router.back(); }}
+-        onSafetyExit={() => setStep("different-route")}
+-      />
+-    );
++  if (step === "runtime" && activeScenarioRun?.run.id) {
++    return <ScenarioPaidPractice
++      key={runtimeKey}
++      scenario={M1_L1_CONVERSION.scenario}
++      requestedRunId={activeScenarioRun.run.id}
++      convertedLesson={M1_L1_CONVERSION}
++      onReturnToDeck={(runId) => router.replace({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: M1_L1_CONVERSION.lessonId, returnFromRehearsal: "1", runId } })}
++      onDiscard={async () => { await clearActiveScenarioRunStrict(); router.back(); }}
++      onSafetyExit={() => setStep("different-route")}
++    />;
+   }
+ 
+-  return (
+-    <View style={styles.root}>
+-      <Backdrop />
+-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+-        <Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to lesson">
+-          <ArrowLeft size={21} color={C.text} />
+-        </Pressable>
+-        <Text style={styles.headerTitle}>Internal rehearsal QA</Text>
+-        <View style={styles.back} />
+-      </View>
+-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 30 }]} showsVerticalScrollIndicator={false}>
+-        {hasVersionMismatch ? (
+-          <GlassCard style={styles.card}>
+-            <Text style={styles.eyebrow}>CONTENT UPDATED</Text>
+-            <Text style={styles.title}>Restart on the current lesson version.</Text>
+-            <Text style={styles.body}>This saved rehearsal belongs to different lesson content. It will not be combined with the current pressure turn or coaching rule.</Text>
+-            <PrimaryButton label="Discard old run and restart" onPress={async () => { await saveActiveScenarioRun(null); setStep("safety"); }} containerStyle={styles.action} />
+-          </GlassCard>
+-        ) : step === "safety" ? (
+-          <GlassCard style={styles.card}>
+-            <Text style={styles.eyebrow}>BEFORE YOU PRACTICE</Text>
+-            <Text style={styles.title}>Is there any reason bringing this up directly could put you at risk, lead to retaliation, or make the situation less safe?</Text>
+-            <Choice label="No. Direct conversation feels appropriate." onPress={() => setStep("scene")} />
+-            <Choice label="I'm not sure." onPress={() => setStep("different-route")} />
+-            <Choice label="Yes." onPress={() => setStep("different-route")} />
+-            <Choice label="I'd rather not answer." onPress={() => router.back()} />
+-          </GlassCard>
+-        ) : step === "different-route" ? (
+-          <GlassCard style={styles.card}>
+-            <ShieldCheck size={28} color={C.sage} />
+-            <Text style={styles.eyebrow}>A DIFFERENT ROUTE MAY FIT BETTER</Text>
+-            <Text style={styles.title}>You do not have to practice a direct conversation first.</Text>
+-            <Text style={styles.body}>You can review support, documentation, reporting, or safety options instead.</Text>
+-            <PrimaryButton label="See other options" onPress={() => router.push("/safety")} containerStyle={styles.action} />
+-            <Choice label="Return to the lesson" onPress={() => router.back()} />
+-            <Choice label="Leave this practice" onPress={() => router.replace("/(tabs)")} />
+-          </GlassCard>
+-        ) : (
+-          <GlassCard style={styles.card}>
+-            <Text style={styles.eyebrow}>THE SCENE</Text>
+-            <Text style={styles.title}>{M1_L1_CONVERSION.title}</Text>
+-            <Text style={styles.body}>Sunday evening, kitchen. Dishes done, kid finally asleep. You’ve wanted to say this for two weeks. Your partner is on the couch, half looking at their phone. Not hostile. Tired.</Text>
+-            <View style={styles.sceneInset}>
+-              <Text style={styles.sceneLabel}>WHAT HAPPENS</Text>
+-              <Text style={styles.body}>You open. Adam pushes back twice. The second one is “You’re acting like this happens all the time.” Then Hope names one change and hands the same moment back to you.</Text>
+-            </View>
+-            <PrimaryButton label="Start rehearsal" onPress={() => void startRuntime()} containerStyle={styles.action} />
+-            <Choice label="Not now" onPress={() => router.back()} />
+-          </GlassCard>
+-        )}
+-      </ScrollView>
+-    </View>
+-  );
++  return <View style={styles.root}><Backdrop />
++    <View style={[styles.header, { paddingTop: insets.top + 8 }]}><Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to lesson"><ArrowLeft size={21} color={C.text} /></Pressable><Text style={styles.headerTitle}>Internal M1 L1 rehearsal QA</Text><View style={styles.back} /></View>
++    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 30 }]}>
++      {step === "conflict" ? <GlassCard style={styles.card}>
++        <Text style={styles.eyebrow}>{hasVersionMismatch ? "CONTENT UPDATED" : "SAVED REHEARSAL FOUND"}</Text>
++        <Text style={styles.title}>{hasVersionMismatch ? "Start the accepted version without mixing content." : "Choose what happens to the existing rehearsal."}</Text>
++        <Text style={styles.body}>{hasVersionMismatch ? "The old run can be preserved, but its pressure and rubric cannot be combined with this version." : "A different practice is active. It will never be overwritten silently."}</Text>
++        <PrimaryButton label="Preserve it and start M1 L1" onPress={() => void preserveAndRestart()} containerStyle={styles.action} />
++        <Choice label="Resume the existing rehearsal" onPress={() => run?.scenarioContext?.scenarioId ? router.push({ pathname: "/rehearse/[id]", params: { id: run.scenarioContext.scenarioId, scenarioRunId: run.id } }) : router.back()} />
++        <Choice label="Save and leave" onPress={() => router.back()} />
++        <Choice label="Discard it, then start M1 L1" onPress={() => void discardAndRestart()} />
++      </GlassCard> : step === "safety" ? <GlassCard style={styles.card}>
++        <Text style={styles.eyebrow}>BEFORE YOU PRACTICE</Text><Text style={styles.title}>Is there any reason bringing this up directly could put you at risk, lead to retaliation, or make the situation less safe?</Text>
++        <Choice label="No. Direct conversation feels appropriate." onPress={() => handleSafetyChoice("direct")} />
++        <Choice label="I'm not sure." onPress={() => handleSafetyChoice("unsure")} />
++        <Choice label="Yes." onPress={() => handleSafetyChoice("yes")} />
++        <Choice label="I'd rather not answer." onPress={() => handleSafetyChoice("prefer_not")} />
++      </GlassCard> : step === "different-route" ? <GlassCard style={styles.card}>
++        <ShieldCheck size={28} color={C.sage} /><Text style={styles.eyebrow}>A DIFFERENT ROUTE MAY FIT BETTER</Text><Text style={styles.title}>You do not have to practice a direct conversation first.</Text><Text style={styles.body}>You can review support, documentation, reporting, or safety options instead. Your answer was not stored.</Text><PrimaryButton label="See other options" onPress={() => router.push("/safety")} containerStyle={styles.action} /><Choice label="Return to the lesson" onPress={() => router.back()} /><Choice label="Leave this practice" onPress={() => router.replace("/(tabs)")} />
++      </GlassCard> : <GlassCard style={styles.card}>
++        <Text style={styles.eyebrow}>THE WORK SCENE</Text><Text style={styles.title}>{M1_L1_CONVERSION.title}</Text><Text style={styles.body}>{M1_L1_CONVERSION.scenario.situation}</Text><View style={styles.sceneInset}><Text style={styles.sceneLabel}>WHAT HAPPENS</Text><Text style={styles.body}>You open. Adam, your colleague, uses two authored pressure turns. Hope coaches one observed Point → Proof → Move behavior, then replays only that exact moment.</Text></View><PrimaryButton label="Start rehearsal" onPress={() => void startRuntime()} containerStyle={styles.action} /><Choice label="Not now" onPress={() => router.back()} />
++      </GlassCard>}
++    </ScrollView>
++  </View>;
+ }
+ 
+ function Choice({ label, onPress }: { label: string; onPress: () => void }): React.JSX.Element {
+@@ -124,9 +146,5 @@ function Unavailable(): React.JSX.Element {
+ }
+ 
+ const styles = StyleSheet.create({
+-  root: { flex: 1, backgroundColor: C.bg }, unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
+-  header: { minHeight: 68, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, back: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerTitle: { flex: 1, textAlign: "center", fontFamily: font.bold, fontSize: 16, color: C.text },
+-  scroll: { paddingHorizontal: GUTTER, paddingTop: 16 }, card: { padding: 20, gap: 14 }, eyebrow: { ...eyebrow, color: C.purple }, title: { ...T.title }, body: { ...T.support }, action: { marginTop: 4 },
+-  choice: { minHeight: 52, borderRadius: radius.md, borderWidth: 1, borderColor: C.line, backgroundColor: C.surfaceHigh, paddingHorizontal: 16, justifyContent: "center" }, choiceText: { ...T.support, color: C.text, fontFamily: font.medium },
+-  sceneInset: { padding: 16, borderRadius: radius.md, backgroundColor: C.purpleSoft, gap: 7 }, sceneLabel: { ...eyebrow, color: C.purple },
++  root: { flex: 1, backgroundColor: C.bg }, unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER }, header: { minHeight: 68, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, back: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerTitle: { flex: 1, textAlign: "center", fontFamily: font.bold, fontSize: 16, color: C.text }, scroll: { paddingHorizontal: GUTTER, paddingTop: 16 }, card: { padding: 20, gap: 14 }, eyebrow: { ...eyebrow, color: C.purple }, title: { ...T.title }, body: { ...T.support }, action: { marginTop: 4 }, choice: { minHeight: 52, borderRadius: radius.md, borderWidth: 1, borderColor: C.line, backgroundColor: C.surfaceHigh, paddingHorizontal: 16, justifyContent: "center" }, choiceText: { ...T.support, color: C.text, fontFamily: font.medium }, sceneInset: { padding: 16, borderRadius: radius.md, backgroundColor: C.purpleSoft, gap: 7 }, sceneLabel: { ...eyebrow, color: C.purple },
+ });
+diff --git a/expo/app/paywall.tsx b/expo/app/paywall.tsx
+index 93b5286..f368c43 100644
+--- a/expo/app/paywall.tsx
++++ b/expo/app/paywall.tsx
+@@ -25,6 +25,8 @@ import { useCustomerInfo, useIsPro, useOfferings, usePurchasePackage, useRestore
+ import { useStore } from "@/providers/store";
+ import type { SharedResultContractV1 } from "@/types/sharedProduct";
+ 
++const DEFAULT_FOCUS_LABEL = "Focus: Specificity";
++
+ export default function Paywall() {
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+@@ -274,7 +276,7 @@ function StageOne({ moduleName, modulePreview, focus }: { moduleName: string; mo
+     return () => entrance.stop();
+   }, [isReduced, segmentProgress]);
+ 
+-  const focusLabel = focus.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
++  const focusLabel = (focus || DEFAULT_FOCUS_LABEL.replace("Focus: ", "")).replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+ 
+   return (
+     <Reveal style={styles.stageOne}>
+@@ -327,7 +329,7 @@ function StageOne({ moduleName, modulePreview, focus }: { moduleName: string; mo
+           <View style={styles.focusPill}>
+             <Text style={styles.focusPillText}>Focus: {focusLabel}</Text>
+           </View>
+-          <Text style={styles.modulePreview}>{modulePreview}</Text>
++          <Text style={styles.modulePreview}>Start with a clear ask. {modulePreview}</Text>
+         </View>
+       ) : null}
+     </Reveal>
+diff --git a/expo/bun.lock b/expo/bun.lock
+index 301289a..fe468ac 100644
+--- a/expo/bun.lock
++++ b/expo/bun.lock
+@@ -21,6 +21,7 @@
+         "expo-blur": "~15.0.8",
+         "expo-clipboard": "~8.0.8",
+         "expo-constants": "~18.0.11",
++        "expo-crypto": "~15.0.9",
+         "expo-file-system": "~19.0.23",
+         "expo-font": "~14.0.10",
+         "expo-haptics": "~15.0.8",
+@@ -973,6 +974,8 @@
+ 
+     "expo-constants": ["expo-constants@18.0.11", "", { "dependencies": { "@expo/config": "~12.0.11", "@expo/env": "~2.0.8" }, "peerDependencies": { "expo": "*", "react-native": "*" } }, "sha512-xnfrfZ7lHjb+03skhmDSYeFF7OU2K3Xn/lAeP+7RhkV2xp2f5RCKtOUYajCnYeZesvMrsUxOsbGOP2JXSOH3NA=="],
+ 
++    "expo-crypto": ["expo-crypto@15.0.9", "", { "dependencies": { "base64-js": "^1.3.0" }, "peerDependencies": { "expo": "*" } }, "sha512-SNWKa2fXx7v9gkp1h/7nqXY5XN7qgNDn3yRc2aO0gWGbeMbvob/haMxxsPFe9f51aqH5NjNCqHf2kvLhvAd8KQ=="],
++
+     "expo-file-system": ["expo-file-system@19.0.23", "", { "peerDependencies": { "expo": "*", "react-native": "*" } }, "sha512-MeGkid9OeNILfT/qonaXHp4f2c15xaB28U/bcN7pqZej0Kx0+6+V7e9ZIXpPHm07zVatxA+QkMTPQEGfmvVOxA=="],
+ 
+     "expo-font": ["expo-font@14.0.10", "", { "dependencies": { "fontfaceobserver": "^2.1.0" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-UqyNaaLKRpj4pKAP4HZSLnuDQqueaO5tB1c/NWu5vh1/LF9ulItyyg2kF/IpeOp0DeOLk0GY0HrIXaKUMrwB+Q=="],
+diff --git a/expo/components/ScenarioPaidPractice.tsx b/expo/components/ScenarioPaidPractice.tsx
+index b3e3eb2..244bedc 100644
+--- a/expo/components/ScenarioPaidPractice.tsx
++++ b/expo/components/ScenarioPaidPractice.tsx
+@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
+ import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+ import { useSafeAreaInsets } from "react-native-safe-area-context";
+ 
++import { M1L1PaidPractice } from "@/components/M1L1PaidPractice";
+ import { ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
+ import { Backdrop, MicControl, PrimaryButton, Reveal, StateDock } from "@/components/ui";
+ import { DIFFICULTY } from "@/constants/scenarios";
+@@ -31,7 +32,7 @@ interface ScenarioPaidPracticeProps {
+   scenario: Scenario;
+   requestedRunId?: string;
+   convertedLesson?: ConvertedLessonConfig;
+-  onReturnToDeck?: () => void;
++  onReturnToDeck?: (runId: string) => void;
+   onDiscard?: () => Promise<void>;
+   onSafetyExit?: () => void;
+ }
+@@ -40,8 +41,16 @@ function turn(id: string, role: Turn["role"], text: string): Turn {
+   return { id, role, text };
+ }
+ 
+-/** Scenario entry surface backed by the same PilotDayRun transitions and immutable attempts as paid modules. */
+-export function ScenarioPaidPractice({ scenario, requestedRunId, convertedLesson, onReturnToDeck, onDiscard, onSafetyExit }: ScenarioPaidPracticeProps) {
++/** Routes only accepted M1 L1 into its isolated authored runtime. */
++export function ScenarioPaidPractice(props: ScenarioPaidPracticeProps): React.JSX.Element {
++  if (props.convertedLesson && props.requestedRunId && props.onReturnToDeck && props.onDiscard && props.onSafetyExit) {
++    return <M1L1PaidPractice requestedRunId={props.requestedRunId} convertedLesson={props.convertedLesson} onReturnToDeck={props.onReturnToDeck} onDiscard={props.onDiscard} onSafetyExit={props.onSafetyExit} />;
++  }
++  return <SharedScenarioPaidPractice {...props} />;
++}
++
++/** Shared non-converted scenario surface; it never defaults to Adam. */
++function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson, onReturnToDeck, onDiscard, onSafetyExit }: ScenarioPaidPracticeProps) {
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+   const { activeScenarioRun, saveActiveScenarioRun, upsertSession } = useStore();
+@@ -169,7 +178,7 @@ export function ScenarioPaidPractice({ scenario, requestedRunId, convertedLesson
+       }, Date.now());
+       setDraft("");
+       await persist(transitionScenarioPracticeRun(withPressure, "ready_for_response", Date.now()));
+-      await speak(pressureText, "man-adam");
++      await speak(pressureText, "woman-hope");
+     } catch {
+       setError(`${context.counterpartName}'s response did not come through. Your approved transcript is saved.`);
+       await persist(transitionScenarioPracticeRun(approved, "network_error", Date.now()));
+@@ -198,7 +207,7 @@ export function ScenarioPaidPractice({ scenario, requestedRunId, convertedLesson
+         approved,
+         lessonNote ? `${lessonNote.worked} ${lessonNote.change}` : flag?.quote ? `In “${flag.quote},” ${flag.issue}` : debrief?.headline ?? "",
+         lessonNote?.retryDirection ?? flag?.reframe ?? debrief?.nextRep ?? "Answer the same pressure again with one concrete next step.",
+-        convertedLesson ? "conversation_job" : "pushback_response",
++        convertedLesson ? "point_proof_move" : "pushback_response",
+         Date.now(),
+       );
+       setDraft("");
+@@ -216,7 +225,7 @@ export function ScenarioPaidPractice({ scenario, requestedRunId, convertedLesson
+     const approved = preserveScenarioAttempt(value, "retry", draft, Date.now());
+     const comparedBase = completeScenarioComparison(approved, Date.now());
+     const compared = convertedLesson && comparedBase.run.responseAttempt && comparedBase.run.retryAttempt
+-      ? { ...comparedBase, run: { ...comparedBase.run, comparison: { behaviorId: "conversation_job" as const, text: m1L1Comparison(comparedBase.run.responseAttempt.transcript, comparedBase.run.retryAttempt.transcript), criterionChanged: false } } }
++      ? { ...comparedBase, run: { ...comparedBase.run, comparison: m1L1Comparison(comparedBase.run.responseAttempt.transcript, comparedBase.run.retryAttempt.transcript) } }
+       : comparedBase;
+     setDraft("");
+     await persist(compared);
+@@ -274,9 +283,9 @@ export function ScenarioPaidPractice({ scenario, requestedRunId, convertedLesson
+         {isListening ? <View style={styles.listening}><Text style={styles.title}>Recording your {state === "listening_attempt" ? "opening" : state === "listening_response" ? "response" : "retry"}.</Text><MicControl state="listening" level={dictation.level} onPress={() => void stopRecording()} glyph={<Square size={24} color={C.onAccent} fill={C.onAccent} />} accessibilityLabel="Done speaking" /><Text style={styles.body}>Tap when you are done. Nothing advances until you approve the transcript.</Text></View> : null}
+         {showReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve your {reviewKind}.</Text>{reviewKind !== "opening" && pressure ? <CounterpartCard presentation={counterpartPresentation} /> : null}<TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel={`Edit ${reviewKind} transcript`} /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2 || busy} onPress={() => void (reviewKind === "opening" ? confirmOpening() : reviewKind === "response" ? confirmResponse() : confirmRetry())} containerStyle={styles.action} />{busy ? <ActivityIndicator color={C.purple} style={styles.busy} /> : null}</Reveal> : null}
+         {state === "ready_for_response" && pressure ? <Reveal><CounterpartCard presentation={counterpartPresentation} />{speech.phase === "speaking" || speech.phase === "generating" ? <Text style={styles.speaking}>{context.counterpartName} is speaking…</Text> : speech.phase === "failed" ? <PrimaryButton label="Try audio again" onPress={() => void replaySpeech()} containerStyle={styles.action} /> : null}<Text style={styles.title}>Respond to the pressure.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("response")} onType={() => void openTypedReview("confirm_response_transcript")} /></Reveal> : null}
+-        {state === "hope_coaching" && pressure ? <Reveal><StatusPill label="Hope · coaching" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><ProductCard accent style={styles.coachCard}><SectionLabel tone={C.purple}>Hope noticed</SectionLabel><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Same-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={`Retry the same ${context.counterpartName} moment`} onPress={async () => { await persist(transitionScenarioPracticeRun(value, "ready_for_retry", Date.now())); await speak(pressure.text, "man-adam"); }} containerStyle={styles.action} /></Reveal> : null}
++        {state === "hope_coaching" && pressure ? <Reveal><StatusPill label="Hope · coaching" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><ProductCard accent style={styles.coachCard}><SectionLabel tone={C.purple}>Hope noticed</SectionLabel><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Same-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={`Retry the same ${context.counterpartName} moment`} onPress={async () => { await persist(transitionScenarioPracticeRun(value, "ready_for_retry", Date.now())); await speak(pressure.text, "woman-hope"); }} containerStyle={styles.action} /></Reveal> : null}
+         {state === "ready_for_retry" && pressure ? <Reveal><StatusPill label="Same-moment retry" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Answer the exact same turn again.</Text><Text style={styles.body}>{run.retryInstruction}</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("retry")} onType={() => void openTypedReview("confirm_retry_transcript")} /></Reveal> : null}
+-        {state === "attempt_comparison" && pressure && run.responseAttempt && run.retryAttempt && run.comparison ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="First approved response" text={run.responseAttempt.transcript} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label="Continue" onPress={() => { if (convertedLesson && onReturnToDeck) onReturnToDeck(); else void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now())); }} containerStyle={styles.action} /></Reveal> : null}
++        {state === "attempt_comparison" && pressure && run.responseAttempt && run.retryAttempt && run.comparison ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="First approved response" text={run.responseAttempt.transcript} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label="Continue" onPress={() => { if (convertedLesson && onReturnToDeck) onReturnToDeck(run.id); else void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now())); }} containerStyle={styles.action} /></Reveal> : null}
+         {state === "transfer_cue" ? <Reveal><StatusPill label="Hope · wrap-up" tone="purple" /><Text style={styles.title}>Take the clearer wording into the real conversation.</Text><Text style={styles.body}>This completion belongs to {context.title}, with {context.counterpartName} as {context.counterpartRole}. No unrelated practice fixture was used.</Text><PrimaryButton label="Complete scenario" onPress={() => void finish()} containerStyle={styles.action} /></Reveal> : null}
+         {state === "complete" ? <Reveal><StatusPill label="Scenario complete" tone="green" /><Text style={styles.title}>{context.title} is complete.</Text><Text style={styles.body}>You practiced one {context.counterpartName} pressure moment twice at {difficultyLabel.toLowerCase()} difficulty.</Text><PrimaryButton label="Back to Scenarios" onPress={() => router.replace("/(tabs)/library")} containerStyle={styles.action} /></Reveal> : null}
+         {state === "network_error" || state === "model_error" ? <Reveal><StatusPill label="Saved checkpoint" tone="amber" /><Text style={styles.title}>{error}</Text><PrimaryButton label="Return to this scenario" onPress={() => void persist(transitionScenarioPracticeRun(value, state === "network_error" ? "confirm_attempt_transcript" : "confirm_response_transcript", Date.now()))} containerStyle={styles.action} /></Reveal> : null}
+diff --git a/expo/lib/approvedDeckLoader.ts b/expo/lib/approvedDeckLoader.ts
+index 4574a92..e0bc229 100644
+--- a/expo/lib/approvedDeckLoader.ts
++++ b/expo/lib/approvedDeckLoader.ts
+@@ -2,9 +2,17 @@ import { strFromU8, unzipSync } from "fflate";
+ 
+ const APPROVED_HANDOFF_ARCHIVE_URL = "https://r2-pub.rork.com/attachments/xo73vo5tbrhku6f68brbr.zip";
+ const TEMPLATE_PATTERN = /<script type="__bundler\/template">\s*(.*?)\s*<\/script>/s;
++const M1_L1_ARCHIVE_PATH = "BYSI-Rork-Handoff/decks/M1-L1-Buried-Point.html";
++const M1_L1_CONTENT_VERSION = "m1-l1-v2.1-2026-08-24";
++const M1_L1_APPROVED_SHA256 = "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e";
+ 
+ let archivePromise: Promise<Record<string, Uint8Array>> | null = null;
+ 
++/** Binds executable M1 L1 deck bytes to its lesson path and content version. */
++export function isApprovedM1L1DeckDigest(archivePath: string, contentVersion: string, digest: string): boolean {
++  return archivePath === M1_L1_ARCHIVE_PATH && contentVersion === M1_L1_CONTENT_VERSION && digest === M1_L1_APPROVED_SHA256;
++}
++
+ function approvedArchive(): Promise<Record<string, Uint8Array>> {
+   if (!archivePromise) {
+     archivePromise = fetch(APPROVED_HANDOFF_ARCHIVE_URL)
+@@ -85,12 +93,24 @@ export function convertedHandoffDeckHtml(rawHtml: string, handoffCard: number):
+   });
+ }
+ 
+-/** Opens the authoritative post-rehearsal cards at the manifest-defined return destination. */
+-export function returnedDeckHtml(rawHtml: string, returnCard: number): string {
++function sliceCardsFrom(template: string, returnCard: number, completionCard: number): string {
++  const cardsStart = template.indexOf("const CARDS = [");
++  const firstCard = template.indexOf("{ n:1, type:", cardsStart);
++  const returnStart = template.indexOf(`{ n:${returnCard}, type:`, cardsStart);
++  const cardsEnd = template.indexOf("\n];", cardsStart);
++  const afterCompletion = template.indexOf(`{ n:${completionCard + 1}, type:`, cardsStart);
++  if (cardsStart < 0 || firstCard < 0 || returnStart < 0 || cardsEnd < 0) throw new Error("Approved return cards are missing");
++  const end = afterCompletion >= 0 && afterCompletion < cardsEnd ? afterCompletion : cardsEnd;
++  return `${template.slice(0, firstCard)}${template.slice(returnStart, end)}${template.slice(cardsEnd)}`;
++}
++
++/** Executes only the accepted post-rehearsal Cards 21–22, never the full remote deck. */
++export function returnedDeckHtml(rawHtml: string, returnCard: number, completionCard: number = 22): string {
+   return replaceEncodedTemplate(rawHtml, (source) => {
++    const sliced = sliceCardsFrom(source, returnCard, completionCard);
+     const marker = "state = { i:0,";
+-    if (!source.includes(marker)) throw new Error("Approved lesson return state is missing");
+-    return source.replace(marker, `state = { i:${returnCard - 1},`);
++    if (!sliced.includes(marker)) throw new Error("Approved lesson return state is missing");
++    return sliced;
+   });
+ }
+ 
+@@ -98,7 +118,13 @@ async function approvedDeckSource(archivePath: string): Promise<string> {
+   const archive = await approvedArchive();
+   const bytes = archive[archivePath];
+   if (!bytes) throw new Error("Approved lesson file is missing from the handoff");
+-  return strFromU8(bytes);
++  const source = strFromU8(bytes);
++  if (archivePath === M1_L1_ARCHIVE_PATH) {
++    const Crypto = await import("expo-crypto");
++    const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, source);
++    if (!isApprovedM1L1DeckDigest(archivePath, M1_L1_CONTENT_VERSION, digest)) throw new Error(`Approved M1 L1 deck failed authenticity check for ${M1_L1_CONTENT_VERSION}`);
++  }
++  return source;
+ }
+ 
+ /** Downloads the approved handoff once and returns only the authorized lesson slice. */
+@@ -110,6 +136,6 @@ export async function loadConvertedHandoffDeckHtml(archivePath: string, handoffC
+   return convertedHandoffDeckHtml(await approvedDeckSource(archivePath), handoffCard);
+ }
+ 
+-export async function loadReturnedDeckHtml(archivePath: string, returnCard: number): Promise<string> {
+-  return returnedDeckHtml(await approvedDeckSource(archivePath), returnCard);
++export async function loadReturnedDeckHtml(archivePath: string, returnCard: number, completionCard: number = 22): Promise<string> {
++  return returnedDeckHtml(await approvedDeckSource(archivePath), returnCard, completionCard);
+ }
+diff --git a/expo/lib/convertedLesson.ts b/expo/lib/convertedLesson.ts
+index 9990b86..42cc297 100644
+--- a/expo/lib/convertedLesson.ts
++++ b/expo/lib/convertedLesson.ts
+@@ -1,38 +1,65 @@
+ import type { Scenario } from "@/types/convo";
++import type {
++  M1L1BehaviorFlag,
++  M1L1DimensionId,
++  PilotAttemptRecord,
++  PilotComparison,
++  PilotDayRun,
++  ScenarioCounterpartTurn,
++} from "@/types/pilotCurriculum";
+ 
+ export type ConvertedLessonId = "m1-l1";
+ export type TransferChoice = "say" | "write" | "save_later";
++export type SafetyChoice = "direct" | "unsure" | "yes" | "prefer_not";
++
++const LESSON_ID = "m1-l1" as const;
++const MODULE_ID = "bysi_m01_get_to_the_point" as const;
++const PRACTICE_ID = "bysi_m01_l01_buried_point" as const;
++const CONTENT_VERSION = "m1-l1-v2.1-2026-08-24" as const;
++const SCENARIO_ID = "bysi-m01-l01-work-handoff" as const;
++const COUNTERPART_ID = "adam" as const;
+ 
+ export interface ConvertedLessonConfig {
+-  lessonId: ConvertedLessonId;
+-  practiceId: "gtp_conversation_job";
+-  contentVersion: "m1-l1-v2.1-2026-08-24";
++  lessonId: typeof LESSON_ID;
++  moduleId: typeof MODULE_ID;
++  practiceId: typeof PRACTICE_ID;
++  contentVersion: typeof CONTENT_VERSION;
+   title: string;
+   scenario: Scenario;
+-  coachedBehaviorId: "conversation_job";
+-  authoredPressureText: string;
++  counterpartId: typeof COUNTERPART_ID;
++  context: "work";
++  semanticVoiceKey: "adam_counterpart";
++  coachedBehaviorId: "point_proof_move";
++  pushbackOneBank: readonly [string, string, string];
++  authoredEvidenceTrap: "You're acting like this happens all the time.";
++  /** Compatibility alias used only by the unreachable shared branch. */
++  authoredPressureText: "You're acting like this happens all the time.";
+   retryDirection: string;
+   namedMoveId: "one-point-one-proof-one-move";
+   namedMove: string;
+   rehearsalHandoffCard: 20;
+   returnCard: 21;
+   completionCard: 22;
++  retryCap: 2;
+   launchEligible: false;
+ }
+ 
+ export interface ConvertedLessonProgress {
+-  lessonId: ConvertedLessonId;
+-  practiceId: ConvertedLessonConfig["practiceId"];
+-  contentVersion: ConvertedLessonConfig["contentVersion"];
++  lessonId: typeof LESSON_ID;
++  moduleId: typeof MODULE_ID;
++  practiceId: typeof PRACTICE_ID;
++  contentVersion: string;
++  runId: string;
+   lessonCardCheckpoint: number;
+   quizGatesCompleted: true;
+   rehearsalCompleted: true;
+   retryCompleted: true;
+   comparisonViewed: true;
+   savedMoveId: ConvertedLessonConfig["namedMoveId"];
++  customWording?: string;
+   transferChoice: TransferChoice;
+   completedAt: number;
+-  sourceLineage: "approved-html-deck";
++  sourceLineage: "approved-html-deck-pinned";
+ }
+ 
+ export interface LessonCoachNote {
+@@ -41,59 +68,274 @@ export interface LessonCoachNote {
+   change: string;
+   retryDirection: string;
+   coachedBehaviorId: ConvertedLessonConfig["coachedBehaviorId"];
++  coachedBeat: 3 | 5;
++  selectedDimension: M1L1DimensionId;
++  flags: M1L1BehaviorFlag[];
++}
++
++export interface M1L1ComparisonResult extends PilotComparison {
++  behaviorId: "point_proof_move";
++  selectedDimension: M1L1DimensionId;
++}
++
++export interface CompletionValidation {
++  isValid: boolean;
++  reason?: string;
+ }
+ 
+ export const M1_L1_CONVERSION: ConvertedLessonConfig = {
+-  lessonId: "m1-l1",
+-  practiceId: "gtp_conversation_job",
+-  contentVersion: "m1-l1-v2.1-2026-08-24",
++  lessonId: LESSON_ID,
++  moduleId: MODULE_ID,
++  practiceId: PRACTICE_ID,
++  contentVersion: CONTENT_VERSION,
+   title: "When the Point Gets Buried",
+   scenario: {
+-    id: "converted-m1-l1-bedtime-handoff",
+-    category: "partner",
+-    title: "The bedtime handoff",
+-    counterpart: "Adam – your partner",
++    id: SCENARIO_ID,
++    category: "work",
++    title: "The late handoff",
++    counterpart: "Adam — your colleague",
+     counterpartGender: "man",
+-    situation: "Sunday evening in the kitchen. The dishes are done and your child is asleep. You have wanted to raise the bedtime handoff for two weeks.",
+-    persona: "Adam is tired and initially treats the issue as an overstatement. He does not resolve the disagreement for the learner.",
++    situation: "Quarter close is underway. A late file handoff left too little review time, and you need one workable change for the next handoff.",
++    persona: "Adam is a colleague under quarter-close pressure. He can push back, but he cannot resolve the decision for the learner.",
+     goal: "Name one point, one concrete proof, and one answerable move.",
+     opensWith: "user",
+-    openingLine: "You're acting like this happens all the time.",
+-    minutes: 7,
++    openingLine: "",
+     isCustom: false,
+   },
+-  coachedBehaviorId: "conversation_job",
++  counterpartId: COUNTERPART_ID,
++  context: "work",
++  semanticVoiceKey: "adam_counterpart",
++  coachedBehaviorId: "point_proof_move",
++  pushbackOneBank: [
++    "That's not really fair. I've been slammed with quarter close.",
++    "Okay... where is this coming from?",
++    "So I'm just failing at this now?",
++  ],
++  authoredEvidenceTrap: "You're acting like this happens all the time.",
+   authoredPressureText: "You're acting like this happens all the time.",
+-  retryDirection: "Lead with the bedtime point, then give one concrete example and one answerable next step.",
++  retryDirection: "Answer the same pressure with one point, one concrete proof, and one answerable move.",
+   namedMoveId: "one-point-one-proof-one-move",
+   namedMove: "One point. One proof. One move.",
+   rehearsalHandoffCard: 20,
+   returnCard: 21,
+   completionCard: 22,
++  retryCap: 2,
+   launchEligible: false,
+ };
+ 
+-/** Produces one transcript-grounded coaching note without scores or inferred tone. */
+-export function m1L1CoachNote(confirmedTranscript: string): LessonCoachNote | null {
+-  const transcript = confirmedTranscript.trim();
++const DIMENSION_PRIORITY: readonly M1L1DimensionId[] = [
++  "evidence_discipline",
++  "motive_character_language",
++  "issue_count",
++  "point_placement",
++  "grounding_concreteness",
++  "move_clarity",
++  "park_and_return",
++];
++
++function cleanTranscript(value: string): string {
++  return value.trim().replace(/\s+/g, " ");
++}
++
++function quoteFor(value: string): string {
++  return cleanTranscript(value).split(/\s+/).slice(0, 10).join(" ");
++}
++
++function flag(dimension: M1L1DimensionId, status: M1L1BehaviorFlag["status"], transcript: string): M1L1BehaviorFlag {
++  return { dimension, status, evidenceQuote: status === "not_assessable" ? null : quoteFor(transcript) };
++}
++
++/** Deterministically selects one approved Pushback 1 from observable opening text. */
++export function selectM1L1PushbackOne(approvedOpening: string, runId: string): ScenarioCounterpartTurn {
++  const opening = cleanTranscript(approvedOpening).toLowerCase();
++  const hasMotiveClaim = /\b(always|never|lazy|selfish|care|respect|trying to|on purpose)\b/.test(opening);
++  const isIndirect = /\?|\b(maybe|wondering|do you think|have you noticed)\b/.test(opening);
++  const index = hasMotiveClaim ? 2 : isIndirect ? 1 : 0;
++  const text = M1_L1_CONVERSION.pushbackOneBank[index];
++  const id = `${runId}-pushback-1-${index + 1}`;
++  return {
++    id,
++    text,
++    source: "authored",
++    reactionId: `m1-l1-pushback-1-${index + 1}`,
++    semanticVoiceKey: M1_L1_CONVERSION.semanticVoiceKey,
++    resolvedAudioId: `m1-l1-v2-1-${id}`,
++  };
++}
++
++/** Returns the mandatory Beat 4 evidence trap with stable audio identity. */
++export function m1L1EvidenceTrap(runId: string): ScenarioCounterpartTurn {
++  const id = `${runId}-pushback-2-evidence-trap`;
++  return {
++    id,
++    text: M1_L1_CONVERSION.authoredEvidenceTrap,
++    source: "authored",
++    reactionId: "m1-l1-evidence-trap",
++    semanticVoiceKey: M1_L1_CONVERSION.semanticVoiceKey,
++    resolvedAudioId: `m1-l1-v2-1-${id}`,
++  };
++}
++
++/** Scoreless transcript-observable flags for one confirmed learner segment. */
++export function m1L1BehaviorFlags(confirmedTranscript: string, coachedBeat: 3 | 5): M1L1BehaviorFlag[] {
++  const transcript = cleanTranscript(confirmedTranscript);
++  if (transcript.length < 2) return DIMENSION_PRIORITY.map((dimension) => flag(dimension, "not_assessable", transcript));
++  const lower = transcript.toLowerCase();
++  const firstSentence = transcript.split(/(?<=[.!?])\s+/)[0] ?? transcript;
++  const sentenceCount = transcript.split(/[.!?]+/).filter((part) => part.trim().length > 0).length;
++  const evidenceMarkers = lower.match(/\b(last|yesterday|today|monday|tuesday|wednesday|thursday|friday|\d+|at \d|file|handoff|deadline)\b/g)?.length ?? 0;
++  const motiveClaim = /\b(always|never|lazy|selfish|don't care|doesn't care|respect me|on purpose|trying to)\b/.test(lower);
++  const caseBuilding = sentenceCount > 4 || (lower.match(/\band\b/g)?.length ?? 0) >= 3 || /\b(also|another time|everyone|other people|all the times)\b/.test(lower);
++  const answerableMove = /\b(can you|can we|could you|could we|will you|would you|please|i need|by (?:today|tomorrow|monday|tuesday|wednesday|thursday|friday|\d))\b/.test(lower);
++  const directPoint = firstSentence.split(/\s+/).length <= 16 && !/^(so|well|i know|i don't know|maybe|this might)/i.test(firstSentence);
++  const grounded = evidenceMarkers > 0;
++  const parksAndReturns = /\b(i hear|that's fair|i understand|i get that)\b/.test(lower) && /\b(still|my point|the handoff|the file|what i need)\b/.test(lower);
++  const evidenceDiscipline = coachedBeat === 5 ? !caseBuilding && !motiveClaim : !caseBuilding;
++  return [
++    flag("point_placement", directPoint ? "met" : "not_met", transcript),
++    flag("issue_count", caseBuilding ? "not_met" : "met", transcript),
++    flag("grounding_concreteness", grounded ? "met" : "not_met", transcript),
++    flag("motive_character_language", motiveClaim ? "not_met" : "met", transcript),
++    flag("move_clarity", answerableMove ? "met" : "not_met", transcript),
++    flag("evidence_discipline", evidenceDiscipline ? "met" : "not_met", transcript),
++    flag("park_and_return", coachedBeat === 5 ? (parksAndReturns ? "met" : "not_met") : "not_assessable", transcript),
++  ];
++}
++
++function labelForDimension(dimension: M1L1DimensionId): string {
++  return ({
++    point_placement: "put the point in the first sentence",
++    issue_count: "keep one issue in view",
++    grounding_concreteness: "use one concrete fact",
++    motive_character_language: "describe the event, not Adam's motive or character",
++    move_clarity: "end with one answerable move",
++    evidence_discipline: "use one proof instead of building the whole case",
++    park_and_return: "acknowledge the pushback and return to the point",
++  } as const)[dimension];
++}
++
++/** Produces one honest note from one exact confirmed beat, with no score. */
++export function m1L1CoachNote(confirmedTranscript: string, coachedBeat: 3 | 5 = 5): LessonCoachNote | null {
++  const transcript = cleanTranscript(confirmedTranscript);
+   if (transcript.length < 2) return null;
+-  const evidenceQuote = transcript.split(/\s+/).slice(0, 10).join(" ");
++  const flags = m1L1BehaviorFlags(transcript, coachedBeat);
++  const selected = DIMENSION_PRIORITY.find((dimension) => flags.find((item) => item.dimension === dimension)?.status === "not_met")
++    ?? DIMENSION_PRIORITY.find((dimension) => flags.find((item) => item.dimension === dimension)?.status === "met")
++    ?? "evidence_discipline";
++  const selectedFlag = flags.find((item) => item.dimension === selected);
++  const evidenceQuote = selectedFlag?.evidenceQuote ?? quoteFor(transcript);
++  const isMet = selectedFlag?.status === "met";
+   return {
+     evidenceQuote,
+-    worked: `You gave Adam a concrete line to answer in “${evidenceQuote}”.`,
+-    change: "Keep the conversation on one bedtime point instead of expanding the case.",
+-    retryDirection: M1_L1_CONVERSION.retryDirection,
++    worked: isMet ? `In “${evidenceQuote},” you kept ${labelForDimension(selected)}.` : `Hope flagged “${evidenceQuote}.”`,
++    change: isMet ? "Keep that same choice in the retry." : `On the retry, ${labelForDimension(selected)}.`,
++    retryDirection: `Replay this exact moment and ${labelForDimension(selected)}.`,
+     coachedBehaviorId: M1_L1_CONVERSION.coachedBehaviorId,
++    coachedBeat,
++    selectedDimension: selected,
++    flags,
+   };
+ }
+ 
+-/** Compares only the coached behavior and never creates a score or global claim. */
+-export function m1L1Comparison(firstAttempt: string, retry: string): string {
+-  const firstLead = (firstAttempt.trim().split(/(?<=[.!?])\s+/)[0]?.trim() ?? "").split(/\s+/).slice(0, 8).join(" ");
+-  const retryLead = (retry.trim().split(/(?<=[.!?])\s+/)[0]?.trim() ?? "").split(/\s+/).slice(0, 8).join(" ");
+-  return `First attempt began “${firstLead}” Retry began “${retryLead}” Review which opening keeps one bedtime point in view.`;
++/** Compares the coached attempt and retry against the same selected scoreless flag. */
++export function m1L1Comparison(firstAttempt: string, retry: string, dimension: M1L1DimensionId = "evidence_discipline", coachedBeat: 3 | 5 = 5): M1L1ComparisonResult {
++  const before = m1L1BehaviorFlags(firstAttempt, coachedBeat).find((item) => item.dimension === dimension)?.status ?? "not_assessable";
++  const after = m1L1BehaviorFlags(retry, coachedBeat).find((item) => item.dimension === dimension)?.status ?? "not_assessable";
++  const criterionChanged = before !== after;
++  const text = criterionChanged
++    ? `First response did not ${labelForDimension(dimension)}. The retry did. That is the only change Hope checked.`
++    : `The retry held the same result on ${labelForDimension(dimension)}. Hope checked no other behavior.`;
++  return { behaviorId: "point_proof_move", selectedDimension: dimension, text, criterionChanged };
++}
++
++/** Safety answers are ephemeral; every non-direct answer reaches the authored alternate route. */
++export function routeForM1L1Safety(choice: SafetyChoice): "scene" | "different-route" {
++  return choice === "direct" ? "scene" : "different-route";
++}
++
++/** Adam is authorized only for this exact accepted work manifest. */
++export function semanticVoiceForScenario(scenario: Scenario, lesson?: ConvertedLessonConfig): "adam_counterpart" | "contextual_counterpart" {
++  return lesson?.practiceId === PRACTICE_ID
++    && lesson.context === "work"
++    && lesson.counterpartId === COUNTERPART_ID
++    && scenario.id === SCENARIO_ID
++    && scenario.category === "work"
++    ? "adam_counterpart"
++    : "contextual_counterpart";
++}
++
++/** Rejects query-only, stale, unrelated, incomplete, or tampered completion attempts. */
++export function validateM1L1Completion(run: PilotDayRun | null | undefined, requestedRunId: string | null | undefined): CompletionValidation {
++  if (!run || !requestedRunId || run.id !== requestedRunId) return { isValid: false, reason: "run_id" };
++  if (run.convertedModuleId !== MODULE_ID || run.practiceId !== PRACTICE_ID || run.contentVersion !== CONTENT_VERSION) return { isValid: false, reason: "manifest_identity" };
++  const context = run.scenarioContext;
++  if (context?.scenarioId !== SCENARIO_ID || context.category !== "work" || context.counterpartId !== COUNTERPART_ID) return { isValid: false, reason: "scenario_identity" };
++  const rehearsal = run.m1L1;
++  if (!run.attempt || !run.responseAttempt || !rehearsal?.secondResponseAttempt || !rehearsal.pushbackOne || !rehearsal.pushbackTwo) return { isValid: false, reason: "turn_plan" };
++  if (rehearsal.beat !== 8 || rehearsal.retryCount < 1 || !run.retryAttempt || !run.comparison || run.state !== "attempt_comparison") return { isValid: false, reason: "rehearsal_state" };
++  return { isValid: true };
++}
++
++function isString(value: unknown): value is string {
++  return typeof value === "string" && value.trim().length > 0;
++}
++
++/** Strictly validates scoreless progress while preserving independently valid versions. */
++export function normalizeConvertedLessonProgress(value: unknown): ConvertedLessonProgress[] {
++  if (!Array.isArray(value)) return [];
++  return value.filter((entry): entry is ConvertedLessonProgress => {
++    if (!entry || typeof entry !== "object") return false;
++    const item = entry as Partial<ConvertedLessonProgress>;
++    return item.lessonId === LESSON_ID
++      && item.moduleId === MODULE_ID
++      && item.practiceId === PRACTICE_ID
++      && isString(item.contentVersion)
++      && isString(item.runId)
++      && Number.isInteger(item.lessonCardCheckpoint)
++      && (item.lessonCardCheckpoint ?? 0) >= M1_L1_CONVERSION.completionCard
++      && item.quizGatesCompleted === true
++      && item.rehearsalCompleted === true
++      && item.retryCompleted === true
++      && item.comparisonViewed === true
++      && item.savedMoveId === M1_L1_CONVERSION.namedMoveId
++      && ["say", "write", "save_later"].includes(item.transferChoice ?? "")
++      && typeof item.completedAt === "number"
++      && Number.isFinite(item.completedAt)
++      && item.completedAt > 0
++      && item.sourceLineage === "approved-html-deck-pinned"
++      && (item.customWording === undefined || (typeof item.customWording === "string" && item.customWording.trim().length > 0 && item.customWording.length <= 240));
++  });
++}
++
++/** Merges by versioned composite identity and never lets an older duplicate regress completion. */
++export function mergeConvertedLessonProgress(existing: unknown, incoming: ConvertedLessonProgress): ConvertedLessonProgress[] {
++  const valid = normalizeConvertedLessonProgress(existing);
++  const key = `${incoming.lessonId}:${incoming.practiceId}:${incoming.contentVersion}`;
++  const current = valid.find((item) => `${item.lessonId}:${item.practiceId}:${item.contentVersion}` === key);
++  const winner = current && current.completedAt >= incoming.completedAt ? current : incoming;
++  return [...valid.filter((item) => `${item.lessonId}:${item.practiceId}:${item.contentVersion}` !== key), winner]
++    .sort((a, b) => a.completedAt - b.completedAt);
++}
++
++export function convertedProgressFacts(record: ConvertedLessonProgress): readonly string[] {
++  return [
++    "Practice completed",
++    ...(record.retryCompleted ? ["Retry completed"] : []),
++    ...(record.savedMoveId ? ["Move saved"] : []),
++    ...(record.lessonCardCheckpoint >= M1_L1_CONVERSION.completionCard ? ["Lesson completed"] : []),
++  ];
++}
++
++export function approvedCustomWording(value: unknown): string | null {
++  if (typeof value !== "string") return null;
++  const clean = cleanTranscript(value);
++  return clean.length >= 2 && clean.length <= 240 ? clean : null;
+ }
+ 
+ export function conversionRuntimeEnabled(lessonId: string | null | undefined): lessonId is ConvertedLessonId {
+   return __DEV__ && lessonId === M1_L1_CONVERSION.lessonId;
+ }
++
++export function createM1L1Attempt(id: string, kind: PilotAttemptRecord["kind"], transcript: string, confirmedAt: number): PilotAttemptRecord {
++  return { id, kind, transcript: cleanTranscript(transcript), representation: "confirmed_transcript", confirmedAt };
++}
+diff --git a/expo/lib/curriculum.ts b/expo/lib/curriculum.ts
+index 04db76b..da62f4d 100644
+--- a/expo/lib/curriculum.ts
++++ b/expo/lib/curriculum.ts
+@@ -120,7 +120,7 @@ export function resolveDay(day: number, track?: CategoryId): ResolvedDay | undef
+     resolved.refId = adaptation.refId;
+     if (scenario !== undefined) {
+       resolved.title = scenario.title;
+-      resolved.minutes = scenario.minutes;
++      if (scenario.minutes !== undefined) resolved.minutes = scenario.minutes;
+     }
+   }
+   return resolved;
+diff --git a/expo/lib/scenarioPractice.ts b/expo/lib/scenarioPractice.ts
+index 73ad64f..56a11e9 100644
+--- a/expo/lib/scenarioPractice.ts
++++ b/expo/lib/scenarioPractice.ts
+@@ -14,8 +14,10 @@ const SCENARIO_DAY = 7;
+ const SCENARIO_CURRICULUM_VERSION = "scenario-paid-practice-v1";
+ const SCENARIO_STATES: ReadonlySet<PilotModuleState> = new Set([
+   "ready_for_attempt", "listening_attempt", "confirm_attempt_transcript", "ready_for_response",
+-  "listening_response", "confirm_response_transcript", "hope_coaching", "ready_for_retry",
+-  "listening_retry", "confirm_retry_transcript", "attempt_comparison", "transfer_cue", "complete",
++  "listening_response", "confirm_response_transcript", "ready_for_second_pressure", "ready_for_second_response",
++  "listening_second_response", "confirm_second_response_transcript", "hope_coaching", "ready_for_retry",
++  "listening_retry", "confirm_retry_transcript", "ready_for_final_retry", "listening_final_retry",
++  "confirm_final_retry_transcript", "attempt_comparison", "transfer_cue", "complete",
+   "network_error", "model_error",
+ ]);
+ 
+@@ -121,6 +123,14 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
+   if (!["gentle", "steady", "challenging"].includes(context.difficulty)) return null;
+   if (run.counterpartTurn && (!run.counterpartTurn.id || !run.counterpartTurn.text || !["provider", "authored"].includes(run.counterpartTurn.source))) return null;
+   if ((run.responseAttempt || run.retryAttempt || run.comparison) && !run.counterpartTurn) return null;
++  if (run.m1L1) {
++    const lesson = run.m1L1;
++    if (!Number.isInteger(lesson.beat) || lesson.beat < 1 || lesson.beat > 8) return null;
++    if (!Number.isInteger(lesson.retryCount) || lesson.retryCount < 0 || lesson.retryCount > 2) return null;
++    if (lesson.pushbackOne && (!lesson.pushbackOne.id || !lesson.pushbackOne.text || lesson.pushbackOne.source !== "authored")) return null;
++    if (lesson.pushbackTwo && (!lesson.pushbackTwo.id || !lesson.pushbackTwo.text || lesson.pushbackTwo.source !== "authored")) return null;
++    if ((lesson.secondResponseAttempt || lesson.coachedBeat || lesson.retryCount > 0) && (!lesson.pushbackOne || !lesson.pushbackTwo)) return null;
++  }
+   return wrapper as PersistedScenarioPracticeRun;
+ }
+ 
+@@ -160,6 +170,94 @@ export function attachScenarioCounterpartTurn(
+ }
+ 
+ /** Stores Hope's evidence-linked note without changing scenario identity. */
++/** Initializes the isolated accepted M1 L1 eight-beat state. */
++export function initializeM1L1Run(value: PersistedScenarioPracticeRun, now: number): PersistedScenarioPracticeRun {
++  if (value.run.m1L1) return value;
++  return { ...value, run: { ...value.run, m1L1: { beat: 1, retryCount: 0 }, updatedAt: now } };
++}
++
++/** Persists the selected approved Pushback 1 exactly once after opener approval. */
++export function attachM1L1PushbackOne(value: PersistedScenarioPracticeRun, turn: ScenarioCounterpartTurn, now: number): PersistedScenarioPracticeRun {
++  const lesson = value.run.m1L1;
++  if (!lesson || lesson.pushbackOne) return value;
++  return {
++    ...value,
++    run: {
++      ...value.run,
++      counterpartTurn: turn,
++      counterpartIdentity: value.run.scenarioContext?.counterpartId,
++      counterpartReactionId: turn.reactionId ?? turn.id,
++      resolvedAudioId: turn.resolvedAudioId ?? turn.id,
++      adamReactionId: turn.reactionId ?? turn.id,
++      adamAudioId: turn.resolvedAudioId ?? turn.id,
++      m1L1: { ...lesson, beat: 2, pushbackOne: turn },
++      updatedAt: now,
++    },
++  };
++}
++
++/** Advances the accepted run after the first pre-coaching response. */
++export function advanceM1L1FirstResponse(value: PersistedScenarioPracticeRun, now: number): PersistedScenarioPracticeRun {
++  const lesson = value.run.m1L1;
++  if (!lesson?.pushbackOne || !value.run.responseAttempt) return value;
++  return { ...value, run: { ...value.run, state: "ready_for_second_pressure", m1L1: { ...lesson, beat: 3 }, updatedAt: now } };
++}
++
++/** Persists mandatory Pushback 2 exactly once. */
++export function attachM1L1PushbackTwo(value: PersistedScenarioPracticeRun, turn: ScenarioCounterpartTurn, now: number): PersistedScenarioPracticeRun {
++  const lesson = value.run.m1L1;
++  if (!lesson || lesson.pushbackTwo) return value;
++  return { ...value, run: { ...value.run, state: "ready_for_second_response", m1L1: { ...lesson, beat: 4, pushbackTwo: turn }, updatedAt: now } };
++}
++
++/** Stores the mandatory second pre-coaching response. */
++export function preserveM1L1SecondResponse(value: PersistedScenarioPracticeRun, transcript: string, now: number): PersistedScenarioPracticeRun {
++  const lesson = value.run.m1L1;
++  const clean = transcript.trim();
++  if (!lesson?.pushbackTwo || lesson.secondResponseAttempt || clean.length < 2) return value;
++  const attempt = { id: `${value.run.id}-m1-l1-response-2`, kind: "response" as const, transcript: clean, representation: "confirmed_transcript" as const, confirmedAt: now };
++  return { ...value, run: { ...value.run, m1L1: { ...lesson, beat: 5, secondResponseAttempt: attempt }, updatedAt: now } };
++}
++
++/** Stores scoreless M1 L1 coaching and the exact flagged beat. */
++export function attachM1L1Coaching(
++  value: PersistedScenarioPracticeRun,
++  note: string,
++  retryInstruction: string,
++  coachedBeat: 3 | 5,
++  flags: NonNullable<PersistedScenarioPracticeRun["run"]["m1L1"]>["flags"],
++  selectedDimension: NonNullable<PersistedScenarioPracticeRun["run"]["m1L1"]>["selectedDimension"],
++  now: number,
++): PersistedScenarioPracticeRun {
++  const lesson = value.run.m1L1;
++  if (!lesson?.secondResponseAttempt || !selectedDimension) return value;
++  return {
++    ...value,
++    run: {
++      ...value.run,
++      state: "hope_coaching",
++      coachNote: note,
++      retryInstruction,
++      coachedBehaviorId: "point_proof_move",
++      coachedSegment: "pushback_response",
++      m1L1: { ...lesson, beat: 6, coachedBeat, flags, selectedDimension },
++      updatedAt: now,
++    },
++  };
++}
++
++/** Records retry count with a hard cap of two and keeps Beat 8 bounded. */
++export function preserveM1L1Retry(value: PersistedScenarioPracticeRun, transcript: string, now: number): PersistedScenarioPracticeRun {
++  const lesson = value.run.m1L1;
++  const clean = transcript.trim();
++  if (!lesson?.selectedDimension || clean.length < 2 || lesson.retryCount >= 2) return value;
++  const attempt = { id: `${value.run.id}-m1-l1-retry-${lesson.retryCount + 1}`, kind: "retry" as const, transcript: clean, representation: "confirmed_transcript" as const, confirmedAt: now };
++  if (lesson.retryCount === 0) {
++    return { ...value, run: { ...value.run, retryAttempt: attempt, m1L1: { ...lesson, beat: 8, retryCount: 1 }, updatedAt: now } };
++  }
++  return { ...value, run: { ...value.run, m1L1: { ...lesson, beat: 8, retryCount: 2, finalRetryAttempt: attempt }, updatedAt: now } };
++}
++
+ export function attachScenarioCoaching(
+   value: PersistedScenarioPracticeRun,
+   note: string,
+@@ -232,6 +330,6 @@ export function scenarioContinuitySnapshot(value: PersistedScenarioPracticeRun):
+     counterpartTurnId: run.counterpartTurn?.id,
+     counterpartTurnText: run.counterpartTurn?.text,
+     firstApprovedResponse: run.responseAttempt?.transcript,
+-    retryApprovedResponse: run.retryAttempt?.transcript,
++    retryApprovedResponse: run.m1L1?.finalRetryAttempt?.transcript ?? run.retryAttempt?.transcript,
+   };
+ }
+diff --git a/expo/metro.config.js b/expo/metro.config.js
+index 86611b2..89cac78 100644
+--- a/expo/metro.config.js
++++ b/expo/metro.config.js
+@@ -1,6 +1,36 @@
++const fs = require("node:fs");
++const path = require("node:path");
+ const { getDefaultConfig } = require("expo/metro-config");
+ const { withRorkMetro } = require("@rork-ai/toolkit-sdk/metro");
+ 
++// The workspace orchestrator may materialize every project environment variable
++// into expo/.env. Remove server credentials and secret-like public variables
++// before Metro can inspect the client environment. Values are never logged.
++const envPath = path.join(__dirname, ".env");
++const prohibited = new Set([
++  "OPENAI_API_KEY",
++  "ANTHROPIC_API_KEY",
++  "ELEVENLABS_API_KEY",
++  "SUPABASE_ACCESS_TOKEN",
++  "SUPABASE_SERVICE_ROLE_KEY",
++  "SERVICE_ROLE_KEY",
++  "EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY",
++]);
++if (fs.existsSync(envPath)) {
++  const original = fs.readFileSync(envPath, "utf8");
++  const removed = [];
++  const kept = original.split(/\r?\n/).filter((line) => {
++    const match = line.match(/^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=/);
++    if (!match || !prohibited.has(match[1])) return true;
++    removed.push(match[1]);
++    return false;
++  });
++  if (removed.length > 0) {
++    fs.writeFileSync(envPath, `${kept.join("\n").trimEnd()}\n`, { mode: 0o600 });
++    process.stderr.write(`[env-guard] sanitized prohibited client variables: ${removed.sort().join(", ")}\n`);
++  }
++}
++
+ const config = getDefaultConfig(__dirname);
+ 
+ module.exports = withRorkMetro(config);
+diff --git a/expo/package.json b/expo/package.json
+index 1106b5f..aab4786 100644
+--- a/expo/package.json
++++ b/expo/package.json
+@@ -26,6 +26,7 @@
+     "expo-blur": "~15.0.8",
+     "expo-clipboard": "~8.0.8",
+     "expo-constants": "~18.0.11",
++    "expo-crypto": "~15.0.9",
+     "expo-file-system": "~19.0.23",
+     "expo-font": "~14.0.10",
+     "expo-haptics": "~15.0.8",
+diff --git a/expo/providers/store.tsx b/expo/providers/store.tsx
+index adfd5f2..301b9e0 100644
+--- a/expo/providers/store.tsx
++++ b/expo/providers/store.tsx
+@@ -16,7 +16,8 @@ import {
+ } from "@/lib/consent";
+ import { clearLiveSessionContent } from "@/lib/ephemeral";
+ import { completedReviewPracticeIds, migrateLegacyPilotProgress } from "@/lib/curriculumMigration";
+-import type { ConvertedLessonProgress } from "@/lib/convertedLesson";
++import { normalizeConvertedLessonProgress, type ConvertedLessonProgress } from "@/lib/convertedLesson";
++import { commitConvertedProgress } from "@/lib/convertedProgressRepository";
+ import { REVIEW_CURRICULUM_VERSION, isInternalReviewModuleComplete } from "@/lib/modularCurriculum";
+ import {
+   activityDayKeys,
+@@ -59,6 +60,7 @@ const KEYS = {
+   anonymousUserId: "cc.anonymousUserId.v1",
+   activePracticeSession: "cc.activePracticeSession.v1",
+   activeScenarioRun: "cc.activeScenarioRun.v1",
++  archivedScenarioRuns: "cc.archivedScenarioRuns.v1",
+   convertedLessonProgress: "cc.convertedLessonProgress.v1",
+   nativeJourneyStarted: "cc.nativeJourneyStarted.v1",
+   /** Development-only entitlement overrides. Never read in a release build. */
+@@ -148,7 +150,11 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+         }
+         if (convertedProgress) {
+           const parsedConvertedProgress = JSON.parse(convertedProgress) as unknown;
+-          if (Array.isArray(parsedConvertedProgress)) setConvertedLessonProgress(parsedConvertedProgress as ConvertedLessonProgress[]);
++          const normalizedConvertedProgress = normalizeConvertedLessonProgress(parsedConvertedProgress);
++          setConvertedLessonProgress(normalizedConvertedProgress);
++          if (JSON.stringify(parsedConvertedProgress) !== JSON.stringify(normalizedConvertedProgress)) {
++            await AsyncStorage.setItem(KEYS.convertedLessonProgress, JSON.stringify(normalizedConvertedProgress));
++          }
+         }
+         if (practiceSession) {
+           const normalized = normalizePracticeSession(JSON.parse(practiceSession) as unknown);
+@@ -354,12 +360,42 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+     }
+   }, []);
+ 
+-  /** Atomically commits scoreless converted-lesson progress after every completion requirement is met. */
++  /** Writes a valid active run durably before exposing it in memory. */
++  const replaceActiveScenarioRunStrict = useCallback(async (value: PersistedScenarioPracticeRun): Promise<void> => {
++    const normalized = normalizeScenarioPracticeRun(value);
++    if (!normalized) throw new Error("Invalid active scenario run");
++    await AsyncStorage.setItem(KEYS.activeScenarioRun, JSON.stringify(normalized));
++    setActiveScenarioRun(normalized);
++  }, []);
++
++  /** Durably deletes active content before clearing memory; failures remain visible and throw. */
++  const clearActiveScenarioRunStrict = useCallback(async (): Promise<void> => {
++    await AsyncStorage.removeItem(KEYS.activeScenarioRun);
++    setActiveScenarioRun(null);
++  }, []);
++
++  /** Preserves a mismatched/cross-practice run before opening the active slot. */
++  const archiveActiveScenarioRunStrict = useCallback(async (): Promise<void> => {
++    if (!activeScenarioRun) return;
++    const raw = await AsyncStorage.getItem(KEYS.archivedScenarioRuns);
++    let existing: PersistedScenarioPracticeRun[] = [];
++    try {
++      const parsed = raw ? JSON.parse(raw) as unknown : [];
++      if (Array.isArray(parsed)) existing = parsed.map(normalizeScenarioPracticeRun).filter((item): item is PersistedScenarioPracticeRun => Boolean(item));
++    } catch {
++      existing = [];
++    }
++    const next = [...existing.filter((item) => item.run.id !== activeScenarioRun.run.id), activeScenarioRun];
++    await AsyncStorage.setItem(KEYS.archivedScenarioRuns, JSON.stringify(next));
++    await AsyncStorage.removeItem(KEYS.activeScenarioRun);
++    setActiveScenarioRun(null);
++  }, [activeScenarioRun]);
++
++  /** Serializes scoreless commits against latest durable state and preserves prior versions. */
+   const commitConvertedLessonProgress = useCallback(async (record: ConvertedLessonProgress): Promise<void> => {
+-    const next = [...convertedLessonProgress.filter((item) => item.practiceId !== record.practiceId), record];
+-    await AsyncStorage.setItem(KEYS.convertedLessonProgress, JSON.stringify(next));
++    const next = await commitConvertedProgress(AsyncStorage, record);
+     setConvertedLessonProgress(next);
+-  }, [convertedLessonProgress]);
++  }, []);
+ 
+   /** Attach the active anonymous session when an account identity becomes available. */
+   const associateActivePracticeSessionWithUser = useCallback(async (userId: string): Promise<void> => {
+@@ -549,6 +585,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+         KEYS.scoredPracticeHistory,
+         KEYS.activePracticeSession,
+         KEYS.activeScenarioRun,
++        KEYS.archivedScenarioRuns,
+         KEYS.convertedLessonProgress,
+         KEYS.nativeJourneyStarted,
+         KEYS.anonymousUserId,
+@@ -833,6 +870,9 @@ export const [StoreProvider, useStore] = createContextHook(() => {
+     beginNativeJourney,
+     saveActivePracticeSession,
+     saveActiveScenarioRun,
++    replaceActiveScenarioRunStrict,
++    clearActiveScenarioRunStrict,
++    archiveActiveScenarioRunStrict,
+     commitConvertedLessonProgress,
+     associateActivePracticeSessionWithUser,
+     currentPilotDay,
+diff --git a/expo/types/convo.ts b/expo/types/convo.ts
+index 6e2ea9f..dd75022 100644
+--- a/expo/types/convo.ts
++++ b/expo/types/convo.ts
+@@ -53,7 +53,8 @@ export interface Scenario {
+   opensWith?: "user" | "counterpart";
+   /** First line the counterpart says. Used only when `opensWith` is "counterpart". */
+   openingLine: string;
+-  minutes: number;
++  /** Optional only when an approved source authorizes a duration claim. */
++  minutes?: number;
+   isCustom?: boolean;
+ }
+ 
+diff --git a/expo/types/pilotCurriculum.ts b/expo/types/pilotCurriculum.ts
+index 2751423..673547c 100644
+--- a/expo/types/pilotCurriculum.ts
++++ b/expo/types/pilotCurriculum.ts
+@@ -130,12 +130,19 @@ export type PilotModuleState =
+   | "ready_for_response"
+   | "listening_response"
+   | "confirm_response_transcript"
++  | "ready_for_second_pressure"
++  | "ready_for_second_response"
++  | "listening_second_response"
++  | "confirm_second_response_transcript"
+   | "hope_coaching"
+   | "day3_note_check"
+   | "day3_neutral_retry"
+   | "ready_for_retry"
+   | "listening_retry"
+   | "confirm_retry_transcript"
++  | "ready_for_final_retry"
++  | "listening_final_retry"
++  | "confirm_final_retry_transcript"
+   | "play_adam_after_opener_retry"
+   | "attempt_comparison"
+   | "transfer_cue"
+@@ -177,11 +184,46 @@ export interface ScenarioCounterpartTurn {
+   id: string;
+   text: string;
+   source: "provider" | "authored";
++  reactionId?: string;
++  semanticVoiceKey?: "hope_teacher" | "adam_counterpart" | "contextual_counterpart";
++  resolvedAudioId?: string;
++}
++
++export type M1L1DimensionId =
++  | "point_placement"
++  | "issue_count"
++  | "grounding_concreteness"
++  | "motive_character_language"
++  | "move_clarity"
++  | "evidence_discipline"
++  | "park_and_return";
++
++export interface M1L1BehaviorFlag {
++  dimension: M1L1DimensionId;
++  status: "met" | "not_met" | "not_assessable";
++  evidenceQuote: string | null;
++}
++
++/** Isolated M1 L1 state; no other lesson or shared scenario consumes it. */
++export interface M1L1RehearsalState {
++  beat: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
++  pushbackOne?: ScenarioCounterpartTurn;
++  pushbackTwo?: ScenarioCounterpartTurn;
++  secondResponseAttempt?: PilotAttemptRecord;
++  coachedBeat?: 3 | 5;
++  flags?: M1L1BehaviorFlag[];
++  selectedDimension?: M1L1DimensionId;
++  /** Durable proof that the approved named move was auto-saved on validated return. */
++  approvedMoveSavedAt?: number;
++  retryCount: 0 | 1 | 2;
++  finalRetryAttempt?: PilotAttemptRecord;
+ }
+ 
+ export interface PilotDayRun {
+   id: string;
+   moduleId?: import("@/constants/modules").ModuleId;
++  /** Stable lesson-manifest module identity for isolated converted lessons. */
++  convertedModuleId?: string;
+   practiceId?: string;
+   contentVersion?: string;
+   day: number;
+@@ -208,6 +250,8 @@ export interface PilotDayRun {
+   retryInstruction?: string;
+   noteFit?: "accepted" | "rejected";
+   comparison?: PilotComparison;
++  /** Present only for accepted M1 L1; keeps the authored eight-beat plan isolated. */
++  m1L1?: M1L1RehearsalState;
+   completedAt?: number;
+   createdAt: number;
+   updatedAt: number;
