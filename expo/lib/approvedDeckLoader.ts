@@ -135,7 +135,10 @@ async function approvedDeckSource(archivePath: string): Promise<string> {
   if (!bytes) throw new Error("Approved lesson file is missing from the handoff");
   const source = strFromU8(bytes);
   if (archivePath === M1_L1_ARCHIVE_PATH) {
-    const Crypto = await import("expo-crypto");
+    // Keep this synchronous module boundary compatible with Hermes; a lazy dynamic
+    // import can surface as a SyntaxError before the approved digest is checked.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Crypto = require("expo-crypto") as typeof import("expo-crypto");
     const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, source);
     if (!isApprovedM1L1DeckDigest(archivePath, M1_L1_CONTENT_VERSION, digest)) throw new Error(`Approved M1 L1 deck failed authenticity check for ${M1_L1_CONTENT_VERSION}`);
   }
