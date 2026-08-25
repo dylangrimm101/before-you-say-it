@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { authorizedDeckHtml } from "../lib/approvedDeckLoader";
+import { authorizedDeckHtml, materializeApprovedDeckHtml } from "../lib/approvedDeckLoader";
 
 const DECK_LIMITS = {
   "M1-L1-Buried-Point.html": 20,
@@ -82,6 +82,20 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).toContain('source={{ html: deckHtml, baseUrl: "about:blank" }}');
     expect(deckScreen).not.toContain("Asset.fromModule");
     expect(deckScreen).not.toContain("downloadAsync");
+  });
+
+  test("materializes approved decks without blob scripts or the artifact unpacker", async () => {
+    const bundle = await source("assets/lesson-decks/M1-L1-Buried-Point.html");
+    const page = materializeApprovedDeckHtml(bundle);
+    expect(page.startsWith("<!DOCTYPE html>")).toBe(true);
+    expect(page).toContain("window.React");
+    expect(page).toContain("window.ReactDOM");
+    expect(page).toContain("class Component extends DCLogic");
+    expect(page).toContain("data:font/woff2;base64,");
+    expect(page).not.toContain("__bundler_loading");
+    expect(page).not.toContain('type="__bundler/manifest"');
+    expect(page).not.toMatch(/<script\s+src=/i);
+    expect(page).not.toContain("blob:");
   });
 
   test("re-verifies every fetched deck against its authorized boundary before display", async () => {

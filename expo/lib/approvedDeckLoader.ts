@@ -1,7 +1,12 @@
-import { strFromU8, unzipSync } from "fflate";
+import { gunzipSync, strFromU8, unzipSync } from "fflate";
 
 const APPROVED_HANDOFF_ARCHIVE_URL = "https://r2-pub.rork.com/attachments/xo73vo5tbrhku6f68brbr.zip";
 const TEMPLATE_PATTERN = /<script type="__bundler\/template">\s*(.*?)\s*<\/script>/s;
+const MANIFEST_PATTERN = /<script type="__bundler\/manifest">\s*(.*?)\s*<\/script>/s;
+const EXTERNAL_RESOURCES_PATTERN = /<script type="__bundler\/ext_resources">\s*(.*?)\s*<\/script>/s;
+
+type BundleEntry = { mime: string; compressed: boolean; data: string };
+type ExternalResource = { id: string; uuid: string };
 const M1_L1_ARCHIVE_PATH = "BYSI-Rork-Handoff/decks/M1-L1-Buried-Point.html";
 const M1_L1_CONTENT_VERSION = "m1-l1-v2.1-2026-08-24";
 const M1_L1_APPROVED_SHA256 = "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e";
@@ -58,7 +63,68 @@ export function authorizedDeckHtml(rawHtml: string, reviewThroughCard: number): 
   }
 
   const encoded = JSON.stringify(template).replace(/<\//g, "<\\u002F");
-  return `${rawHtml.slice(0, templateMatch.index)}${rawHtml.slice(templateMatch.index).replace(encodedTemplate, encoded)}`;
+  return `${rawHtml.slice(0, templateMatch.index)}${rawHtml.slice(templateMatch.index).replace(encodedTemplate, () => encoded)}`;
+}
+
+function decodeBase64(value: string): Uint8Array {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const clean = value.replace(/[^A-Za-z0-9+/]/g, "");
+  const output = new Uint8Array(Math.floor((clean.length * 6) / 8));
+  let accumulator = 0;
+  let bits = 0;
+  let offset = 0;
+  for (const character of clean) {
+    const index = alphabet.indexOf(character);
+    if (index < 0) continue;
+    accumulator = (accumulator << 6) | index;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      output[offset] = (accumulator >> bits) & 0xff;
+      offset += 1;
+    }
+  }
+  return output.subarray(0, offset);
+}
+
+function executableSource(entry: BundleEntry): string {
+  const encoded = decodeBase64(entry.data);
+  return strFromU8(entry.compressed ? gunzipSync(encoded) : encoded);
+}
+
+function inlineScript(source: string): string {
+  return `<script>${source.replace(/<\/script/gi, "<\\/script")}<\/script>`;
+}
+
+/** Flattens the approved artifact into one same-origin page for native WebViews. */
+export function materializeApprovedDeckHtml(bundleHtml: string): string {
+  const templateEncoded = bundleHtml.match(TEMPLATE_PATTERN)?.[1];
+  const manifestEncoded = bundleHtml.match(MANIFEST_PATTERN)?.[1];
+  const externalEncoded = bundleHtml.match(EXTERNAL_RESOURCES_PATTERN)?.[1];
+  if (!templateEncoded || !manifestEncoded || !externalEncoded) throw new Error("Approved lesson bundle metadata is missing");
+
+  let template = JSON.parse(templateEncoded) as string;
+  const manifest = JSON.parse(manifestEncoded) as Record<string, BundleEntry>;
+  const externalResources = JSON.parse(externalEncoded) as ExternalResource[];
+  const externalScripts = externalResources.map(({ uuid }) => {
+    const entry = manifest[uuid];
+    if (!entry || entry.mime !== "text/javascript") throw new Error("Approved lesson runtime dependency is missing");
+    return inlineScript(executableSource(entry));
+  }).join("");
+  const runtimeMatch = template.match(/<script\s+src="([0-9a-f-]+)"\s*><\/script>/i);
+  const runtimeId = runtimeMatch?.[1];
+  const runtimeEntry = runtimeId ? manifest[runtimeId] : undefined;
+  if (!runtimeMatch || !runtimeId || !runtimeEntry || runtimeEntry.mime !== "text/javascript") throw new Error("Approved lesson runtime is missing");
+
+  const inlineRuntime = `<script>window.__resources={};<\/script>${externalScripts}${inlineScript(executableSource(runtimeEntry))}`;
+  template = template.replace(runtimeMatch[0], () => inlineRuntime);
+  Object.entries(manifest).forEach(([uuid, entry]) => {
+    if (entry.mime === "text/javascript") return;
+    if (entry.compressed) throw new Error("Compressed approved lesson media is unsupported");
+    template = template.split(uuid).join(`data:${entry.mime};base64,${entry.data}`);
+  });
+  if (template.includes("__bundler_loading") || /<script\s+src="blob:/i.test(template)) throw new Error("Approved lesson page was not fully materialized");
+  return template;
 }
 
 function replaceEncodedTemplate(rawHtml: string, transform: (template: string) => string): string {
@@ -67,7 +133,7 @@ function replaceEncodedTemplate(rawHtml: string, transform: (template: string) =
   if (!templateMatch || !encodedTemplate) throw new Error("Approved lesson template is missing");
   const template = transform(JSON.parse(encodedTemplate) as string);
   const encoded = JSON.stringify(template).replace(/<\//g, "<\\u002F");
-  return `${rawHtml.slice(0, templateMatch.index)}${rawHtml.slice(templateMatch.index).replace(encodedTemplate, encoded)}`;
+  return `${rawHtml.slice(0, templateMatch.index)}${rawHtml.slice(templateMatch.index).replace(encodedTemplate, () => encoded)}`;
 }
 
 function sliceCards(template: string, throughCard: number): string {
@@ -147,13 +213,13 @@ async function approvedDeckSource(archivePath: string): Promise<string> {
 
 /** Downloads the approved handoff once and returns only the authorized lesson slice. */
 export async function loadApprovedDeckHtml(archivePath: string, reviewThroughCard: number): Promise<string> {
-  return authorizedDeckHtml(await approvedDeckSource(archivePath), reviewThroughCard);
+  return materializeApprovedDeckHtml(authorizedDeckHtml(await approvedDeckSource(archivePath), reviewThroughCard));
 }
 
 export async function loadConvertedHandoffDeckHtml(archivePath: string, handoffCard: number): Promise<string> {
-  return convertedHandoffDeckHtml(await approvedDeckSource(archivePath), handoffCard);
+  return materializeApprovedDeckHtml(convertedHandoffDeckHtml(await approvedDeckSource(archivePath), handoffCard));
 }
 
 export async function loadReturnedDeckHtml(archivePath: string, returnCard: number, completionCard: number = 22, approvedMoveSaved: boolean = false): Promise<string> {
-  return returnedDeckHtml(await approvedDeckSource(archivePath), returnCard, completionCard, approvedMoveSaved);
+  return materializeApprovedDeckHtml(returnedDeckHtml(await approvedDeckSource(archivePath), returnCard, completionCard, approvedMoveSaved));
 }
