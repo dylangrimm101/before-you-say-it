@@ -2,11 +2,14 @@ import type { ApprovedLessonId } from "@/constants/approvedLessons";
 import type { Scenario } from "@/types/convo";
 import type { PilotDayRun } from "@/types/pilotCurriculum";
 
-export type ApprovedRehearsalLessonId = Extract<ApprovedLessonId, "m1-l2" | "m1-l3" | "m1-l4" | "m1-l5">;
+export type ApprovedRehearsalLessonId = Extract<
+  ApprovedLessonId,
+  "m1-l2" | "m1-l3" | "m1-l4" | "m1-l5" | "m2-l1" | "m2-l2" | "m2-l3" | "m2-l4" | "m2-l5"
+>;
 
 export interface ApprovedRehearsalConfig {
   lessonId: ApprovedRehearsalLessonId;
-  moduleId: "bysi_m01_get_to_the_point";
+  moduleId: "bysi_m01_get_to_the_point" | "bysi_m02_make_a_clear_ask";
   practiceId: string;
   contentVersion: string;
   scenario: Scenario;
@@ -23,12 +26,13 @@ export interface ApprovedRehearsalConfig {
   launchEligible: false;
 }
 
-const MODULE_ID = "bysi_m01_get_to_the_point" as const;
+const MODULE_ONE_ID = "bysi_m01_get_to_the_point" as const;
+const MODULE_TWO_ID = "bysi_m02_make_a_clear_ask" as const;
 
 const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalConfig>> = {
   "m1-l2": {
     lessonId: "m1-l2",
-    moduleId: MODULE_ID,
+    moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l02_cut_the_case",
     contentVersion: "m1-l2-approved-2026-08-24",
     scenario: {
@@ -58,7 +62,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
   },
   "m1-l3": {
     lessonId: "m1-l3",
-    moduleId: MODULE_ID,
+    moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l03_park_and_return",
     contentVersion: "m1-l3-approved-2026-08-24",
     scenario: {
@@ -88,7 +92,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
   },
   "m1-l4": {
     lessonId: "m1-l4",
-    moduleId: MODULE_ID,
+    moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l04_make_it_repeatable",
     contentVersion: "m1-l4-approved-2026-08-24",
     scenario: {
@@ -118,7 +122,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
   },
   "m1-l5": {
     lessonId: "m1-l5",
-    moduleId: MODULE_ID,
+    moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l05_fit_in_one",
     contentVersion: "m1-l5-approved-2026-08-24",
     scenario: {
@@ -143,6 +147,154 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     rehearsalHandoffCard: 18,
     returnCard: 19,
     completionCard: 20,
+    retryCap: 2,
+    launchEligible: false,
+  },
+  "m2-l1": {
+    lessonId: "m2-l1",
+    moduleId: MODULE_TWO_ID,
+    practiceId: "bysi_m02_l01_clear_ask",
+    contentVersion: "m2-l1-approved-2026-08-24",
+    scenario: {
+      id: "bysi-m02-l01-thursday-handoff",
+      category: "work",
+      title: "The Thursday handoff",
+      counterpart: "Maya",
+      counterpartGender: "woman",
+      situation: "Thursday morning, before standup. The handoff brief has landed late three weeks running and the review is at 4. You've mentioned it twice without asking for anything.",
+      persona: "Maya cannot do the whole request by Thursday and tests whether the learner can keep one clear action while leaving room for a real answer.",
+      goal: "Make one clear ask with one action, one owner, and room for Maya to answer.",
+      opensWith: "user",
+      openingLine: "",
+      isCustom: false,
+    },
+    counterpartId: "maya",
+    authoredPressureText: "I can't do Thursday.",
+    coachedBehaviorId: "clear_answerable_ask",
+    namedMoveId: "one-action-one-owner-room-to-answer",
+    namedMove: "One action. One owner. Room to answer.",
+    retryDirection: "Answer the same constraint without adding more jobs or removing Maya's room to answer. Keep one action and clarify where the ask stands.",
+    rehearsalHandoffCard: 20,
+    returnCard: 21,
+    completionCard: 22,
+    retryCap: 2,
+    launchEligible: false,
+  },
+  "m2-l2": {
+    lessonId: "m2-l2",
+    moduleId: MODULE_TWO_ID,
+    practiceId: "bysi_m02_l02_say_who",
+    contentVersion: "m2-l2-approved-2026-08-24",
+    scenario: {
+      id: "bysi-m02-l02-cupcake-order",
+      category: "friends",
+      title: "The cupcake order",
+      counterpart: "Renee",
+      counterpartGender: "woman",
+      situation: "Thursday afternoon, outside the school. You asked the group, there was a pause, and nobody has answered yet. Renee, Cory and Angela are still standing there. The bakery needs the cupcake order confirmed by five.",
+      persona: "Renee asks why the request is hers, then explains that she has everyone's cash but the order is under Jen's name and card.",
+      goal: "Put the next answerable action to one person instead of sending it back to the group.",
+      opensWith: "user",
+      openingLine: "",
+      isCustom: false,
+    },
+    counterpartId: "renee-m2-l2",
+    authoredPressureText: "Why me?",
+    coachedBehaviorId: "named_ask_owner",
+    namedMoveId: "say-who-youre-asking",
+    namedMove: "Say who you're asking.",
+    retryDirection: "Answer the same question by naming the one person who owns the next answerable action. Do not send the request back to everyone.",
+    rehearsalHandoffCard: 20,
+    returnCard: 21,
+    completionCard: 22,
+    retryCap: 2,
+    launchEligible: false,
+  },
+  "m2-l3": {
+    lessonId: "m2-l3",
+    moduleId: MODULE_TWO_ID,
+    practiceId: "bysi_m02_l03_when_they_say_they_cant",
+    contentVersion: "m2-l3-approved-2026-08-24",
+    scenario: {
+      id: "bysi-m02-l03-saturday-van",
+      category: "family",
+      title: "Saturday and the van",
+      counterpart: "Marcus — your brother",
+      counterpartGender: "man",
+      situation: "Thursday night, on the phone with your brother Marcus about Saturday. Ellie gets the keys in the morning and the van goes back Sunday night.",
+      persona: "Marcus has a real constraint: Theo has a game and Marcus is not free until two. Those facts remain true for the whole scene.",
+      goal: "Hear the constraint, trade one thing, and clearly say where the ask now stands.",
+      opensWith: "user",
+      openingLine: "",
+      isCustom: false,
+    },
+    counterpartId: "marcus",
+    authoredPressureText: "I can't do a whole Saturday. Theo's got a game and I'm not free till two.",
+    coachedBehaviorId: "hear_trade_state",
+    namedMoveId: "hear-it-trade-one-say-where-it-stands",
+    namedMove: "Hear it. Trade one thing. Say where it stands.",
+    retryDirection: "Answer the exact same constraint: show that you heard it, trade one part of the ask, and say clearly what remains.",
+    rehearsalHandoffCard: 20,
+    returnCard: 21,
+    completionCard: 22,
+    retryCap: 2,
+    launchEligible: false,
+  },
+  "m2-l4": {
+    lessonId: "m2-l4",
+    moduleId: MODULE_TWO_ID,
+    practiceId: "bysi_m02_l04_say_whether_no",
+    contentVersion: "m2-l4-approved-2026-08-24",
+    scenario: {
+      id: "bysi-m02-l04-thursday-pickup",
+      category: "partner",
+      title: "Thursday pickup",
+      counterpart: "Sam",
+      situation: "Wednesday night at home, talking to Sam about tomorrow. The client dinner is Thursday and it won't move. Pickup is at 5:30.",
+      persona: "Sam answers honestly. The answer can be no, and the learner must not ask for that no again if it was genuinely available.",
+      goal: "Make clear whether no is available, then respond consistently when the answer is no.",
+      opensWith: "user",
+      openingLine: "",
+      isCustom: false,
+    },
+    counterpartId: "sam-m2-l4",
+    authoredPressureText: "No, I can't do pickup tomorrow.",
+    coachedBehaviorId: "honor_available_no",
+    namedMoveId: "say-whether-no-is-available",
+    namedMove: "Say whether no is available.",
+    retryDirection: "Respond to the same no without asking again or turning it into a penalty. If no was available, acknowledge the answer and stop.",
+    rehearsalHandoffCard: 20,
+    returnCard: 21,
+    completionCard: 22,
+    retryCap: 2,
+    launchEligible: false,
+  },
+  "m2-l5": {
+    lessonId: "m2-l5",
+    moduleId: MODULE_TWO_ID,
+    practiceId: "bysi_m02_l05_ask_for_the_loop",
+    contentVersion: "m2-l5-approved-2026-08-24",
+    scenario: {
+      id: "bysi-m02-l05-camp-signup",
+      category: "partner",
+      title: "Camp signup",
+      counterpart: "Sam",
+      situation: "A weeknight at the kitchen table with Sam. Camp signup opens next month, early-bird closes six weeks after that, and you have run it the last three summers.",
+      persona: "Sam asks what counts as at risk. Once that is clear, the weeks in between belong to Sam.",
+      goal: "Define the check-back condition without taking back the steps in between.",
+      opensWith: "user",
+      openingLine: "",
+      isCustom: false,
+    },
+    counterpartId: "sam-m2-l5",
+    authoredPressureText: "What counts as at risk?",
+    coachedBehaviorId: "loop_not_last_step",
+    namedMoveId: "ask-for-loop-not-last-step",
+    namedMove: "Ask for the loop, not the last step.",
+    retryDirection: "Answer the same question with only the condition that should bring Sam back to you. Leave the steps in between with him.",
+    rehearsalHandoffCard: 20,
+    returnCard: 21,
+    completionCard: 22,
     retryCap: 2,
     launchEligible: false,
   },
@@ -197,8 +349,29 @@ export function approvedRehearsalCriterion(config: ApprovedRehearsalConfig, tran
     const widening = hasAny(text, [/\balways\b/, /\bnever\b/, /\beverything\b/, /\bthe whole month\b/, /\ball the times\b/]);
     return text.length >= 12 && !widening;
   }
-  const onePurpose = hasAny(text, [/\bi'm asking\b/, /\bi am asking\b/, /\bmy ask is\b/, /\bthis is about\b/, /\bwhat i want\b/, /\bone thing\b/]);
-  return onePurpose;
+  if (config.lessonId === "m1-l5") {
+    return hasAny(text, [/\bi'm asking\b/, /\bi am asking\b/, /\bmy ask is\b/, /\bthis is about\b/, /\bwhat i want\b/, /\bone thing\b/]);
+  }
+  if (config.lessonId === "m2-l1") {
+    const keepsOneAction = hasAny(text, [/\bbrief\b/, /\bhandoff\b/, /\bhalf\b/, /\bpart\b/, /\bby \w+day\b/, /\bwhat can\b/]);
+    const pilesOn = (text.match(/\b(also|another|plus|and then)\b/g)?.length ?? 0) > 1;
+    return keepsOneAction && !pilesOn;
+  }
+  if (config.lessonId === "m2-l2") {
+    return hasAny(text, [/\brenee\b/, /\bjen\b/, /\bcory\b/, /\bangela\b/, /\byou\b/])
+      && !hasAny(text, [/\banyone\b/, /\bsomeone\b/, /\beveryone\b/, /\bwhoever\b/]);
+  }
+  if (config.lessonId === "m2-l3") {
+    const hears = hasAny(text, [/\bi hear\b/, /\bi get\b/, /\bunderstand\b/, /\bthat makes sense\b/, /\bokay\b/]);
+    const trades = hasAny(text, [/\bafter two\b/, /\bfrom two\b/, /\bsunday\b/, /\bmorning\b/, /\bafternoon\b/, /\binstead\b/, /\bthen\b/]);
+    const states = hasAny(text, [/\bcan you\b/, /\bcould you\b/, /\bthe ask\b/, /\bstill need\b/, /\bthat leaves\b/, /\bso we're\b/]);
+    return hears && trades && states;
+  }
+  if (config.lessonId === "m2-l4") {
+    return hasAny(text, [/\bokay\b/, /\bthanks for telling me\b/, /\bthank you for telling me\b/, /\bi hear you\b/])
+      && !hasAny(text, [/\bare you sure\b/, /\bbut i need\b/, /\bjust this once\b/, /\bplease reconsider\b/]);
+  }
+  return hasAny(text, [/\banything that changes\b/, /\bif .* changes\b/, /\bat risk\b/, /\bwhat i'd have to do next\b/, /\bwhat i would have to do next\b/]);
 }
 
 export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, transcript: string): { note: string; retryDirection: string } {

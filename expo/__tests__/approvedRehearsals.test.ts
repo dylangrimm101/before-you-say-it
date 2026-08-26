@@ -7,6 +7,7 @@ import {
   approvedRehearsalCriterion,
   validateApprovedRehearsalCompletion,
 } from "@/lib/approvedRehearsals";
+import { normalizeConvertedLessonProgress } from "@/lib/convertedLesson";
 import { createScenarioPracticeRun } from "@/lib/scenarioPractice";
 import type { PilotDayRun } from "@/types/pilotCurriculum";
 
@@ -70,5 +71,110 @@ describe("approved M1 L2-L5 rehearsals", () => {
     expect(validateApprovedRehearsalCompletion(config, run, "run-l4")).toBe(true);
     expect(validateApprovedRehearsalCompletion(config, { ...run, counterpartTurn: { ...run.counterpartTurn!, text: "Different line" } }, "run-l4")).toBe(false);
     expect(validateApprovedRehearsalCompletion(config, run, "other-run")).toBe(false);
+  });
+});
+
+describe("approved M2 L1-L5 rehearsals", () => {
+  test("preserves each deck-specific scene, counterpart cue, move, and Cards 20-22 topology", () => {
+    const l1 = approvedRehearsalConfig("m2-l1")!;
+    const l2 = approvedRehearsalConfig("m2-l2")!;
+    const l3 = approvedRehearsalConfig("m2-l3")!;
+    const l4 = approvedRehearsalConfig("m2-l4")!;
+    const l5 = approvedRehearsalConfig("m2-l5")!;
+
+    expect(l1.moduleId).toBe("bysi_m02_make_a_clear_ask");
+    expect(l1.scenario.counterpart).toBe("Maya");
+    expect(l1.scenario.situation).toContain("Thursday morning, before standup");
+    expect(l1.authoredPressureText).toBe("I can't do Thursday.");
+    expect(l1.namedMove).toBe("One action. One owner. Room to answer.");
+    expect(l2.scenario.counterpart).toBe("Renee");
+    expect(l2.scenario.situation).toContain("outside the school");
+    expect(l2.authoredPressureText).toBe("Why me?");
+    expect(l2.namedMove).toBe("Say who you're asking.");
+    expect(l3.scenario.counterpart).toBe("Marcus — your brother");
+    expect(l3.authoredPressureText).toBe("I can't do a whole Saturday. Theo's got a game and I'm not free till two.");
+    expect(l3.namedMove).toBe("Hear it. Trade one thing. Say where it stands.");
+    expect(l4.scenario.counterpart).toBe("Sam");
+    expect(l4.authoredPressureText).toBe("No, I can't do pickup tomorrow.");
+    expect(l4.namedMove).toBe("Say whether no is available.");
+    expect(l5.scenario.counterpart).toBe("Sam");
+    expect(l5.authoredPressureText).toBe("What counts as at risk?");
+    expect(l5.namedMove).toBe("Ask for the loop, not the last step.");
+
+    for (const config of [l1, l2, l3, l4, l5]) {
+      expect([config.rehearsalHandoffCard, config.returnCard, config.completionCard]).toEqual([20, 21, 22]);
+      expect(config.retryCap).toBe(2);
+      expect(config.launchEligible).toBe(false);
+    }
+  });
+
+  test("checks only each Module 2 named move in scoreless same-moment coaching", () => {
+    const cases = [
+      ["m2-l1", "No, do everything anyway.", "What part of the brief can you finish by Thursday?"],
+      ["m2-l2", "Can somebody handle it?", "Jen, can you confirm the order?"],
+      ["m2-l3", "That doesn't help.", "Okay, I hear the game is fixed. Could you take the van after two, so that leaves the morning with me?"],
+      ["m2-l4", "But I need you to reconsider.", "Okay. Thanks for telling me."],
+      ["m2-l5", "Keep me copied on every step.", "Come back if anything changes what I'd have to do next."],
+    ] as const;
+
+    for (const [lessonId, before, after] of cases) {
+      const config = approvedRehearsalConfig(lessonId)!;
+      expect(approvedRehearsalCriterion(config, before)).toBe(false);
+      expect(approvedRehearsalCriterion(config, after)).toBe(true);
+      expect(approvedRehearsalCoachNote(config, before).note).toContain("checking no other behavior");
+      expect(approvedRehearsalComparison(config, before, after)).toEqual({
+        behaviorId: config.coachedBehaviorId,
+        text: `The retry made “${config.namedMove}” observable. That is the only change Hope checked.`,
+        criterionChanged: true,
+      });
+    }
+  });
+
+  test("accepts a Module 2 return only for the exact run and authored manifest", () => {
+    const config = approvedRehearsalConfig("m2-l3")!;
+    const wrapper = createScenarioPracticeRun(config.scenario, "steady", "defensive", "run-m2-l3", 1);
+    const run: PilotDayRun = {
+      ...wrapper.run,
+      convertedModuleId: config.moduleId,
+      practiceId: config.practiceId,
+      contentVersion: config.contentVersion,
+      counterpartIdentity: config.counterpartId,
+      scenarioContext: { ...wrapper.run.scenarioContext!, counterpartId: config.counterpartId },
+      counterpartTurn: { id: "pressure", text: config.authoredPressureText, source: "authored", authoredAt: 3 },
+      attempt: { id: "run-m2-l3-opener", kind: "opener", transcript: "Can you take Saturday?", representation: "confirmed_transcript", confirmedAt: 2 },
+      responseAttempt: { id: "run-m2-l3-response", kind: "response", transcript: "That doesn't help.", representation: "confirmed_transcript", confirmedAt: 4 },
+      retryAttempt: { id: "run-m2-l3-retry", kind: "retry", transcript: "I hear you. Could you take it after two?", representation: "confirmed_transcript", confirmedAt: 5 },
+      comparison: { behaviorId: config.coachedBehaviorId, text: "One criterion.", criterionChanged: true },
+      state: "attempt_comparison",
+      updatedAt: 5,
+    };
+
+    expect(validateApprovedRehearsalCompletion(config, run, "run-m2-l3")).toBe(true);
+    expect(validateApprovedRehearsalCompletion(config, { ...run, convertedModuleId: "bysi_m01_get_to_the_point" }, "run-m2-l3")).toBe(false);
+    expect(validateApprovedRehearsalCompletion(config, { ...run, counterpartIdentity: "different" }, "run-m2-l3")).toBe(false);
+    expect(validateApprovedRehearsalCompletion(config, run, "other-run")).toBe(false);
+  });
+
+  test("normalizes Module 2 completion only against its own lesson identity", () => {
+    const config = approvedRehearsalConfig("m2-l5")!;
+    const completion = {
+      lessonId: config.lessonId,
+      moduleId: config.moduleId,
+      practiceId: config.practiceId,
+      contentVersion: config.contentVersion,
+      runId: "run-m2-l5",
+      lessonCardCheckpoint: config.completionCard,
+      quizGatesCompleted: true,
+      rehearsalCompleted: true,
+      retryCompleted: true,
+      comparisonViewed: true,
+      savedMoveId: config.namedMoveId,
+      transferChoice: "say",
+      completedAt: 10,
+      sourceLineage: "approved-html-deck-pinned",
+    };
+    expect(normalizeConvertedLessonProgress([completion])).toHaveLength(1);
+    expect(normalizeConvertedLessonProgress([{ ...completion, moduleId: "bysi_m01_get_to_the_point" }])).toHaveLength(0);
+    expect(normalizeConvertedLessonProgress([{ ...completion, savedMoveId: "different-move" }])).toHaveLength(0);
   });
 });
