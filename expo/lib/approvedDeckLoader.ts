@@ -1,5 +1,7 @@
 import { gunzipSync, strFromU8, unzipSync } from "fflate";
 
+import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
+
 const APPROVED_HANDOFF_ARCHIVE_URL = "https://r2-pub.rork.com/attachments/xo73vo5tbrhku6f68brbr.zip";
 const TEMPLATE_PATTERN = /<script type="__bundler\/template">\s*(.*?)\s*<\/script>/s;
 const MANIFEST_PATTERN = /<script type="__bundler\/manifest">\s*(.*?)\s*<\/script>/s;
@@ -10,6 +12,9 @@ type ExternalResource = { id: string; uuid: string };
 const M1_L1_ARCHIVE_PATH = "BYSI-Rork-Handoff/decks/M1-L1-Buried-Point.html";
 const M1_L1_CONTENT_VERSION = "m1-l1-v2.1-2026-08-24";
 const M1_L1_APPROVED_SHA256 = "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e";
+const STALE_M1_L1_SCENE = "Sunday evening, kitchen. Dishes done, kid finally asleep. You've wanted to say this for two weeks. Your partner is on the couch, half looking at their phone. Not hostile. Tired.";
+const STALE_M1_L1_SCENE_BEATS = "You open. Adam pushes back twice. The second one is <em>“You're acting like this happens all the time.”</em> Then Hope names one change and hands the same moment back to you.";
+const ACCEPTED_M1_L1_SCENE_BEATS = "You open. Adam, your colleague, pushes back twice. The second one is <em>“You're acting like this happens all the time.”</em> Then Hope names one Point → Proof → Move change and hands the same work moment back to you.";
 
 let archivePromise: Promise<Record<string, Uint8Array>> | null = null;
 
@@ -163,11 +168,17 @@ function sliceCards(template: string, throughCard: number): string {
 export function convertedHandoffDeckHtml(rawHtml: string, handoffCard: number): string {
   return replaceEncodedTemplate(rawHtml, (source) => {
     const sliced = sliceCards(source, handoffCard);
-    const converted = sliced.replace(
+    const withAcceptedScene = sliced
+      .replace(STALE_M1_L1_SCENE, M1_L1_CONVERSION.scenario.situation)
+      .replace(STALE_M1_L1_SCENE_BEATS, ACCEPTED_M1_L1_SCENE_BEATS);
+    if (sliced.includes(STALE_M1_L1_SCENE) && withAcceptedScene.includes(STALE_M1_L1_SCENE)) {
+      throw new Error("Converted lesson scene could not be aligned");
+    }
+    const converted = withAcceptedScene.replace(
       /openHandoff:\(\) => \{.*?\},\s*handoffContinue:/s,
       `openHandoff:() => { window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type:'start-rehearsal' })); }, handoffContinue:`,
     );
-    if (converted === sliced) throw new Error("Converted lesson handoff could not be installed");
+    if (converted === withAcceptedScene) throw new Error("Converted lesson handoff could not be installed");
     return converted;
   });
 }

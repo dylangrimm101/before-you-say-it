@@ -47,7 +47,7 @@ function fixtureDeck(duplicateCompletion = false): string {
   const cardEntries = Array.from({ length: 22 }, (_, index) => index === 20 ? "  { n:21, type:'Saved move', saved:true }" : `  { n:${index + 1}, type:'Card ${index + 1}' }`);
   if (duplicateCompletion) cardEntries.push("  { n:22, type:'Duplicate 22' }");
   const cards = cardEntries.join(",\n");
-  const template = `const CARDS = [\n${cards}\n];\nclass Component {\n  state = { i:0, picks:{}, sm:[false, false, false] };\n  setState(next) { this.state = { ...this.state, ...next }; }\n  go(delta) { const c = CARDS[this.state.i]; if (c.saved && this.state.sm.indexOf(false) !== -1) return; this.state.i += delta; }\n  view() { const c = CARDS[this.state.i]; const st = this.state; const cta = {}; if (c.saved) { const smDone = st.sm.indexOf(false) === -1; cta.act = smDone ? () => this.go(1) : () => {}; } return { openHandoff:() => { this.setState({ handoffOpen:true }); }, handoffContinue:() => {}, cta }; }\n}`;
+  const template = `/* Sunday evening, kitchen. Dishes done, kid finally asleep. You've wanted to say this for two weeks. Your partner is on the couch, half looking at their phone. Not hostile. Tired. */\n/* You open. Adam pushes back twice. The second one is <em>“You're acting like this happens all the time.”</em> Then Hope names one change and hands the same moment back to you. */\nconst CARDS = [\n${cards}\n];\nclass Component {\n  state = { i:0, picks:{}, sm:[false, false, false] };\n  setState(next) { this.state = { ...this.state, ...next }; }\n  go(delta) { const c = CARDS[this.state.i]; if (c.saved && this.state.sm.indexOf(false) !== -1) return; this.state.i += delta; }\n  view() { const c = CARDS[this.state.i]; const st = this.state; const cta = {}; if (c.saved) { const smDone = st.sm.indexOf(false) === -1; cta.act = smDone ? () => this.go(1) : () => {}; } return { openHandoff:() => { this.setState({ handoffOpen:true }); }, handoffContinue:() => {}, cta }; }\n}`;
   return `<html><script type="__bundler/template">${JSON.stringify(template)}</script></html>`;
 }
 
@@ -308,6 +308,14 @@ describe("accepted M1 L1 narrow correction", () => {
     const handoff = convertedHandoffDeckHtml(fixtureDeck(), 20);
     const returned = returnedDeckHtml(fixtureDeck(), 21, 22);
     expect(handoff).toContain("start-rehearsal");
+    const handoffEncoded = handoff.match(/<script type="__bundler\/template">\s*(.*?)\s*<\/script>/s)?.[1];
+    expect(handoffEncoded).toBeDefined();
+    const handoffTemplate = JSON.parse(handoffEncoded!) as string;
+    expect(handoffTemplate).toContain(M1_L1_CONVERSION.scenario.situation);
+    expect(handoffTemplate).toContain("Adam, your colleague, pushes back twice");
+    expect(handoffTemplate).toContain("same work moment back to you");
+    expect(handoffTemplate).not.toContain("Sunday evening, kitchen");
+    expect(handoffTemplate).not.toContain("Your partner is on the couch");
     expect(handoff).not.toContain("{ n:21, type:");
     expect(returned).not.toContain("{ n:20, type:");
     expect(returned).toContain("{ n:21, type:");
