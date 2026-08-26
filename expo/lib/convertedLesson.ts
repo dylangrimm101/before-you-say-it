@@ -1,4 +1,5 @@
 import type { Scenario } from "@/types/convo";
+import { approvedRehearsalConfig, type ApprovedRehearsalLessonId } from "@/lib/approvedRehearsals";
 import type {
   M1L1BehaviorFlag,
   M1L1DimensionId,
@@ -45,9 +46,9 @@ export interface ConvertedLessonConfig {
 }
 
 export interface ConvertedLessonProgress {
-  lessonId: typeof LESSON_ID;
-  moduleId: typeof MODULE_ID;
-  practiceId: typeof PRACTICE_ID;
+  lessonId: ConvertedLessonId | ApprovedRehearsalLessonId;
+  moduleId: string;
+  practiceId: string;
   contentVersion: string;
   runId: string;
   lessonCardCheckpoint: number;
@@ -55,7 +56,7 @@ export interface ConvertedLessonProgress {
   rehearsalCompleted: true;
   retryCompleted: true;
   comparisonViewed: true;
-  savedMoveId: ConvertedLessonConfig["namedMoveId"];
+  savedMoveId: string;
   customWording?: string;
   transferChoice: TransferChoice;
   completedAt: number;
@@ -413,24 +414,25 @@ export function normalizeConvertedLessonProgress(value: unknown): ConvertedLesso
   return value.filter((entry): entry is ConvertedLessonProgress => {
     if (!entry || typeof entry !== "object") return false;
     const item = entry as Partial<ConvertedLessonProgress>;
-    return item.lessonId === LESSON_ID
-      && item.moduleId === MODULE_ID
-      && item.practiceId === PRACTICE_ID
-      && isString(item.contentVersion)
+    const config = item.lessonId === LESSON_ID ? M1_L1_CONVERSION : approvedRehearsalConfig(item.lessonId);
+    if (!config) return false;
+    return item.moduleId === config.moduleId
+      && item.practiceId === config.practiceId
+      && (item.lessonId === LESSON_ID ? isString(item.contentVersion) : item.contentVersion === config.contentVersion)
       && isString(item.runId)
       && Number.isInteger(item.lessonCardCheckpoint)
-      && (item.lessonCardCheckpoint ?? 0) >= M1_L1_CONVERSION.completionCard
+      && (item.lessonCardCheckpoint ?? 0) >= config.completionCard
       && item.quizGatesCompleted === true
       && item.rehearsalCompleted === true
       && item.retryCompleted === true
       && item.comparisonViewed === true
-      && item.savedMoveId === M1_L1_CONVERSION.namedMoveId
+      && item.savedMoveId === config.namedMoveId
       && ["say", "write", "save_later"].includes(item.transferChoice ?? "")
       && typeof item.completedAt === "number"
       && Number.isFinite(item.completedAt)
       && item.completedAt > 0
       && item.sourceLineage === "approved-html-deck-pinned"
-      && (item.customWording === undefined || (typeof item.customWording === "string" && item.customWording.trim().length > 0 && item.customWording.length <= 240));
+      && (item.customWording === undefined || (item.lessonId === LESSON_ID && typeof item.customWording === "string" && item.customWording.trim().length > 0 && item.customWording.length <= 240));
   });
 }
 
@@ -447,11 +449,14 @@ export function mergeConvertedLessonProgress(existing: unknown, incoming: Conver
 }
 
 export function convertedProgressFacts(record: ConvertedLessonProgress): readonly string[] {
+  const completionCard = record.lessonId === LESSON_ID
+    ? M1_L1_CONVERSION.completionCard
+    : approvedRehearsalConfig(record.lessonId)?.completionCard ?? Number.MAX_SAFE_INTEGER;
   return [
     "Practice completed",
     ...(record.retryCompleted ? ["Retry completed"] : []),
     ...(record.savedMoveId ? ["Move saved"] : []),
-    ...(record.lessonCardCheckpoint >= M1_L1_CONVERSION.completionCard ? ["Lesson completed"] : []),
+    ...(record.lessonCardCheckpoint >= completionCard ? ["Lesson completed"] : []),
   ];
 }
 

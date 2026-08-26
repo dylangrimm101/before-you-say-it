@@ -164,7 +164,7 @@ function sliceCards(template: string, throughCard: number): string {
   return `${template.slice(0, deferredCardStart)}${template.slice(cardsEnd)}`;
 }
 
-/** Converts M1 L1's approved handoff action into the fail-closed native QA runtime launch. */
+/** Converts an approved lesson handoff action into the fail-closed native QA runtime launch. */
 export function convertedHandoffDeckHtml(rawHtml: string, handoffCard: number): string {
   return replaceEncodedTemplate(rawHtml, (source) => {
     const sliced = sliceCards(source, handoffCard);
@@ -196,12 +196,12 @@ function sliceCardsFrom(template: string, returnCard: number, completionCard: nu
   const slicedCardsEnd = sliced.indexOf("\n];", slicedCardsStart);
   const inventory = Array.from(sliced.slice(slicedCardsStart, slicedCardsEnd).matchAll(/\{ n:(\d+), type:/g), (match) => Number(match[1]));
   if (inventory.length !== 2 || inventory[0] !== returnCard || inventory[1] !== completionCard) {
-    throw new Error("Converted return inventory must contain exactly Cards 21–22");
+    throw new Error(`Converted return inventory must contain exactly Cards ${returnCard}–${completionCard}`);
   }
   return sliced;
 }
 
-/** Executes only the accepted post-rehearsal Cards 21–22, never the full remote deck. */
+/** Executes only the lesson's two accepted post-rehearsal cards, never the full remote deck. */
 export function returnedDeckHtml(rawHtml: string, returnCard: number, completionCard: number = 22, approvedMoveSaved: boolean = false): string {
   return replaceEncodedTemplate(rawHtml, (source) => {
     let sliced = sliceCardsFrom(source, returnCard, completionCard);

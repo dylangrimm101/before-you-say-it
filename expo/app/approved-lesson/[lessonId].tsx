@@ -10,6 +10,7 @@ import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { C, GUTTER, T, font, shadow } from "@/constants/theme";
 import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
 import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
+import { approvedRehearsalConfig, validateApprovedRehearsalCompletion } from "@/lib/approvedRehearsals";
 import { approvedCustomWording, conversionRuntimeEnabled, M1_L1_CONVERSION, validateM1L1Completion, type TransferChoice } from "@/lib/convertedLesson";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useStore } from "@/providers/store";
@@ -28,22 +29,28 @@ export default function ApprovedLessonDeckScreen() {
     replaceActiveScenarioRunStrict,
     writePendingConvertedLessonCompletion,
   } = useStore();
-  const isConverted = conversionRuntimeEnabled(params.lessonId);
+  const isM1L1 = conversionRuntimeEnabled(params.lessonId);
+  const approvedConfig = approvedRehearsalConfig(params.lessonId);
+  const rehearsalConfig = isM1L1 ? M1_L1_CONVERSION : approvedConfig;
+  const isConverted = Boolean(rehearsalConfig);
   const isReturning = isConverted && params.returnFromRehearsal === "1";
   const returningRun = activeScenarioRun?.run;
+  const hasValidReturn = isM1L1
+    ? validateM1L1Completion(returningRun, params.runId).isValid
+    : Boolean(approvedConfig && validateApprovedRehearsalCompletion(approvedConfig, returningRun, params.runId));
   const isApprovedMoveSaved = !isReturning || Boolean(
-    returningRun?.m1L1?.approvedMoveSavedAt && validateM1L1Completion(returningRun, params.runId).isValid,
+    isM1L1 ? returningRun?.m1L1?.approvedMoveSavedAt && hasValidReturn : hasValidReturn,
   );
   const [customDraft, setCustomDraft] = useState<string>("");
   const [customWording, setCustomWording] = useState<string | null>(null);
-  const [showWordingConsent, setShowWordingConsent] = useState<boolean>(isReturning);
+  const [showWordingConsent, setShowWordingConsent] = useState<boolean>(isReturning && isM1L1);
   const [completionCommitted, setCompletionCommitted] = useState<boolean>(false);
   const [deckHtml, setDeckHtml] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<boolean>(false);
 
   useEffect(() => {
     const run = activeScenarioRun?.run;
-    if (!isReturning || !activeScenarioRun || !run || run.m1L1?.approvedMoveSavedAt) return;
+    if (!isM1L1 || !isReturning || !activeScenarioRun || !run || run.m1L1?.approvedMoveSavedAt) return;
     if (!validateM1L1Completion(run, params.runId).isValid) return;
     void replaceActiveScenarioRunStrict(
       { ...activeScenarioRun, run: { ...run, m1L1: { ...run.m1L1!, approvedMoveSavedAt: Date.now() }, updatedAt: Math.max(Date.now(), run.updatedAt + 1) } },
@@ -52,7 +59,7 @@ export default function ApprovedLessonDeckScreen() {
       safeLog("[converted-lesson] approved move auto-save failed", errorShape(error));
       Alert.alert("We couldn’t save the approved move", "Stay on this screen and try returning from the rehearsal again.");
     });
-  }, [activeScenarioRun, isReturning, params.runId, replaceActiveScenarioRunStrict]);
+  }, [activeScenarioRun, isM1L1, isReturning, params.runId, replaceActiveScenarioRunStrict]);
 
   useEffect(() => {
     let isActive = true;
@@ -60,10 +67,10 @@ export default function ApprovedLessonDeckScreen() {
     setLoadError(false);
     if (!__DEV__ || !lesson) return () => { isActive = false; };
 
-    const loader = isReturning
-      ? loadReturnedDeckHtml(lesson.archivePath, M1_L1_CONVERSION.returnCard, M1_L1_CONVERSION.completionCard, isApprovedMoveSaved)
-      : isConverted
-        ? loadConvertedHandoffDeckHtml(lesson.archivePath, M1_L1_CONVERSION.rehearsalHandoffCard)
+    const loader = isReturning && rehearsalConfig
+      ? loadReturnedDeckHtml(lesson.archivePath, rehearsalConfig.returnCard, rehearsalConfig.completionCard, isApprovedMoveSaved)
+      : rehearsalConfig
+        ? loadConvertedHandoffDeckHtml(lesson.archivePath, rehearsalConfig.rehearsalHandoffCard)
         : loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard);
     loader.then((html) => { if (isActive) setDeckHtml(html); })
       .catch((error: unknown) => {
@@ -71,7 +78,7 @@ export default function ApprovedLessonDeckScreen() {
         if (isActive) setLoadError(true);
       });
     return () => { isActive = false; };
-  }, [isApprovedMoveSaved, isConverted, isReturning, lesson]);
+  }, [isApprovedMoveSaved, isReturning, lesson, rehearsalConfig]);
 
   const reviewGuard = useMemo(() => {
     if (!lesson) return "true;";
@@ -205,30 +212,32 @@ export default function ApprovedLessonDeckScreen() {
     } catch {
       return;
     }
-    if (message.type === "start-rehearsal" && isConverted && !isReturning) {
-      router.push({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: M1_L1_CONVERSION.lessonId } });
+    if (message.type === "start-rehearsal" && rehearsalConfig && !isReturning) {
+      router.push({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: rehearsalConfig.lessonId } });
       return;
     }
     const run = activeScenarioRun?.run;
-    const completion = validateM1L1Completion(run, params.runId);
-    if (message.type !== "transfer-selected" || !isReturning || message.runId !== params.runId || !completion.isValid || completionCommitted) return;
+    const completionIsValid = isM1L1
+      ? validateM1L1Completion(run, params.runId).isValid
+      : Boolean(approvedConfig && validateApprovedRehearsalCompletion(approvedConfig, run, params.runId));
+    if (message.type !== "transfer-selected" || !isReturning || message.runId !== params.runId || !completionIsValid || completionCommitted || !rehearsalConfig) return;
     const transferByLabel: Record<string, TransferChoice> = { "say it": "say", "write it": "write", "save it for later": "save_later" };
     const transferChoice = typeof message.label === "string" ? transferByLabel[message.label] : undefined;
     if (!transferChoice || !run) return;
     try {
       await finalizeConvertedLesson({
-        lessonId: M1_L1_CONVERSION.lessonId,
-        moduleId: M1_L1_CONVERSION.moduleId,
-        practiceId: M1_L1_CONVERSION.practiceId,
-        contentVersion: M1_L1_CONVERSION.contentVersion,
+        lessonId: rehearsalConfig.lessonId,
+        moduleId: rehearsalConfig.moduleId,
+        practiceId: rehearsalConfig.practiceId,
+        contentVersion: rehearsalConfig.contentVersion,
         runId: run.id,
-        lessonCardCheckpoint: M1_L1_CONVERSION.completionCard,
+        lessonCardCheckpoint: rehearsalConfig.completionCard,
         quizGatesCompleted: true,
         rehearsalCompleted: true,
         retryCompleted: true,
         comparisonViewed: true,
-        savedMoveId: M1_L1_CONVERSION.namedMoveId,
-        ...(customWording ? { customWording } : {}),
+        savedMoveId: rehearsalConfig.namedMoveId,
+        ...(isM1L1 && customWording ? { customWording } : {}),
         transferChoice,
         completedAt: Date.now(),
         sourceLineage: "approved-html-deck-pinned",
@@ -248,7 +257,7 @@ export default function ApprovedLessonDeckScreen() {
       safeLog("[converted-lesson] progress commit failed", errorShape(error));
       Alert.alert("We couldn’t finish securely", "Progress or rehearsal deletion did not complete. Stay on this screen and try again.");
     }
-  }, [activeScenarioRun, clearActiveScenarioRunStrict, completionCommitted, customWording, isConverted, isReturning, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, router, writePendingConvertedLessonCompletion]);
+  }, [activeScenarioRun, approvedConfig, clearActiveScenarioRunStrict, completionCommitted, customWording, isM1L1, isReturning, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, rehearsalConfig, router, writePendingConvertedLessonCompletion]);
 
   if (!__DEV__) {
     return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
