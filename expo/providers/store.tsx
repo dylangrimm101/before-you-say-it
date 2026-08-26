@@ -7,6 +7,7 @@ import { CURRICULUM_MODULES, isModuleId, type ModuleId } from "@/constants/modul
 import { SCENARIOS } from "@/constants/scenarios";
 import type { AccessState, Entitlement } from "@/lib/access";
 import {
+  activeRunRevision,
   archiveActiveScenarioRunCAS,
   clearActiveScenarioRunCAS,
   readActiveScenarioRunStrict,
@@ -24,6 +25,10 @@ import {
 import { clearLiveSessionContent } from "@/lib/ephemeral";
 import { completedReviewPracticeIds, migrateLegacyPilotProgress } from "@/lib/curriculumMigration";
 import { normalizeConvertedLessonProgress, type ConvertedLessonProgress } from "@/lib/convertedLesson";
+import {
+  resetConvertedLessonProgress,
+  restoreConvertedLessonProgress,
+} from "@/lib/convertedProgressRepository";
 import {
   markPendingPrivateContentDeleted,
   promotePendingConvertedCompletion,
@@ -405,6 +410,32 @@ export const [StoreProvider, useStore] = createContextHook(() => {
 
   const promotePendingConvertedLessonCompletion = useCallback(async (expectedRunId: string): Promise<void> => {
     const next = await promotePendingConvertedCompletion(AsyncStorage, expectedRunId);
+    setConvertedLessonProgress(next);
+  }, []);
+
+  /** Clears one lesson's completion and any exact active rehearsal; deleted private content is never restored by Undo. */
+  const resetConvertedLesson = useCallback(async (identity: {
+    lessonId: ConvertedLessonProgress["lessonId"];
+    moduleId: string;
+    practiceId: string;
+  }): Promise<ConvertedLessonProgress[]> => {
+    const active = activeScenarioRun;
+    if (active?.run.convertedModuleId === identity.moduleId && active.run.practiceId === identity.practiceId) {
+      const expected = activeRunRevision(active);
+      if (!expected) throw new Error("Active rehearsal identity is unavailable");
+      await clearActiveScenarioRunStrict(expected);
+    }
+    const result = await resetConvertedLessonProgress(AsyncStorage, identity.lessonId);
+    setConvertedLessonProgress(result.next);
+    return result.removed;
+  }, [activeScenarioRun, clearActiveScenarioRunStrict]);
+
+  /** Restores only the minimized completion facts captured by a recent lesson reset. */
+  const undoConvertedLessonReset = useCallback(async (
+    lessonId: ConvertedLessonProgress["lessonId"],
+    snapshot: readonly ConvertedLessonProgress[],
+  ): Promise<void> => {
+    const next = await restoreConvertedLessonProgress(AsyncStorage, lessonId, snapshot);
     setConvertedLessonProgress(next);
   }, []);
 
@@ -888,6 +919,8 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     writePendingConvertedLessonCompletion,
     markPendingConvertedLessonPrivateContentDeleted,
     promotePendingConvertedLessonCompletion,
+    resetConvertedLesson,
+    undoConvertedLessonReset,
     associateActivePracticeSessionWithUser,
     currentPilotDay,
     markPilotDayDone,

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, ShieldCheck } from "lucide-react-native";
+import { ArrowLeft, MoreHorizontal, RotateCcw, ShieldCheck } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,7 +11,7 @@ import { C, GUTTER, T, font, shadow } from "@/constants/theme";
 import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
 import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
 import { approvedRehearsalConfig, validateApprovedRehearsalCompletion } from "@/lib/approvedRehearsals";
-import { approvedCustomWording, conversionRuntimeEnabled, M1_L1_CONVERSION, validateM1L1Completion, type TransferChoice } from "@/lib/convertedLesson";
+import { approvedCustomWording, conversionRuntimeEnabled, M1_L1_CONVERSION, validateM1L1Completion, type ConvertedLessonProgress, type TransferChoice } from "@/lib/convertedLesson";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useStore } from "@/providers/store";
 
@@ -27,13 +27,16 @@ export default function ApprovedLessonDeckScreen() {
     markPendingConvertedLessonPrivateContentDeleted,
     promotePendingConvertedLessonCompletion,
     replaceActiveScenarioRunStrict,
+    resetConvertedLesson,
+    undoConvertedLessonReset,
     writePendingConvertedLessonCompletion,
   } = useStore();
+  const [lessonWasReset, setLessonWasReset] = useState<boolean>(false);
   const isM1L1 = conversionRuntimeEnabled(params.lessonId);
   const approvedConfig = approvedRehearsalConfig(params.lessonId);
   const rehearsalConfig = isM1L1 ? M1_L1_CONVERSION : approvedConfig;
   const isConverted = Boolean(rehearsalConfig);
-  const isReturning = isConverted && params.returnFromRehearsal === "1";
+  const isReturning = isConverted && params.returnFromRehearsal === "1" && !lessonWasReset;
   const returningRun = activeScenarioRun?.run;
   const hasValidReturn = isM1L1
     ? validateM1L1Completion(returningRun, params.runId).isValid
@@ -47,6 +50,9 @@ export default function ApprovedLessonDeckScreen() {
   const [completionCommitted, setCompletionCommitted] = useState<boolean>(false);
   const [deckHtml, setDeckHtml] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<boolean>(false);
+  const [isLessonMenuOpen, setIsLessonMenuOpen] = useState<boolean>(false);
+  const [isResetting, setIsResetting] = useState<boolean>(false);
+  const [resetNotice, setResetNotice] = useState<{ message: string; snapshot: ConvertedLessonProgress[]; canUndo: boolean } | null>(null);
 
   useEffect(() => {
     const run = activeScenarioRun?.run;
@@ -60,6 +66,12 @@ export default function ApprovedLessonDeckScreen() {
       Alert.alert("We couldn’t save the approved move", "Stay on this screen and try returning from the rehearsal again.");
     });
   }, [activeScenarioRun, isM1L1, isReturning, params.runId, replaceActiveScenarioRunStrict]);
+
+  useEffect(() => {
+    if (!resetNotice) return undefined;
+    const timer = setTimeout(() => setResetNotice(null), 6000);
+    return () => clearTimeout(timer);
+  }, [resetNotice]);
 
   useEffect(() => {
     let isActive = true;
@@ -205,6 +217,45 @@ export default function ApprovedLessonDeckScreen() {
     `;
   }, [isApprovedMoveSaved, isConverted, isReturning, lesson, params.runId]);
 
+  const handleResetLesson = useCallback(async (): Promise<void> => {
+    if (!rehearsalConfig || isResetting) return;
+    setIsLessonMenuOpen(false);
+    setIsResetting(true);
+    try {
+      const snapshot = await resetConvertedLesson({
+        lessonId: rehearsalConfig.lessonId,
+        moduleId: rehearsalConfig.moduleId,
+        practiceId: rehearsalConfig.practiceId,
+      });
+      setCompletionCommitted(false);
+      setCustomDraft("");
+      setCustomWording(null);
+      setShowWordingConsent(false);
+      setLessonWasReset(true);
+      setResetNotice({
+        message: "Lesson reset. Starting again at Card 1.",
+        snapshot,
+        canUndo: snapshot.length > 0,
+      });
+    } catch (error: unknown) {
+      safeLog("[converted-lesson] lesson reset failed", errorShape(error));
+      Alert.alert("We couldn’t reset this lesson", "Your saved progress was not cleared. Try again.");
+    } finally {
+      setIsResetting(false);
+    }
+  }, [isResetting, rehearsalConfig, resetConvertedLesson]);
+
+  const handleUndoReset = useCallback(async (): Promise<void> => {
+    if (!rehearsalConfig || !resetNotice?.canUndo) return;
+    try {
+      await undoConvertedLessonReset(rehearsalConfig.lessonId, resetNotice.snapshot);
+      setResetNotice({ message: "Completion restored. Private rehearsal content stays deleted.", snapshot: [], canUndo: false });
+    } catch (error: unknown) {
+      safeLog("[converted-lesson] lesson reset undo failed", errorShape(error));
+      Alert.alert("We couldn’t undo the reset", "The lesson remains ready to begin again at Card 1.");
+    }
+  }, [rehearsalConfig, resetNotice, undoConvertedLessonReset]);
+
   const handleDeckMessage = useCallback(async (raw: string): Promise<void> => {
     let message: { type?: unknown; label?: unknown; runId?: unknown };
     try {
@@ -299,7 +350,25 @@ export default function ApprovedLessonDeckScreen() {
       >
         <ArrowLeft size={20} color={C.text} />
       </Pressable>
+      {isConverted ? <Pressable
+        onPress={() => setIsLessonMenuOpen((current) => !current)}
+        style={[styles.menuButton, { top: insets.top + 6 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Lesson options"
+        accessibilityState={{ expanded: isLessonMenuOpen }}
+      >
+        <MoreHorizontal size={21} color={C.text} />
+      </Pressable> : null}
+      {isLessonMenuOpen && rehearsalConfig ? <View style={[styles.lessonMenu, { top: insets.top + 56 }]}>
+        <Text style={styles.lessonMenuLabel}>LESSON OPTIONS</Text>
+        <Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.lessonMenuAction} accessibilityRole="button">
+          {isResetting ? <ActivityIndicator size="small" color={C.clay} /> : <RotateCcw size={18} color={C.clay} />}
+          <View style={styles.lessonMenuCopy}><Text style={styles.lessonMenuTitle}>Reset this lesson</Text><Text style={styles.lessonMenuBody}>Clear its completion and rehearsal, then return to Card 1.</Text></View>
+        </Pressable>
+      </View> : null}
       {showWordingConsent && isApprovedMoveSaved && !completionCommitted ? <View style={[styles.wordingPanel, { bottom: insets.bottom + 18 }]}><Text style={styles.wordingTitle}>Optional custom wording</Text><Text style={styles.wordingBody}>The approved move is already saved. Custom text is retained only if you choose Save this wording.</Text><TextInput value={customDraft} onChangeText={setCustomDraft} maxLength={240} placeholder="Optional wording" style={styles.wordingInput} /><Pressable onPress={() => { const approved = approvedCustomWording(customDraft); if (approved) { setCustomWording(approved); setShowWordingConsent(false); } }} style={styles.wordingPrimary} accessibilityRole="button"><Text style={styles.wordingPrimaryText}>Save this wording</Text></Pressable><Pressable onPress={() => setShowWordingConsent(false)} style={styles.wordingSecondary} accessibilityRole="button"><Text style={styles.wordingSecondaryText}>Keep the approved move only</Text></Pressable></View> : null}
+      {completionCommitted && !lessonWasReset ? <View style={[styles.completionReset, { bottom: insets.bottom + 18 }]}><Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.completionResetButton} accessibilityRole="button"><RotateCcw size={18} color={C.purple} /><Text style={styles.completionResetText}>{isResetting ? "Resetting…" : "Do this lesson again"}</Text></Pressable></View> : null}
+      {resetNotice ? <View style={[styles.resetNotice, { bottom: insets.bottom + 18 }]}><Text style={styles.resetNoticeText}>{resetNotice.message}</Text>{resetNotice.canUndo ? <Pressable onPress={() => void handleUndoReset()} style={styles.undoButton} accessibilityRole="button"><Text style={styles.undoText}>Undo</Text></Pressable> : null}</View> : null}
       <View pointerEvents="none" style={[styles.qaBadge, { top: insets.top + 9 }]}>
         <Text style={styles.qaBadgeText}>{completionCommitted ? (customWording ? "COMPLETE · ONLY SAVED WORDING RETAINED" : "COMPLETE · TRANSCRIPT DELETED") : isReturning ? "REHEARSAL COMPLETE" : "INTERNAL QA"}</Text>
       </View>
@@ -323,10 +392,17 @@ const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   loadingText: { ...T.caption },
   backButton: { position: "absolute", left: 12, zIndex: 4, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
-  qaBadge: { position: "absolute", right: 14, zIndex: 3, minHeight: 32, borderRadius: 16, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line },
+  menuButton: { position: "absolute", right: 12, zIndex: 5, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
+  qaBadge: { position: "absolute", alignSelf: "center", zIndex: 3, minHeight: 32, borderRadius: 16, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line },
   qaBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.1, color: C.purple },
   wordingPanel: { position: "absolute", left: 18, right: 18, zIndex: 6, borderRadius: 20, padding: 16, backgroundColor: "rgba(255,255,255,0.98)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
   wordingTitle: { ...T.support, color: C.text, fontFamily: font.bold }, wordingBody: { ...T.caption, marginTop: 5 }, wordingInput: { ...T.body, minHeight: 44, marginTop: 10, borderWidth: 1, borderColor: C.line, borderRadius: 12, paddingHorizontal: 12, backgroundColor: C.surfaceHigh }, wordingPrimary: { minHeight: 44, marginTop: 10, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: C.purple }, wordingPrimaryText: { fontFamily: font.bold, fontSize: 13, color: C.onAccent }, wordingSecondary: { minHeight: 44, alignItems: "center", justifyContent: "center" }, wordingSecondaryText: { fontFamily: font.semi, fontSize: 12, color: C.purple },
+  lessonMenu: { position: "absolute", right: 12, zIndex: 8, width: 278, borderRadius: 18, padding: 12, backgroundColor: "rgba(255,255,255,0.98)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
+  lessonMenuLabel: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.2, color: C.dim, paddingHorizontal: 6, paddingBottom: 7 },
+  lessonMenuAction: { minHeight: 70, borderRadius: 14, padding: 10, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.claySoft },
+  lessonMenuCopy: { flex: 1 }, lessonMenuTitle: { fontFamily: font.bold, fontSize: 14, color: C.clay }, lessonMenuBody: { ...T.caption, marginTop: 2 },
+  completionReset: { position: "absolute", left: 18, right: 18, zIndex: 6, alignItems: "center" }, completionResetButton: { minHeight: 48, borderRadius: 24, paddingHorizontal: 18, flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.96)", borderWidth: 1, borderColor: C.line, ...shadow.layer }, completionResetText: { fontFamily: font.bold, fontSize: 13, color: C.purple },
+  resetNotice: { position: "absolute", left: 14, right: 14, zIndex: 10, minHeight: 56, borderRadius: 18, paddingLeft: 16, paddingRight: 8, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.text, ...shadow.layer }, resetNoticeText: { flex: 1, fontFamily: font.medium, fontSize: 13, lineHeight: 18, color: C.onAccent }, undoButton: { minWidth: 58, minHeight: 44, alignItems: "center", justifyContent: "center" }, undoText: { fontFamily: font.bold, fontSize: 13, color: "#DCC8F6" },
   unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
   unavailableTitle: { ...T.title, textAlign: "center", marginTop: 16 },
   unavailableBody: { ...T.support, textAlign: "center", marginTop: 8 },
