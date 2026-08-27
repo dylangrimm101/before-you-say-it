@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
-import { Backdrop, MicControl, PrimaryButton, Reveal } from "@/components/ui";
+import { Backdrop, MicControl, PrimaryButton, Reveal, Thinking } from "@/components/ui";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import {
   m1L1BehaviorFlags,
@@ -144,14 +144,17 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
   const confirmOpening = useCallback(async (): Promise<void> => {
     if (!value || draft.trim().length < 2) return;
     setBusy(true);
-    const approved = preserveScenarioAttempt(value, "opener", draft, Date.now());
-    const selected = selectM1L1PushbackOne(draft, approved.run.id);
-    const withPressure = attachM1L1PushbackOne(approved, selected, Date.now());
-    const ready = transitionScenarioPracticeRun(withPressure, "ready_for_response", Date.now());
-    await persist(ready);
-    setDraft("");
-    await speakPilotAudio(lineFor(selected));
-    setBusy(false);
+    try {
+      const approved = preserveScenarioAttempt(value, "opener", draft, Date.now());
+      const selected = selectM1L1PushbackOne(draft, approved.run.id);
+      const withPressure = attachM1L1PushbackOne(approved, selected, Date.now());
+      const ready = transitionScenarioPracticeRun(withPressure, "ready_for_response", Date.now());
+      await persist(ready);
+      setDraft("");
+      await speakPilotAudio(lineFor(selected));
+    } finally {
+      setBusy(false);
+    }
   }, [draft, persist, value]);
 
   const confirmFirstResponse = useCallback(async (): Promise<void> => {
@@ -286,6 +289,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
         <StatusPill label="WORK · M1 L1" tone="purple" /><Text style={styles.scenarioTitle}>{convertedLesson.scenario.title}</Text><Text style={styles.context}>{convertedLesson.scenario.situation}</Text>
         <View accessible accessibilityLabel={`${progressLabel}. Eight-beat rehearsal progress.`} style={styles.progress}><View style={[styles.progressFill, { width: `${(step / 8) * 100}%` }]} /></View>
         {messages.map((message) => <View key={message.id} style={[styles.messageWrap, message.mine ? styles.mine : styles.theirs]}><Text style={styles.messageLabel}>{message.who}</Text><View style={[styles.bubble, message.mine ? styles.bubbleMine : styles.bubbleTheirs]}><Text style={[styles.messageText, message.mine ? styles.messageTextMine : null]}>{message.text}</Text></View></View>)}
+        {busy && state === "confirm_attempt_transcript" ? <View style={[styles.messageWrap, styles.theirs]} accessibilityLiveRegion="polite" accessibilityLabel="Adam is thinking"><Text style={styles.messageLabel}>Adam</Text><View style={[styles.bubble, styles.bubbleTheirs, styles.thinkingBubble]}><Thinking /><Text style={styles.thinkingText}>Adam is thinking…</Text></View></View> : null}
 
         {permissionKind ? <ProductCard accent style={styles.card}><SectionLabel tone={C.purple}>Use your voice for this rehearsal</SectionLabel><Text style={styles.body}>Microphone access is used only for the turn you choose to record. You can type instead.</Text>{dictation.status === "denied" ? <><Text style={styles.title}>Microphone access is off</Text><PrimaryButton label="Open Settings" onPress={() => void Linking.openSettings()} containerStyle={styles.action} /></> : <PrimaryButton label="Allow microphone" onPress={() => void allowMicrophone()} containerStyle={styles.action} />}<Pressable onPress={() => void typeCapture(permissionKind)} style={styles.secondary}><Text style={styles.secondaryText}>Type this turn instead</Text></Pressable></ProductCard> : null}
         {state === "ready_for_attempt" ? <Capture title="Open with one point, one proof, and one move." kind="opener" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /> : null}
@@ -315,5 +319,5 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: GUTTER, paddingTop: 12 }, scenarioTitle: { ...T.title, marginTop: 10 }, context: { ...T.support, marginTop: 7 }, progress: { height: 5, borderRadius: 3, backgroundColor: C.track, overflow: "hidden", marginTop: 14 }, progressFill: { height: "100%", backgroundColor: C.purple },
   title: { ...T.title, marginTop: 22 }, body: { ...T.support, marginTop: 8 }, action: { marginTop: 18 }, capture: { alignItems: "center", marginTop: 18 }, or: { ...T.caption, marginVertical: 16 }, input: { ...T.body, minHeight: 108, width: "100%", backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.glassEdge, borderRadius: radius.md, padding: 16, textAlignVertical: "top" },
   card: { marginTop: 16, gap: 10 }, secondary: { minHeight: 44, alignItems: "center", justifyContent: "center" }, secondaryText: { ...T.caption, color: C.purple, fontFamily: font.semi },
-  messageWrap: { maxWidth: "84%", marginTop: 10 }, mine: { alignSelf: "flex-end", alignItems: "flex-end" }, theirs: { alignSelf: "flex-start", alignItems: "flex-start" }, messageLabel: { ...T.caption, fontFamily: font.semi, marginBottom: 4 }, bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 11 }, bubbleMine: { backgroundColor: C.purple }, bubbleTheirs: { backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.line }, messageText: { ...T.support, color: C.text }, messageTextMine: { color: C.onAccent },
+  messageWrap: { maxWidth: "84%", marginTop: 10 }, thinkingBubble: { minWidth: 156, flexDirection: "row", alignItems: "center", gap: 10 }, thinkingText: { ...T.caption, color: C.textSoft }, mine: { alignSelf: "flex-end", alignItems: "flex-end" }, theirs: { alignSelf: "flex-start", alignItems: "flex-start" }, messageLabel: { ...T.caption, fontFamily: font.semi, marginBottom: 4 }, bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 11 }, bubbleMine: { backgroundColor: C.purple }, bubbleTheirs: { backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.line }, messageText: { ...T.support, color: C.text }, messageTextMine: { color: C.onAccent },
 });

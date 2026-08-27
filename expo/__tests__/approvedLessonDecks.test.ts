@@ -196,6 +196,17 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(implementation).not.toContain("A DIFFERENT ROUTE MAY FIT BETTER");
   });
 
+  test("shows the onboarding-style thinking indicator while lesson counterparts respond", async () => {
+    const sharedRuntime = await source("components/ScenarioPaidPractice.tsx");
+    const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
+    expect(sharedRuntime).toContain("<Thinking />");
+    expect(sharedRuntime).toContain("is thinking…");
+    expect(sharedRuntime).toContain('accessibilityLiveRegion="polite"');
+    expect(m1L1Runtime).toContain("<Thinking />");
+    expect(m1L1Runtime).toContain("Adam is thinking…");
+    expect(m1L1Runtime).toContain('accessibilityLiveRegion="polite"');
+  });
+
   test("keeps the catalog and deck route fail-closed outside development", async () => {
     const catalogScreen = await source("app/approved-lessons.tsx");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
