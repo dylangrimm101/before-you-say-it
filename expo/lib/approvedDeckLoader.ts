@@ -130,6 +130,13 @@ export function installTapTutorialDismissal(template: string): string {
   return template.replace(TAP_TUTORIAL_GO_HANDLER, `${TAP_TUTORIAL_GO_HANDLER}${TAP_TUTORIAL_DISMISSAL}`);
 }
 
+const REHEARSAL_CONTINUATION_PARAGRAPH = /<p\b[^>]*>\s*The rehearsal runs in the voice engine\..*?<\/p>/gs;
+
+/** Removes the redundant continuation paragraph from rehearsal handoff cards. */
+export function removeRehearsalContinuationCopy(template: string): string {
+  return template.replace(REHEARSAL_CONTINUATION_PARAGRAPH, "");
+}
+
 /** Flattens the approved artifact into one same-origin page for native WebViews. */
 export function materializeApprovedDeckHtml(bundleHtml: string): string {
   const templateEncoded = bundleHtml.match(TEMPLATE_PATTERN)?.[1];
@@ -137,7 +144,7 @@ export function materializeApprovedDeckHtml(bundleHtml: string): string {
   const externalEncoded = bundleHtml.match(EXTERNAL_RESOURCES_PATTERN)?.[1];
   if (!templateEncoded || !manifestEncoded || !externalEncoded) throw new Error("Approved lesson bundle metadata is missing");
 
-  let template = installTapTutorialDismissal(JSON.parse(templateEncoded) as string);
+  let template = removeRehearsalContinuationCopy(installTapTutorialDismissal(JSON.parse(templateEncoded) as string));
   const manifest = JSON.parse(manifestEncoded) as Record<string, BundleEntry>;
   const externalResources = JSON.parse(externalEncoded) as ExternalResource[];
   const externalScripts = externalResources.map(({ uuid }) => {

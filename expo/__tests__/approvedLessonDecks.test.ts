@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { authorizedDeckHtml, installTapTutorialDismissal, materializeApprovedDeckHtml } from "../lib/approvedDeckLoader";
+import { authorizedDeckHtml, installTapTutorialDismissal, materializeApprovedDeckHtml, removeRehearsalContinuationCopy } from "../lib/approvedDeckLoader";
 
 const DECK_LIMITS = {
   "M1-L1-Buried-Point.html": 20,
@@ -118,6 +118,24 @@ describe("approved Modules 1 and 2 internal deck port", () => {
       expect((installed.match(/if \(this\.state\.hint && this\.state\.i === 0\)/g) ?? [])).toHaveLength(1);
     }
     expect(tutorialDeckCount).toBe(11);
+  });
+
+  test("removes the redundant voice-engine continuation paragraph from every handoff that contains it", async () => {
+    const paragraphStart = "The rehearsal runs in the voice engine.";
+    let affectedDeckCount = 0;
+    for (const fileName of Object.keys(DECK_LIMITS)) {
+      const template = approvedTemplate(await source(`assets/lesson-decks/${fileName}`));
+      const cleaned = removeRehearsalContinuationCopy(template);
+      if (!template.includes(paragraphStart)) {
+        expect(cleaned).toBe(template);
+        continue;
+      }
+      affectedDeckCount += 1;
+      expect(cleaned).not.toContain(paragraphStart);
+      expect(cleaned).toContain("Now say it out loud");
+      expect(cleaned).toContain("Start rehearsal");
+    }
+    expect(affectedDeckCount).toBe(1);
   });
 
   test("re-verifies every fetched deck against its authorized boundary before display", async () => {
