@@ -19,24 +19,38 @@ const M1_L1_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/d
 const M1_L1_EMPTY_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*<\/div>\s*<\/div>/gis;
 
 let archivePromise: Promise<Record<string, Uint8Array>> | null = null;
+const ARCHIVE_LOAD_ATTEMPTS = 3;
+const ARCHIVE_LOAD_TIMEOUT_MS = 12_000;
 
 /** Binds executable M1 L1 deck bytes to its lesson path and content version. */
 export function isApprovedM1L1DeckDigest(archivePath: string, contentVersion: string, digest: string): boolean {
   return archivePath === M1_L1_ARCHIVE_PATH && contentVersion === M1_L1_CONTENT_VERSION && digest === M1_L1_APPROVED_SHA256;
 }
 
+async function fetchApprovedArchive(): Promise<Record<string, Uint8Array>> {
+  let lastError: unknown = new Error("Approved lesson archive is unavailable");
+  for (let attempt = 0; attempt < ARCHIVE_LOAD_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ARCHIVE_LOAD_TIMEOUT_MS);
+    try {
+      const response = await fetch(APPROVED_HANDOFF_ARCHIVE_URL, { signal: controller.signal });
+      if (!response.ok) throw new Error("Approved lesson archive is unavailable");
+      return unzipSync(new Uint8Array(await response.arrayBuffer()));
+    } catch (error: unknown) {
+      lastError = error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError;
+}
+
 function approvedArchive(): Promise<Record<string, Uint8Array>> {
   if (!archivePromise) {
-    archivePromise = fetch(APPROVED_HANDOFF_ARCHIVE_URL)
-      .then((response) => {
-        if (!response.ok) throw new Error("Approved lesson archive is unavailable");
-        return response.arrayBuffer();
-      })
-      .then((buffer) => unzipSync(new Uint8Array(buffer)))
-      .catch((error: unknown) => {
-        archivePromise = null;
-        throw error;
-      });
+    archivePromise = fetchApprovedArchive().catch((error: unknown) => {
+      archivePromise = null;
+      throw error;
+    });
   }
   return archivePromise;
 }

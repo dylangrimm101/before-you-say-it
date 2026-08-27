@@ -52,6 +52,7 @@ export default function ApprovedLessonDeckScreen() {
   const [isCompleting, setIsCompleting] = useState<boolean>(false);
   const [deckHtml, setDeckHtml] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<boolean>(false);
+  const [loadAttempt, setLoadAttempt] = useState<number>(0);
   const [isLessonMenuOpen, setIsLessonMenuOpen] = useState<boolean>(false);
   const [isResetting, setIsResetting] = useState<boolean>(false);
   const [resetNotice, setResetNotice] = useState<{ message: string; snapshot: ConvertedLessonProgress[]; canUndo: boolean } | null>(null);
@@ -79,7 +80,7 @@ export default function ApprovedLessonDeckScreen() {
         if (isActive) setLoadError(true);
       });
     return () => { isActive = false; };
-  }, [isApprovedMoveSaved, isReturning, lesson, rehearsalConfig]);
+  }, [isApprovedMoveSaved, isReturning, lesson, loadAttempt, rehearsalConfig]);
 
   const reviewGuard = useMemo(() => {
     if (!lesson) return "true;";
@@ -396,6 +397,7 @@ export default function ApprovedLessonDeckScreen() {
     <View style={styles.root}>
       {deckHtml && !loadError && isApprovedMoveSaved ? (
         <WebView
+          key={`${lesson.id}-${loadAttempt}`}
           source={{ html: deckHtml, baseUrl: "about:blank" }}
           style={styles.webView}
           originWhitelist={["*"]}
@@ -415,7 +417,11 @@ export default function ApprovedLessonDeckScreen() {
           accessibilityLabel={`${lesson.title} approved source deck`}
         />
       ) : loadError ? (
-        <Unavailable title="The approved deck couldn't open." body="Check your connection, return to the catalog, and try again." />
+        <Unavailable
+          title="The approved deck couldn't open."
+          body="The lesson is still available. Try loading it again."
+          onRetry={() => setLoadAttempt((current) => current + 1)}
+        />
       ) : (
         <View style={styles.loading}><ActivityIndicator color={C.purple} /><Text style={styles.loadingText}>Opening approved deck…</Text></View>
       )}
@@ -498,12 +504,13 @@ function LessonCompletionScreen({ impact, originalResponse, retryResponse, compa
   </ScrollView></View>;
 }
 
-function Unavailable({ title, body }: { title: string; body: string }) {
+function Unavailable({ title, body, onRetry }: { title: string; body: string; onRetry?: () => void }) {
   return (
     <View style={[styles.root, styles.unavailable]}>
       <ShieldCheck size={30} color={C.sage} />
       <Text style={styles.unavailableTitle}>{title}</Text>
       <Text style={styles.unavailableBody}>{body}</Text>
+      {onRetry ? <PrimaryButton label="Try again" onPress={onRetry} containerStyle={styles.retryButton} /> : null}
     </View>
   );
 }
@@ -530,4 +537,5 @@ const styles = StyleSheet.create({
   unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
   unavailableTitle: { ...T.title, textAlign: "center", marginTop: 16 },
   unavailableBody: { ...T.support, textAlign: "center", marginTop: 8 },
+  retryButton: { marginTop: 20, minWidth: 160 },
 });

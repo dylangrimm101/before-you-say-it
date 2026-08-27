@@ -70,6 +70,18 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     }
   });
 
+  test("retries transient archive failures and lets a failed WebView load be retried in place", async () => {
+    const loader = await source("lib/approvedDeckLoader.ts");
+    const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
+    expect(loader).toContain("ARCHIVE_LOAD_ATTEMPTS = 3");
+    expect(loader).toContain("ARCHIVE_LOAD_TIMEOUT_MS = 12_000");
+    expect(loader).toContain("for (let attempt = 0; attempt < ARCHIVE_LOAD_ATTEMPTS; attempt += 1)");
+    expect(loader).toContain("controller.abort()");
+    expect(deckScreen).toContain('label="Try again"');
+    expect(deckScreen).toContain("setLoadAttempt((current) => current + 1)");
+    expect(deckScreen).toContain("lesson, loadAttempt, rehearsalConfig");
+  });
+
   test("loads decks without relying on unsupported live-preview HTML asset URLs", async () => {
     const catalog = await source("constants/approvedLessons.ts");
     const loader = await source("lib/approvedDeckLoader.ts");
@@ -82,6 +94,18 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).toContain('source={{ html: deckHtml, baseUrl: "about:blank" }}');
     expect(deckScreen).not.toContain("Asset.fromModule");
     expect(deckScreen).not.toContain("downloadAsync");
+  });
+
+  test("materializes M1 L3 and M1 Close into complete WebView documents", async () => {
+    const m1L3 = materializeApprovedDeckHtml(await source("assets/lesson-decks/M1-L3-Park-and-Return.html"));
+    const m1Close = materializeApprovedDeckHtml(await source("assets/lesson-decks/M1-Close.html"));
+    for (const page of [m1L3, m1Close]) {
+      expect(page.startsWith("<!DOCTYPE html>")).toBe(true);
+      expect(page).toContain('data-bysi="deck"');
+      expect(page).toContain("window.React");
+      expect(page).not.toContain("__bundler_loading");
+      expect(page).not.toMatch(/<script\s+src=/i);
+    }
   });
 
   test("materializes approved decks without blob scripts or the artifact unpacker", async () => {
