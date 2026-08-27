@@ -207,6 +207,20 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(m1L1Runtime).toContain('accessibilityLiveRegion="polite"');
   });
 
+  test("gives the learner a concrete M1 L1 setup and an optional non-scripted opener hint", async () => {
+    const conversion = await source("lib/convertedLesson.ts");
+    const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
+    expect(conversion).toContain("weekly client file");
+    expect(conversion).toContain("Yesterday it arrived at 4:20 PM");
+    expect(conversion).toContain("before the 5:00 PM deadline");
+    expect(conversion).toContain("This has happened twice this month");
+    expect(conversion).toContain("send future files by noon");
+    expect(m1L1Runtime).toContain("Need help starting?");
+    expect(m1L1Runtime).toContain("Describe one thing Adam could have done differently. Then say what you need going forward.");
+    expect(m1L1Runtime).toContain("isOpenerHintVisible ?");
+    expect(m1L1Runtime).not.toContain('Shape: “When');
+  });
+
   test("uses the shortened seven-step M1 L1 flow without a second learner response", async () => {
     const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
     expect(m1L1Runtime).toContain("`Step ${step} of 7`");

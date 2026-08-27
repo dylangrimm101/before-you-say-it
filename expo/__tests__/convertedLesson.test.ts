@@ -103,6 +103,11 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(M1_L1_CONVERSION.context).toBe("work");
     expect(M1_L1_CONVERSION.counterpartId).toBe("adam");
     expect(M1_L1_CONVERSION.scenario.minutes).toBeUndefined();
+    expect(M1_L1_CONVERSION.scenario.situation).toContain("weekly client file");
+    expect(M1_L1_CONVERSION.scenario.situation).toContain("4:20 PM");
+    expect(M1_L1_CONVERSION.scenario.situation).toContain("5:00 PM deadline");
+    expect(M1_L1_CONVERSION.scenario.situation).toContain("twice this month");
+    expect(M1_L1_CONVERSION.scenario.situation).toContain("by noon");
     expect(M1_L1_CONVERSION.launchEligible).toBe(false);
   });
 

@@ -96,7 +96,7 @@ export const M1_L1_CONVERSION: ConvertedLessonConfig = {
     title: "The late handoff",
     counterpart: "Adam — your colleague",
     counterpartGender: "man",
-    situation: "Quarter close is underway. A late file handoff left too little review time, and you need one workable change for the next handoff.",
+    situation: "You’re speaking with Adam, a coworker who sends you a weekly client file. Yesterday it arrived at 4:20 PM, leaving you only 40 minutes to finish your part before the 5:00 PM deadline. This has happened twice this month. You want to ask Adam to send future files by noon.",
     persona: "Adam is a colleague under quarter-close pressure. He can push back, but he cannot resolve the decision for the learner.",
     goal: "Name one point, one concrete proof, and one answerable move.",
     opensWith: "user",
