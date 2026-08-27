@@ -92,17 +92,32 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(loader).toContain("authorizedDeckHtml");
     expect(deckScreen).toContain("loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard)");
     expect(deckScreen).toContain('source={{ html: deckHtml, baseUrl: "about:blank" }}');
+    expect(deckScreen).toContain('message.type === "deck-render-error"');
+    expect(deckScreen).toContain("setLoadError(true)");
     expect(deckScreen).not.toContain("Asset.fromModule");
     expect(deckScreen).not.toContain("downloadAsync");
   });
 
-  test("materializes M1 L3 and M1 Close into complete WebView documents", async () => {
-    const m1L3 = materializeApprovedDeckHtml(await source("assets/lesson-decks/M1-L3-Park-and-Return.html"));
-    const m1Close = materializeApprovedDeckHtml(await source("assets/lesson-decks/M1-Close.html"));
-    for (const page of [m1L3, m1Close]) {
+  test("repairs M1 L3 and M1 Close runtime dependency order before their cards mount", async () => {
+    const affectedBundles = [
+      await source("assets/lesson-decks/M1-L3-Park-and-Return.html"),
+      await source("assets/lesson-decks/M1-Close.html"),
+    ];
+    for (const bundle of affectedBundles) {
+      const externalEncoded = bundle.match(/<script type="__bundler\/ext_resources">\s*(.*?)\s*<\/script>/s)?.[1];
+      expect(externalEncoded).toBeTruthy();
+      const externalResources = JSON.parse(externalEncoded!) as { id: string }[];
+      expect(externalResources[0]?.id).toContain("react-dom@");
+
+      const page = materializeApprovedDeckHtml(bundle);
+      const reactIndex = page.indexOf("react.production.min.js");
+      const reactDomIndex = page.indexOf("react-dom.production.min.js");
       expect(page.startsWith("<!DOCTYPE html>")).toBe(true);
       expect(page).toContain('data-bysi="deck"');
-      expect(page).toContain("window.React");
+      expect(reactIndex).toBeGreaterThan(-1);
+      expect(reactDomIndex).toBeGreaterThan(reactIndex);
+      expect(page).toContain('post("deck-ready")');
+      expect(page).toContain('post("deck-render-error")');
       expect(page).not.toContain("__bundler_loading");
       expect(page).not.toMatch(/<script\s+src=/i);
     }

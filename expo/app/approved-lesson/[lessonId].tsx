@@ -251,6 +251,12 @@ export default function ApprovedLessonDeckScreen() {
     } catch {
       return;
     }
+    if (message.type === "deck-render-error") {
+      safeLog("[approved-lessons] deck runtime did not mount", { lessonId: lesson?.id ?? "unknown" });
+      setLoadError(true);
+      return;
+    }
+    if (message.type === "deck-ready") return;
     if (message.type === "start-rehearsal" && rehearsalConfig && !isReturning) {
       router.push({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: rehearsalConfig.lessonId } });
       return;
@@ -295,7 +301,7 @@ export default function ApprovedLessonDeckScreen() {
       safeLog("[converted-lesson] progress commit failed", errorShape(error));
       Alert.alert("We couldn’t finish securely", "Progress or rehearsal deletion did not complete. Stay on this screen and try again.");
     }
-  }, [activeScenarioRun, approvedConfig, clearActiveScenarioRunStrict, completionCommitted, isM1L1, isReturning, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, rehearsalConfig, router, writePendingConvertedLessonCompletion]);
+  }, [activeScenarioRun, approvedConfig, clearActiveScenarioRunStrict, completionCommitted, isM1L1, isReturning, lesson?.id, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, rehearsalConfig, router, writePendingConvertedLessonCompletion]);
 
   const indexEvidence = useMemo(
     () => progressHistoryPresentation(scoredPracticeHistory, activePracticeSession?.sharedResult),

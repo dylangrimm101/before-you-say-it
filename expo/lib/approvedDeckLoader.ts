@@ -117,6 +117,46 @@ function inlineScript(source: string): string {
   return `<script>${source.replace(/<\/script/gi, "<\\/script")}<\/script>`;
 }
 
+function externalRuntimePriority(resource: ExternalResource): number {
+  if (/\/react@[^/]+\/umd\/react\./i.test(resource.id)) return 0;
+  if (/\/react-dom@/i.test(resource.id)) return 1;
+  return 2;
+}
+
+function orderedExternalResources(resources: ExternalResource[]): ExternalResource[] {
+  return resources
+    .map((resource, sourceIndex) => ({ resource, sourceIndex }))
+    .sort((left, right) => externalRuntimePriority(left.resource) - externalRuntimePriority(right.resource) || left.sourceIndex - right.sourceIndex)
+    .map(({ resource }) => resource);
+}
+
+const DECK_RUNTIME_MONITOR = `<script>
+(function () {
+  var finished = false;
+  function post(type) {
+    if (finished || !window.ReactNativeWebView) return;
+    finished = true;
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: type }));
+  }
+  window.addEventListener("error", function () { post("deck-render-error"); });
+  window.addEventListener("unhandledrejection", function () { post("deck-render-error"); });
+  var attempts = 0;
+  function verifyMount() {
+    if (document.querySelector('[data-bysi="deck"]')) {
+      post("deck-ready");
+      return;
+    }
+    attempts += 1;
+    if (attempts >= 40) {
+      post("deck-render-error");
+      return;
+    }
+    window.setTimeout(verifyMount, 100);
+  }
+  window.setTimeout(verifyMount, 0);
+})();
+<\/script>`;
+
 const NATIVE_DECK_SHELL = `<style id="bysi-native-deck-shell">
 html,body{margin:0!important;padding:0!important;width:100%!important;height:100%!important;overflow:hidden!important;background:#FAF7F2!important}
 body *{visibility:hidden!important}
@@ -160,7 +200,7 @@ export function materializeApprovedDeckHtml(bundleHtml: string): string {
     removeRehearsalContinuationCopy(JSON.parse(templateEncoded) as string),
   );
   const manifest = JSON.parse(manifestEncoded) as Record<string, BundleEntry>;
-  const externalResources = JSON.parse(externalEncoded) as ExternalResource[];
+  const externalResources = orderedExternalResources(JSON.parse(externalEncoded) as ExternalResource[]);
   const externalScripts = externalResources.map(({ uuid }) => {
     const entry = manifest[uuid];
     if (!entry || entry.mime !== "text/javascript") throw new Error("Approved lesson runtime dependency is missing");
@@ -171,7 +211,7 @@ export function materializeApprovedDeckHtml(bundleHtml: string): string {
   const runtimeEntry = runtimeId ? manifest[runtimeId] : undefined;
   if (!runtimeMatch || !runtimeId || !runtimeEntry || runtimeEntry.mime !== "text/javascript") throw new Error("Approved lesson runtime is missing");
 
-  const inlineRuntime = `<script>window.__resources={};<\/script>${externalScripts}${inlineScript(executableSource(runtimeEntry))}`;
+  const inlineRuntime = `<script>window.__resources={};<\/script>${DECK_RUNTIME_MONITOR}${externalScripts}${inlineScript(executableSource(runtimeEntry))}`;
   template = template.replace(runtimeMatch[0], () => inlineRuntime);
   Object.entries(manifest).forEach(([uuid, entry]) => {
     if (entry.mime === "text/javascript") return;
