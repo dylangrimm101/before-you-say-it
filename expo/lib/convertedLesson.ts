@@ -322,40 +322,104 @@ export function m1L1CoachNote(confirmedTranscript: string, coachedBeat: 1 | 3 | 
 
 export interface M1L1ExchangeTranscripts { opener: string; firstResponse: string }
 
-/** Chooses one highest-priority failed behavior from the learner's two required turns. */
-export function m1L1CoachExchange(exchange: M1L1ExchangeTranscripts): LessonCoachNote | null {
-  const turns = ([
+interface M1L1CoachingCandidate {
+  beat: 1 | 3;
+  dimension: M1L1DimensionId;
+  evidenceQuote: string;
+  flags: M1L1BehaviorFlag[];
+  score: number;
+}
+
+const COACHING_SEVERITY: Readonly<Record<M1L1DimensionId, number>> = {
+  evidence_discipline: 86,
+  motive_character_language: 100,
+  issue_count: 82,
+  point_placement: 62,
+  grounding_concreteness: 68,
+  move_clarity: 78,
+  park_and_return: 84,
+};
+
+function coachingConfidence(dimension: M1L1DimensionId, transcript: string): number {
+  const lower = cleanTranscript(transcript).toLowerCase();
+  if (dimension === "motive_character_language") return /\b(always|never|lazy|selfish|don't care|doesn't care|respect me|on purpose|trying to)\b/.test(lower) ? 30 : 12;
+  if (dimension === "evidence_discipline" || dimension === "issue_count") {
+    const conjunctions = lower.match(/\band\b/g)?.length ?? 0;
+    return conjunctions >= 3 || /\b(also|another time|everyone|other people|all the times)\b/.test(lower) ? 26 : 14;
+  }
+  if (dimension === "park_and_return") {
+    const acknowledges = /\b(i hear|that's fair|i understand|i get that)\b/.test(lower);
+    const returns = /\b(still|my point|the handoff|the file|what i need)\b/.test(lower);
+    return !acknowledges && !returns ? 28 : 20;
+  }
+  if (dimension === "move_clarity") return 22;
+  return 16;
+}
+
+function coachingRelevance(dimension: M1L1DimensionId, beat: 1 | 3): number {
+  if (beat === 3 && dimension === "park_and_return") return 34;
+  if (beat === 3) return 22;
+  if (dimension === "move_clarity") return 20;
+  return 12;
+}
+
+function failedCoachingCandidates(exchange: M1L1ExchangeTranscripts): M1L1CoachingCandidate[] {
+  const turns = [
     { beat: 1 as const, transcript: exchange.opener },
     { beat: 3 as const, transcript: exchange.firstResponse },
-  ]).filter((turn) => cleanTranscript(turn.transcript).length >= 2);
-  if (turns.length !== 2) return null;
+  ];
   const sourceBeats: Record<M1L1DimensionId, readonly (1 | 3)[]> = {
     evidence_discipline: [3], motive_character_language: [1, 3], issue_count: [1],
     point_placement: [1], grounding_concreteness: [1], move_clarity: [1], park_and_return: [3],
   };
-  for (const desiredStatus of ["not_met", "met"] as const) {
-    for (const dimension of DIMENSION_PRIORITY) {
-      for (const beat of sourceBeats[dimension]) {
-        const turn = turns.find((candidate) => candidate.beat === beat)!;
-        const selected = m1L1BehaviorFlags(turn.transcript, beat).find((item) => item.dimension === dimension);
-        if (selected?.status !== desiredStatus) continue;
-        const evidenceQuote = selected.evidenceQuote;
-        if (!evidenceQuote) continue;
-        const isMet = selected.status === "met";
-        return {
-          evidenceQuote,
-          worked: isMet ? `In “${evidenceQuote},” you kept ${labelForDimension(dimension)}.` : `Hope flagged “${evidenceQuote}.”`,
-          change: isMet ? "Keep that same choice in the retry." : `On the retry, ${labelForDimension(dimension)}.`,
-          retryDirection: `Replay this exact moment and ${labelForDimension(dimension)}.`,
-          coachedBehaviorId: M1_L1_CONVERSION.coachedBehaviorId,
-          coachedBeat: beat,
-          selectedDimension: dimension,
-          flags: m1L1BehaviorFlags(turn.transcript, beat),
-        };
-      }
-    }
+  return turns.flatMap((turn) => {
+    const flags = m1L1BehaviorFlags(turn.transcript, turn.beat);
+    return flags.flatMap((item): M1L1CoachingCandidate[] => {
+      if (item.status !== "not_met" || !item.evidenceQuote || !sourceBeats[item.dimension].includes(turn.beat)) return [];
+      return [{
+        beat: turn.beat,
+        dimension: item.dimension,
+        evidenceQuote: item.evidenceQuote,
+        flags,
+        score: COACHING_SEVERITY[item.dimension] + coachingConfidence(item.dimension, turn.transcript) + coachingRelevance(item.dimension, turn.beat),
+      }];
+    });
+  }).sort((left, right) => right.score - left.score
+    || right.beat - left.beat
+    || DIMENSION_PRIORITY.indexOf(left.dimension) - DIMENSION_PRIORITY.indexOf(right.dimension));
+}
+
+function contextualCoachingCopy(candidate: M1L1CoachingCandidate): Pick<LessonCoachNote, "worked" | "change" | "retryDirection"> {
+  const quote = `“${candidate.evidenceQuote}”`;
+  const copy: Readonly<Record<M1L1DimensionId, readonly [string, string]>> = {
+    evidence_discipline: [`In ${quote}, several pieces of the case compete with the main point.`, "Use one proof, then make one answerable request."],
+    motive_character_language: [`In ${quote}, the wording shifts from what happened to a judgment about Adam.`, "Name the observable handoff problem without assigning motive or character."],
+    issue_count: [`In ${quote}, more than one issue is competing for attention.`, "Keep the late handoff as the one issue in view."],
+    point_placement: [`In ${quote}, the main point arrives after the setup.`, "Lead with the late handoff, then add one supporting fact."],
+    grounding_concreteness: [`In ${quote}, the concern is not anchored to a specific handoff fact.`, "Ground the point in one observable detail, such as the 4:20 arrival."],
+    move_clarity: [`In ${quote}, Adam does not get one clear next step to answer.`, "End with one answerable request, including the noon handoff."],
+    park_and_return: [`In ${quote}, your response engages Adam's explanation but loses the noon request.`, "Acknowledge the constraint briefly, then return to the noon handoff."],
+  };
+  const [worked, change] = copy[candidate.dimension];
+  return { worked, change, retryDirection: `Replay this exact moment. ${change}` };
+}
+
+/** Ranks observable failures by severity, signal confidence, and relevance to the live pushback. */
+export function m1L1CoachExchange(exchange: M1L1ExchangeTranscripts): LessonCoachNote | null {
+  if (cleanTranscript(exchange.opener).length < 2 || cleanTranscript(exchange.firstResponse).length < 2) return null;
+  const candidate = failedCoachingCandidates(exchange)[0];
+  if (candidate) {
+    return {
+      evidenceQuote: candidate.evidenceQuote,
+      ...contextualCoachingCopy(candidate),
+      coachedBehaviorId: M1_L1_CONVERSION.coachedBehaviorId,
+      coachedBeat: candidate.beat,
+      selectedDimension: candidate.dimension,
+      flags: candidate.flags,
+    };
   }
-  return null;
+  const responseNote = m1L1CoachNote(exchange.firstResponse, 3);
+  return responseNote ?? m1L1CoachNote(exchange.opener, 1);
 }
 
 /** Compares the same scoreless flag using a complete, explicit transition table. */

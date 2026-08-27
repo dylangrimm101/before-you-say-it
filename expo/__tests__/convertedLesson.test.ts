@@ -258,14 +258,44 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(m1L1Comparison(original, original, "grounding_concreteness", 5).text).toMatch(/held|not assessable/i);
   });
 
-  test("chooses coaching evidence across the opener and first response", () => {
+  test("ranks a high-confidence motive judgment above a weaker response miss", () => {
     const note = m1L1CoachExchange({
       opener: "You never respect my review time. Can we move it to noon?",
       firstResponse: "I hear that. The handoff is still the point.",
     });
     expect(note?.selectedDimension).toBe("motive_character_language");
     expect(note?.coachedBeat).toBe(1);
+    expect(note?.worked).toContain("judgment about Adam");
     expect("You never respect my review time. Can we move it to noon?").toContain(note?.evidenceQuote ?? "missing");
+  });
+
+  test("prioritizes handling Adam's live pushback over a lower-impact opener structure miss", () => {
+    const response = "I understand that the client is taking their time, but we need to put a firm deadline onto them and be clearer on expectations.";
+    const note = m1L1CoachExchange({
+      opener: "I need your help getting the client list report to me sooner so I have more time to review it.",
+      firstResponse: response,
+    });
+    expect(note?.selectedDimension).toBe("park_and_return");
+    expect(note?.coachedBeat).toBe(3);
+    expect(note?.evidenceQuote).toBe(response);
+    expect(note?.worked).toContain("loses the noon request");
+    expect(note?.retryDirection).toContain("return to the noon handoff");
+  });
+
+  test("keeps the contextually selected behavior locked through retry comparison", () => {
+    const note = m1L1CoachExchange({
+      opener: "I need your help getting the report to me sooner so I have more time to review it.",
+      firstResponse: "I understand the client is late, but accounting needs to set firmer deadlines.",
+    });
+    expect(note?.selectedDimension).toBe("park_and_return");
+    const comparison = m1L1Comparison(
+      "I understand the client is late, but accounting needs to set firmer deadlines.",
+      "I understand the client is late. I still need the file by noon.",
+      note!.selectedDimension,
+      note!.coachedBeat,
+    );
+    expect(comparison.selectedDimension).toBe("park_and_return");
+    expect(comparison.text).toMatch(/improved/i);
   });
 
   test("resume isolation requires the exact work category and Adam identity", () => {
