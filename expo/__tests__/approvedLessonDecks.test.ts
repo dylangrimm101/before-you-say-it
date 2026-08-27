@@ -207,6 +207,15 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(m1L1Runtime).toContain('accessibilityLiveRegion="polite"');
   });
 
+  test("uses the shortened seven-step M1 L1 flow without a second learner response", async () => {
+    const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
+    expect(m1L1Runtime).toContain("`Step ${step} of 7`");
+    expect(m1L1Runtime).toContain("Seven-step rehearsal progress.");
+    expect(m1L1Runtime).toContain("(step / 7) * 100");
+    expect(m1L1Runtime).not.toContain('kind="response-two"');
+    expect(m1L1Runtime).not.toContain("confirmSecondResponse");
+  });
+
   test("prepares M1 L1 audio before revealing persisted text, then starts it after the reveal paint", async () => {
     const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
     const firstPrepare = m1L1Runtime.indexOf("await preparePilotAudio(lineFor(selected))");
@@ -219,7 +228,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(firstPaint).toBeLessThan(firstPlay);
 
     const secondPrepare = m1L1Runtime.indexOf("await preparePilotAudio(lineFor(trap))");
-    const secondPersist = m1L1Runtime.indexOf("await persist(withTrap)", secondPrepare);
+    const secondPersist = m1L1Runtime.indexOf("await persist(coached)", secondPrepare);
     const secondPaint = m1L1Runtime.indexOf("await afterNextPaint()", secondPersist);
     const secondPlay = m1L1Runtime.indexOf("await playPreparedPilotAudio()", secondPaint);
     expect(secondPrepare).toBeGreaterThan(firstPlay);

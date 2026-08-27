@@ -320,19 +320,18 @@ export function m1L1CoachNote(confirmedTranscript: string, coachedBeat: 1 | 3 | 
   };
 }
 
-export interface M1L1ExchangeTranscripts { opener: string; firstResponse: string; secondResponse: string }
+export interface M1L1ExchangeTranscripts { opener: string; firstResponse: string }
 
-/** Chooses one highest-priority failed behavior across the authored exchange and its true source turn. */
+/** Chooses one highest-priority failed behavior from the learner's two required turns. */
 export function m1L1CoachExchange(exchange: M1L1ExchangeTranscripts): LessonCoachNote | null {
   const turns = ([
     { beat: 1 as const, transcript: exchange.opener },
     { beat: 3 as const, transcript: exchange.firstResponse },
-    { beat: 5 as const, transcript: exchange.secondResponse },
   ]).filter((turn) => cleanTranscript(turn.transcript).length >= 2);
-  if (turns.length !== 3) return null;
-  const sourceBeats: Record<M1L1DimensionId, readonly (1 | 3 | 5)[]> = {
-    evidence_discipline: [5], motive_character_language: [1, 3, 5], issue_count: [1],
-    point_placement: [1], grounding_concreteness: [1], move_clarity: [1], park_and_return: [3, 5],
+  if (turns.length !== 2) return null;
+  const sourceBeats: Record<M1L1DimensionId, readonly (1 | 3)[]> = {
+    evidence_discipline: [3], motive_character_language: [1, 3], issue_count: [1],
+    point_placement: [1], grounding_concreteness: [1], move_clarity: [1], park_and_return: [3],
   };
   for (const desiredStatus of ["not_met", "met"] as const) {
     for (const dimension of DIMENSION_PRIORITY) {
@@ -405,14 +404,13 @@ export function validateM1L1Completion(run: PilotDayRun | null | undefined, requ
   const context = run.scenarioContext;
   if (context?.scenarioId !== SCENARIO_ID || context.category !== "work" || context.counterpartId !== COUNTERPART_ID) return { isValid: false, reason: "scenario_identity" };
   const rehearsal = run.m1L1;
-  if (!run.attempt || !run.responseAttempt || !rehearsal?.secondResponseAttempt || !rehearsal.pushbackOne || !rehearsal.pushbackTwo) return { isValid: false, reason: "turn_plan" };
+  if (!run.attempt || !run.responseAttempt || !rehearsal?.pushbackOne || !rehearsal.pushbackTwo) return { isValid: false, reason: "turn_plan" };
   if (!hasCanonicalM1L1PressureSequence(run)) return { isValid: false, reason: "pressure_authenticity" };
   const ordered = run.attempt.confirmedAt < (rehearsal.pushbackOne.authoredAt ?? 0)
     && (rehearsal.pushbackOne.authoredAt ?? 0) < run.responseAttempt.confirmedAt
-    && run.responseAttempt.confirmedAt < (rehearsal.pushbackTwo.authoredAt ?? 0)
-    && (rehearsal.pushbackTwo.authoredAt ?? 0) < rehearsal.secondResponseAttempt.confirmedAt;
+    && run.responseAttempt.confirmedAt < (rehearsal.pushbackTwo.authoredAt ?? 0);
   if (!ordered) return { isValid: false, reason: "turn_order" };
-  if (rehearsal.beat !== 8 || rehearsal.retryCount < 1 || !run.retryAttempt || !run.comparison || run.state !== "attempt_comparison") return { isValid: false, reason: "rehearsal_state" };
+  if (![7, 8].includes(rehearsal.beat) || rehearsal.retryCount < 1 || !run.retryAttempt || !run.comparison || run.state !== "attempt_comparison") return { isValid: false, reason: "rehearsal_state" };
   return { isValid: true };
 }
 

@@ -266,7 +266,7 @@ export interface PilotDayRun {
   retryInstruction?: string;
   noteFit?: "accepted" | "rejected";
   comparison?: PilotComparison;
-  /** Present only for accepted M1 L1; keeps the authored eight-beat plan isolated. */
+  /** Present only for accepted M1 L1; keeps the seven-step plan isolated. */
   m1L1?: M1L1RehearsalState;
   completedAt?: number;
   createdAt: number;

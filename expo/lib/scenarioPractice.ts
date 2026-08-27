@@ -204,8 +204,10 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
       }).filter((entry): entry is NonNullable<NonNullable<PilotDayRun["m1L1"]>["flags"]>[number] => entry !== null);
       if (flags.length !== item.flags.length) return null;
     }
+    const legacyBeat = item.beat as number;
+    const migratedBeat = second && legacyBeat >= 6 ? legacyBeat - 1 : legacyBeat;
     const lesson: NonNullable<PilotDayRun["m1L1"]> = {
-      beat: item.beat as NonNullable<PilotDayRun["m1L1"]>["beat"], retryCount: item.retryCount as 0 | 1 | 2,
+      beat: migratedBeat as NonNullable<PilotDayRun["m1L1"]>["beat"], retryCount: item.retryCount as 0 | 1 | 2,
       ...(pushbackOne ? { pushbackOne } : {}), ...(pushbackTwo ? { pushbackTwo } : {}), ...(second ? { secondResponseAttempt: second } : {}),
       ...(item.coachedBeat !== undefined ? { coachedBeat: item.coachedBeat as 1 | 3 | 5 } : {}), ...(flags ? { flags } : {}),
       ...(item.selectedDimension ? { selectedDimension: item.selectedDimension as NonNullable<PilotDayRun["m1L1"]>["selectedDimension"] } : {}),
@@ -288,7 +290,7 @@ export function attachScenarioCounterpartTurn(
 }
 
 /** Stores Hope's evidence-linked note without changing scenario identity. */
-/** Initializes the isolated accepted M1 L1 eight-beat state. */
+/** Initializes the isolated accepted M1 L1 seven-step state. */
 export function initializeM1L1Run(value: PersistedScenarioPracticeRun, now: number): PersistedScenarioPracticeRun {
   if (value.run.m1L1) return value;
   return { ...value, run: { ...value.run, m1L1: { beat: 1, retryCount: 0 }, updatedAt: now } };
@@ -352,7 +354,7 @@ export function attachM1L1Coaching(
   now: number,
 ): PersistedScenarioPracticeRun {
   const lesson = value.run.m1L1;
-  if (!lesson?.secondResponseAttempt || !selectedDimension) return value;
+  if (!lesson?.pushbackTwo || !value.run.responseAttempt || !selectedDimension) return value;
   const updatedAt = Math.max(now, value.run.updatedAt + 1);
   return {
     ...value,
@@ -363,13 +365,13 @@ export function attachM1L1Coaching(
       retryInstruction,
       coachedBehaviorId: "point_proof_move",
       coachedSegment: "pushback_response",
-      m1L1: { ...lesson, beat: 6, coachedBeat, flags, selectedDimension },
+      m1L1: { ...lesson, beat: 5, coachedBeat, flags, selectedDimension },
       updatedAt,
     },
   };
 }
 
-/** Persists a non-capturable Beat 7 replay request for the exact coached moment. */
+/** Persists the non-capturable Step 6 replay request for the exact coached moment. */
 export function stageM1L1PressureReplay(value: PersistedScenarioPracticeRun, isFinal: boolean, now: number): PersistedScenarioPracticeRun {
   const lesson = value.run.m1L1;
   if (!lesson?.selectedDimension || !lesson.coachedBeat) return value;
@@ -387,7 +389,7 @@ export function stageM1L1PressureReplay(value: PersistedScenarioPracticeRun, isF
       state: "replay_pending",
       m1L1: {
         ...lesson,
-        beat: 7,
+        beat: 6,
         replayTarget: target,
         replayIsFinal: isFinal,
         replayRequestedAt: requestedAt,
@@ -442,11 +444,11 @@ export async function completeM1L1PressureReplay(
 export function preserveM1L1Retry(value: PersistedScenarioPracticeRun, transcript: string, now: number): PersistedScenarioPracticeRun {
   const lesson = value.run.m1L1;
   const clean = transcript.trim();
-  if (!lesson?.selectedDimension || clean.length < 2 || lesson.retryCount >= 2 || lesson.beat !== 7 || !lesson.replayProof || !lesson.replayCompletedAt) return value;
+  if (!lesson?.selectedDimension || clean.length < 2 || lesson.retryCount >= 2 || lesson.beat !== 6 || !lesson.replayProof || !lesson.replayCompletedAt) return value;
   const confirmedAt = Math.max(now, value.run.updatedAt + 1);
   const attempt = { id: `${value.run.id}-m1-l1-retry-${lesson.retryCount + 1}`, kind: "retry" as const, transcript: clean, representation: "confirmed_transcript" as const, confirmedAt };
   if (lesson.retryCount === 0) {
-    return { ...value, run: { ...value.run, retryAttempt: attempt, m1L1: { ...lesson, beat: 8, retryCount: 1 }, updatedAt: confirmedAt } };
+    return { ...value, run: { ...value.run, retryAttempt: attempt, m1L1: { ...lesson, beat: 7, retryCount: 1 }, updatedAt: confirmedAt } };
   }
   const expectedReplayId = lesson.coachedBeat === 1
     ? `top-of-scene:${value.run.id}`
@@ -454,7 +456,7 @@ export function preserveM1L1Retry(value: PersistedScenarioPracticeRun, transcrip
       ? lesson.pushbackOne?.resolvedAudioId
       : lesson.pushbackTwo?.resolvedAudioId;
   if (!lesson.finalRetryPressureReplayedAt || !lesson.replayProof || lesson.finalRetryPressureAudioId !== expectedReplayId) return value;
-  return { ...value, run: { ...value.run, m1L1: { ...lesson, beat: 8, retryCount: 2, finalRetryAttempt: attempt }, updatedAt: confirmedAt } };
+  return { ...value, run: { ...value.run, m1L1: { ...lesson, beat: 7, retryCount: 2, finalRetryAttempt: attempt }, updatedAt: confirmedAt } };
 }
 
 export function attachScenarioCoaching(

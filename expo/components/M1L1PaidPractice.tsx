@@ -26,7 +26,6 @@ import {
   attachM1L1PushbackOne,
   attachM1L1PushbackTwo,
   preserveM1L1Retry,
-  preserveM1L1SecondResponse,
   preserveScenarioAttempt,
   scenarioRunForRoute,
   stageM1L1PressureReplay,
@@ -45,12 +44,11 @@ interface M1L1PaidPracticeProps {
   onDiscard: () => Promise<void>;
 }
 
-type CaptureKind = "opener" | "response-one" | "response-two" | "retry" | "final-retry";
+type CaptureKind = "opener" | "response-one" | "retry" | "final-retry";
 
 function reviewState(kind: CaptureKind): PersistedScenarioPracticeRun["run"]["state"] {
   if (kind === "opener") return "confirm_attempt_transcript";
   if (kind === "response-one") return "confirm_response_transcript";
-  if (kind === "response-two") return "confirm_second_response_transcript";
   if (kind === "final-retry") return "confirm_final_retry_transcript";
   return "confirm_retry_transcript";
 }
@@ -58,7 +56,6 @@ function reviewState(kind: CaptureKind): PersistedScenarioPracticeRun["run"]["st
 function listeningState(kind: CaptureKind): PersistedScenarioPracticeRun["run"]["state"] {
   if (kind === "opener") return "listening_attempt";
   if (kind === "response-one") return "listening_response";
-  if (kind === "response-two") return "listening_second_response";
   if (kind === "final-retry") return "listening_final_retry";
   return "listening_retry";
 }
@@ -105,9 +102,25 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
 
   const run = value?.run;
   const lesson = run?.m1L1;
-  const currentPressure = lesson?.coachedBeat === 3 ? lesson.pushbackOne : lesson?.coachedBeat === 5 ? lesson.pushbackTwo : undefined;
-  const step = lesson?.beat ?? 1;
-  const progressLabel = `Step ${step} of 8`;
+  const currentPressure = lesson?.coachedBeat === 3 ? lesson.pushbackOne : undefined;
+  const step = Math.min(lesson?.beat ?? 1, 7);
+  const progressLabel = `Step ${step} of 7`;
+
+  useEffect(() => {
+    if (run?.state !== "ready_for_second_response" || !run.attempt || !run.responseAttempt || !lesson?.pushbackTwo || lesson.coachedBeat) return;
+    const note = m1L1CoachExchange({ opener: run.attempt.transcript, firstResponse: run.responseAttempt.transcript });
+    if (!note || !value) return;
+    const coached = attachM1L1Coaching(
+      value,
+      `${note.worked} ${note.change}`,
+      note.retryDirection,
+      note.coachedBeat,
+      note.flags,
+      note.selectedDimension,
+      Date.now(),
+    );
+    void persist(coached);
+  }, [lesson?.coachedBeat, lesson?.pushbackTwo, persist, run?.attempt, run?.responseAttempt, run?.state, value]);
 
   const beginRecording = useCallback(async (kind: CaptureKind): Promise<void> => {
     if (!value || speech.phase === "speaking" || speech.phase === "generating") return;
@@ -202,7 +215,20 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
         : fallback;
       const isAudioPrepared = await preparePilotAudio(lineFor(trap));
       const withTrap = attachM1L1PushbackTwo(afterResponse, trap, Date.now());
-      await persist(withTrap);
+      const note = withTrap.run.attempt && withTrap.run.responseAttempt
+        ? m1L1CoachExchange({ opener: withTrap.run.attempt.transcript, firstResponse: withTrap.run.responseAttempt.transcript })
+        : null;
+      if (!note) return;
+      const coached = attachM1L1Coaching(
+        withTrap,
+        `${note.worked} ${note.change}`,
+        note.retryDirection,
+        note.coachedBeat,
+        note.flags,
+        note.selectedDimension,
+        Date.now(),
+      );
+      await persist(coached);
       setDraft("");
       await afterNextPaint();
       if (isAudioPrepared) await playPreparedPilotAudio();
@@ -211,30 +237,10 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
     }
   }, [convertedLesson.scenario, draft, persist, value]);
 
-  const confirmSecondResponse = useCallback(async (): Promise<void> => {
-    if (!value || draft.trim().length < 2) return;
-    const approved = preserveM1L1SecondResponse(value, draft, Date.now());
-    const note = run?.attempt && run.responseAttempt
-      ? m1L1CoachExchange({ opener: run.attempt.transcript, firstResponse: run.responseAttempt.transcript, secondResponse: draft })
-      : null;
-    if (!note) return;
-    const coached = attachM1L1Coaching(
-      approved,
-      `${note.worked} ${note.change}`,
-      note.retryDirection,
-      note.coachedBeat,
-      note.flags,
-      note.selectedDimension,
-      Date.now(),
-    );
-    await persist(coached);
-    setDraft("");
-  }, [draft, persist, run?.attempt, run?.responseAttempt, value]);
-
   const confirmRetry = useCallback(async (isFinal: boolean): Promise<void> => {
     if (!value || !lesson?.selectedDimension || draft.trim().length < 2) return;
     const retried = preserveM1L1Retry(value, draft, Date.now());
-    const original = lesson.coachedBeat === 1 ? run?.attempt?.transcript : lesson.coachedBeat === 3 ? run?.responseAttempt?.transcript : lesson.secondResponseAttempt?.transcript;
+    const original = lesson.coachedBeat === 1 ? run?.attempt?.transcript : run?.responseAttempt?.transcript;
     const latest = retried.run.m1L1?.finalRetryAttempt?.transcript ?? retried.run.retryAttempt?.transcript;
     if (!original || !latest) return;
     const comparison = m1L1Comparison(original, latest, lesson.selectedDimension, lesson.coachedBeat ?? 5);
@@ -311,7 +317,6 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
     lesson?.pushbackOne ? { id: lesson.pushbackOne.id, who: "Adam", text: lesson.pushbackOne.text, mine: false } : null,
     run?.responseAttempt ? { id: run.responseAttempt.id, who: "You", text: run.responseAttempt.transcript, mine: true } : null,
     lesson?.pushbackTwo ? { id: lesson.pushbackTwo.id, who: "Adam", text: lesson.pushbackTwo.text, mine: false } : null,
-    lesson?.secondResponseAttempt ? { id: lesson.secondResponseAttempt.id, who: "You", text: lesson.secondResponseAttempt.transcript, mine: true } : null,
   ].filter((item): item is { id: string; who: string; text: string; mine: boolean } => Boolean(item)), [lesson, run]);
 
   if (!value || !run || !lesson) {
@@ -330,16 +335,15 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]} keyboardShouldPersistTaps="handled">
         <StatusPill label="WORK · M1 L1" tone="purple" /><Text style={styles.scenarioTitle}>{convertedLesson.scenario.title}</Text><Text style={styles.context}>{convertedLesson.scenario.situation}</Text>
-        <View accessible accessibilityLabel={`${progressLabel}. Eight-beat rehearsal progress.`} style={styles.progress}><View style={[styles.progressFill, { width: `${(step / 8) * 100}%` }]} /></View>
+        <View accessible accessibilityLabel={`${progressLabel}. Seven-step rehearsal progress.`} style={styles.progress}><View style={[styles.progressFill, { width: `${(step / 7) * 100}%` }]} /></View>
         {messages.map((message) => <View key={message.id} style={[styles.messageWrap, message.mine ? styles.mine : styles.theirs]}><Text style={styles.messageLabel}>{message.who}</Text><View style={[styles.bubble, message.mine ? styles.bubbleMine : styles.bubbleTheirs]}><Text style={[styles.messageText, message.mine ? styles.messageTextMine : null]}>{message.text}</Text></View></View>)}
         {busy && (state === "confirm_attempt_transcript" || state === "confirm_response_transcript") ? <View style={[styles.messageWrap, styles.theirs]} accessibilityLiveRegion="polite" accessibilityLabel="Adam is thinking"><Text style={styles.messageLabel}>Adam</Text><View style={[styles.bubble, styles.bubbleTheirs, styles.thinkingBubble]}><Thinking /><Text style={styles.thinkingText}>Adam is thinking…</Text></View></View> : null}
 
         {permissionKind ? <ProductCard accent style={styles.card}><SectionLabel tone={C.purple}>Use your voice for this rehearsal</SectionLabel><Text style={styles.body}>Microphone access is used only for the turn you choose to record. You can type instead.</Text>{dictation.status === "denied" ? <><Text style={styles.title}>Microphone access is off</Text><PrimaryButton label="Open Settings" onPress={() => void Linking.openSettings()} containerStyle={styles.action} /></> : <PrimaryButton label="Allow microphone" onPress={() => void allowMicrophone()} containerStyle={styles.action} />}<Pressable onPress={() => void typeCapture(permissionKind)} style={styles.secondary}><Text style={styles.secondaryText}>Type this turn instead</Text></Pressable></ProductCard> : null}
         {state === "ready_for_attempt" ? <Capture title="Open with one point, one proof, and one move." kind="opener" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /> : null}
         {state === "ready_for_response" && lesson.pushbackOne ? <Capture title="Respond to Pushback 1." kind="response-one" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /> : null}
-        {state === "ready_for_second_response" && lesson.pushbackTwo ? <Capture title="Respond to Adam’s follow-up." kind="response-two" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /> : null}
         {isListening ? <Reveal><Text style={styles.title}>Recording this turn.</Text><MicControl state="listening" level={dictation.level} onPress={() => void stopRecording()} glyph={<Square size={24} color={C.onAccent} fill={C.onAccent} />} accessibilityLabel="Done speaking" /><Text style={styles.body}>Stopping does not submit. You approve the transcript next.</Text></Reveal> : null}
-        {isReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve this exact transcript.</Text><TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel="Edit confirmed transcript" /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2 || busy} onPress={() => void (captureKind === "opener" ? confirmOpening() : captureKind === "response-one" ? confirmFirstResponse() : captureKind === "response-two" ? confirmSecondResponse() : confirmRetry(captureKind === "final-retry"))} containerStyle={styles.action} />{busy ? <ActivityIndicator color={C.purple} /> : null}</Reveal> : null}
+        {isReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve this exact transcript.</Text><TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel="Edit confirmed transcript" /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2 || busy} onPress={() => void (captureKind === "opener" ? confirmOpening() : captureKind === "response-one" ? confirmFirstResponse() : confirmRetry(captureKind === "final-retry"))} containerStyle={styles.action} />{busy ? <ActivityIndicator color={C.purple} /> : null}</Reveal> : null}
         {state === "hope_coaching" && lesson.coachedBeat ? <Reveal><StatusPill label="Hope · one observed behavior" tone="purple" /><ProductCard accent style={styles.card}><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Exact-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={lesson.coachedBeat === 1 ? "Reset to the top of the scene" : "Replay the exact flagged pressure"} onPress={() => void replayFlaggedMoment(false)} containerStyle={styles.action} /></Reveal> : null}
         {state === "ready_for_retry" ? <Capture title="Retry only the flagged moment." kind="retry" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /> : null}
         {state === "final_retry_available" && lesson.coachedBeat ? <Reveal><StatusPill label="Optional final retry · 2 of 2" tone="amber" /><Text style={styles.title}>One final retry is available.</Text><Text style={styles.body}>Replay the same exact moment before final capture, or continue to the behavior-only comparison.</Text><PrimaryButton label={lesson.coachedBeat === 1 ? "Reset to the top of the scene" : "Replay the exact pressure"} onPress={() => void replayFlaggedMoment(true)} containerStyle={styles.action} /><Pressable onPress={() => void persist(transitionScenarioPracticeRun(value, "attempt_comparison", Date.now()))} style={styles.secondary}><Text style={styles.secondaryText}>Continue without another retry</Text></Pressable></Reveal> : null}
