@@ -1,17 +1,20 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, MoreHorizontal, RotateCcw, ShieldCheck } from "lucide-react-native";
+import { ArrowLeft, Bookmark, Check, MoreHorizontal, RotateCcw, ShieldCheck, Sparkles, TrendingUp } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
 import { approvedLessonDeck } from "@/constants/approvedLessons";
+import { ProductCard, SectionLabel } from "@/components/PaidProductUI";
+import { Backdrop, PrimaryButton, Reveal } from "@/components/ui";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
-import { C, GUTTER, T, font, shadow } from "@/constants/theme";
+import { C, GUTTER, T, font, radius, shadow } from "@/constants/theme";
 import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
 import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
 import { approvedRehearsalConfig, validateApprovedRehearsalCompletion } from "@/lib/approvedRehearsals";
-import { approvedCustomWording, conversionRuntimeEnabled, M1_L1_CONVERSION, validateM1L1Completion, type ConvertedLessonProgress, type TransferChoice } from "@/lib/convertedLesson";
+import { conversionRuntimeEnabled, m1L1GoodVersion, m1L1IndexImpact, M1_L1_CONVERSION, validateM1L1Completion, type ConvertedLessonProgress, type M1L1IndexImpact, type TransferChoice } from "@/lib/convertedLesson";
+import { progressHistoryPresentation, SCORED_PRACTICE_HISTORY_VERSION, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useStore } from "@/providers/store";
 
@@ -28,6 +31,9 @@ export default function ApprovedLessonDeckScreen() {
     promotePendingConvertedLessonCompletion,
     replaceActiveScenarioRunStrict,
     resetConvertedLesson,
+    saveScoredPracticeRecord,
+    scoredPracticeHistory,
+    activePracticeSession,
     undoConvertedLessonReset,
     writePendingConvertedLessonCompletion,
   } = useStore();
@@ -44,10 +50,9 @@ export default function ApprovedLessonDeckScreen() {
   const isApprovedMoveSaved = !isReturning || Boolean(
     isM1L1 ? returningRun?.m1L1?.approvedMoveSavedAt && hasValidReturn : hasValidReturn,
   );
-  const [customDraft, setCustomDraft] = useState<string>("");
-  const [customWording, setCustomWording] = useState<string | null>(null);
-  const [showWordingConsent, setShowWordingConsent] = useState<boolean>(isReturning && isM1L1);
+  const [isStrongVersionSaved, setIsStrongVersionSaved] = useState<boolean>(false);
   const [completionCommitted, setCompletionCommitted] = useState<boolean>(false);
+  const [isCompleting, setIsCompleting] = useState<boolean>(false);
   const [deckHtml, setDeckHtml] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<boolean>(false);
   const [isLessonMenuOpen, setIsLessonMenuOpen] = useState<boolean>(false);
@@ -228,9 +233,7 @@ export default function ApprovedLessonDeckScreen() {
         practiceId: rehearsalConfig.practiceId,
       });
       setCompletionCommitted(false);
-      setCustomDraft("");
-      setCustomWording(null);
-      setShowWordingConsent(false);
+      setIsStrongVersionSaved(false);
       setLessonWasReset(true);
       setResetNotice({
         message: "Lesson reset. Starting again at Card 1.",
@@ -288,7 +291,6 @@ export default function ApprovedLessonDeckScreen() {
         retryCompleted: true,
         comparisonViewed: true,
         savedMoveId: rehearsalConfig.namedMoveId,
-        ...(isM1L1 && customWording ? { customWording } : {}),
         transferChoice,
         completedAt: Date.now(),
         sourceLineage: "approved-html-deck-pinned",
@@ -308,12 +310,91 @@ export default function ApprovedLessonDeckScreen() {
       safeLog("[converted-lesson] progress commit failed", errorShape(error));
       Alert.alert("We couldn’t finish securely", "Progress or rehearsal deletion did not complete. Stay on this screen and try again.");
     }
-  }, [activeScenarioRun, approvedConfig, clearActiveScenarioRunStrict, completionCommitted, customWording, isM1L1, isReturning, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, rehearsalConfig, router, writePendingConvertedLessonCompletion]);
+  }, [activeScenarioRun, approvedConfig, clearActiveScenarioRunStrict, completionCommitted, isM1L1, isReturning, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, rehearsalConfig, router, writePendingConvertedLessonCompletion]);
+
+  const indexEvidence = useMemo(
+    () => progressHistoryPresentation(scoredPracticeHistory, activePracticeSession?.sharedResult),
+    [activePracticeSession?.sharedResult, scoredPracticeHistory],
+  );
+  const indexImpact = useMemo<M1L1IndexImpact | null>(() => {
+    if (!isM1L1 || !returningRun) return null;
+    const currentSignals = indexEvidence.rows.flatMap((row) => row.value === null ? [] : [{ key: row.key, value: row.value }]);
+    return m1L1IndexImpact(returningRun, currentSignals);
+  }, [indexEvidence.rows, isM1L1, returningRun]);
+  const strongVersion = returningRun?.m1L1?.selectedDimension && returningRun.m1L1.coachedBeat
+    ? m1L1GoodVersion(returningRun.m1L1.selectedDimension, returningRun.m1L1.coachedBeat)
+    : null;
+
+  const finishM1L1 = useCallback(async (): Promise<void> => {
+    if (!activeScenarioRun || !returningRun || !indexImpact || !rehearsalConfig || isCompleting) return;
+    setIsCompleting(true);
+    const completedAt = Date.now();
+    const record: ScoredPracticeRecord = {
+      schemaVersion: SCORED_PRACTICE_HISTORY_VERSION,
+      id: returningRun.id,
+      rehearsalId: returningRun.id,
+      completedAt,
+      scenarioId: rehearsalConfig.scenario.id,
+      scenarioTitle: M1_L1_CONVERSION.title,
+      observedSignals: [{ key: indexImpact.signalKey, value: indexImpact.signalValue, evidenceTurnIds: [returningRun.retryAttempt!.id] }],
+      observedSignalSet: [indexImpact.signalKey],
+      overallIndex: indexImpact.signalValue,
+      evidence: [{ turnId: returningRun.retryAttempt!.id }],
+      currentFocus: `Keep ${indexImpact.signalLabel.toLowerCase()} visible under pushback`,
+    };
+    try {
+      await finalizeConvertedLesson({
+        lessonId: rehearsalConfig.lessonId,
+        moduleId: rehearsalConfig.moduleId,
+        practiceId: rehearsalConfig.practiceId,
+        contentVersion: rehearsalConfig.contentVersion,
+        runId: returningRun.id,
+        lessonCardCheckpoint: rehearsalConfig.completionCard,
+        quizGatesCompleted: true,
+        rehearsalCompleted: true,
+        retryCompleted: true,
+        comparisonViewed: true,
+        savedMoveId: rehearsalConfig.namedMoveId,
+        ...(isStrongVersionSaved && strongVersion ? { customWording: strongVersion } : {}),
+        transferChoice: "finish",
+        completedAt,
+        sourceLineage: "approved-html-deck-pinned",
+      }, {
+        expectedActiveRevision: activeRunRevision(activeScenarioRun)!,
+        writePending: writePendingConvertedLessonCompletion,
+        markPrivateContentDeleted: markPendingConvertedLessonPrivateContentDeleted,
+        clearActiveRunStrict: async (expectedRunId: string, afterPrivateCleanup: () => Promise<void>) => {
+          const expected = activeRunRevision(activeScenarioRun);
+          if (!expected || expected.runId !== expectedRunId) throw new Error("Active rehearsal identity changed");
+          await clearActiveScenarioRunStrict(expected, afterPrivateCleanup);
+        },
+        promotePending: promotePendingConvertedLessonCompletion,
+      });
+      await saveScoredPracticeRecord(record);
+      setCompletionCommitted(true);
+      router.replace("/(tabs)");
+    } catch (error: unknown) {
+      safeLog("[converted-lesson] native completion failed", errorShape(error));
+      Alert.alert("We couldn’t finish securely", "Your rehearsal is still available. Please try again.");
+      setIsCompleting(false);
+    }
+  }, [activeScenarioRun, clearActiveScenarioRunStrict, indexImpact, isCompleting, isStrongVersionSaved, markPendingConvertedLessonPrivateContentDeleted, promotePendingConvertedLessonCompletion, rehearsalConfig, returningRun, router, saveScoredPracticeRecord, strongVersion, writePendingConvertedLessonCompletion]);
 
   if (!__DEV__) {
     return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
   }
   if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to the internal lesson catalog and choose another deck." />;
+  if (isM1L1 && isReturning && hasValidReturn && indexImpact && strongVersion) {
+    return <M1L1CompletionScreen
+      impact={indexImpact}
+      strongVersion={strongVersion}
+      isSaved={isStrongVersionSaved}
+      isCompleting={isCompleting}
+      bottomInset={insets.bottom}
+      onToggleSave={() => setIsStrongVersionSaved((current) => !current)}
+      onFinish={() => void finishM1L1()}
+    />;
+  }
 
   return (
     <View style={styles.root}>
@@ -366,14 +447,23 @@ export default function ApprovedLessonDeckScreen() {
           <View style={styles.lessonMenuCopy}><Text style={styles.lessonMenuTitle}>Reset this lesson</Text><Text style={styles.lessonMenuBody}>Clear its completion and rehearsal, then return to Card 1.</Text></View>
         </Pressable>
       </View> : null}
-      {showWordingConsent && isApprovedMoveSaved && !completionCommitted ? <View style={[styles.wordingPanel, { bottom: insets.bottom + 18 }]}><Text style={styles.wordingTitle}>Optional custom wording</Text><Text style={styles.wordingBody}>The approved move is already saved. Custom text is retained only if you choose Save this wording.</Text><TextInput value={customDraft} onChangeText={setCustomDraft} maxLength={240} placeholder="Optional wording" style={styles.wordingInput} /><Pressable onPress={() => { const approved = approvedCustomWording(customDraft); if (approved) { setCustomWording(approved); setShowWordingConsent(false); } }} style={styles.wordingPrimary} accessibilityRole="button"><Text style={styles.wordingPrimaryText}>Save this wording</Text></Pressable><Pressable onPress={() => setShowWordingConsent(false)} style={styles.wordingSecondary} accessibilityRole="button"><Text style={styles.wordingSecondaryText}>Keep the approved move only</Text></Pressable></View> : null}
       {completionCommitted && !lessonWasReset ? <View style={[styles.completionReset, { bottom: insets.bottom + 18 }]}><Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.completionResetButton} accessibilityRole="button"><RotateCcw size={18} color={C.purple} /><Text style={styles.completionResetText}>{isResetting ? "Resetting…" : "Do this lesson again"}</Text></Pressable></View> : null}
       {resetNotice ? <View style={[styles.resetNotice, { bottom: insets.bottom + 18 }]}><Text style={styles.resetNoticeText}>{resetNotice.message}</Text>{resetNotice.canUndo ? <Pressable onPress={() => void handleUndoReset()} style={styles.undoButton} accessibilityRole="button"><Text style={styles.undoText}>Undo</Text></Pressable> : null}</View> : null}
       <View pointerEvents="none" style={[styles.qaBadge, { top: insets.top + 9 }]}>
-        <Text style={styles.qaBadgeText}>{completionCommitted ? (customWording ? "COMPLETE · ONLY SAVED WORDING RETAINED" : "COMPLETE · TRANSCRIPT DELETED") : isReturning ? "REHEARSAL COMPLETE" : "INTERNAL QA"}</Text>
+        <Text style={styles.qaBadgeText}>{completionCommitted ? "COMPLETE · TRANSCRIPT DELETED" : isReturning ? "REHEARSAL COMPLETE" : "INTERNAL QA"}</Text>
       </View>
     </View>
   );
+}
+
+function M1L1CompletionScreen({ impact, strongVersion, isSaved, isCompleting, bottomInset, onToggleSave, onFinish }: { impact: M1L1IndexImpact; strongVersion: string; isSaved: boolean; isCompleting: boolean; bottomInset: number; onToggleSave: () => void; onFinish: () => void }): React.JSX.Element {
+  const resultLabel = impact.delta === null ? "Your first lesson Index" : impact.delta > 0 ? `+${impact.delta} to your Index` : impact.delta === 0 ? "Your Index held" : `${impact.delta} to your Index`;
+  return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={[styles.completionScroll, { paddingBottom: bottomInset + 34 }]} showsVerticalScrollIndicator={false}>
+    <Reveal><View style={styles.celebrationIcon}><Sparkles size={26} color={C.onAccent} /></View><SectionLabel tone={C.purple}>Lesson complete</SectionLabel><Text style={styles.completionTitle}>You practiced it under pressure.</Text><Text style={styles.completionLede}>Hope compared the same behavior before and after your retry.</Text></Reveal>
+    <Reveal index={1}><ProductCard accent style={styles.indexImpactCard}><View style={styles.impactTop}><View><SectionLabel tone={C.purple}>Communication Index</SectionLabel><Text style={styles.impactResult}>{resultLabel}</Text></View><TrendingUp size={24} color={C.purple} /></View><View style={styles.indexNumbers}>{impact.beforeIndex !== null ? <><Text style={styles.indexBefore}>{impact.beforeIndex}</Text><Text style={styles.indexArrow}>→</Text></> : null}<Text style={styles.indexAfter}>{impact.afterIndex}</Text><Text style={styles.indexOutOf}>/ 100</Text></View><Text style={styles.impactExplanation}>{impact.explanation}</Text><Text style={styles.signalNote}>Observed signal · {impact.signalLabel}</Text></ProductCard></Reveal>
+    <Reveal index={2}><ProductCard style={styles.strongCard}><SectionLabel tone={C.purple}>A strong version</SectionLabel><Text style={styles.strongText}>“{strongVersion}”</Text><Pressable onPress={onToggleSave} style={[styles.saveStrongButton, isSaved && styles.saveStrongButtonSaved]} accessibilityRole="button" accessibilityState={{ selected: isSaved }}><View style={styles.saveIcon}>{isSaved ? <Check size={17} color={C.onAccent} strokeWidth={3} /> : <Bookmark size={17} color={C.purple} />}</View><Text style={[styles.saveStrongText, isSaved && styles.saveStrongTextSaved]}>{isSaved ? "Saved for later" : "Save this version for later"}</Text></Pressable></ProductCard></Reveal>
+    <Reveal index={3}><PrimaryButton label={isCompleting ? "Updating your Index…" : "Done — back to Home"} disabled={isCompleting} onPress={onFinish} containerStyle={styles.finishButton} /><Text style={styles.privacyNote}>{isSaved ? "The strong version will be saved. Your rehearsal transcript will be deleted." : "Your rehearsal transcript will be deleted when you finish."}</Text></Reveal>
+  </ScrollView></View>;
 }
 
 function Unavailable({ title, body }: { title: string; body: string }) {
@@ -395,8 +485,9 @@ const styles = StyleSheet.create({
   menuButton: { position: "absolute", right: 12, zIndex: 5, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
   qaBadge: { position: "absolute", alignSelf: "center", zIndex: 3, minHeight: 32, borderRadius: 16, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line },
   qaBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.1, color: C.purple },
-  wordingPanel: { position: "absolute", left: 18, right: 18, zIndex: 6, borderRadius: 20, padding: 16, backgroundColor: "rgba(255,255,255,0.98)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
-  wordingTitle: { ...T.support, color: C.text, fontFamily: font.bold }, wordingBody: { ...T.caption, marginTop: 5 }, wordingInput: { ...T.body, minHeight: 44, marginTop: 10, borderWidth: 1, borderColor: C.line, borderRadius: 12, paddingHorizontal: 12, backgroundColor: C.surfaceHigh }, wordingPrimary: { minHeight: 44, marginTop: 10, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: C.purple }, wordingPrimaryText: { fontFamily: font.bold, fontSize: 13, color: C.onAccent }, wordingSecondary: { minHeight: 44, alignItems: "center", justifyContent: "center" }, wordingSecondaryText: { fontFamily: font.semi, fontSize: 12, color: C.purple },
+  completionScroll: { paddingHorizontal: GUTTER, paddingTop: 76 }, celebrationIcon: { width: 52, height: 52, borderRadius: 18, backgroundColor: C.purple, alignItems: "center", justifyContent: "center", marginBottom: 18, ...shadow.hero }, completionTitle: { fontFamily: font.bold, fontSize: 34, lineHeight: 40, letterSpacing: -0.8, color: C.text, marginTop: 10, maxWidth: 340 }, completionLede: { ...T.support, marginTop: 10, maxWidth: 340 },
+  indexImpactCard: { marginTop: 24, gap: 10 }, impactTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }, impactResult: { fontFamily: font.bold, fontSize: 18, lineHeight: 23, color: C.text, marginTop: 7 }, indexNumbers: { flexDirection: "row", alignItems: "baseline", gap: 8 }, indexBefore: { fontFamily: font.semi, fontSize: 31, color: C.dim, textDecorationLine: "line-through" }, indexArrow: { fontFamily: font.regular, fontSize: 23, color: C.dim }, indexAfter: { fontFamily: font.bold, fontSize: 54, lineHeight: 60, color: C.purple, letterSpacing: -1.5 }, indexOutOf: { fontFamily: font.regular, fontSize: 14, color: C.dim }, impactExplanation: { ...T.support, color: C.text }, signalNote: { ...T.caption, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  strongCard: { marginTop: 14, gap: 10 }, strongText: { fontFamily: font.medium, fontSize: 18, lineHeight: 27, color: C.text }, saveStrongButton: { minHeight: 52, borderRadius: radius.pill, borderWidth: 1, borderColor: C.purple, paddingHorizontal: 15, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 }, saveStrongButtonSaved: { backgroundColor: C.purple }, saveIcon: { width: 24, alignItems: "center" }, saveStrongText: { fontFamily: font.semi, fontSize: 14, color: C.purple }, saveStrongTextSaved: { color: C.onAccent }, finishButton: { marginTop: 22 }, privacyNote: { ...T.caption, textAlign: "center", marginTop: 10, paddingHorizontal: 20 },
   lessonMenu: { position: "absolute", right: 12, zIndex: 8, width: 278, borderRadius: 18, padding: 12, backgroundColor: "rgba(255,255,255,0.98)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
   lessonMenuLabel: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.2, color: C.dim, paddingHorizontal: 6, paddingBottom: 7 },
   lessonMenuAction: { minHeight: 70, borderRadius: 14, padding: 10, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.claySoft },

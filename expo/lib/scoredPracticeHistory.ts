@@ -158,22 +158,41 @@ export interface ProgressHistoryPresentation {
   currentFocus: string | null;
 }
 
-/** Derives the chart, count, Index, and six current rows from one ordered history. */
-export function progressHistoryPresentation(history: readonly ScoredPracticeRecord[]): ProgressHistoryPresentation {
+/** Derives a cumulative Index: each practice updates only the signals it genuinely observed. */
+export function progressHistoryPresentation(
+  history: readonly ScoredPracticeRecord[],
+  baseline?: SharedResultContractV1,
+): ProgressHistoryPresentation {
   const ordered = [...history].sort((left, right) => left.completedAt - right.completedAt);
-  const current = ordered.at(-1);
-  const bySignal = new Map(current?.observedSignals.map((signal) => [signal.key, signal]) ?? []);
+  const bySignal = new Map<SharedSignalKey, ScoredPracticeSignal>();
+  const baselineIsAlreadyRecorded = Boolean(baseline && ordered.some((record) => record.rehearsalId === baseline.rehearsal_id));
+  if (baseline && !baselineIsAlreadyRecorded) {
+    baseline.signals.forEach((signal) => {
+      if (signal.observation_status === "observed" && typeof signal.score === "number" && signal.evidence_turn_ids.length > 0) {
+        bySignal.set(signal.signal_key, { key: signal.signal_key, value: signal.score, evidenceTurnIds: [...signal.evidence_turn_ids] });
+      }
+    });
+  }
+  const chartValues: number[] = [];
+  const baselineValues = [...bySignal.values()];
+  if (baselineValues.length > 0) chartValues.push(Math.round(baselineValues.reduce((sum, signal) => sum + signal.value, 0) / baselineValues.length));
+  ordered.forEach((record) => {
+    record.observedSignals.forEach((signal) => bySignal.set(signal.key, signal));
+    const values = [...bySignal.values()];
+    chartValues.push(Math.round(values.reduce((sum, signal) => sum + signal.value, 0) / values.length));
+  });
   const rows = PROGRESS_SIGNAL_ORDER.map((key): HistorySignalRow => {
     const signal = bySignal.get(key);
     return { key, label: PROGRESS_SIGNAL_LABELS[key], value: signal?.value ?? null, evidenceTurnIds: signal?.evidenceTurnIds ?? [] };
   });
+  const currentSignals = [...bySignal.values()];
   return {
-    recordCount: ordered.length,
-    indexValue: current?.overallIndex ?? null,
-    observedCount: current?.observedSignals.length ?? 0,
-    chartValues: ordered.map((record) => record.overallIndex),
+    recordCount: ordered.length + (baselineValues.length > 0 ? 1 : 0),
+    indexValue: currentSignals.length > 0 ? Math.round(currentSignals.reduce((sum, signal) => sum + signal.value, 0) / currentSignals.length) : null,
+    observedCount: currentSignals.length,
+    chartValues,
     rows,
-    currentFocus: current?.currentFocus ?? null,
+    currentFocus: ordered.at(-1)?.currentFocus ?? baseline?.first_focus?.first_focus_label ?? null,
   };
 }
 

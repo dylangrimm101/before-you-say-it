@@ -1,6 +1,7 @@
 import type { Scenario } from "@/types/convo";
 import { approvedRehearsalConfig, type ApprovedRehearsalLessonId } from "@/lib/approvedRehearsals";
 import { isValidM1L1ProviderTurn, m1L1DynamicReplyPassesQuality } from "@/lib/m1L1DynamicResponse";
+import type { SharedSignalKey } from "@/types/sharedProduct";
 import type {
   M1L1BehaviorFlag,
   M1L1DimensionId,
@@ -11,7 +12,7 @@ import type {
 } from "@/types/pilotCurriculum";
 
 export type ConvertedLessonId = "m1-l1";
-export type TransferChoice = "say" | "write" | "save_later";
+export type TransferChoice = "say" | "write" | "save_later" | "finish";
 
 const LESSON_ID = "m1-l1" as const;
 const MODULE_ID = "bysi_m01_get_to_the_point" as const;
@@ -77,6 +78,21 @@ export interface LessonCoachNote {
 export interface M1L1ComparisonResult extends PilotComparison {
   behaviorId: "point_proof_move";
   selectedDimension: M1L1DimensionId;
+}
+
+export interface M1L1IndexImpact {
+  signalKey: SharedSignalKey;
+  signalLabel: string;
+  signalValue: number;
+  beforeIndex: number | null;
+  afterIndex: number;
+  delta: number | null;
+  explanation: string;
+}
+
+export interface M1L1CurrentSignal {
+  key: SharedSignalKey;
+  value: number;
 }
 
 export interface CompletionValidation {
@@ -342,7 +358,9 @@ const COACHING_SEVERITY: Readonly<Record<M1L1DimensionId, number>> = {
 
 function coachingConfidence(dimension: M1L1DimensionId, transcript: string): number {
   const lower = cleanTranscript(transcript).toLowerCase();
-  if (dimension === "motive_character_language") return /\b(always|never|lazy|selfish|don't care|doesn't care|respect me|on purpose|trying to)\b/.test(lower) ? 30 : 12;
+  const explicitJudgmentConfidence = 30;
+  const missingReturnConfidence = 28;
+  if (dimension === "motive_character_language") return /\b(always|never|lazy|selfish|don't care|doesn't care|respect me|on purpose|trying to)\b/.test(lower) ? explicitJudgmentConfidence : 12;
   if (dimension === "evidence_discipline" || dimension === "issue_count") {
     const conjunctions = lower.match(/\band\b/g)?.length ?? 0;
     return conjunctions >= 3 || /\b(also|another time|everyone|other people|all the times)\b/.test(lower) ? 26 : 14;
@@ -350,7 +368,7 @@ function coachingConfidence(dimension: M1L1DimensionId, transcript: string): num
   if (dimension === "park_and_return") {
     const acknowledges = /\b(i hear|that's fair|i understand|i get that)\b/.test(lower);
     const returns = /\b(still|my point|the handoff|the file|what i need)\b/.test(lower);
-    return !acknowledges && !returns ? 28 : 20;
+    return !acknowledges && !returns ? missingReturnConfidence : 20;
   }
   if (dimension === "move_clarity") return 22;
   return 16;
@@ -461,6 +479,61 @@ export function m1L1Comparison(firstAttempt: string, retry: string, dimension: M
   return { behaviorId: "point_proof_move", selectedDimension: dimension, text, criterionChanged };
 }
 
+const INDEX_SIGNAL_BY_DIMENSION: Record<M1L1DimensionId, SharedSignalKey> = {
+  point_placement: "clarity",
+  issue_count: "clarity",
+  grounding_concreteness: "specificity",
+  motive_character_language: "steadiness",
+  move_clarity: "clarity",
+  evidence_discipline: "specificity",
+  park_and_return: "listening",
+};
+
+const INDEX_SIGNAL_LABELS: Record<SharedSignalKey, string> = {
+  clarity: "Clarity",
+  specificity: "Specificity",
+  steadiness: "Steadiness",
+  listening: "Listening",
+  boundaries: "Boundaries",
+  repair: "Repair",
+};
+
+/** Calculates one transparent Index update from the single behavior Hope observed. */
+export function m1L1IndexImpact(run: PilotDayRun, currentSignals: readonly M1L1CurrentSignal[]): M1L1IndexImpact | null {
+  const lesson = run.m1L1;
+  const dimension = lesson?.selectedDimension;
+  const coachedBeat = lesson?.coachedBeat;
+  const retry = run.retryAttempt?.transcript;
+  const original = coachedBeat === 1 ? run.attempt?.transcript : run.responseAttempt?.transcript;
+  if (!dimension || !coachedBeat || !retry || !original) return null;
+  const beforeStatus = m1L1BehaviorFlags(original, coachedBeat).find((item) => item.dimension === dimension)?.status ?? "not_assessable";
+  const afterStatus = m1L1BehaviorFlags(retry, coachedBeat).find((item) => item.dimension === dimension)?.status ?? "not_assessable";
+  const signalKey = INDEX_SIGNAL_BY_DIMENSION[dimension];
+  const values = new Map<SharedSignalKey, number>(currentSignals.map((signal) => [signal.key, signal.value]));
+  const previousSignal = values.get(signalKey);
+  const step = beforeStatus === "not_met" && afterStatus === "met"
+    ? 18
+    : afterStatus === "met"
+      ? 6
+      : beforeStatus === "met" && afterStatus === "not_met"
+        ? -12
+        : 0;
+  const signalValue = Math.max(0, Math.min(100, previousSignal === undefined ? (afterStatus === "met" ? 72 : 52) : previousSignal + step));
+  const beforeIndex = values.size > 0 ? Math.round([...values.values()].reduce((sum, value) => sum + value, 0) / values.size) : null;
+  values.set(signalKey, signalValue);
+  const afterIndex = Math.round([...values.values()].reduce((sum, value) => sum + value, 0) / values.size);
+  const delta = beforeIndex === null ? null : afterIndex - beforeIndex;
+  const signalLabel = INDEX_SIGNAL_LABELS[signalKey];
+  const explanation = delta === null
+    ? `Hope established ${signalLabel.toLowerCase()} evidence from how you handled the coached moment.`
+    : delta > 0
+      ? `Your Index increased because the retry made ${labelForDimension(dimension)} observable under pushback.`
+      : delta < 0
+        ? `Your Index adjusted because the retry no longer made ${labelForDimension(dimension)} observable.`
+        : `Your Index held. Hope added evidence about ${signalLabel.toLowerCase()} and kept the next practice target clear.`;
+  return { signalKey, signalLabel, signalValue, beforeIndex, afterIndex, delta, explanation };
+}
+
 /** Adam is authorized only for this exact accepted work manifest. */
 export function semanticVoiceForScenario(scenario: Scenario, lesson?: ConvertedLessonConfig): "adam_counterpart" | "contextual_counterpart" {
   return lesson?.practiceId === PRACTICE_ID
@@ -525,7 +598,7 @@ export function normalizeConvertedLessonProgress(value: unknown): ConvertedLesso
       && item.retryCompleted === true
       && item.comparisonViewed === true
       && item.savedMoveId === config.namedMoveId
-      && ["say", "write", "save_later"].includes(item.transferChoice ?? "")
+      && ["say", "write", "save_later", "finish"].includes(item.transferChoice ?? "")
       && typeof item.completedAt === "number"
       && Number.isFinite(item.completedAt)
       && item.completedAt > 0

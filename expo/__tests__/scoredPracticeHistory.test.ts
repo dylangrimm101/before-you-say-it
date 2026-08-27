@@ -90,9 +90,10 @@ describe("canonical scored-practice history", () => {
     expect(view.rows.find((row) => row.key === "repair")?.value).toBe(70);
   });
 
-  test("a previously observed signal later unobserved is truthfully Not observed currently", () => {
+  test("a later practice updates only what it observed and preserves earlier signal evidence", () => {
     const history = [record("a", 1, { clarity: 50, repair: 70 }), record("b", 2, { clarity: 60 })];
-    expect(progressHistoryPresentation(history).rows.find((row) => row.key === "repair")?.value).toBeNull();
+    expect(progressHistoryPresentation(history).rows.find((row) => row.key === "repair")?.value).toBe(70);
+    expect(progressHistoryPresentation(history).indexValue).toBe(65);
     expect(dimensionHistoryPresentation("repair", history).practiceCount).toBe(1);
   });
 

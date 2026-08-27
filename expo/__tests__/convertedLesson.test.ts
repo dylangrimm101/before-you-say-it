@@ -14,6 +14,7 @@ import {
   m1L1Comparison,
   m1L1EvidenceTrap,
   m1L1GoodVersion,
+  m1L1IndexImpact,
   normalizeConvertedLessonProgress,
   selectM1L1PushbackOne,
   semanticVoiceForScenario,
@@ -274,6 +275,21 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(note?.evidenceQuote).toBe(response);
     expect(note?.worked).toContain("loses the noon request");
     expect(note?.retryDirection).toContain("return to the noon handoff");
+  });
+
+  test("calculates a transparent Index update from only Hope's selected behavior", () => {
+    const impact = m1L1IndexImpact(acceptedRun().run, [
+      { key: "clarity", value: 60 },
+      { key: "specificity", value: 60 },
+      { key: "steadiness", value: 60 },
+      { key: "listening", value: 60 },
+      { key: "boundaries", value: 60 },
+      { key: "repair", value: 60 },
+    ]);
+    expect(impact).not.toBeNull();
+    expect(impact?.beforeIndex).toBe(60);
+    expect(impact?.afterIndex).toBe((impact?.beforeIndex ?? 0) + (impact?.delta ?? 0));
+    expect(impact?.explanation).toMatch(/Index (increased|held|adjusted)/);
   });
 
   test("provides a concrete strong version tailored to the selected behavior and moment", () => {

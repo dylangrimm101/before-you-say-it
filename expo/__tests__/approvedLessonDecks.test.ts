@@ -301,7 +301,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).toContain("conversionRuntimeEnabled(params.lessonId)");
   });
 
-  test("keeps the new deck review isolated from purchases, persistence, and legacy scores", async () => {
+  test("keeps deck review isolated from purchases while allowing the approved M1 L1 Index update", async () => {
     const catalog = await source("constants/approvedLessons.ts");
     const catalogScreen = await source("app/approved-lessons.tsx");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
@@ -309,8 +309,11 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(implementation).not.toContain("useIsPro");
     expect(implementation).not.toContain("purchasePackage");
     expect(implementation).not.toContain("restorePurchases");
-    expect(implementation).not.toContain("scoredPracticeHistory");
-    expect(implementation).not.toContain("saveScoredPracticeRecord");
+    expect(deckScreen).toContain("m1L1IndexImpact");
+    expect(deckScreen).toContain("saveScoredPracticeRecord");
+    expect(deckScreen).toContain("A strong version");
+    expect(deckScreen).toContain("Done — back to Home");
+    expect(deckScreen).not.toContain("Optional custom wording");
     expect(implementation).not.toContain("AsyncStorage");
   });
 });

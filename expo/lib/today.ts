@@ -1,5 +1,6 @@
 import type { ModuleId } from "@/constants/modules";
 import type { ActivePracticeSession } from "@/lib/practiceSession";
+import { progressHistoryPresentation, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
 import type { PilotModuleState, PilotProgressEntry } from "@/types/pilotCurriculum";
 import type { SharedResultContractV1 } from "@/types/sharedProduct";
 
@@ -61,23 +62,24 @@ function localDayKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-/** Presents only the persisted six-signal Index; paid completion never changes it. */
-export function todayIndexPresentation(result: SharedResultContractV1 | undefined): TodayIndexPresentation {
-  const index = result?.starting_index;
-  const observedCount = index?.observed_count ?? 0;
-  const value = index?.index_value ?? null;
-  const kind: TodayIndexKind = value === null || observedCount === 0
+/** Presents the cumulative evidence-backed Index, including lesson updates. */
+export function todayIndexPresentation(
+  result: SharedResultContractV1 | undefined,
+  history: readonly ScoredPracticeRecord[] = [],
+): TodayIndexPresentation {
+  const evidence = progressHistoryPresentation(history, result);
+  const kind: TodayIndexKind = evidence.indexValue === null || evidence.observedCount === 0
     ? "insufficient"
-    : observedCount === 6
+    : evidence.observedCount === 6
       ? "overall"
       : "partial";
   return {
     kind,
-    value,
-    observedCount,
+    value: evidence.indexValue,
+    observedCount: evidence.observedCount,
     totalSignalCount: 6,
-    focus: result?.first_focus?.first_focus_label ?? null,
-    chartValues: value === null ? [] : [value],
+    focus: evidence.currentFocus,
+    chartValues: [...evidence.chartValues],
   };
 }
 

@@ -146,13 +146,16 @@ export default function TodayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isReduced = useReducedMotion();
-  const { access, activityDays, activePracticeSession, completedPracticeIds } = useStore();
+  const { access, activityDays, activePracticeSession, completedPracticeIds, scoredPracticeHistory } = useStore();
   const moduleId = todayRecommendedModuleId(activePracticeSession);
   const recommended = curriculumModule(moduleId);
   const activeRun = moduleId ? Object.values(activePracticeSession?.pilotRuns ?? {}).find((run) => run.moduleId === moduleId && run.state !== "complete") : undefined;
   const nextPractice = moduleId ? nextReviewPractice(moduleId, completedPracticeIds) : undefined;
   const moduleDay = reviewPracticeRuntime(activeRun?.practiceId ?? nextPractice?.practiceId ?? "")?.module;
-  const index = useMemo<TodayIndexPresentation>(() => todayIndexPresentation(activePracticeSession?.sharedResult), [activePracticeSession?.sharedResult]);
+  const index = useMemo<TodayIndexPresentation>(
+    () => todayIndexPresentation(activePracticeSession?.sharedResult, scoredPracticeHistory),
+    [activePracticeSession?.sharedResult, scoredPracticeHistory],
+  );
   const recentDays = useMemo(() => todayRecentPractice(activityDays, new Date()), [activityDays]);
   const activities = useMemo(() => todayActivityPresentation(activeRun?.state, Boolean(activeRun)), [activeRun]);
   const entrances = useRef<Animated.Value[]>(Array.from({ length: 5 }, () => new Animated.Value(0))).current;

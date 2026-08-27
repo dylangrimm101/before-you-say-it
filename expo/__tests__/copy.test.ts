@@ -329,7 +329,7 @@ describe("the debrief only claims what it can measure", () => {
     expect(source).not.toContain('label: "Stayed steady"');
     expect(source).not.toContain('label: "Composure"');
     expect(source).not.toMatch(/Delivery|seventh signal/i);
-    expect(source).toContain("progressHistoryPresentation(scoredPracticeHistory)");
+    expect(source).toContain("progressHistoryPresentation(scoredPracticeHistory, activePracticeSession?.sharedResult)");
   });
 
   it("keeps third-person phrasing out of the roleplay instructions", async () => {
