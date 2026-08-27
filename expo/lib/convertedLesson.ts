@@ -11,7 +11,6 @@ import type {
 
 export type ConvertedLessonId = "m1-l1";
 export type TransferChoice = "say" | "write" | "save_later";
-export type SafetyChoice = "direct" | "unsure" | "yes" | "prefer_not";
 
 const LESSON_ID = "m1-l1" as const;
 const MODULE_ID = "bysi_m01_get_to_the_point" as const;
@@ -355,11 +354,6 @@ export function m1L1Comparison(firstAttempt: string, retry: string, dimension: M
   else if (before === "met" && after === "not_met") { text = `The retry regressed: it no longer ${label}. Hope checked no other behavior.`; criterionChanged = true; }
   else text = `The retry still did not ${label}. Hope checked no other behavior.`;
   return { behaviorId: "point_proof_move", selectedDimension: dimension, text, criterionChanged };
-}
-
-/** Safety answers are ephemeral; every non-direct answer reaches the authored alternate route. */
-export function routeForM1L1Safety(choice: SafetyChoice): "scene" | "different-route" {
-  return choice === "direct" ? "scene" : "different-route";
 }
 
 /** Adam is authorized only for this exact accepted work manifest. */

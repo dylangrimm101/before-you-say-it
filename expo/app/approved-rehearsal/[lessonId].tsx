@@ -1,13 +1,12 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, ShieldCheck } from "lucide-react-native";
+import { ShieldCheck } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 
 import { ScenarioPaidPractice } from "@/components/ScenarioPaidPractice";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
-import { Backdrop, GlassCard, PrimaryButton } from "@/components/ui";
-import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
+import { Backdrop } from "@/components/ui";
+import { C, GUTTER, T } from "@/constants/theme";
 import { approvedRehearsalConfig, approvedRehearsalRuntimeEnabled } from "@/lib/approvedRehearsals";
 import { conversionRuntimeEnabled, isAcceptedM1L1ResumeRun, M1_L1_CONVERSION } from "@/lib/convertedLesson";
 import { createScenarioPracticeRun, initializeM1L1Run } from "@/lib/scenarioPractice";
@@ -16,7 +15,6 @@ import { useStore } from "@/providers/store";
 export default function ApprovedRehearsalRoute(): React.JSX.Element {
   const params = useLocalSearchParams<{ lessonId?: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const {
     activeScenarioRun,
     archiveActiveScenarioRunStrict,
@@ -41,7 +39,7 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
   const hasConflict = isAvailable && Boolean(activeScenarioRun) && !resumable;
   const preservationStarted = useRef<boolean>(false);
   const startupStarted = useRef<boolean>(false);
-  const [step, setStep] = useState<"preserving" | "starting" | "different-route" | "runtime">(resumable ? "runtime" : hasConflict ? "preserving" : "starting");
+  const [step, setStep] = useState<"preserving" | "starting" | "runtime">(resumable ? "runtime" : hasConflict ? "preserving" : "starting");
 
   const createAcceptedRun = useCallback(async (): Promise<void> => {
     if (!config) throw new Error("Approved rehearsal config is unavailable");
@@ -127,22 +125,10 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
       {...(isM1L1 ? { convertedLesson: M1_L1_CONVERSION } : { approvedRehearsal: approvedConfig! })}
       onReturnToDeck={(runId) => router.replace({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: config!.lessonId, returnFromRehearsal: "1", runId } })}
       onDiscard={async () => { const expected = activeRunRevision(activeScenarioRun); if (!expected) throw new Error("Active rehearsal is missing"); await clearActiveScenarioRunStrict(expected); router.back(); }}
-      onSafetyExit={() => setStep("different-route")}
     />;
   }
 
-  return <View style={styles.root}><Backdrop />
-    <View style={[styles.header, { paddingTop: insets.top + 8 }]}><Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to lesson"><ArrowLeft size={21} color={C.text} /></Pressable><Text style={styles.headerTitle}>Internal {config?.lessonId.toUpperCase()} rehearsal QA</Text><View style={styles.back} /></View>
-    <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 30 }]}>
-      <GlassCard style={styles.card}>
-        <ShieldCheck size={28} color={C.sage} /><Text style={styles.eyebrow}>A DIFFERENT ROUTE MAY FIT BETTER</Text><Text style={styles.title}>You do not have to practice a direct conversation first.</Text><Text style={styles.body}>You can review support, documentation, reporting, or safety options instead. Your answer was not stored.</Text><PrimaryButton label="See other options" onPress={() => router.push("/safety")} containerStyle={styles.action} /><Choice label="Return to the lesson" onPress={() => router.back()} /><Choice label="Leave this practice" onPress={() => router.replace("/(tabs)")} />
-      </GlassCard>
-    </ScrollView>
-  </View>;
-}
-
-function Choice({ label, onPress }: { label: string; onPress: () => void }): React.JSX.Element {
-  return <Pressable onPress={onPress} style={styles.choice} accessibilityRole="button"><Text style={styles.choiceText}>{label}</Text></Pressable>;
+  return <View style={[styles.root, styles.loading]}><Backdrop /><ActivityIndicator size="small" color={C.purple} accessibilityLabel="Starting rehearsal" /></View>;
 }
 
 function Unavailable(): React.JSX.Element {
@@ -150,5 +136,5 @@ function Unavailable(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg }, loading: { alignItems: "center", justifyContent: "center" }, unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER }, header: { minHeight: 68, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, back: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerTitle: { flex: 1, textAlign: "center", fontFamily: font.bold, fontSize: 16, color: C.text }, scroll: { paddingHorizontal: GUTTER, paddingTop: 16 }, card: { padding: 20, gap: 14 }, eyebrow: { ...eyebrow, color: C.purple }, title: { ...T.title }, body: { ...T.support }, action: { marginTop: 4 }, choice: { minHeight: 52, borderRadius: radius.md, borderWidth: 1, borderColor: C.line, backgroundColor: C.surfaceHigh, paddingHorizontal: 16, justifyContent: "center" }, choiceText: { ...T.support, color: C.text, fontFamily: font.medium },
+  root: { flex: 1, backgroundColor: C.bg }, loading: { alignItems: "center", justifyContent: "center" }, unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER }, title: { ...T.title }, body: { ...T.support },
 });

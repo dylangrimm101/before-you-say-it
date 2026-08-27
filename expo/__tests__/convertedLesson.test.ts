@@ -14,7 +14,6 @@ import {
   m1L1Comparison,
   m1L1EvidenceTrap,
   normalizeConvertedLessonProgress,
-  routeForM1L1Safety,
   selectM1L1PushbackOne,
   semanticVoiceForScenario,
   validateM1L1Completion,
@@ -177,13 +176,6 @@ describe("accepted M1 L1 narrow correction", () => {
     const acknowledged = confirmM1L1PressureReplay(staged, "text_fallback_acknowledged", 203);
     expect(acknowledged.run.state).toBe("ready_for_final_retry_capture");
     expect(acknowledged.run.m1L1?.replayProof).toBe("text_fallback_acknowledged");
-  });
-
-  test("routes all four ephemeral safety choices deterministically", () => {
-    expect(routeForM1L1Safety("direct")).toBe("scene");
-    expect(routeForM1L1Safety("unsure")).toBe("different-route");
-    expect(routeForM1L1Safety("yes")).toBe("different-route");
-    expect(routeForM1L1Safety("prefer_not")).toBe("different-route");
   });
 
   test("isolates Adam from partner, family, and non-converted scenarios", () => {

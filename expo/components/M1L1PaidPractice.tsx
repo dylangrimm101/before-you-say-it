@@ -41,7 +41,6 @@ interface M1L1PaidPracticeProps {
   convertedLesson: ConvertedLessonConfig;
   onReturnToDeck: (runId: string) => void;
   onDiscard: () => Promise<void>;
-  onSafetyExit: () => void;
 }
 
 type CaptureKind = "opener" | "response-one" | "response-two" | "retry" | "final-retry";
@@ -71,7 +70,7 @@ function lineFor(turn: NonNullable<PersistedScenarioPracticeRun["run"]["counterp
 }
 
 /** Isolated accepted M1 L1 runtime. Other lessons and shared scenarios never enter this component. */
-export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDeck, onDiscard, onSafetyExit }: M1L1PaidPracticeProps): React.JSX.Element {
+export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDeck, onDiscard }: M1L1PaidPracticeProps): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeScenarioRun, replaceActiveScenarioRunStrict } = useStore();
@@ -286,7 +285,6 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]} keyboardShouldPersistTaps="handled">
         <StatusPill label="WORK · M1 L1" tone="purple" /><Text style={styles.scenarioTitle}>{convertedLesson.scenario.title}</Text><Text style={styles.context}>{convertedLesson.scenario.situation}</Text>
         <View accessible accessibilityLabel={`${progressLabel}. Eight-beat rehearsal progress.`} style={styles.progress}><View style={[styles.progressFill, { width: `${(step / 8) * 100}%` }]} /></View>
-        <Pressable onPress={() => { void dictation.cancel().then(onSafetyExit).catch(() => Alert.alert("Recording cleanup is pending", "Try again before leaving this rehearsal.")); }} style={styles.safety} accessibilityRole="button"><Text style={styles.safetyText}>This doesn’t feel safe to practice</Text></Pressable>
         {messages.map((message) => <View key={message.id} style={[styles.messageWrap, message.mine ? styles.mine : styles.theirs]}><Text style={styles.messageLabel}>{message.who}</Text><View style={[styles.bubble, message.mine ? styles.bubbleMine : styles.bubbleTheirs]}><Text style={[styles.messageText, message.mine ? styles.messageTextMine : null]}>{message.text}</Text></View></View>)}
 
         {permissionKind ? <ProductCard accent style={styles.card}><SectionLabel tone={C.purple}>Use your voice for this rehearsal</SectionLabel><Text style={styles.body}>Microphone access is used only for the turn you choose to record. You can type instead.</Text>{dictation.status === "denied" ? <><Text style={styles.title}>Microphone access is off</Text><PrimaryButton label="Open Settings" onPress={() => void Linking.openSettings()} containerStyle={styles.action} /></> : <PrimaryButton label="Allow microphone" onPress={() => void allowMicrophone()} containerStyle={styles.action} />}<Pressable onPress={() => void typeCapture(permissionKind)} style={styles.secondary}><Text style={styles.secondaryText}>Type this turn instead</Text></Pressable></ProductCard> : null}
@@ -314,7 +312,7 @@ function Capture({ title, kind, value, onChange, onRecord, onType }: { title: st
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 }, center: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
   header: { minHeight: 70, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, hit: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerCopy: { flex: 1, alignItems: "center" }, headerTitle: { fontFamily: font.bold, fontSize: 17, color: C.text }, headerMeta: { ...T.caption, color: C.purple, marginTop: 2 },
-  scroll: { paddingHorizontal: GUTTER, paddingTop: 12 }, scenarioTitle: { ...T.title, marginTop: 10 }, context: { ...T.support, marginTop: 7 }, progress: { height: 5, borderRadius: 3, backgroundColor: C.track, overflow: "hidden", marginTop: 14 }, progressFill: { height: "100%", backgroundColor: C.purple }, safety: { minHeight: 44, justifyContent: "center" }, safetyText: { ...T.caption, color: C.clay, fontFamily: font.semi },
+  scroll: { paddingHorizontal: GUTTER, paddingTop: 12 }, scenarioTitle: { ...T.title, marginTop: 10 }, context: { ...T.support, marginTop: 7 }, progress: { height: 5, borderRadius: 3, backgroundColor: C.track, overflow: "hidden", marginTop: 14 }, progressFill: { height: "100%", backgroundColor: C.purple },
   title: { ...T.title, marginTop: 22 }, body: { ...T.support, marginTop: 8 }, action: { marginTop: 18 }, capture: { alignItems: "center", marginTop: 18 }, or: { ...T.caption, marginVertical: 16 }, input: { ...T.body, minHeight: 108, width: "100%", backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.glassEdge, borderRadius: radius.md, padding: 16, textAlignVertical: "top" },
   card: { marginTop: 16, gap: 10 }, secondary: { minHeight: 44, alignItems: "center", justifyContent: "center" }, secondaryText: { ...T.caption, color: C.purple, fontFamily: font.semi },
   messageWrap: { maxWidth: "84%", marginTop: 10 }, mine: { alignSelf: "flex-end", alignItems: "flex-end" }, theirs: { alignSelf: "flex-start", alignItems: "flex-start" }, messageLabel: { ...T.caption, fontFamily: font.semi, marginBottom: 4 }, bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 11 }, bubbleMine: { backgroundColor: C.purple }, bubbleTheirs: { backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.line }, messageText: { ...T.support, color: C.text }, messageTextMine: { color: C.onAccent },

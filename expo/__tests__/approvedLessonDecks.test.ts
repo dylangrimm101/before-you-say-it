@@ -185,6 +185,17 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(rehearsalRoute).not.toContain('label="Start rehearsal"');
   });
 
+  test("removes the unsafe-practice exit from every approved rehearsal runtime", async () => {
+    const rehearsalRoute = await source("app/approved-rehearsal/[lessonId].tsx");
+    const sharedRuntime = await source("components/ScenarioPaidPractice.tsx");
+    const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
+    const implementation = `${rehearsalRoute}\n${sharedRuntime}\n${m1L1Runtime}`;
+    expect(implementation).not.toContain("This doesn’t feel safe to practice");
+    expect(implementation).not.toContain("onSafetyExit");
+    expect(implementation).not.toContain("different-route");
+    expect(implementation).not.toContain("A DIFFERENT ROUTE MAY FIT BETTER");
+  });
+
   test("keeps the catalog and deck route fail-closed outside development", async () => {
     const catalogScreen = await source("app/approved-lessons.tsx");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
