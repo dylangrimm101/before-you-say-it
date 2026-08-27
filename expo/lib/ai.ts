@@ -3,6 +3,7 @@ import { renderCounterpartMessage } from "@/lib/rehearsal";
 import { errorShape, safeLog } from "@/lib/redact";
 import type { Debrief, Difficulty, OnboardingForm, PersonaVoice, ReactionPattern, Scenario, Turn } from "@/types/convo";
 import { neutralPilotCoachResponse, selectDay8Pushback, validatePilotCoachResponse } from "@/lib/pilotCurriculum";
+import { m1L1DynamicReplyPassesQuality, type M1L1PressureKind } from "@/lib/m1L1DynamicResponse";
 import type {
   PilotCoachResponse,
   PilotCounterpartResponse,
@@ -204,6 +205,82 @@ const ROLEPLAY_MAX_TOKENS = 900;
  * gets a `CounterpartTurnError` so it can show a retry state. Nothing partial
  * or unparsed is ever returned.
  */
+export interface M1L1DynamicReplyInput {
+  scenario: Scenario;
+  kind: M1L1PressureKind;
+  approvedTranscript: string;
+  openingTranscript: string;
+  firstPushback?: string;
+  firstResponse?: string;
+  authoredFallback: string;
+  runId: string;
+}
+
+export interface M1L1DynamicReplyResult {
+  reply: string;
+  source: "provider" | "authored";
+}
+
+function m1L1ConversationContext(input: M1L1DynamicReplyInput): string {
+  return [
+    input.scenario.title,
+    input.scenario.situation,
+    input.scenario.persona,
+    input.openingTranscript,
+    input.firstPushback ?? "",
+    input.firstResponse ?? "",
+  ].filter((value) => value.trim().length > 0).join(" ");
+}
+
+/** Generates one constrained M1 L1 pressure turn, retries one rejected result, then returns the authored fallback. */
+export async function generateM1L1DynamicReply(input: M1L1DynamicReplyInput): Promise<M1L1DynamicReplyResult> {
+  const context = m1L1ConversationContext(input);
+  const turn = input.kind === "pushback_one" ? "pushback" : "close";
+  const transcript: BysiTranscript = {
+    user_turn_1: input.openingTranscript,
+    counterpart_pushback: input.firstPushback ?? "",
+    user_turn_2: input.firstResponse ?? "",
+    counterpart_close: "",
+  };
+  const pressureObjective = input.kind === "pushback_one"
+    ? "Respond directly to the learner's actual point while defending Adam's quarter-close constraints and keeping the requested handoff change unresolved."
+    : "Respond to the full exchange by challenging the learner's evidence or scope without changing topic or resolving the requested handoff change.";
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const result = await postBysi<BysiTurnResponse>({
+        type: "rehearsal_turn",
+        turn,
+        contract: {
+          ...bysiContract(input.scenario, "defensive", input.scenario.goal),
+          pressure_condition: `${input.scenario.persona} ${pressureObjective}`,
+        },
+        transcript,
+        avoid_repeating: [input.firstPushback ?? "", input.authoredFallback].filter(Boolean),
+        lesson_constraints: {
+          lesson_id: "m1-l1",
+          counterpart: "Adam, the learner's colleague",
+          approved_transcript: input.approvedTranscript,
+          conversation_context: context,
+          pressure_objective: pressureObjective,
+          output: "One short, natural in-character reply of no more than three sentences.",
+          reject: ["invented facts", "instant agreement", "coaching language", "topic changes"],
+        },
+        variation_seed: `${input.runId}-${input.kind}-${attempt}`,
+      });
+      const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
+      if (reply && m1L1DynamicReplyPassesQuality(reply, input.kind, input.approvedTranscript, context)) {
+        return { reply, source: "provider" };
+      }
+      safeLog("[ai] M1 L1 semantic quality gate rejected line", { attempt, kind: input.kind });
+    } catch (error) {
+      safeLog("[ai] M1 L1 counterpart request failed", { attempt, kind: input.kind, ...errorShape(error) });
+    }
+  }
+
+  return { reply: input.authoredFallback, source: "authored" };
+}
+
 export async function nextCounterpartTurn(
   scenario: Scenario,
   difficulty: Difficulty,

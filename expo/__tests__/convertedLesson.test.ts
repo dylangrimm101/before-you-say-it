@@ -41,6 +41,7 @@ import {
   stageM1L1PressureReplay,
 } from "@/lib/scenarioPractice";
 import type { PersistedScenarioPracticeRun } from "@/lib/scenarioPractice";
+import { m1L1ProviderTurn } from "@/lib/m1L1DynamicResponse";
 
 function fixtureDeck(duplicateCompletion = false): string {
   const cardEntries = Array.from({ length: 22 }, (_, index) => index === 20 ? "  { n:21, type:'Saved move', saved:true }" : `  { n:${index + 1}, type:'Card ${index + 1}' }`);
@@ -126,6 +127,28 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(value.run.m1L1?.coachedBeat).toBe(5);
     expect(value.run.m1L1?.beat).toBe(8);
     expect(value.run.m1L1?.retryCount).toBe(1);
+  });
+
+  test("persists and restores the exact accepted provider wording without changing completion rules", () => {
+    const authored = acceptedRun("dynamic-persisted");
+    const first = { ...m1L1ProviderTurn(authored.run.id, "pushback_one", "But quarter close is heavy. What handoff timing would actually leave enough review time?"), authoredAt: authored.run.m1L1!.pushbackOne!.authoredAt };
+    const second = { ...m1L1ProviderTurn(authored.run.id, "evidence_trap", "But that's one handoff example. What else are you basing this on?"), authoredAt: authored.run.m1L1!.pushbackTwo!.authoredAt };
+    const dynamic = {
+      ...authored,
+      run: {
+        ...authored.run,
+        counterpartTurn: first,
+        counterpartReactionId: first.reactionId,
+        resolvedAudioId: first.resolvedAudioId,
+        adamReactionId: first.reactionId,
+        adamAudioId: first.resolvedAudioId,
+        m1L1: { ...authored.run.m1L1!, pushbackOne: first, pushbackTwo: second },
+      },
+    };
+    const restored = normalizeScenarioPracticeRun(JSON.parse(JSON.stringify(dynamic)));
+    expect(restored?.run.m1L1?.pushbackOne?.text).toBe(first.text);
+    expect(restored?.run.m1L1?.pushbackTwo?.text).toBe(second.text);
+    expect(validateM1L1Completion(restored?.run, dynamic.run.id).isValid).toBe(true);
   });
 
   test("hard-caps retries at two and preserves exact pressure/audio identity", () => {
