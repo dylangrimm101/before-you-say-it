@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, ShieldCheck } from "lucide-react-native";
-import React, { useCallback, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScenarioPaidPractice } from "@/components/ScenarioPaidPractice";
@@ -39,8 +39,8 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
       && run.counterpartIdentity === config.counterpartId);
   const resumable = isAvailable && isAcceptedIdentity && run?.state !== "complete";
   const hasConflict = isAvailable && Boolean(activeScenarioRun) && !resumable;
-  const hasVersionMismatch = Boolean(config && run?.practiceId === config.practiceId && run.contentVersion !== config.contentVersion);
-  const [step, setStep] = useState<"conflict" | "safety" | "different-route" | "scene" | "runtime">(resumable ? "runtime" : hasConflict ? "conflict" : "safety");
+  const preservationStarted = useRef<boolean>(false);
+  const [step, setStep] = useState<"preserving" | "safety" | "different-route" | "scene" | "runtime">(resumable ? "runtime" : hasConflict ? "preserving" : "safety");
 
   const createAcceptedRun = useCallback(async (): Promise<void> => {
     if (!config) throw new Error("Approved rehearsal config is unavailable");
@@ -84,27 +84,23 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
     }
   }, [createAcceptedRun, isAvailable, resumable]);
 
-  const preserveAndRestart = useCallback(async (): Promise<void> => {
-    try {
-      const expected = activeRunRevision(activeScenarioRun);
-      if (!expected) throw new Error("Active rehearsal is missing");
-      await archiveActiveScenarioRunStrict(expected);
-      setStep("safety");
-    } catch {
-      Alert.alert("We couldn’t preserve the saved rehearsal", "The existing rehearsal remains active. Nothing was overwritten.");
-    }
-  }, [activeScenarioRun, archiveActiveScenarioRunStrict]);
-
-  const discardAndRestart = useCallback(async (): Promise<void> => {
-    try {
-      const expected = activeRunRevision(activeScenarioRun);
-      if (!expected) throw new Error("Active rehearsal is missing");
-      await clearActiveScenarioRunStrict(expected);
-      setStep("safety");
-    } catch {
-      Alert.alert("We couldn’t delete the saved rehearsal", "It remains active on this device. Nothing new was started.");
-    }
-  }, [activeScenarioRun, clearActiveScenarioRunStrict]);
+  useEffect(() => {
+    if (step !== "preserving" || preservationStarted.current) return;
+    preservationStarted.current = true;
+    const preserveAndContinue = async (): Promise<void> => {
+      try {
+        const expected = activeRunRevision(activeScenarioRun);
+        if (!expected) throw new Error("Active rehearsal is missing");
+        await archiveActiveScenarioRunStrict(expected);
+        setStep("safety");
+      } catch {
+        Alert.alert("We couldn’t preserve the saved rehearsal", "The existing rehearsal remains active. Nothing was overwritten.", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      }
+    };
+    void preserveAndContinue();
+  }, [activeScenarioRun, archiveActiveScenarioRunStrict, router, step]);
 
   const handleSafetyChoice = useCallback((choice: SafetyChoice): void => {
     setStep(routeForM1L1Safety(choice));
@@ -113,6 +109,9 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
   const runtimeKey = useMemo(() => activeScenarioRun?.run.id ?? "new-run", [activeScenarioRun?.run.id]);
 
   if (!isAvailable) return <Unavailable />;
+  if (step === "preserving") {
+    return <View style={[styles.root, styles.preserving]}><Backdrop /><ActivityIndicator size="small" color={C.purple} accessibilityLabel="Saving existing rehearsal" /></View>;
+  }
   if (step === "runtime" && activeScenarioRun?.run.id) {
     return <ScenarioPaidPractice
       key={runtimeKey}
@@ -128,15 +127,7 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
   return <View style={styles.root}><Backdrop />
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}><Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to lesson"><ArrowLeft size={21} color={C.text} /></Pressable><Text style={styles.headerTitle}>Internal {config?.lessonId.toUpperCase()} rehearsal QA</Text><View style={styles.back} /></View>
     <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 30 }]}>
-      {step === "conflict" ? <GlassCard style={styles.card}>
-        <Text style={styles.eyebrow}>{hasVersionMismatch ? "CONTENT UPDATED" : "SAVED REHEARSAL FOUND"}</Text>
-        <Text style={styles.title}>{hasVersionMismatch ? "Start the accepted version without mixing content." : "Choose what happens to the existing rehearsal."}</Text>
-        <Text style={styles.body}>{hasVersionMismatch ? "The old run can be preserved, but its pressure and rubric cannot be combined with this version." : "A different practice is active. It will never be overwritten silently."}</Text>
-        <PrimaryButton label={`Preserve it and start ${config?.lessonId.toUpperCase() ?? "lesson"}`} onPress={() => void preserveAndRestart()} containerStyle={styles.action} />
-        <Choice label="Resume the existing rehearsal" onPress={() => run?.scenarioContext?.scenarioId ? router.push({ pathname: "/rehearse/[id]", params: { id: run.scenarioContext.scenarioId, scenarioRunId: run.id } }) : router.back()} />
-        <Choice label="Save and leave" onPress={() => router.back()} />
-        <Choice label={`Discard it, then start ${config?.lessonId.toUpperCase() ?? "lesson"}`} onPress={() => void discardAndRestart()} />
-      </GlassCard> : step === "safety" ? <GlassCard style={styles.card}>
+      {step === "safety" ? <GlassCard style={styles.card}>
         <Text style={styles.eyebrow}>BEFORE YOU PRACTICE</Text><Text style={styles.title}>Is there any reason bringing this up directly could put you at risk, lead to retaliation, or make the situation less safe?</Text>
         <Choice label="No. Direct conversation feels appropriate." onPress={() => handleSafetyChoice("direct")} />
         <Choice label="I'm not sure." onPress={() => handleSafetyChoice("unsure")} />
@@ -160,5 +151,5 @@ function Unavailable(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg }, unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER }, header: { minHeight: 68, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, back: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerTitle: { flex: 1, textAlign: "center", fontFamily: font.bold, fontSize: 16, color: C.text }, scroll: { paddingHorizontal: GUTTER, paddingTop: 16 }, card: { padding: 20, gap: 14 }, eyebrow: { ...eyebrow, color: C.purple }, title: { ...T.title }, body: { ...T.support }, action: { marginTop: 4 }, choice: { minHeight: 52, borderRadius: radius.md, borderWidth: 1, borderColor: C.line, backgroundColor: C.surfaceHigh, paddingHorizontal: 16, justifyContent: "center" }, choiceText: { ...T.support, color: C.text, fontFamily: font.medium }, sceneInset: { padding: 16, borderRadius: radius.md, backgroundColor: C.purpleSoft, gap: 7 }, sceneLabel: { ...eyebrow, color: C.purple },
+  root: { flex: 1, backgroundColor: C.bg }, preserving: { alignItems: "center", justifyContent: "center" }, unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER }, header: { minHeight: 68, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, back: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerTitle: { flex: 1, textAlign: "center", fontFamily: font.bold, fontSize: 16, color: C.text }, scroll: { paddingHorizontal: GUTTER, paddingTop: 16 }, card: { padding: 20, gap: 14 }, eyebrow: { ...eyebrow, color: C.purple }, title: { ...T.title }, body: { ...T.support }, action: { marginTop: 4 }, choice: { minHeight: 52, borderRadius: radius.md, borderWidth: 1, borderColor: C.line, backgroundColor: C.surfaceHigh, paddingHorizontal: 16, justifyContent: "center" }, choiceText: { ...T.support, color: C.text, fontFamily: font.medium }, sceneInset: { padding: 16, borderRadius: radius.md, backgroundColor: C.purpleSoft, gap: 7 }, sceneLabel: { ...eyebrow, color: C.purple },
 });
