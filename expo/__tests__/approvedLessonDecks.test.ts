@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { authorizedDeckHtml, materializeApprovedDeckHtml } from "../lib/approvedDeckLoader";
+import { authorizedDeckHtml, installTapTutorialDismissal, materializeApprovedDeckHtml } from "../lib/approvedDeckLoader";
 
 const DECK_LIMITS = {
   "M1-L1-Buried-Point.html": 20,
@@ -100,6 +100,24 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(page).not.toContain('type="__bundler/manifest"');
     expect(page).not.toMatch(/<script\s+src=/i);
     expect(page).not.toContain("blob:");
+  });
+
+  test("uses the first tutorial tap only to dismiss the hint and keeps Card 1 visible", async () => {
+    let tutorialDeckCount = 0;
+    for (const fileName of Object.keys(DECK_LIMITS)) {
+      const template = approvedTemplate(await source(`assets/lesson-decks/${fileName}`));
+      const hasTutorial = template.includes("showHint:st.hint && i === 0,");
+      const installed = installTapTutorialDismissal(template);
+      if (!hasTutorial) {
+        expect(installed).toBe(template);
+        continue;
+      }
+      tutorialDeckCount += 1;
+      expect(installed).toContain("go(d) {\n    if (this.state.hint && this.state.i === 0)");
+      expect(installed).toContain("this.setState({ hint:false });\n      return;");
+      expect((installed.match(/if \(this\.state\.hint && this\.state\.i === 0\)/g) ?? [])).toHaveLength(1);
+    }
+    expect(tutorialDeckCount).toBe(11);
   });
 
   test("re-verifies every fetched deck against its authorized boundary before display", async () => {
