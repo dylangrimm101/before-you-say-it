@@ -24,7 +24,7 @@ import {
   resetConvertedProgressQueueForTests,
   type ConvertedProgressStorage,
 } from "@/lib/convertedProgressRepository";
-import { convertedHandoffDeckHtml, isApprovedM1L1DeckDigest, returnedDeckHtml } from "@/lib/approvedDeckLoader";
+import { convertedHandoffDeckHtml, isApprovedM1L1DeckDigest, removeM1L1OutcomePreview, returnedDeckHtml } from "@/lib/approvedDeckLoader";
 import {
   advanceM1L1FirstResponse,
   attachM1L1Coaching,
@@ -322,6 +322,17 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(isApprovedM1L1DeckDigest("other.html", M1_L1_CONVERSION.contentVersion, digest)).toBe(false);
   });
 
+  test("removes the M1 L1 outcome preview without removing the scene", () => {
+    const preview = `<div style="padding:20px"><div style="color:purple">What happens</div><div style="margin-top:8px">You open. Adam pushes back twice. The second one is <em>“You're acting like this happens all the time.”</em> Then Hope names one change and hands the same moment back to you.</div></div>`;
+    const template = `<div>The scene</div><p>${M1_L1_CONVERSION.scenario.situation}</p>${preview}<button>Start voice rehearsal</button>`;
+    const cleaned = removeM1L1OutcomePreview(template);
+    expect(cleaned).toContain("The scene");
+    expect(cleaned).toContain(M1_L1_CONVERSION.scenario.situation);
+    expect(cleaned).toContain("Start voice rehearsal");
+    expect(cleaned).not.toContain("What happens");
+    expect(cleaned).not.toContain("pushes back twice");
+  });
+
   test("slices handoff before rehearsal and authorizes only Cards 21–22 after return", () => {
     const handoff = convertedHandoffDeckHtml(fixtureDeck(), 20);
     const returned = returnedDeckHtml(fixtureDeck(), 21, 22);
@@ -330,8 +341,9 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(handoffEncoded).toBeDefined();
     const handoffTemplate = JSON.parse(handoffEncoded!) as string;
     expect(handoffTemplate).toContain(M1_L1_CONVERSION.scenario.situation);
-    expect(handoffTemplate).toContain("Adam, your colleague, pushes back twice");
-    expect(handoffTemplate).toContain("same work moment back to you");
+    expect(handoffTemplate).not.toContain("What happens");
+    expect(handoffTemplate).not.toContain("pushes back twice");
+    expect(handoffTemplate).not.toContain("same moment back to you");
     expect(handoffTemplate).not.toContain("Sunday evening, kitchen");
     expect(handoffTemplate).not.toContain("Your partner is on the couch");
     expect(handoff).not.toContain("{ n:21, type:");

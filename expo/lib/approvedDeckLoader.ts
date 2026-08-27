@@ -14,7 +14,7 @@ const M1_L1_CONTENT_VERSION = "m1-l1-v2.1-2026-08-24";
 const M1_L1_APPROVED_SHA256 = "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e";
 const STALE_M1_L1_SCENE = "Sunday evening, kitchen. Dishes done, kid finally asleep. You've wanted to say this for two weeks. Your partner is on the couch, half looking at their phone. Not hostile. Tired.";
 const STALE_M1_L1_SCENE_BEATS = "You open. Adam pushes back twice. The second one is <em>“You're acting like this happens all the time.”</em> Then Hope names one change and hands the same moment back to you.";
-const ACCEPTED_M1_L1_SCENE_BEATS = "You open. Adam, your colleague, pushes back twice. The second one is <em>“You're acting like this happens all the time.”</em> Then Hope names one Point → Proof → Move change and hands the same work moment back to you.";
+const M1_L1_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*You open\.\s*Adam pushes back twice\..*?same moment back to you\.\s*<\/div>\s*<\/div>/is;
 
 let archivePromise: Promise<Record<string, Uint8Array>> | null = null;
 
@@ -187,13 +187,19 @@ function sliceCards(template: string, throughCard: number): string {
   return `${template.slice(0, deferredCardStart)}${template.slice(cardsEnd)}`;
 }
 
+/** Removes the outcome preview so the handoff gives context without revealing the exchange. */
+export function removeM1L1OutcomePreview(template: string): string {
+  return template
+    .replace(M1_L1_OUTCOME_PREVIEW, "")
+    .replace(STALE_M1_L1_SCENE_BEATS, "");
+}
+
 /** Converts an approved lesson handoff action into the fail-closed native QA runtime launch. */
 export function convertedHandoffDeckHtml(rawHtml: string, handoffCard: number): string {
   return replaceEncodedTemplate(rawHtml, (source) => {
     const sliced = sliceCards(source, handoffCard);
-    const withAcceptedScene = sliced
-      .replace(STALE_M1_L1_SCENE, M1_L1_CONVERSION.scenario.situation)
-      .replace(STALE_M1_L1_SCENE_BEATS, ACCEPTED_M1_L1_SCENE_BEATS);
+    const withAcceptedScene = removeM1L1OutcomePreview(sliced)
+      .replace(STALE_M1_L1_SCENE, M1_L1_CONVERSION.scenario.situation);
     if (sliced.includes(STALE_M1_L1_SCENE) && withAcceptedScene.includes(STALE_M1_L1_SCENE)) {
       throw new Error("Converted lesson scene could not be aligned");
     }
