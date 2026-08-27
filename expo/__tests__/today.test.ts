@@ -86,6 +86,15 @@ describe("locked Today card system", () => {
     expect(source).toContain("pinnedTranslation(order, scrollOffset)");
     expect(source).not.toContain("stickyHeaderIndices");
   });
+
+  test("makes the current Communication Index the Home focal point and includes completed lesson evidence", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text();
+    expect(source).toContain("Your current Index");
+    expect(source).toContain("Latest lesson included");
+    expect(source).toContain("hasLessonUpdate={scoredPracticeHistory.length > 0}");
+    expect(source).toContain("todayIndexPresentation(activePracticeSession?.sharedResult, scoredPracticeHistory)");
+    expect(source).toContain("fontSize: 58");
+  });
 });
 
 describe("truthful Today state", () => {

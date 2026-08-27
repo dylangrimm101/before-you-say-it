@@ -313,6 +313,10 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).toContain("saveScoredPracticeRecord");
     expect(deckScreen).toContain("A strong version");
     expect(deckScreen).toContain("Done — back to Home");
+    expect(deckScreen).toContain("Animated.timing(indexProgress");
+    expect(deckScreen).toContain("useReducedMotion()");
+    expect(deckScreen).toContain("announceForAccessibility");
+    expect(deckScreen).toContain("Communication Index moved from");
     expect(deckScreen).not.toContain("Optional custom wording");
     expect(implementation).not.toContain("AsyncStorage");
   });

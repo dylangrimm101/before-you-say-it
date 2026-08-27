@@ -92,7 +92,7 @@ function activityCopy(key: TodayActivityKey, module: CurriculumModule, moduleDay
   return { title: "See what changed", body: moduleDay?.copy.transfer ?? "Compare your responses and carry one adjustment forward." };
 }
 
-function IndexCard({ index, chartProgress, onDetails }: { index: TodayIndexPresentation; chartProgress: Animated.Value; onDetails: () => void }) {
+function IndexCard({ index, chartProgress, hasLessonUpdate, onDetails }: { index: TodayIndexPresentation; chartProgress: Animated.Value; hasLessonUpdate: boolean; onDetails: () => void }) {
   const chartSlots = Array.from({ length: 7 }, (_, slot) => {
     const valueIndex = slot - (7 - index.chartValues.length);
     return valueIndex >= 0 ? index.chartValues[valueIndex] ?? null : null;
@@ -101,16 +101,16 @@ function IndexCard({ index, chartProgress, onDetails }: { index: TodayIndexPrese
   const statusLabel = index.kind === "overall" ? "Overall Index" : index.kind === "partial" ? "Partial Index" : "Insufficient evidence";
 
   return (
-    <View style={styles.card} accessibilityLabel={`${statusLabel}. ${index.value ?? "No Index value"}. ${index.observedCount} of 6 signals observed.`}>
+    <View style={[styles.card, styles.indexCard]} accessibilityLabel={`Current Communication Index. ${statusLabel}. ${index.value ?? "No Index value"}. ${index.observedCount} of 6 signals observed.${hasLessonUpdate ? " Latest completed lesson included." : ""}`}>
       <View style={styles.cardTopRow}>
-        <Text style={styles.cardEyebrow}>Communication Index</Text>
+        <View style={styles.indexLabelRow}><Text style={styles.cardEyebrow}>Communication Index</Text><View style={styles.currentBadge}><View style={styles.currentDot} /><Text style={styles.currentBadgeText}>Current</Text></View></View>
         <Pressable onPress={onDetails} accessibilityRole="button" accessibilityLabel="Communication Index details" hitSlop={12}>
           <View style={styles.detailsRow}><Text style={styles.details}>Details</Text><ChevronRight size={12} color={C.purple} /></View>
         </Pressable>
       </View>
       <View style={styles.indexHeading}>
-        <View style={styles.indexValueRow}><Text style={styles.indexValue}>{valueLabel}</Text>{index.value !== null ? <Text style={styles.outOf}>/ 100</Text> : null}</View>
-        <View style={styles.indexPills}><View style={styles.pill}><Text style={styles.pillText}>{statusLabel}</Text></View><View style={styles.pill}><Text style={styles.pillText}>{index.observedCount} of 6</Text></View></View>
+        <View><Text style={styles.currentIndexCaption}>Your current Index</Text><View style={styles.indexValueRow}><Text style={styles.indexValue}>{valueLabel}</Text>{index.value !== null ? <Text style={styles.outOf}>/ 100</Text> : null}</View></View>
+        <View style={styles.indexPills}><View style={styles.pill}><Text style={styles.pillText}>{statusLabel}</Text></View><View style={styles.pill}><Text style={styles.pillText}>{index.observedCount} of 6 signals</Text></View>{hasLessonUpdate ? <View style={styles.updatedPill}><Check size={10} color={C.purple} strokeWidth={3} /><Text style={styles.updatedPillText}>Latest lesson included</Text></View> : null}</View>
       </View>
       <View style={styles.chartArea}>
         <View style={styles.chart} accessibilityRole="image" accessibilityLabel={index.chartValues.length === 0 ? "No scored practice values yet" : `Scored practice history. ${index.chartValues.join(", ")} on a zero to one hundred scale.`}>
@@ -212,7 +212,7 @@ export default function TodayScreen() {
         showsVerticalScrollIndicator={false}
       >
         <DeckLayer entrance={entrances[0]} order={0} scrollOffset={scrollOffset}>
-          <IndexCard index={index} chartProgress={chartProgress} onDetails={openProgress} />
+          <IndexCard index={index} chartProgress={chartProgress} hasLessonUpdate={scoredPracticeHistory.length > 0} onDetails={openProgress} />
         </DeckLayer>
         {TODAY_ACTIVITY_KEYS.map((key, activityIndex) => {
           const activity = activities[activityIndex];
@@ -240,13 +240,14 @@ const styles = StyleSheet.create({
   deck: { flex: 1 }, deckContent: { paddingHorizontal: 20, isolation: "isolate" },
   cardLayer: { paddingBottom: TODAY_CARD_GAP },
   card: { height: TODAY_CARD_HEIGHT, borderRadius: TODAY_CARD_RADIUS, padding: TODAY_CARD_PADDING, backgroundColor: C.onAccent, borderWidth: 1, borderColor: C.line, ...shadow.layer },
+  indexCard: { backgroundColor: "#FCFAFF", borderColor: "rgba(81,40,136,0.2)", shadowColor: C.purple, shadowOffset: { width: 0, height: 13 }, shadowOpacity: 0.12, shadowRadius: 28, elevation: 7 },
   cardCurrent: { borderColor: "rgba(81,40,136,0.22)", shadowColor: C.purple, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.14, shadowRadius: 26, elevation: 8 },
   cardTopRow: { minHeight: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  cardEyebrow: { ...eyebrow, color: C.dim }, detailsRow: { flexDirection: "row", alignItems: "center", gap: 1 }, details: { fontFamily: font.semi, fontSize: 12, color: C.purple },
-  indexHeading: { minHeight: 54, marginTop: 5, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
-  indexValueRow: { flexDirection: "row", alignItems: "flex-end", gap: 5 }, indexValue: { fontFamily: font.bold, fontSize: 46, lineHeight: 49, letterSpacing: -1.5, color: C.purple }, outOf: { fontFamily: font.regular, fontSize: 14, color: C.dim, paddingBottom: 6 },
-  indexPills: { flexDirection: "row", gap: 5, paddingBottom: 5 }, pill: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: "rgba(23,26,31,0.05)", borderWidth: 1, borderColor: C.line }, pillText: { fontFamily: font.semi, fontSize: 10, color: C.textSoft },
-  chartArea: { flex: 1, minHeight: 0, marginTop: 5, gap: 5 }, chart: { flex: 1, minHeight: 0, flexDirection: "row", alignItems: "flex-end", gap: 6 }, chartTrack: { flex: 1, height: "100%", borderRadius: 5, backgroundColor: "rgba(81,40,136,0.07)", overflow: "hidden", justifyContent: "flex-end" }, chartBar: { width: "100%", borderRadius: 5, backgroundColor: "rgba(81,40,136,0.24)", transformOrigin: "bottom" }, chartBarCurrent: { backgroundColor: C.purple }, chartCaption: { fontFamily: font.medium, fontSize: 10, lineHeight: 12, color: C.dim },
+  indexLabelRow: { flexDirection: "row", alignItems: "center", gap: 8 }, cardEyebrow: { ...eyebrow, color: C.dim }, currentBadge: { minHeight: 22, paddingHorizontal: 8, borderRadius: 11, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.purpleSoft }, currentDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.purple }, currentBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 0.6, textTransform: "uppercase", color: C.purple }, detailsRow: { flexDirection: "row", alignItems: "center", gap: 1 }, details: { fontFamily: font.semi, fontSize: 12, color: C.purple },
+  indexHeading: { minHeight: 76, marginTop: 4, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 }, currentIndexCaption: { fontFamily: font.medium, fontSize: 11, lineHeight: 13, color: C.dim, marginBottom: -2 },
+  indexValueRow: { flexDirection: "row", alignItems: "flex-end", gap: 5 }, indexValue: { fontFamily: font.bold, fontSize: 58, lineHeight: 63, letterSpacing: -2.2, color: C.purple }, outOf: { fontFamily: font.regular, fontSize: 14, color: C.dim, paddingBottom: 8 },
+  indexPills: { alignItems: "flex-end", gap: 4, paddingBottom: 5 }, pill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: "rgba(23,26,31,0.05)", borderWidth: 1, borderColor: C.line }, pillText: { fontFamily: font.semi, fontSize: 9, color: C.textSoft }, updatedPill: { minHeight: 22, paddingHorizontal: 8, borderRadius: 11, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.purpleSoft }, updatedPillText: { fontFamily: font.semi, fontSize: 9, color: C.purple },
+  chartArea: { flex: 1, minHeight: 0, marginTop: 2, gap: 5 }, chart: { flex: 1, minHeight: 0, flexDirection: "row", alignItems: "flex-end", gap: 6 }, chartTrack: { flex: 1, height: "100%", borderRadius: 5, backgroundColor: "rgba(81,40,136,0.07)", overflow: "hidden", justifyContent: "flex-end" }, chartBar: { width: "100%", borderRadius: 5, backgroundColor: "rgba(81,40,136,0.24)", transformOrigin: "bottom" }, chartBarCurrent: { backgroundColor: C.purple }, chartCaption: { fontFamily: font.medium, fontSize: 10, lineHeight: 12, color: C.dim },
   indexFooter: { paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line, gap: 6 }, signalLegend: { flexDirection: "row", flexWrap: "wrap", rowGap: 5 }, signalItem: { width: "33.333%", flexDirection: "row", alignItems: "center", gap: 5 }, signalMark: { width: 7, height: 7, borderRadius: 2 }, signalLabel: { fontFamily: font.medium, fontSize: 10, color: C.textSoft }, focus: { fontFamily: font.regular, fontSize: 11, lineHeight: 15, color: C.textSoft }, focusKey: { fontFamily: font.semi, fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: C.purple },
   activityMeta: { flexDirection: "row", alignItems: "center", gap: 5 }, activityKind: { fontFamily: font.semi, fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase", color: C.dim }, activityKindCurrent: { color: C.purple }, check: { width: 19, height: 19, borderRadius: 10, backgroundColor: C.purple, alignItems: "center", justifyContent: "center" },
   activityTitle: { fontFamily: font.bold, fontSize: 20, lineHeight: 25, letterSpacing: -0.25, color: C.text, marginTop: 10 }, activityTitleQuiet: { color: C.textSoft }, activityBody: { ...T.support, fontSize: 14, lineHeight: 20, color: C.textSoft, flex: 1, marginTop: 9 }, activityBodyQuiet: { color: C.dim },

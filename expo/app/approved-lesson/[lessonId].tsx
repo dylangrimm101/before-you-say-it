@@ -1,13 +1,13 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, Bookmark, Check, MoreHorizontal, RotateCcw, ShieldCheck, Sparkles, TrendingUp } from "lucide-react-native";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AccessibilityInfo, ActivityIndicator, Alert, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
 import { approvedLessonDeck } from "@/constants/approvedLessons";
 import { ProductCard, SectionLabel } from "@/components/PaidProductUI";
-import { Backdrop, PrimaryButton, Reveal } from "@/components/ui";
+import { Backdrop, PrimaryButton, Reveal, useReducedMotion } from "@/components/ui";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { C, GUTTER, T, font, radius, shadow } from "@/constants/theme";
 import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
@@ -457,10 +457,45 @@ export default function ApprovedLessonDeckScreen() {
 }
 
 function M1L1CompletionScreen({ impact, strongVersion, isSaved, isCompleting, bottomInset, onToggleSave, onFinish }: { impact: M1L1IndexImpact; strongVersion: string; isSaved: boolean; isCompleting: boolean; bottomInset: number; onToggleSave: () => void; onFinish: () => void }): React.JSX.Element {
+  const isReduced = useReducedMotion();
+  const startingValue = impact.beforeIndex ?? impact.afterIndex;
+  const [displayedIndex, setDisplayedIndex] = useState<number>(startingValue);
+  const indexProgress = useRef<Animated.Value>(new Animated.Value(isReduced ? 1 : 0)).current;
   const resultLabel = impact.delta === null ? "Your first lesson Index" : impact.delta > 0 ? `+${impact.delta} to your Index` : impact.delta === 0 ? "Your Index held" : `${impact.delta} to your Index`;
+  const animatedFill = indexProgress.interpolate({ inputRange: [0, 1], outputRange: [`${startingValue}%`, `${impact.afterIndex}%`] });
+  const animatedScale = impact.delta === 0
+    ? indexProgress.interpolate({ inputRange: [0, 0.55, 1], outputRange: [1, 1.045, 1] })
+    : indexProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
+  const explanationOpacity = indexProgress.interpolate({ inputRange: [0, 0.72, 1], outputRange: [0, 0, 1] });
+
+  useEffect(() => {
+    setDisplayedIndex(isReduced ? impact.afterIndex : startingValue);
+    indexProgress.setValue(isReduced ? 1 : 0);
+    if (isReduced) return undefined;
+    const listenerId = indexProgress.addListener(({ value }) => {
+      setDisplayedIndex(Math.round(startingValue + ((impact.afterIndex - startingValue) * value)));
+    });
+    const animation = Animated.timing(indexProgress, {
+      toValue: 1,
+      duration: 1100,
+      delay: 380,
+      easing: Easing.bezier(0.2, 0.82, 0.24, 1),
+      useNativeDriver: false,
+    });
+    animation.start(({ finished }) => {
+      if (!finished) return;
+      setDisplayedIndex(impact.afterIndex);
+      AccessibilityInfo.announceForAccessibility(`Communication Index ${resultLabel}. Current value ${impact.afterIndex} out of 100.`);
+    });
+    return () => {
+      animation.stop();
+      indexProgress.removeListener(listenerId);
+    };
+  }, [impact.afterIndex, indexProgress, isReduced, resultLabel, startingValue]);
+
   return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={[styles.completionScroll, { paddingBottom: bottomInset + 34 }]} showsVerticalScrollIndicator={false}>
     <Reveal><View style={styles.celebrationIcon}><Sparkles size={26} color={C.onAccent} /></View><SectionLabel tone={C.purple}>Lesson complete</SectionLabel><Text style={styles.completionTitle}>You practiced it under pressure.</Text><Text style={styles.completionLede}>Hope compared the same behavior before and after your retry.</Text></Reveal>
-    <Reveal index={1}><ProductCard accent style={styles.indexImpactCard}><View style={styles.impactTop}><View><SectionLabel tone={C.purple}>Communication Index</SectionLabel><Text style={styles.impactResult}>{resultLabel}</Text></View><TrendingUp size={24} color={C.purple} /></View><View style={styles.indexNumbers}>{impact.beforeIndex !== null ? <><Text style={styles.indexBefore}>{impact.beforeIndex}</Text><Text style={styles.indexArrow}>→</Text></> : null}<Text style={styles.indexAfter}>{impact.afterIndex}</Text><Text style={styles.indexOutOf}>/ 100</Text></View><Text style={styles.impactExplanation}>{impact.explanation}</Text><Text style={styles.signalNote}>Observed signal · {impact.signalLabel}</Text></ProductCard></Reveal>
+    <Reveal index={1}><ProductCard accent style={styles.indexImpactCard}><View style={styles.impactTop}><View><SectionLabel tone={C.purple}>Communication Index</SectionLabel><Text style={styles.impactResult}>{resultLabel}</Text></View><TrendingUp size={24} color={C.purple} /></View><View style={styles.indexTransition} accessibilityLabel={`Communication Index moved from ${impact.beforeIndex ?? "no previous value"} to ${impact.afterIndex} out of 100`}><View style={styles.indexNumbers}>{impact.beforeIndex !== null ? <><Text style={styles.indexBefore}>{impact.beforeIndex}</Text><Text style={styles.indexArrow}>→</Text></> : null}<Animated.Text style={[styles.indexAfter, { transform: [{ scale: animatedScale }] }]}>{displayedIndex}</Animated.Text><Text style={styles.indexOutOf}>/ 100</Text></View><View style={styles.indexTrack}><Animated.View style={[styles.indexFill, { width: animatedFill }]} /></View></View><Animated.View style={{ opacity: explanationOpacity }}><Text style={styles.impactExplanation}>{impact.explanation}</Text><Text style={styles.signalNote}>Observed signal · {impact.signalLabel}</Text></Animated.View></ProductCard></Reveal>
     <Reveal index={2}><ProductCard style={styles.strongCard}><SectionLabel tone={C.purple}>A strong version</SectionLabel><Text style={styles.strongText}>“{strongVersion}”</Text><Pressable onPress={onToggleSave} style={[styles.saveStrongButton, isSaved && styles.saveStrongButtonSaved]} accessibilityRole="button" accessibilityState={{ selected: isSaved }}><View style={styles.saveIcon}>{isSaved ? <Check size={17} color={C.onAccent} strokeWidth={3} /> : <Bookmark size={17} color={C.purple} />}</View><Text style={[styles.saveStrongText, isSaved && styles.saveStrongTextSaved]}>{isSaved ? "Saved for later" : "Save this version for later"}</Text></Pressable></ProductCard></Reveal>
     <Reveal index={3}><PrimaryButton label={isCompleting ? "Updating your Index…" : "Done — back to Home"} disabled={isCompleting} onPress={onFinish} containerStyle={styles.finishButton} /><Text style={styles.privacyNote}>{isSaved ? "The strong version will be saved. Your rehearsal transcript will be deleted." : "Your rehearsal transcript will be deleted when you finish."}</Text></Reveal>
   </ScrollView></View>;
@@ -486,7 +521,7 @@ const styles = StyleSheet.create({
   qaBadge: { position: "absolute", alignSelf: "center", zIndex: 3, minHeight: 32, borderRadius: 16, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line },
   qaBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.1, color: C.purple },
   completionScroll: { paddingHorizontal: GUTTER, paddingTop: 76 }, celebrationIcon: { width: 52, height: 52, borderRadius: 18, backgroundColor: C.purple, alignItems: "center", justifyContent: "center", marginBottom: 18, ...shadow.hero }, completionTitle: { fontFamily: font.bold, fontSize: 34, lineHeight: 40, letterSpacing: -0.8, color: C.text, marginTop: 10, maxWidth: 340 }, completionLede: { ...T.support, marginTop: 10, maxWidth: 340 },
-  indexImpactCard: { marginTop: 24, gap: 10 }, impactTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }, impactResult: { fontFamily: font.bold, fontSize: 18, lineHeight: 23, color: C.text, marginTop: 7 }, indexNumbers: { flexDirection: "row", alignItems: "baseline", gap: 8 }, indexBefore: { fontFamily: font.semi, fontSize: 31, color: C.dim, textDecorationLine: "line-through" }, indexArrow: { fontFamily: font.regular, fontSize: 23, color: C.dim }, indexAfter: { fontFamily: font.bold, fontSize: 54, lineHeight: 60, color: C.purple, letterSpacing: -1.5 }, indexOutOf: { fontFamily: font.regular, fontSize: 14, color: C.dim }, impactExplanation: { ...T.support, color: C.text }, signalNote: { ...T.caption, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  indexImpactCard: { marginTop: 24, gap: 10 }, impactTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }, impactResult: { fontFamily: font.bold, fontSize: 18, lineHeight: 23, color: C.text, marginTop: 7 }, indexTransition: { gap: 9 }, indexNumbers: { flexDirection: "row", alignItems: "baseline", gap: 8 }, indexBefore: { fontFamily: font.semi, fontSize: 31, color: C.dim, textDecorationLine: "line-through" }, indexArrow: { fontFamily: font.regular, fontSize: 23, color: C.dim }, indexAfter: { fontFamily: font.bold, fontSize: 54, lineHeight: 60, color: C.purple, letterSpacing: -1.5 }, indexOutOf: { fontFamily: font.regular, fontSize: 14, color: C.dim }, indexTrack: { height: 8, overflow: "hidden", borderRadius: 4, backgroundColor: "rgba(81,40,136,0.11)" }, indexFill: { height: "100%", borderRadius: 4, backgroundColor: C.purple }, impactExplanation: { ...T.support, color: C.text }, signalNote: { ...T.caption, marginTop: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
   strongCard: { marginTop: 14, gap: 10 }, strongText: { fontFamily: font.medium, fontSize: 18, lineHeight: 27, color: C.text }, saveStrongButton: { minHeight: 52, borderRadius: radius.pill, borderWidth: 1, borderColor: C.purple, paddingHorizontal: 15, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 }, saveStrongButtonSaved: { backgroundColor: C.purple }, saveIcon: { width: 24, alignItems: "center" }, saveStrongText: { fontFamily: font.semi, fontSize: 14, color: C.purple }, saveStrongTextSaved: { color: C.onAccent }, finishButton: { marginTop: 22 }, privacyNote: { ...T.caption, textAlign: "center", marginTop: 10, paddingHorizontal: 20 },
   lessonMenu: { position: "absolute", right: 12, zIndex: 8, width: 278, borderRadius: 18, padding: 12, backgroundColor: "rgba(255,255,255,0.98)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
   lessonMenuLabel: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.2, color: C.dim, paddingHorizontal: 6, paddingBottom: 7 },
