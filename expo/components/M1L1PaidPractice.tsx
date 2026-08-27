@@ -18,6 +18,7 @@ import {
   type ConvertedLessonConfig,
 } from "@/lib/convertedLesson";
 import { m1L1ProviderTurn } from "@/lib/m1L1DynamicResponse";
+import { errorShape, safeLog } from "@/lib/redact";
 import {
   advanceM1L1FirstResponse,
   attachM1L1Coaching,
@@ -87,6 +88,8 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
   const [isOpenerHintVisible, setIsOpenerHintVisible] = useState<boolean>(false);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const shouldAutoScrollRef = useRef<boolean>(false);
+  const approvalInFlightRef = useRef<boolean>(false);
+  const captureTransitionInFlightRef = useRef<boolean>(false);
   const dictation = useDictation();
   const speech = useSpeech();
   const cancelDictation = dictation.cancel;
@@ -120,7 +123,9 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       note.selectedDimension,
       Date.now(),
     );
-    void persist(coached);
+    void persist(coached).catch((error: unknown) => {
+      safeLog("[m1-l1] coaching recovery skipped after a newer rehearsal update", errorShape(error));
+    });
   }, [lesson?.coachedBeat, lesson?.pushbackTwo, persist, run?.attempt, run?.responseAttempt, run?.state, value]);
 
   const beginRecording = useCallback(async (kind: CaptureKind): Promise<void> => {
@@ -150,10 +155,18 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
   }, [beginRecording, dictation, permissionKind]);
 
   const typeCapture = useCallback(async (kind: CaptureKind): Promise<void> => {
-    if (!value) return;
+    if (!value || captureTransitionInFlightRef.current) return;
+    captureTransitionInFlightRef.current = true;
     setCaptureKind(kind);
     setPermissionKind(null);
-    await persist(transitionScenarioPracticeRun(value, reviewState(kind), Date.now()));
+    try {
+      await persist(transitionScenarioPracticeRun(value, reviewState(kind), Date.now()));
+    } catch (error: unknown) {
+      safeLog("[m1-l1] typed transcript transition failed", errorShape(error));
+      Alert.alert("We couldn’t open transcript review", "Your typed reply is still here. Try Review typed transcript again.");
+    } finally {
+      captureTransitionInFlightRef.current = false;
+    }
   }, [persist, value]);
 
   const stopRecording = useCallback(async (): Promise<void> => {
@@ -164,8 +177,9 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
   }, [captureKind, dictation, persist, value]);
 
   const confirmOpening = useCallback(async (): Promise<void> => {
-    if (!value || draft.trim().length < 2) return;
-    void unlockAudioPlayback();
+    if (!value || draft.trim().length < 2 || approvalInFlightRef.current) return;
+    approvalInFlightRef.current = true;
+    void unlockAudioPlayback().catch(() => {});
     setBusy(true);
     try {
       const approved = preserveScenarioAttempt(value, "opener", draft, Date.now());
@@ -190,14 +204,19 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       setDraft("");
       await afterNextPaint();
       if (isAudioPrepared) await playPreparedPilotAudio();
+    } catch (error: unknown) {
+      safeLog("[m1-l1] opener approval failed", errorShape(error));
+      Alert.alert("We couldn’t continue that turn", "Your approved opener is still saved. Try again to continue the rehearsal.");
     } finally {
+      approvalInFlightRef.current = false;
       setBusy(false);
     }
   }, [convertedLesson.scenario, draft, persist, replaceActiveScenarioRunStrict, value]);
 
   const confirmFirstResponse = useCallback(async (): Promise<void> => {
-    if (!value || draft.trim().length < 2) return;
-    void unlockAudioPlayback();
+    if (!value || draft.trim().length < 2 || approvalInFlightRef.current) return;
+    approvalInFlightRef.current = true;
+    void unlockAudioPlayback().catch(() => {});
     setBusy(true);
     try {
       const approved = preserveScenarioAttempt(value, "response", draft, Date.now());
@@ -237,29 +256,41 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       setDraft("");
       await afterNextPaint();
       if (isAudioPrepared) await playPreparedPilotAudio();
+    } catch (error: unknown) {
+      safeLog("[m1-l1] first response approval failed", errorShape(error));
+      Alert.alert("We couldn’t continue that turn", "Your approved reply is still saved. Try again to continue the rehearsal.");
     } finally {
+      approvalInFlightRef.current = false;
       setBusy(false);
     }
   }, [convertedLesson.scenario, draft, persist, replaceActiveScenarioRunStrict, value]);
 
   const confirmRetry = useCallback(async (): Promise<void> => {
-    if (!value || !lesson?.selectedDimension || draft.trim().length < 2) return;
-    const retried = preserveM1L1Retry(value, draft, Date.now());
-    const original = lesson.coachedBeat === 1 ? run?.attempt?.transcript : run?.responseAttempt?.transcript;
-    const latest = retried.run.retryAttempt?.transcript;
-    if (!original || !latest) return;
-    const comparison = m1L1Comparison(original, latest, lesson.selectedDimension, lesson.coachedBeat ?? 5);
-    const next = {
-      ...retried,
-      run: {
-        ...retried.run,
-        state: "attempt_comparison" as const,
-        comparison,
-        updatedAt: Math.max(Date.now(), retried.run.updatedAt + 1),
-      },
-    };
-    await persist(next);
-    setDraft("");
+    if (!value || !lesson?.selectedDimension || draft.trim().length < 2 || approvalInFlightRef.current) return;
+    approvalInFlightRef.current = true;
+    try {
+      const retried = preserveM1L1Retry(value, draft, Date.now());
+      const original = lesson.coachedBeat === 1 ? run?.attempt?.transcript : run?.responseAttempt?.transcript;
+      const latest = retried.run.retryAttempt?.transcript;
+      if (!original || !latest) return;
+      const comparison = m1L1Comparison(original, latest, lesson.selectedDimension, lesson.coachedBeat ?? 5);
+      const next = {
+        ...retried,
+        run: {
+          ...retried.run,
+          state: "attempt_comparison" as const,
+          comparison,
+          updatedAt: Math.max(Date.now(), retried.run.updatedAt + 1),
+        },
+      };
+      await persist(next);
+      setDraft("");
+    } catch (error: unknown) {
+      safeLog("[m1-l1] retry approval failed", errorShape(error));
+      Alert.alert("We couldn’t save that retry", "Your reply is still here. Try Approve this transcript again.");
+    } finally {
+      approvalInFlightRef.current = false;
+    }
   }, [draft, lesson, persist, run?.attempt?.transcript, run?.responseAttempt?.transcript, value]);
 
   const replayFlaggedMoment = useCallback(async (isFinal: boolean): Promise<void> => {

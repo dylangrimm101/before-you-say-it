@@ -289,6 +289,18 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(secondPaint).toBeLessThan(secondPlay);
   });
 
+  test("serializes typed transcript approvals and catches stale-write protection without a developer error toast", async () => {
+    const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
+    expect(m1L1Runtime).toContain("approvalInFlightRef.current");
+    expect(m1L1Runtime).toContain("captureTransitionInFlightRef.current");
+    expect(m1L1Runtime).toContain("if (!value || draft.trim().length < 2 || approvalInFlightRef.current) return");
+    expect(m1L1Runtime).toContain("typed transcript transition failed");
+    expect(m1L1Runtime).toContain("first response approval failed");
+    expect(m1L1Runtime).toContain("persist(coached).catch");
+    expect(m1L1Runtime).not.toContain("void persist(coached);");
+    expect(m1L1Runtime).not.toContain("void unlockAudioPlayback();");
+  });
+
   test("keeps the catalog and deck route fail-closed outside development", async () => {
     const catalogScreen = await source("app/approved-lessons.tsx");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
