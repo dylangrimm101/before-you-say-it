@@ -11,6 +11,8 @@ const STOP_WORDS = new Set([
 const COACHING_LEAKAGE = /\b(?:learner|lesson|practice|rehearsal|coach|coaching|rubric|transcript|one point|one proof|one move|try saying|you should say|good job|well done)\b/i;
 const INSTANT_AGREEMENT = /^(?:okay[,!. ]+)?(?:you(?:'|’)re right|i agree|that(?:'|’)s fair|i(?:'|’)m sorry|i apologize|i(?:'|’)ll do that|i will do that|consider it done|sure[,!. ]+i(?:'|’)ll)\b/i;
 const TOPIC_CHANGE = /\b(?:relationship|marriage|kids?|chores?|vacation|rent|politics|dinner|pickup|school)\b/i;
+const UNSUPPORTED_CLIENT_BEHAVIOR = /\b(?:the\s+)?client\s+(?:keeps?|is|was|has|had|changes?|changed|revises?|revised|updates?|updated|sends?|sent|provides?|provided|approves?|approved|confirms?|confirmed|delays?|delayed|needs?|needed|wants?|wanted)\b/i;
+const UNSUPPORTED_TIMEFRAME = /\b(?:two|2)\s+weeks?\b/i;
 const PRESSURE_ONE = /\b(?:but|because|fair|slammed|quarter close|deadline|heavy|realistic|understand|what|when|how)\b/i;
 const PRESSURE_TWO = /\b(?:example|basis|basing|happens|often|pattern|time|always|evidence|what else|why|how)\b/i;
 const FACT_PATTERN = /\b(?:\d{1,2}(?::\d{2})?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday|tomorrow|today)\b/gi;
@@ -37,7 +39,13 @@ export function m1L1DynamicReplyPassesQuality(
   const clean = reply.trim();
   const wordCount = words(clean).length;
   if (clean.length < 8 || clean.length > 320 || wordCount < 3 || wordCount > 55) return false;
-  if (COACHING_LEAKAGE.test(clean) || INSTANT_AGREEMENT.test(clean) || TOPIC_CHANGE.test(clean)) return false;
+  if (
+    COACHING_LEAKAGE.test(clean)
+    || INSTANT_AGREEMENT.test(clean)
+    || TOPIC_CHANGE.test(clean)
+    || UNSUPPORTED_CLIENT_BEHAVIOR.test(clean)
+    || UNSUPPORTED_TIMEFRAME.test(clean)
+  ) return false;
 
   const allowedContext = `${conversationContext} ${approvedTranscript}`;
   const allowedFacts = facts(allowedContext);

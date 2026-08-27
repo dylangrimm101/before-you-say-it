@@ -19,6 +19,8 @@ describe("M1 L1 constrained dynamic counterpart", () => {
     expect(m1L1DynamicReplyPassesQuality("Good job. Try saying one point, one proof, and one move.", "pushback_one", opening, context)).toBe(false);
     expect(m1L1DynamicReplyPassesQuality("You're right. I'll move the handoff to noon.", "pushback_one", opening, context)).toBe(false);
     expect(m1L1DynamicReplyPassesQuality("The handoff will arrive Monday at 9:00, but quarter close is heavy.", "pushback_one", opening, context)).toBe(false);
+    expect(m1L1DynamicReplyPassesQuality("Noon isn't realistic right now, the client keeps changing numbers on me until mid-afternoon during quarter close.", "pushback_one", opening, context)).toBe(false);
+    expect(m1L1DynamicReplyPassesQuality("Noon isn't realistic every week when the client changes numbers last minute; I'm not locking in a fixed time just because two weeks were rough.", "evidence_trap", opening, context)).toBe(false);
     expect(m1L1DynamicReplyPassesQuality("But we should talk about chores and dinner instead.", "pushback_one", opening, context)).toBe(false);
   });
 
