@@ -116,22 +116,6 @@ function isolateNativeDeck(template: string): string {
   return template.replace("</head>", `${NATIVE_DECK_SHELL}</head>`);
 }
 
-const TAP_TUTORIAL_MARKER = "showHint:st.hint && i === 0,";
-const TAP_TUTORIAL_GO_HANDLER = "\n  go(d) {";
-const TAP_TUTORIAL_DISMISSAL = `
-    if (this.state.hint && this.state.i === 0) {
-      this.setState({ hint:false });
-      return;
-    }`;
-
-/** Makes the tutorial's first tap dismiss its overlay while keeping Card 1 visible. */
-export function installTapTutorialDismissal(template: string): string {
-  if (!template.includes(TAP_TUTORIAL_MARKER)) return template;
-  if (template.includes(TAP_TUTORIAL_DISMISSAL)) return template;
-  if (!template.includes(TAP_TUTORIAL_GO_HANDLER)) throw new Error("Approved lesson tap tutorial handler is missing");
-  return template.replace(TAP_TUTORIAL_GO_HANDLER, `${TAP_TUTORIAL_GO_HANDLER}${TAP_TUTORIAL_DISMISSAL}`);
-}
-
 const REHEARSAL_CONTINUATION_PARAGRAPH = /<p\b[^>]*>\s*The rehearsal runs in the voice engine\..*?<\/p>/gs;
 
 /** Removes the redundant continuation paragraph from rehearsal handoff cards. */
@@ -146,7 +130,7 @@ export function materializeApprovedDeckHtml(bundleHtml: string): string {
   const externalEncoded = bundleHtml.match(EXTERNAL_RESOURCES_PATTERN)?.[1];
   if (!templateEncoded || !manifestEncoded || !externalEncoded) throw new Error("Approved lesson bundle metadata is missing");
 
-  let template = removeRehearsalContinuationCopy(installTapTutorialDismissal(JSON.parse(templateEncoded) as string));
+  let template = removeRehearsalContinuationCopy(JSON.parse(templateEncoded) as string);
   const manifest = JSON.parse(manifestEncoded) as Record<string, BundleEntry>;
   const externalResources = JSON.parse(externalEncoded) as ExternalResource[];
   const externalScripts = externalResources.map(({ uuid }) => {
