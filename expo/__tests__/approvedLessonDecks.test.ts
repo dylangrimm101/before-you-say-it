@@ -317,7 +317,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).toContain("conversionRuntimeEnabled(params.lessonId)");
   });
 
-  test("keeps deck review isolated from purchases while allowing the approved M1 L1 Index update", async () => {
+  test("keeps deck review isolated from purchases while giving every approved rehearsal a native evidence-based completion", async () => {
     const catalog = await source("constants/approvedLessons.ts");
     const catalogScreen = await source("app/approved-lessons.tsx");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
@@ -326,7 +326,10 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(implementation).not.toContain("purchasePackage");
     expect(implementation).not.toContain("restorePurchases");
     expect(deckScreen).toContain("m1L1IndexImpact");
+    expect(deckScreen).toContain("approvedRehearsalIndexImpact");
+    expect(deckScreen).toContain("approvedRehearsalStrongVersion");
     expect(deckScreen).toContain("saveScoredPracticeRecord");
+    expect(deckScreen).toContain("Same moment · before and after");
     expect(deckScreen).toContain("A strong version");
     expect(deckScreen).toContain("Done — back to Home");
     expect(deckScreen).toContain("Animated.timing(indexProgress");
@@ -335,6 +338,9 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).toContain("Communication Index moved from");
     expect(deckScreen).not.toContain("approved move auto-save failed");
     expect(deckScreen).not.toContain("approvedMoveSavedAt: Date.now()");
+    expect(deckScreen).not.toContain("if (isM1L1 && isReturning && hasValidReturn");
+    expect(deckScreen).toContain("isStrongVersionSaved && strongVersion");
+    expect(deckScreen).toContain("Your rehearsal transcript will be deleted");
     expect(deckScreen).not.toContain("Optional custom wording");
     expect(implementation).not.toContain("AsyncStorage");
   });

@@ -5,6 +5,8 @@ import {
   approvedRehearsalComparison,
   approvedRehearsalConfig,
   approvedRehearsalCriterion,
+  approvedRehearsalIndexImpact,
+  approvedRehearsalStrongVersion,
   validateApprovedRehearsalCompletion,
 } from "@/lib/approvedRehearsals";
 import { normalizeConvertedLessonProgress } from "@/lib/convertedLesson";
@@ -174,7 +176,66 @@ describe("approved M2 L1-L5 rehearsals", () => {
       sourceLineage: "approved-html-deck-pinned",
     };
     expect(normalizeConvertedLessonProgress([completion])).toHaveLength(1);
+    expect(normalizeConvertedLessonProgress([{ ...completion, customWording: approvedRehearsalStrongVersion(config) }])).toHaveLength(1);
     expect(normalizeConvertedLessonProgress([{ ...completion, moduleId: "bysi_m01_get_to_the_point" }])).toHaveLength(0);
     expect(normalizeConvertedLessonProgress([{ ...completion, savedMoveId: "different-move" }])).toHaveLength(0);
+  });
+});
+
+describe("approved lesson native completion evidence", () => {
+  const passingRetry: Readonly<Record<string, string>> = {
+    "m1-l2": "Yesterday’s late file is one example. Can we decide who owns approval?",
+    "m1-l3": "That’s fair. Let’s finish March’s appointments, and tomorrow we can talk about calls.",
+    "m1-l4": "I mean the two plan changes this month, not your schedule overall.",
+    "m1-l5": "I’m asking for one thing: decide the current plan tonight.",
+    "m2-l1": "What part of the brief can you finish by Friday?",
+    "m2-l2": "Jen, can you confirm the order?",
+    "m2-l3": "I hear the game is fixed. Could you take the van after two, so that leaves the morning with me?",
+    "m2-l4": "Okay. Thanks for telling me.",
+    "m2-l5": "Come back if the signup is at risk.",
+  };
+
+  function completionRun(lessonId: Parameters<typeof approvedRehearsalConfig>[0], before: string, after: string): PilotDayRun {
+    const config = approvedRehearsalConfig(lessonId)!;
+    const wrapper = createScenarioPracticeRun(config.scenario, "steady", "defensive", `run-${lessonId}`, 1);
+    return {
+      ...wrapper.run,
+      responseAttempt: { id: `response-${lessonId}`, kind: "response", transcript: before, representation: "confirmed_transcript", confirmedAt: 2 },
+      retryAttempt: { id: `retry-${lessonId}`, kind: "retry", transcript: after, representation: "confirmed_transcript", confirmedAt: 3 },
+    };
+  }
+
+  test("maps every approved lesson to one observed signal and establishes first evidence", () => {
+    const expectedSignals = {
+      "m1-l2": "specificity",
+      "m1-l3": "listening",
+      "m1-l4": "steadiness",
+      "m1-l5": "clarity",
+      "m2-l1": "clarity",
+      "m2-l2": "clarity",
+      "m2-l3": "listening",
+      "m2-l4": "listening",
+      "m2-l5": "specificity",
+    } as const;
+    for (const [lessonId, signalKey] of Object.entries(expectedSignals)) {
+      const config = approvedRehearsalConfig(lessonId)!;
+      const impact = approvedRehearsalIndexImpact(config, completionRun(lessonId, "No.", passingRetry[lessonId]!), []);
+      expect(impact?.signalKey).toBe(signalKey);
+      expect(impact?.signalValue).toBe(72);
+      expect(impact?.beforeIndex).toBeNull();
+      expect(impact?.delta).toBeNull();
+      expect(approvedRehearsalStrongVersion(config).length).toBeGreaterThan(30);
+    }
+  });
+
+  test("supports evidence-based increase, hold, and decrease without completion points", () => {
+    const config = approvedRehearsalConfig("m2-l4")!;
+    const current = [{ key: "listening" as const, value: 60 }];
+    const increased = approvedRehearsalIndexImpact(config, completionRun("m2-l4", "Please reconsider.", passingRetry["m2-l4"]!), current);
+    const held = approvedRehearsalIndexImpact(config, completionRun("m2-l4", "Please reconsider.", "No, please reconsider."), current);
+    const decreased = approvedRehearsalIndexImpact(config, completionRun("m2-l4", passingRetry["m2-l4"]!, "No, please reconsider."), current);
+    expect(increased).toMatchObject({ signalValue: 78, beforeIndex: 60, afterIndex: 78, delta: 18 });
+    expect(held).toMatchObject({ signalValue: 60, beforeIndex: 60, afterIndex: 60, delta: 0 });
+    expect(decreased).toMatchObject({ signalValue: 48, beforeIndex: 60, afterIndex: 48, delta: -12 });
   });
 });

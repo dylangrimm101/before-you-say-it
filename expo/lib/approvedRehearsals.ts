@@ -1,11 +1,27 @@
 import type { ApprovedLessonId } from "@/constants/approvedLessons";
 import type { Scenario } from "@/types/convo";
 import type { PilotDayRun } from "@/types/pilotCurriculum";
+import type { SharedSignalKey } from "@/types/sharedProduct";
 
 export type ApprovedRehearsalLessonId = Extract<
   ApprovedLessonId,
   "m1-l2" | "m1-l3" | "m1-l4" | "m1-l5" | "m2-l1" | "m2-l2" | "m2-l3" | "m2-l4" | "m2-l5"
 >;
+
+export interface ApprovedRehearsalIndexImpact {
+  signalKey: SharedSignalKey;
+  signalLabel: string;
+  signalValue: number;
+  beforeIndex: number | null;
+  afterIndex: number;
+  delta: number | null;
+  explanation: string;
+}
+
+export interface ApprovedRehearsalCurrentSignal {
+  key: SharedSignalKey;
+  value: number;
+}
 
 export interface ApprovedRehearsalConfig {
   lessonId: ApprovedRehearsalLessonId;
@@ -341,7 +357,7 @@ export function approvedRehearsalCriterion(config: ApprovedRehearsalConfig, tran
     return text.length >= 12 && listSignals <= 1;
   }
   if (config.lessonId === "m1-l3") {
-    const acknowledges = hasAny(text, [/\bi hear\b/, /\bthat's fair\b/, /\bi get that\b/, /\bwe should talk about\b/]);
+    const acknowledges = hasAny(text, [/\bi hear\b/, /\bthat[’']s fair\b/, /\bi get that\b/, /\bthat makes sense\b/, /\bi can see that\b/, /\bi appreciate that\b/, /\bwe should talk about\b/]);
     const returns = hasAny(text, [/\bafter\b/, /\btomorrow\b/, /\btonight\b/, /\bnext\b/, /\bwhen\b/, /\bon \w+day\b/]);
     return acknowledges && returns;
   }
@@ -372,6 +388,75 @@ export function approvedRehearsalCriterion(config: ApprovedRehearsalConfig, tran
       && !hasAny(text, [/\bare you sure\b/, /\bbut i need\b/, /\bjust this once\b/, /\bplease reconsider\b/]);
   }
   return hasAny(text, [/\banything that changes\b/, /\bif .* changes\b/, /\bat risk\b/, /\bwhat i'd have to do next\b/, /\bwhat i would have to do next\b/]);
+}
+
+const INDEX_SIGNAL_BY_LESSON: Readonly<Record<ApprovedRehearsalLessonId, SharedSignalKey>> = {
+  "m1-l2": "specificity",
+  "m1-l3": "listening",
+  "m1-l4": "steadiness",
+  "m1-l5": "clarity",
+  "m2-l1": "clarity",
+  "m2-l2": "clarity",
+  "m2-l3": "listening",
+  "m2-l4": "listening",
+  "m2-l5": "specificity",
+};
+
+const INDEX_SIGNAL_LABELS: Readonly<Record<SharedSignalKey, string>> = {
+  clarity: "Clarity",
+  specificity: "Specificity",
+  steadiness: "Steadiness",
+  listening: "Listening",
+  boundaries: "Boundaries",
+  repair: "Repair",
+};
+
+const STRONG_VERSION_BY_LESSON: Readonly<Record<ApprovedRehearsalLessonId, string>> = {
+  "m1-l2": "Yesterday’s late file is one example of why the approval step needs a clear owner. Can we decide who owns that approval today?",
+  "m1-l3": "You’re right that we should talk about calls. Let’s finish splitting March’s appointments now, and I’ll call you tomorrow so we can come back to that.",
+  "m1-l4": "I’m not saying you never think about my schedule. I’m talking about the two times this month the plan changed after I had rearranged work.",
+  "m1-l5": "I’m asking us to decide one thing tonight: how we’ll handle the current plan. I want to keep the signups for a separate conversation.",
+  "m2-l1": "I hear Thursday won’t work. What part of the handoff brief can you complete, and by when?",
+  "m2-l2": "Jen, since the order is under your name and card, can you confirm it with the bakery by five?",
+  "m2-l3": "I hear that Theo’s game means you’re not free until two. Could you take the van after two, while I cover the morning?",
+  "m2-l4": "Okay. Thanks for telling me you can’t do pickup tomorrow. I’ll make another plan.",
+  "m2-l5": "Please come back to me only if the timing or cost changes enough to put the signup at risk. Otherwise, you can handle the steps in between.",
+};
+
+/** Supplies a deterministic model of the approved lesson move without retaining learner wording. */
+export function approvedRehearsalStrongVersion(config: ApprovedRehearsalConfig): string {
+  return STRONG_VERSION_BY_LESSON[config.lessonId];
+}
+
+/** Calculates one transparent post-lesson Index update from the lesson's observed retry behavior. */
+export function approvedRehearsalIndexImpact(
+  config: ApprovedRehearsalConfig,
+  run: PilotDayRun,
+  currentSignals: readonly ApprovedRehearsalCurrentSignal[],
+): ApprovedRehearsalIndexImpact | null {
+  const original = run.responseAttempt?.transcript;
+  const retry = run.retryAttempt?.transcript;
+  if (!original || !retry) return null;
+  const beforeMet = approvedRehearsalCriterion(config, original);
+  const afterMet = approvedRehearsalCriterion(config, retry);
+  const signalKey = INDEX_SIGNAL_BY_LESSON[config.lessonId];
+  const values = new Map<SharedSignalKey, number>(currentSignals.map((signal) => [signal.key, signal.value]));
+  const previousSignal = values.get(signalKey);
+  const step = !beforeMet && afterMet ? 18 : afterMet ? 6 : beforeMet ? -12 : 0;
+  const signalValue = Math.max(0, Math.min(100, previousSignal === undefined ? (afterMet ? 72 : 52) : previousSignal + step));
+  const beforeIndex = values.size > 0 ? Math.round([...values.values()].reduce((sum, value) => sum + value, 0) / values.size) : null;
+  values.set(signalKey, signalValue);
+  const afterIndex = Math.round([...values.values()].reduce((sum, value) => sum + value, 0) / values.size);
+  const delta = beforeIndex === null ? null : afterIndex - beforeIndex;
+  const signalLabel = INDEX_SIGNAL_LABELS[signalKey];
+  const explanation = delta === null
+    ? `Hope established ${signalLabel.toLowerCase()} evidence from how you used “${config.namedMove}” in the retry.`
+    : delta > 0
+      ? `Your Index increased because the retry made “${config.namedMove}” observable under pressure.`
+      : delta < 0
+        ? `Your Index adjusted because the retry no longer made “${config.namedMove}” observable.`
+        : `Your Index held. Hope added evidence about ${signalLabel.toLowerCase()} and kept the next practice target clear.`;
+  return { signalKey, signalLabel, signalValue, beforeIndex, afterIndex, delta, explanation };
 }
 
 export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, transcript: string): { note: string; retryDirection: string } {

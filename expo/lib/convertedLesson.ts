@@ -634,7 +634,7 @@ export function normalizeConvertedLessonProgress(value: unknown): ConvertedLesso
       && Number.isFinite(item.completedAt)
       && item.completedAt > 0
       && item.sourceLineage === "approved-html-deck-pinned"
-      && (item.customWording === undefined || (item.lessonId === LESSON_ID && typeof item.customWording === "string" && item.customWording.trim().length > 0 && item.customWording.length <= 240));
+      && (item.customWording === undefined || (typeof item.customWording === "string" && item.customWording.trim().length > 0 && item.customWording.length <= 240));
   });
 }
 

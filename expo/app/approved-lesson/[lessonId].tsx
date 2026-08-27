@@ -12,7 +12,7 @@ import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { C, GUTTER, T, font, radius, shadow } from "@/constants/theme";
 import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
 import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
-import { approvedRehearsalConfig, validateApprovedRehearsalCompletion } from "@/lib/approvedRehearsals";
+import { approvedRehearsalConfig, approvedRehearsalIndexImpact, approvedRehearsalStrongVersion, validateApprovedRehearsalCompletion, type ApprovedRehearsalIndexImpact } from "@/lib/approvedRehearsals";
 import { conversionRuntimeEnabled, m1L1GoodVersion, m1L1IndexImpact, M1_L1_CONVERSION, validateM1L1Completion, type ConvertedLessonProgress, type M1L1IndexImpact, type TransferChoice } from "@/lib/convertedLesson";
 import { progressHistoryPresentation, SCORED_PRACTICE_HISTORY_VERSION, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
 import { errorShape, safeLog } from "@/lib/redact";
@@ -300,17 +300,26 @@ export default function ApprovedLessonDeckScreen() {
     () => progressHistoryPresentation(scoredPracticeHistory, activePracticeSession?.sharedResult),
     [activePracticeSession?.sharedResult, scoredPracticeHistory],
   );
-  const indexImpact = useMemo<M1L1IndexImpact | null>(() => {
-    if (!isM1L1 || !returningRun) return null;
+  const indexImpact = useMemo<M1L1IndexImpact | ApprovedRehearsalIndexImpact | null>(() => {
+    if (!returningRun) return null;
     const currentSignals = indexEvidence.rows.flatMap((row) => row.value === null ? [] : [{ key: row.key, value: row.value }]);
-    return m1L1IndexImpact(returningRun, currentSignals);
-  }, [indexEvidence.rows, isM1L1, returningRun]);
-  const strongVersion = returningRun?.m1L1?.selectedDimension && returningRun.m1L1.coachedBeat
-    ? m1L1GoodVersion(returningRun.m1L1.selectedDimension, returningRun.m1L1.coachedBeat)
-    : null;
+    return isM1L1
+      ? m1L1IndexImpact(returningRun, currentSignals)
+      : approvedConfig
+        ? approvedRehearsalIndexImpact(approvedConfig, returningRun, currentSignals)
+        : null;
+  }, [approvedConfig, indexEvidence.rows, isM1L1, returningRun]);
+  const strongVersion = isM1L1
+    ? returningRun?.m1L1?.selectedDimension && returningRun.m1L1.coachedBeat
+      ? m1L1GoodVersion(returningRun.m1L1.selectedDimension, returningRun.m1L1.coachedBeat)
+      : null
+    : approvedConfig
+      ? approvedRehearsalStrongVersion(approvedConfig)
+      : null;
 
-  const finishM1L1 = useCallback(async (): Promise<void> => {
-    if (!activeScenarioRun || !returningRun || !indexImpact || !rehearsalConfig || isCompleting) return;
+  const finishLesson = useCallback(async (): Promise<void> => {
+    const retryAttempt = returningRun?.retryAttempt;
+    if (!activeScenarioRun || !returningRun || !retryAttempt || !indexImpact || !rehearsalConfig || isCompleting) return;
     setIsCompleting(true);
     const completedAt = Date.now();
     const record: ScoredPracticeRecord = {
@@ -319,11 +328,11 @@ export default function ApprovedLessonDeckScreen() {
       rehearsalId: returningRun.id,
       completedAt,
       scenarioId: rehearsalConfig.scenario.id,
-      scenarioTitle: M1_L1_CONVERSION.title,
-      observedSignals: [{ key: indexImpact.signalKey, value: indexImpact.signalValue, evidenceTurnIds: [returningRun.retryAttempt!.id] }],
+      scenarioTitle: lesson?.title ?? rehearsalConfig.scenario.title,
+      observedSignals: [{ key: indexImpact.signalKey, value: indexImpact.signalValue, evidenceTurnIds: [retryAttempt.id] }],
       observedSignalSet: [indexImpact.signalKey],
       overallIndex: indexImpact.signalValue,
-      evidence: [{ turnId: returningRun.retryAttempt!.id }],
+      evidence: [{ turnId: retryAttempt.id }],
       currentFocus: `Keep ${indexImpact.signalLabel.toLowerCase()} visible under pushback`,
     };
     try {
@@ -362,21 +371,24 @@ export default function ApprovedLessonDeckScreen() {
       Alert.alert("We couldn’t finish securely", "Your rehearsal is still available. Please try again.");
       setIsCompleting(false);
     }
-  }, [activeScenarioRun, clearActiveScenarioRunStrict, indexImpact, isCompleting, isStrongVersionSaved, markPendingConvertedLessonPrivateContentDeleted, promotePendingConvertedLessonCompletion, rehearsalConfig, returningRun, router, saveScoredPracticeRecord, strongVersion, writePendingConvertedLessonCompletion]);
+  }, [activeScenarioRun, clearActiveScenarioRunStrict, indexImpact, isCompleting, isStrongVersionSaved, lesson?.title, markPendingConvertedLessonPrivateContentDeleted, promotePendingConvertedLessonCompletion, rehearsalConfig, returningRun, router, saveScoredPracticeRecord, strongVersion, writePendingConvertedLessonCompletion]);
 
   if (!__DEV__) {
     return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
   }
   if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to the internal lesson catalog and choose another deck." />;
-  if (isM1L1 && isReturning && hasValidReturn && indexImpact && strongVersion) {
-    return <M1L1CompletionScreen
+  if (isReturning && hasValidReturn && indexImpact && strongVersion && returningRun?.responseAttempt && returningRun.retryAttempt && returningRun.comparison) {
+    return <LessonCompletionScreen
       impact={indexImpact}
+      originalResponse={returningRun.responseAttempt.transcript}
+      retryResponse={returningRun.retryAttempt.transcript}
+      comparison={returningRun.comparison.text}
       strongVersion={strongVersion}
       isSaved={isStrongVersionSaved}
       isCompleting={isCompleting}
       bottomInset={insets.bottom}
       onToggleSave={() => setIsStrongVersionSaved((current) => !current)}
-      onFinish={() => void finishM1L1()}
+      onFinish={() => void finishLesson()}
     />;
   }
 
@@ -440,7 +452,7 @@ export default function ApprovedLessonDeckScreen() {
   );
 }
 
-function M1L1CompletionScreen({ impact, strongVersion, isSaved, isCompleting, bottomInset, onToggleSave, onFinish }: { impact: M1L1IndexImpact; strongVersion: string; isSaved: boolean; isCompleting: boolean; bottomInset: number; onToggleSave: () => void; onFinish: () => void }): React.JSX.Element {
+function LessonCompletionScreen({ impact, originalResponse, retryResponse, comparison, strongVersion, isSaved, isCompleting, bottomInset, onToggleSave, onFinish }: { impact: M1L1IndexImpact | ApprovedRehearsalIndexImpact; originalResponse: string; retryResponse: string; comparison: string; strongVersion: string; isSaved: boolean; isCompleting: boolean; bottomInset: number; onToggleSave: () => void; onFinish: () => void }): React.JSX.Element {
   const isReduced = useReducedMotion();
   const startingValue = impact.beforeIndex ?? impact.afterIndex;
   const [displayedIndex, setDisplayedIndex] = useState<number>(startingValue);
@@ -480,8 +492,9 @@ function M1L1CompletionScreen({ impact, strongVersion, isSaved, isCompleting, bo
   return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={[styles.completionScroll, { paddingBottom: bottomInset + 34 }]} showsVerticalScrollIndicator={false}>
     <Reveal><View style={styles.celebrationIcon}><Sparkles size={26} color={C.onAccent} /></View><SectionLabel tone={C.purple}>Lesson complete</SectionLabel><Text style={styles.completionTitle}>You practiced it under pressure.</Text><Text style={styles.completionLede}>Hope compared the same behavior before and after your retry.</Text></Reveal>
     <Reveal index={1}><ProductCard accent style={styles.indexImpactCard}><View style={styles.impactTop}><View><SectionLabel tone={C.purple}>Communication Index</SectionLabel><Text style={styles.impactResult}>{resultLabel}</Text></View><TrendingUp size={24} color={C.purple} /></View><View style={styles.indexTransition} accessibilityLabel={`Communication Index moved from ${impact.beforeIndex ?? "no previous value"} to ${impact.afterIndex} out of 100`}><View style={styles.indexNumbers}>{impact.beforeIndex !== null ? <><Text style={styles.indexBefore}>{impact.beforeIndex}</Text><Text style={styles.indexArrow}>→</Text></> : null}<Animated.Text style={[styles.indexAfter, { transform: [{ scale: animatedScale }] }]}>{displayedIndex}</Animated.Text><Text style={styles.indexOutOf}>/ 100</Text></View><View style={styles.indexTrack}><Animated.View style={[styles.indexFill, { width: animatedFill }]} /></View></View><Animated.View style={{ opacity: explanationOpacity }}><Text style={styles.impactExplanation}>{impact.explanation}</Text><Text style={styles.signalNote}>Observed signal · {impact.signalLabel}</Text></Animated.View></ProductCard></Reveal>
-    <Reveal index={2}><ProductCard style={styles.strongCard}><SectionLabel tone={C.purple}>A strong version</SectionLabel><Text style={styles.strongText}>“{strongVersion}”</Text><Pressable onPress={onToggleSave} style={[styles.saveStrongButton, isSaved && styles.saveStrongButtonSaved]} accessibilityRole="button" accessibilityState={{ selected: isSaved }}><View style={styles.saveIcon}>{isSaved ? <Check size={17} color={C.onAccent} strokeWidth={3} /> : <Bookmark size={17} color={C.purple} />}</View><Text style={[styles.saveStrongText, isSaved && styles.saveStrongTextSaved]}>{isSaved ? "Saved for later" : "Save this version for later"}</Text></Pressable></ProductCard></Reveal>
-    <Reveal index={3}><PrimaryButton label={isCompleting ? "Updating your Index…" : "Done — back to Home"} disabled={isCompleting} onPress={onFinish} containerStyle={styles.finishButton} /><Text style={styles.privacyNote}>{isSaved ? "The strong version will be saved. Your rehearsal transcript will be deleted." : "Your rehearsal transcript will be deleted when you finish."}</Text></Reveal>
+    <Reveal index={2}><ProductCard style={styles.comparisonCard}><SectionLabel tone={C.purple}>Same moment · before and after</SectionLabel><View style={styles.responseBlock}><Text style={styles.responseLabel}>First response</Text><Text style={styles.responseText}>“{originalResponse}”</Text></View><View style={styles.responseDivider} /><View style={styles.responseBlock}><Text style={styles.responseLabel}>Retry</Text><Text style={styles.responseText}>“{retryResponse}”</Text></View><Text style={styles.comparisonText}>{comparison}</Text></ProductCard></Reveal>
+    <Reveal index={3}><ProductCard style={styles.strongCard}><SectionLabel tone={C.purple}>A strong version</SectionLabel><Text style={styles.strongText}>“{strongVersion}”</Text><Pressable onPress={onToggleSave} style={[styles.saveStrongButton, isSaved && styles.saveStrongButtonSaved]} accessibilityRole="button" accessibilityState={{ selected: isSaved }}><View style={styles.saveIcon}>{isSaved ? <Check size={17} color={C.onAccent} strokeWidth={3} /> : <Bookmark size={17} color={C.purple} />}</View><Text style={[styles.saveStrongText, isSaved && styles.saveStrongTextSaved]}>{isSaved ? "Saved for later" : "Save this version for later"}</Text></Pressable></ProductCard></Reveal>
+    <Reveal index={4}><PrimaryButton label={isCompleting ? "Updating your Index…" : "Done — back to Home"} disabled={isCompleting} onPress={onFinish} containerStyle={styles.finishButton} /><Text style={styles.privacyNote}>{isSaved ? "The strong version will be saved. Your rehearsal transcript will be deleted." : "Your rehearsal transcript will be deleted when you finish."}</Text></Reveal>
   </ScrollView></View>;
 }
 
@@ -506,6 +519,7 @@ const styles = StyleSheet.create({
   qaBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.1, color: C.purple },
   completionScroll: { paddingHorizontal: GUTTER, paddingTop: 76 }, celebrationIcon: { width: 52, height: 52, borderRadius: 18, backgroundColor: C.purple, alignItems: "center", justifyContent: "center", marginBottom: 18, ...shadow.hero }, completionTitle: { fontFamily: font.bold, fontSize: 34, lineHeight: 40, letterSpacing: -0.8, color: C.text, marginTop: 10, maxWidth: 340 }, completionLede: { ...T.support, marginTop: 10, maxWidth: 340 },
   indexImpactCard: { marginTop: 24, gap: 10 }, impactTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }, impactResult: { fontFamily: font.bold, fontSize: 18, lineHeight: 23, color: C.text, marginTop: 7 }, indexTransition: { gap: 9 }, indexNumbers: { flexDirection: "row", alignItems: "baseline", gap: 8 }, indexBefore: { fontFamily: font.semi, fontSize: 31, color: C.dim, textDecorationLine: "line-through" }, indexArrow: { fontFamily: font.regular, fontSize: 23, color: C.dim }, indexAfter: { fontFamily: font.bold, fontSize: 54, lineHeight: 60, color: C.purple, letterSpacing: -1.5 }, indexOutOf: { fontFamily: font.regular, fontSize: 14, color: C.dim }, indexTrack: { height: 8, overflow: "hidden", borderRadius: 4, backgroundColor: "rgba(81,40,136,0.11)" }, indexFill: { height: "100%", borderRadius: 4, backgroundColor: C.purple }, impactExplanation: { ...T.support, color: C.text }, signalNote: { ...T.caption, marginTop: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
+  comparisonCard: { marginTop: 14, gap: 12 }, responseBlock: { gap: 5 }, responseLabel: { fontFamily: font.bold, fontSize: 11, letterSpacing: 0.7, textTransform: "uppercase", color: C.dim }, responseText: { fontFamily: font.medium, fontSize: 16, lineHeight: 23, color: C.text }, responseDivider: { height: StyleSheet.hairlineWidth, backgroundColor: C.line }, comparisonText: { ...T.support, color: C.purple, paddingTop: 4 },
   strongCard: { marginTop: 14, gap: 10 }, strongText: { fontFamily: font.medium, fontSize: 18, lineHeight: 27, color: C.text }, saveStrongButton: { minHeight: 52, borderRadius: radius.pill, borderWidth: 1, borderColor: C.purple, paddingHorizontal: 15, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 }, saveStrongButtonSaved: { backgroundColor: C.purple }, saveIcon: { width: 24, alignItems: "center" }, saveStrongText: { fontFamily: font.semi, fontSize: 14, color: C.purple }, saveStrongTextSaved: { color: C.onAccent }, finishButton: { marginTop: 22 }, privacyNote: { ...T.caption, textAlign: "center", marginTop: 10, paddingHorizontal: 20 },
   lessonMenu: { position: "absolute", right: 12, zIndex: 8, width: 278, borderRadius: 18, padding: 12, backgroundColor: "rgba(255,255,255,0.98)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
   lessonMenuLabel: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.2, color: C.dim, paddingHorizontal: 6, paddingBottom: 7 },
