@@ -239,10 +239,35 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(m1L1Runtime).not.toContain("confirmSecondResponse");
   });
 
-  test("prepares M1 L1 audio before revealing persisted text, then starts it after the reveal paint", async () => {
+  test("shows each approved M1 L1 transcript as a sent message while Adam thinks", async () => {
+    const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
+    const firstApproval = m1L1Runtime.indexOf('preserveScenarioAttempt(value, "opener"');
+    const firstPersist = m1L1Runtime.indexOf("await persist(approved)", firstApproval);
+    const firstGenerate = m1L1Runtime.indexOf("await generateM1L1DynamicReply", firstPersist);
+    const secondApproval = m1L1Runtime.indexOf('preserveScenarioAttempt(value, "response"');
+    const secondPersist = m1L1Runtime.indexOf("await persist(approved)", secondApproval);
+    const secondGenerate = m1L1Runtime.indexOf("await generateM1L1DynamicReply", secondPersist);
+    expect(firstApproval).toBeGreaterThan(-1);
+    expect(firstApproval).toBeLessThan(firstPersist);
+    expect(firstPersist).toBeLessThan(firstGenerate);
+    expect(secondApproval).toBeGreaterThan(firstGenerate);
+    expect(secondApproval).toBeLessThan(secondPersist);
+    expect(secondPersist).toBeLessThan(secondGenerate);
+    expect(m1L1Runtime).toContain('const isReview = state.startsWith("confirm_") && !busy;');
+    expect(m1L1Runtime).not.toContain("<ActivityIndicator");
+  });
+
+  test("keeps the latest M1 L1 chat transition visible as content grows", async () => {
+    const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
+    expect(m1L1Runtime).toContain("shouldAutoScrollRef.current = true");
+    expect(m1L1Runtime).toContain("scrollViewRef.current?.scrollToEnd({ animated: true })");
+    expect(m1L1Runtime).toContain("onContentSizeChange={handleContentSizeChange}");
+  });
+
+  test("prepares M1 L1 audio before revealing Adam's persisted text, then starts it after the reveal paint", async () => {
     const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
     const firstPrepare = m1L1Runtime.indexOf("await preparePilotAudio(lineFor(selected))");
-    const firstPersist = m1L1Runtime.indexOf("await persist(ready)", firstPrepare);
+    const firstPersist = m1L1Runtime.indexOf("await replaceActiveScenarioRunStrict(ready, activeRunRevision(approved))", firstPrepare);
     const firstPaint = m1L1Runtime.indexOf("await afterNextPaint()", firstPersist);
     const firstPlay = m1L1Runtime.indexOf("await playPreparedPilotAudio()", firstPaint);
     expect(firstPrepare).toBeGreaterThan(-1);
@@ -251,7 +276,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(firstPaint).toBeLessThan(firstPlay);
 
     const secondPrepare = m1L1Runtime.indexOf("await preparePilotAudio(lineFor(trap))");
-    const secondPersist = m1L1Runtime.indexOf("await persist(coached)", secondPrepare);
+    const secondPersist = m1L1Runtime.indexOf("await replaceActiveScenarioRunStrict(coached, activeRunRevision(approved))", secondPrepare);
     const secondPaint = m1L1Runtime.indexOf("await afterNextPaint()", secondPersist);
     const secondPlay = m1L1Runtime.indexOf("await playPreparedPilotAudio()", secondPaint);
     expect(secondPrepare).toBeGreaterThan(firstPlay);

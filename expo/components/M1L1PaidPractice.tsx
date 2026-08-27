@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { Mic, Square, X } from "lucide-react-native";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
@@ -87,6 +87,8 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
   const [isMicrophonePrepared, setIsMicrophonePrepared] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
   const [isOpenerHintVisible, setIsOpenerHintVisible] = useState<boolean>(false);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const shouldAutoScrollRef = useRef<boolean>(false);
   const dictation = useDictation();
   const speech = useSpeech();
   const cancelDictation = dictation.cancel;
@@ -169,6 +171,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
     setBusy(true);
     try {
       const approved = preserveScenarioAttempt(value, "opener", draft, Date.now());
+      await persist(approved);
       const fallback = selectM1L1PushbackOne(draft, approved.run.id);
       const generated = await generateM1L1DynamicReply({
         scenario: convertedLesson.scenario,
@@ -184,14 +187,15 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       const isAudioPrepared = await preparePilotAudio(lineFor(selected));
       const withPressure = attachM1L1PushbackOne(approved, selected, Date.now());
       const ready = transitionScenarioPracticeRun(withPressure, "ready_for_response", Date.now());
-      await persist(ready);
+      await replaceActiveScenarioRunStrict(ready, activeRunRevision(approved));
+      setValue(ready);
       setDraft("");
       await afterNextPaint();
       if (isAudioPrepared) await playPreparedPilotAudio();
     } finally {
       setBusy(false);
     }
-  }, [convertedLesson.scenario, draft, persist, value]);
+  }, [convertedLesson.scenario, draft, persist, replaceActiveScenarioRunStrict, value]);
 
   const confirmFirstResponse = useCallback(async (): Promise<void> => {
     if (!value || draft.trim().length < 2) return;
@@ -199,6 +203,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
     setBusy(true);
     try {
       const approved = preserveScenarioAttempt(value, "response", draft, Date.now());
+      await persist(approved);
       const afterResponse = advanceM1L1FirstResponse(approved, Date.now());
       const fallback = m1L1EvidenceTrap(approved.run.id);
       const generated = await generateM1L1DynamicReply({
@@ -229,14 +234,15 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
         note.selectedDimension,
         Date.now(),
       );
-      await persist(coached);
+      await replaceActiveScenarioRunStrict(coached, activeRunRevision(approved));
+      setValue(coached);
       setDraft("");
       await afterNextPaint();
       if (isAudioPrepared) await playPreparedPilotAudio();
     } finally {
       setBusy(false);
     }
-  }, [convertedLesson.scenario, draft, persist, value]);
+  }, [convertedLesson.scenario, draft, persist, replaceActiveScenarioRunStrict, value]);
 
   const confirmRetry = useCallback(async (isFinal: boolean): Promise<void> => {
     if (!value || !lesson?.selectedDimension || draft.trim().length < 2) return;
@@ -319,6 +325,21 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
     run?.responseAttempt ? { id: run.responseAttempt.id, who: "You", text: run.responseAttempt.transcript, mine: true } : null,
     lesson?.pushbackTwo ? { id: lesson.pushbackTwo.id, who: "Adam", text: lesson.pushbackTwo.text, mine: false } : null,
   ].filter((item): item is { id: string; who: string; text: string; mine: boolean } => Boolean(item)), [lesson, run]);
+  const autoScrollSignature = `${messages.map((message) => message.id).join(":")}|${busy ? "thinking" : "idle"}|${run?.state ?? "unavailable"}|${run?.coachNote ?? ""}`;
+  const previousAutoScrollSignatureRef = useRef<string>(autoScrollSignature);
+
+  useEffect(() => {
+    if (previousAutoScrollSignatureRef.current === autoScrollSignature) return;
+    previousAutoScrollSignatureRef.current = autoScrollSignature;
+    shouldAutoScrollRef.current = true;
+    requestAnimationFrame(() => scrollViewRef.current?.scrollToEnd({ animated: true }));
+  }, [autoScrollSignature]);
+
+  const handleContentSizeChange = useCallback((): void => {
+    if (!shouldAutoScrollRef.current) return;
+    shouldAutoScrollRef.current = false;
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, []);
 
   if (!value || !run || !lesson) {
     return <View style={[styles.root, styles.center]}><Backdrop /><Text style={styles.title}>This rehearsal is unavailable.</Text><Text style={styles.body}>Return to the lesson and start the accepted M1 L1 work rehearsal.</Text></View>;
@@ -326,7 +347,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
 
   const state = run.state;
   const isListening = state.startsWith("listening_");
-  const isReview = state.startsWith("confirm_");
+  const isReview = state.startsWith("confirm_") && !busy;
 
   return <View style={styles.root}><Backdrop />
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -334,7 +355,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       <View style={styles.headerCopy}><Text style={styles.headerTitle}>Adam · your colleague</Text><Text style={styles.headerMeta}>{progressLabel}</Text></View><View style={styles.hit} />
     </View>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollViewRef} contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]} keyboardShouldPersistTaps="handled" onContentSizeChange={handleContentSizeChange}>
         <StatusPill label="WORK · M1 L1" tone="purple" /><Text style={styles.scenarioTitle}>{convertedLesson.scenario.title}</Text><Text style={styles.context}>{convertedLesson.scenario.situation}</Text>
         <View accessible accessibilityLabel={`${progressLabel}. Seven-step rehearsal progress.`} style={styles.progress}><View style={[styles.progressFill, { width: `${(step / 7) * 100}%` }]} /></View>
         {messages.map((message) => <View key={message.id} style={[styles.messageWrap, message.mine ? styles.mine : styles.theirs]}><Text style={styles.messageLabel}>{message.who}</Text><View style={[styles.bubble, message.mine ? styles.bubbleMine : styles.bubbleTheirs]}><Text style={[styles.messageText, message.mine ? styles.messageTextMine : null]}>{message.text}</Text></View></View>)}
@@ -344,7 +365,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
         {state === "ready_for_attempt" ? <Reveal><Text style={styles.title}>Open the conversation.</Text><Pressable onPress={() => setIsOpenerHintVisible((current) => !current)} style={styles.hintButton} accessibilityRole="button" accessibilityState={{ expanded: isOpenerHintVisible }}><Text style={styles.hintButtonText}>Need help starting?</Text></Pressable>{isOpenerHintVisible ? <ProductCard style={styles.hintCard}><SectionLabel tone={C.purple}>A way to think about it</SectionLabel><Text style={styles.body}>Describe one thing Adam could have done differently. Then say what you need going forward.</Text></ProductCard> : null}<Capture title="Your opener" kind="opener" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /></Reveal> : null}
         {state === "ready_for_response" && lesson.pushbackOne ? <Capture title="Respond to Pushback 1." kind="response-one" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /> : null}
         {isListening ? <Reveal><Text style={styles.title}>Recording this turn.</Text><MicControl state="listening" level={dictation.level} onPress={() => void stopRecording()} glyph={<Square size={24} color={C.onAccent} fill={C.onAccent} />} accessibilityLabel="Done speaking" /><Text style={styles.body}>Stopping does not submit. You approve the transcript next.</Text></Reveal> : null}
-        {isReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve this exact transcript.</Text><TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel="Edit confirmed transcript" /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2 || busy} onPress={() => void (captureKind === "opener" ? confirmOpening() : captureKind === "response-one" ? confirmFirstResponse() : confirmRetry(captureKind === "final-retry"))} containerStyle={styles.action} />{busy ? <ActivityIndicator color={C.purple} /> : null}</Reveal> : null}
+        {isReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve this exact transcript.</Text><TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel="Edit confirmed transcript" /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2} onPress={() => void (captureKind === "opener" ? confirmOpening() : captureKind === "response-one" ? confirmFirstResponse() : confirmRetry(captureKind === "final-retry"))} containerStyle={styles.action} /></Reveal> : null}
         {state === "hope_coaching" && lesson.coachedBeat ? <Reveal><StatusPill label="Hope · one observed behavior" tone="purple" /><ProductCard accent style={styles.card}><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Exact-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={lesson.coachedBeat === 1 ? "Reset to the top of the scene" : "Replay the exact flagged pressure"} onPress={() => void replayFlaggedMoment(false)} containerStyle={styles.action} /></Reveal> : null}
         {state === "ready_for_retry" ? <Capture title="Retry only the flagged moment." kind="retry" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /> : null}
         {state === "final_retry_available" && lesson.coachedBeat ? <Reveal><StatusPill label="Optional final retry · 2 of 2" tone="amber" /><Text style={styles.title}>One final retry is available.</Text><Text style={styles.body}>Replay the same exact moment before final capture, or continue to the behavior-only comparison.</Text><PrimaryButton label={lesson.coachedBeat === 1 ? "Reset to the top of the scene" : "Replay the exact pressure"} onPress={() => void replayFlaggedMoment(true)} containerStyle={styles.action} /><Pressable onPress={() => void persist(transitionScenarioPracticeRun(value, "attempt_comparison", Date.now()))} style={styles.secondary}><Text style={styles.secondaryText}>Continue without another retry</Text></Pressable></Reveal> : null}
