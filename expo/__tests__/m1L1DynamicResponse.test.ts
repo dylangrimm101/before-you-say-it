@@ -20,8 +20,12 @@ describe("M1 L1 constrained dynamic counterpart", () => {
     expect(m1L1DynamicReplyPassesQuality("You're right. I'll move the handoff to noon.", "pushback_one", opening, context)).toBe(false);
     expect(m1L1DynamicReplyPassesQuality("The handoff will arrive Monday at 9:00, but quarter close is heavy.", "pushback_one", opening, context)).toBe(false);
     expect(m1L1DynamicReplyPassesQuality("Noon isn't realistic right now, the client keeps changing numbers on me until mid-afternoon during quarter close.", "pushback_one", opening, context)).toBe(false);
+    expect(m1L1DynamicReplyPassesQuality("Noon's not realistic because finance releases numbers late, so I can't promise that.", "pushback_one", opening, context)).toBe(false);
     expect(m1L1DynamicReplyPassesQuality("Noon isn't realistic every week when the client changes numbers last minute; I'm not locking in a fixed time just because two weeks were rough.", "evidence_trap", opening, context)).toBe(false);
     expect(m1L1DynamicReplyPassesQuality("But we should talk about chores and dinner instead.", "pushback_one", opening, context)).toBe(false);
+    expect(m1L1DynamicReplyPassesQuality("I understand the late file caused a deadline problem.", "pushback_one", opening, context)).toBe(false);
+    expect(m1L1DynamicReplyPassesQuality("How can I help with the file timing?", "evidence_trap", opening, context)).toBe(false);
+    expect(m1L1DynamicReplyPassesQuality("I don't think two late handoffs make this a pattern.", "evidence_trap", opening, context)).toBe(true);
   });
 
   test("retries one semantically rejected response and sends the full lesson contract", async () => {

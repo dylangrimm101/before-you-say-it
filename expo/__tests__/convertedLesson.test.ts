@@ -212,13 +212,47 @@ describe("accepted M1 L1 narrow correction", () => {
     const motive = m1L1BehaviorFlags("You never care about my time.", 5);
     const noMove = m1L1BehaviorFlags("Yesterday the file arrived at 4:20.", 5);
     const clean = m1L1BehaviorFlags("I hear that. Yesterday the file arrived at 4:20. Can we move the handoff to noon?", 5);
-    expect(vague.find((f) => f.dimension === "grounding_concreteness")?.status).toBe("not_assessable");
+    expect(vague.find((f) => f.dimension === "grounding_concreteness")?.status).toBe("not_met");
     expect(caseBuilding.find((f) => f.dimension === "evidence_discipline")?.status).toBe("not_met");
     expect(motive.find((f) => f.dimension === "motive_character_language")?.status).toBe("not_met");
-    expect(noMove.find((f) => f.dimension === "move_clarity")?.status).toBe("not_assessable");
+    expect(noMove.find((f) => f.dimension === "move_clarity")?.status).toBe("not_met");
     expect(clean.find((f) => f.dimension === "evidence_discipline")?.status).toBe("not_assessable");
     expect(clean.find((f) => f.dimension === "move_clarity")?.status).toBe("met");
     expect(clean.find((f) => f.dimension === "park_and_return")?.status).toBe("met");
+  });
+
+  test("keeps setup, vague claims, and missing requests assessable without inventing evidence", () => {
+    const setup = "Thanks for meeting with me. I wanted to discuss something important.";
+    const vague = "The file timing has been a problem.";
+    const derailed = "Accounting needs to set better expectations with everyone.";
+    const setupFlags = m1L1BehaviorFlags(setup, 1);
+    const vagueFlags = m1L1BehaviorFlags(vague, 1);
+    const responseFlags = m1L1BehaviorFlags(derailed, 3);
+    expect(setupFlags.find((item) => item.dimension === "point_placement")?.status).toBe("not_met");
+    expect(vagueFlags.find((item) => item.dimension === "grounding_concreteness")?.status).toBe("not_met");
+    expect(vagueFlags.find((item) => item.dimension === "move_clarity")?.status).toBe("not_met");
+    expect(responseFlags.find((item) => item.dimension === "park_and_return")?.status).toBe("not_met");
+    for (const flags of [setupFlags, vagueFlags, responseFlags]) {
+      for (const item of flags) if (item.evidenceQuote !== null) {
+        const source = flags === setupFlags ? setup : flags === vagueFlags ? vague : derailed;
+        expect(source).toContain(item.evidenceQuote);
+      }
+    }
+  });
+
+  test("recognizes natural acknowledgements and gives grammatical, pressure-relevant positive feedback", () => {
+    const variants = [
+      "That makes sense. I still need future files by noon.",
+      "I can see that quarter close is busy. The handoff is still the issue, and I need the file by noon.",
+      "I appreciate that you're under pressure. Can we still make noon work for future files?",
+    ];
+    variants.forEach((response) => {
+      expect(m1L1BehaviorFlags(response, 3).find((item) => item.dimension === "park_and_return")?.status).toBe("met");
+    });
+    const note = m1L1CoachNote(variants[0]!, 3)!;
+    expect(note.selectedDimension).toBe("park_and_return");
+    expect(note.worked).toContain("acknowledged the pushback and returned to the point");
+    expect(note.worked).not.toMatch(/kept put|continued to kept/i);
   });
 
   test("keeps Hope's exact quote and bounded 32/20/48-word output", () => {

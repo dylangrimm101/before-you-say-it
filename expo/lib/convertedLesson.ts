@@ -176,19 +176,24 @@ export function evidenceQuoteFor(dimension: M1L1DimensionId, transcript: string)
   }
   const patterns: Partial<Record<M1L1DimensionId, RegExp>> = {
     issue_count: /\b(?:also|another time|everyone|other people|all the times|and)\b/iu,
-    grounding_concreteness: /\b(?:last|yesterday|today|monday|tuesday|wednesday|thursday|friday|\d+|file|handoff|deadline)\b/iu,
+    grounding_concreteness: /\b(?:last|yesterday|today|monday|tuesday|wednesday|thursday|friday|twice|\d+)\b/iu,
     motive_character_language: /\b(?:always|never|lazy|selfish|don't care|doesn't care|respect me|on purpose|trying to)\b/iu,
     move_clarity: /\b(?:can you|can we|could you|could we|will you|would you|please|i need|by)\b/iu,
     evidence_discipline: /\b(?:also|another time|everyone|other people|all the times|always|never)\b/iu,
-    park_and_return: /\b(?:i hear|that's fair|i understand|i get that|still|my point)\b/iu,
+    park_and_return: /\b(?:i hear|that's fair|i understand|i get that|that makes sense|i can see that|i appreciate that|i know (?:that )?quarter close|still|my point|future files|by noon)\b/iu,
   };
   const pattern = patterns[dimension];
   return pattern ? exactSentenceSpan(transcript, pattern) : null;
 }
 
+function fallbackEvidenceSpan(transcript: string): string | null {
+  const firstContent = /\S+/u.exec(transcript);
+  return firstContent ? exactSentenceSpan(transcript, new RegExp(firstContent[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "u")) : null;
+}
+
 function flag(dimension: M1L1DimensionId, status: M1L1BehaviorFlag["status"], transcript: string): M1L1BehaviorFlag {
   if (status === "not_assessable") return { dimension, status, evidenceQuote: null };
-  const evidenceQuote = evidenceQuoteFor(dimension, transcript);
+  const evidenceQuote = evidenceQuoteFor(dimension, transcript) ?? (status === "not_met" ? fallbackEvidenceSpan(transcript) : null);
   return evidenceQuote && transcript.includes(evidenceQuote)
     ? { dimension, status, evidenceQuote }
     : { dimension, status: "not_assessable", evidenceQuote: null };
@@ -281,13 +286,15 @@ export function m1L1BehaviorFlags(confirmedTranscript: string, coachedBeat: 1 | 
   const lower = transcript.toLowerCase();
   const firstSentence = transcript.split(/(?<=[.!?])\s+/)[0] ?? transcript;
   const sentenceCount = transcript.split(/[.!?]+/).filter((part) => part.trim().length > 0).length;
-  const evidenceMarkers = lower.match(/\b(last|yesterday|today|monday|tuesday|wednesday|thursday|friday|\d+|at \d|file|handoff|deadline)\b/g)?.length ?? 0;
+  const evidenceMarkers = lower.match(/\b(last|yesterday|today|monday|tuesday|wednesday|thursday|friday|twice|\d+|at \d)\b/g)?.length ?? 0;
   const motiveClaim = /\b(always|never|lazy|selfish|don't care|doesn't care|respect me|on purpose|trying to)\b/.test(lower);
   const caseBuilding = sentenceCount > 4 || (lower.match(/\band\b/g)?.length ?? 0) >= 3 || /\b(also|another time|everyone|other people|all the times)\b/.test(lower);
-  const answerableMove = /\b(can you|can we|could you|could we|will you|would you|please|i need|by (?:today|tomorrow|monday|tuesday|wednesday|thursday|friday|\d))\b/.test(lower);
-  const directPoint = firstSentence.split(/\s+/).length <= 16 && !/^(so|well|i know|i don't know|maybe|this might)/i.test(firstSentence);
+  const answerableMove = /\b(can you|can we|could you|could we|will you|would you|please|i need|by (?:noon|today|tomorrow|monday|tuesday|wednesday|thursday|friday|\d))\b/.test(lower);
+  const pointAnchor = /\b(?:file|handoff|late|timing|review time|deadline|noon|send|arriv(?:e|ed|al)|sooner)\b/.test(firstSentence.toLowerCase());
+  const directPoint = firstSentence.split(/\s+/).length <= 16 && pointAnchor && !/^(so|well|i know|i don't know|maybe|this might|thanks?\b)/i.test(firstSentence);
   const grounded = evidenceMarkers > 0;
-  const parksAndReturns = /\b(i hear|that's fair|i understand|i get that)\b/.test(lower) && /\b(still|my point|the handoff|the file|what i need)\b/.test(lower);
+  const acknowledgesPressure = /\b(i hear|that's fair|i understand|i get that|that makes sense|i can see that|i appreciate that|i know (?:that )?quarter close)\b/.test(lower);
+  const parksAndReturns = acknowledgesPressure && /\b(still|my point|the handoff|the file|what i need|future files|by noon)\b/.test(lower);
   const evidenceDiscipline = coachedBeat === 5 ? !caseBuilding && !motiveClaim : !caseBuilding;
   return [
     flag("point_placement", directPoint ? "met" : "not_met", originalTranscript),
@@ -312,13 +319,37 @@ function labelForDimension(dimension: M1L1DimensionId): string {
   } as const)[dimension];
 }
 
+function positiveObservationForDimension(dimension: M1L1DimensionId): string {
+  return ({
+    point_placement: "put the point in the first sentence",
+    issue_count: "kept one issue in view",
+    grounding_concreteness: "used one concrete fact",
+    motive_character_language: "stayed with the event instead of judging Adam",
+    move_clarity: "ended with one answerable move",
+    evidence_discipline: "used one proof instead of building the whole case",
+    park_and_return: "acknowledged the pushback and returned to the point",
+  } as const)[dimension];
+}
+
+function failurePriority(coachedBeat: 1 | 3 | 5): readonly M1L1DimensionId[] {
+  if (coachedBeat === 1) return ["motive_character_language", "issue_count", "point_placement", "grounding_concreteness", "move_clarity"];
+  if (coachedBeat === 3) return ["motive_character_language", "evidence_discipline", "park_and_return"];
+  return DIMENSION_PRIORITY;
+}
+
+function successPriority(coachedBeat: 1 | 3 | 5): readonly M1L1DimensionId[] {
+  return coachedBeat === 1
+    ? ["move_clarity", "grounding_concreteness", "point_placement", "issue_count", "motive_character_language", "evidence_discipline"]
+    : ["park_and_return", "move_clarity", "grounding_concreteness", "point_placement", "evidence_discipline", "issue_count", "motive_character_language"];
+}
+
 /** Produces one honest note from one exact confirmed beat, with no score. */
 export function m1L1CoachNote(confirmedTranscript: string, coachedBeat: 1 | 3 | 5 = 5): LessonCoachNote | null {
   const transcript = cleanTranscript(confirmedTranscript);
   if (transcript.length < 2) return null;
   const flags = m1L1BehaviorFlags(confirmedTranscript, coachedBeat);
-  const selected = DIMENSION_PRIORITY.find((dimension) => flags.find((item) => item.dimension === dimension)?.status === "not_met")
-    ?? DIMENSION_PRIORITY.find((dimension) => flags.find((item) => item.dimension === dimension)?.status === "met")
+  const selected = failurePriority(coachedBeat).find((dimension) => flags.find((item) => item.dimension === dimension)?.status === "not_met")
+    ?? successPriority(coachedBeat).find((dimension) => flags.find((item) => item.dimension === dimension)?.status === "met")
     ?? "evidence_discipline";
   const selectedFlag = flags.find((item) => item.dimension === selected);
   const evidenceQuote = selectedFlag?.evidenceQuote;
@@ -326,7 +357,7 @@ export function m1L1CoachNote(confirmedTranscript: string, coachedBeat: 1 | 3 | 
   const isMet = selectedFlag.status === "met";
   return {
     evidenceQuote,
-    worked: isMet ? `In “${evidenceQuote},” you kept ${labelForDimension(selected)}.` : `Hope flagged “${evidenceQuote}.”`,
+    worked: isMet ? `In “${evidenceQuote},” you ${positiveObservationForDimension(selected)}.` : `Hope flagged “${evidenceQuote}.”`,
     change: isMet ? "Keep that same choice in the retry." : `On the retry, ${labelForDimension(selected)}.`,
     retryDirection: `Replay this exact moment and ${labelForDimension(selected)}.`,
     coachedBehaviorId: M1_L1_CONVERSION.coachedBehaviorId,
@@ -366,8 +397,8 @@ function coachingConfidence(dimension: M1L1DimensionId, transcript: string): num
     return conjunctions >= 3 || /\b(also|another time|everyone|other people|all the times)\b/.test(lower) ? 26 : 14;
   }
   if (dimension === "park_and_return") {
-    const acknowledges = /\b(i hear|that's fair|i understand|i get that)\b/.test(lower);
-    const returns = /\b(still|my point|the handoff|the file|what i need)\b/.test(lower);
+    const acknowledges = /\b(i hear|that's fair|i understand|i get that|that makes sense|i can see that|i appreciate that|i know (?:that )?quarter close)\b/.test(lower);
+    const returns = /\b(still|my point|the handoff|the file|what i need|future files|by noon)\b/.test(lower);
     return !acknowledges && !returns ? missingReturnConfidence : 20;
   }
   if (dimension === "move_clarity") return 22;
@@ -413,7 +444,7 @@ function contextualCoachingCopy(candidate: M1L1CoachingCandidate): Pick<LessonCo
     evidence_discipline: [`In ${quote}, several pieces of the case compete with the main point.`, "Use one proof, then make one answerable request."],
     motive_character_language: [`In ${quote}, the wording shifts from what happened to a judgment about Adam.`, "Name the observable handoff problem without assigning motive or character."],
     issue_count: [`In ${quote}, more than one issue is competing for attention.`, "Keep the late handoff as the one issue in view."],
-    point_placement: [`In ${quote}, the main point arrives after the setup.`, "Lead with the late handoff, then add one supporting fact."],
+    point_placement: [`In ${quote}, the first sentence does not yet name the handoff problem.`, "Lead with the late handoff, then add one supporting fact."],
     grounding_concreteness: [`In ${quote}, the concern is not anchored to a specific handoff fact.`, "Ground the point in one observable detail, such as the 4:20 arrival."],
     move_clarity: [`In ${quote}, Adam does not get one clear next step to answer.`, "End with one answerable request, including the noon handoff."],
     park_and_return: [`In ${quote}, your response engages Adam's explanation but loses the noon request.`, "Acknowledge the constraint briefly, then return to the noon handoff."],

@@ -5,6 +5,9 @@ export type M1L1PressureKind = "pushback_one" | "evidence_trap";
 const TOPIC_WORDS = new Set([
   "close", "deadline", "file", "handoff", "late", "noon", "quarter", "review", "schedule", "time", "timing",
 ]);
+const CONTEXT_BOUND_WORDS = new Set([
+  "accounting", "boss", "finance", "manager", "numbers", "portal", "scope", "software", "system", "team", "vendor",
+]);
 const STOP_WORDS = new Set([
   "about", "after", "again", "also", "been", "before", "being", "could", "from", "have", "into", "just", "like", "more", "really", "still", "than", "that", "their", "there", "they", "this", "those", "very", "want", "what", "when", "where", "which", "with", "would", "your",
 ]);
@@ -13,8 +16,8 @@ const INSTANT_AGREEMENT = /^(?:okay[,!. ]+)?(?:you(?:'|’)re right|i agree|that
 const TOPIC_CHANGE = /\b(?:relationship|marriage|kids?|chores?|vacation|rent|politics|dinner|pickup|school)\b/i;
 const UNSUPPORTED_CLIENT_BEHAVIOR = /\b(?:the\s+)?client\s+(?:keeps?|is|was|has|had|changes?|changed|revises?|revised|updates?|updated|sends?|sent|provides?|provided|approves?|approved|confirms?|confirmed|delays?|delayed|needs?|needed|wants?|wanted)\b/i;
 const UNSUPPORTED_TIMEFRAME = /\b(?:two|2)\s+weeks?\b/i;
-const PRESSURE_ONE = /\b(?:but|because|fair|slammed|quarter close|deadline|heavy|realistic|understand|what|when|how)\b/i;
-const PRESSURE_TWO = /\b(?:example|basis|basing|happens|often|pattern|time|always|evidence|what else|why|how)\b/i;
+const PRESSURE_ONE = /\b(?:but|because|not realistic|can't|cannot|won't|slammed|quarter close|unfair|fair to say|failing|where is this coming from|what do you mean|why)\b/i;
+const PRESSURE_TWO = /\b(?:one (?:example|time|handoff)|all the time|basis|basing|pattern|often|always|twice|what else|how often|doesn(?:'|’)t make|don(?:'|’)t think|is that enough|why (?:is|are|do))\b/i;
 const FACT_PATTERN = /\b(?:\d{1,2}(?::\d{2})?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday|tomorrow|today)\b/gi;
 
 function words(value: string): string[] {
@@ -48,6 +51,8 @@ export function m1L1DynamicReplyPassesQuality(
   ) return false;
 
   const allowedContext = `${conversationContext} ${approvedTranscript}`;
+  const allowedContextWords = meaningfulWords(allowedContext);
+  if ([...meaningfulWords(clean)].some((word) => CONTEXT_BOUND_WORDS.has(word) && !allowedContextWords.has(word))) return false;
   const allowedFacts = facts(allowedContext);
   if ([...facts(clean)].some((fact) => !allowedFacts.has(fact))) return false;
 

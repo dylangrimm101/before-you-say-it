@@ -29,7 +29,6 @@ export default function ApprovedLessonDeckScreen() {
     clearActiveScenarioRunStrict,
     markPendingConvertedLessonPrivateContentDeleted,
     promotePendingConvertedLessonCompletion,
-    replaceActiveScenarioRunStrict,
     resetConvertedLesson,
     saveScoredPracticeRecord,
     scoredPracticeHistory,
@@ -47,9 +46,7 @@ export default function ApprovedLessonDeckScreen() {
   const hasValidReturn = isM1L1
     ? validateM1L1Completion(returningRun, params.runId).isValid
     : Boolean(approvedConfig && validateApprovedRehearsalCompletion(approvedConfig, returningRun, params.runId));
-  const isApprovedMoveSaved = !isReturning || Boolean(
-    isM1L1 ? returningRun?.m1L1?.approvedMoveSavedAt && hasValidReturn : hasValidReturn,
-  );
+  const isApprovedMoveSaved = !isReturning || hasValidReturn;
   const [isStrongVersionSaved, setIsStrongVersionSaved] = useState<boolean>(false);
   const [completionCommitted, setCompletionCommitted] = useState<boolean>(false);
   const [isCompleting, setIsCompleting] = useState<boolean>(false);
@@ -58,19 +55,6 @@ export default function ApprovedLessonDeckScreen() {
   const [isLessonMenuOpen, setIsLessonMenuOpen] = useState<boolean>(false);
   const [isResetting, setIsResetting] = useState<boolean>(false);
   const [resetNotice, setResetNotice] = useState<{ message: string; snapshot: ConvertedLessonProgress[]; canUndo: boolean } | null>(null);
-
-  useEffect(() => {
-    const run = activeScenarioRun?.run;
-    if (!isM1L1 || !isReturning || !activeScenarioRun || !run || run.m1L1?.approvedMoveSavedAt) return;
-    if (!validateM1L1Completion(run, params.runId).isValid) return;
-    void replaceActiveScenarioRunStrict(
-      { ...activeScenarioRun, run: { ...run, m1L1: { ...run.m1L1!, approvedMoveSavedAt: Date.now() }, updatedAt: Math.max(Date.now(), run.updatedAt + 1) } },
-      activeRunRevision(activeScenarioRun),
-    ).catch((error: unknown) => {
-      safeLog("[converted-lesson] approved move auto-save failed", errorShape(error));
-      Alert.alert("We couldn’t save the approved move", "Stay on this screen and try returning from the rehearsal again.");
-    });
-  }, [activeScenarioRun, isM1L1, isReturning, params.runId, replaceActiveScenarioRunStrict]);
 
   useEffect(() => {
     if (!resetNotice) return undefined;
