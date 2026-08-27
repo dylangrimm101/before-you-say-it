@@ -172,15 +172,17 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).toContain("suppressArtifactHostDiagnostic();");
   });
 
-  test("opens the rehearsal scene directly and silently preserves conflicts first", async () => {
+  test("opens every rehearsal runtime directly and silently preserves conflicts first", async () => {
     const rehearsalRoute = await source("app/approved-rehearsal/[lessonId].tsx");
-    expect(rehearsalRoute).toContain('hasConflict ? "preserving" : "scene"');
+    expect(rehearsalRoute).toContain('hasConflict ? "preserving" : "starting"');
     expect(rehearsalRoute).toContain("await archiveActiveScenarioRunStrict(expected)");
-    expect(rehearsalRoute).toContain('setStep("scene")');
+    expect(rehearsalRoute).toContain('setStep("starting")');
+    expect(rehearsalRoute).toContain("void startRuntime()");
     expect(rehearsalRoute).toContain("preservationStarted.current");
     expect(rehearsalRoute).not.toContain("SAVED REHEARSAL FOUND");
     expect(rehearsalRoute).not.toContain("BEFORE YOU PRACTICE");
-    expect(rehearsalRoute).not.toContain("Direct conversation feels appropriate");
+    expect(rehearsalRoute).not.toContain("THE {config?.scenario.category.toUpperCase()} SCENE");
+    expect(rehearsalRoute).not.toContain('label="Start rehearsal"');
   });
 
   test("keeps the catalog and deck route fail-closed outside development", async () => {
