@@ -9,7 +9,7 @@ import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { Backdrop, GlassCard, PrimaryButton } from "@/components/ui";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { approvedRehearsalConfig, approvedRehearsalRuntimeEnabled } from "@/lib/approvedRehearsals";
-import { conversionRuntimeEnabled, isAcceptedM1L1ResumeRun, M1_L1_CONVERSION, routeForM1L1Safety, type SafetyChoice } from "@/lib/convertedLesson";
+import { conversionRuntimeEnabled, isAcceptedM1L1ResumeRun, M1_L1_CONVERSION } from "@/lib/convertedLesson";
 import { createScenarioPracticeRun, initializeM1L1Run } from "@/lib/scenarioPractice";
 import { useStore } from "@/providers/store";
 
@@ -40,7 +40,7 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
   const resumable = isAvailable && isAcceptedIdentity && run?.state !== "complete";
   const hasConflict = isAvailable && Boolean(activeScenarioRun) && !resumable;
   const preservationStarted = useRef<boolean>(false);
-  const [step, setStep] = useState<"preserving" | "safety" | "different-route" | "scene" | "runtime">(resumable ? "runtime" : hasConflict ? "preserving" : "safety");
+  const [step, setStep] = useState<"preserving" | "different-route" | "scene" | "runtime">(resumable ? "runtime" : hasConflict ? "preserving" : "scene");
 
   const createAcceptedRun = useCallback(async (): Promise<void> => {
     if (!config) throw new Error("Approved rehearsal config is unavailable");
@@ -92,7 +92,7 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
         const expected = activeRunRevision(activeScenarioRun);
         if (!expected) throw new Error("Active rehearsal is missing");
         await archiveActiveScenarioRunStrict(expected);
-        setStep("safety");
+        setStep("scene");
       } catch {
         Alert.alert("We couldn’t preserve the saved rehearsal", "The existing rehearsal remains active. Nothing was overwritten.", [
           { text: "OK", onPress: () => router.back() },
@@ -101,10 +101,6 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
     };
     void preserveAndContinue();
   }, [activeScenarioRun, archiveActiveScenarioRunStrict, router, step]);
-
-  const handleSafetyChoice = useCallback((choice: SafetyChoice): void => {
-    setStep(routeForM1L1Safety(choice));
-  }, []);
 
   const runtimeKey = useMemo(() => activeScenarioRun?.run.id ?? "new-run", [activeScenarioRun?.run.id]);
 
@@ -127,13 +123,7 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
   return <View style={styles.root}><Backdrop />
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}><Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to lesson"><ArrowLeft size={21} color={C.text} /></Pressable><Text style={styles.headerTitle}>Internal {config?.lessonId.toUpperCase()} rehearsal QA</Text><View style={styles.back} /></View>
     <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 30 }]}>
-      {step === "safety" ? <GlassCard style={styles.card}>
-        <Text style={styles.eyebrow}>BEFORE YOU PRACTICE</Text><Text style={styles.title}>Is there any reason bringing this up directly could put you at risk, lead to retaliation, or make the situation less safe?</Text>
-        <Choice label="No. Direct conversation feels appropriate." onPress={() => handleSafetyChoice("direct")} />
-        <Choice label="I'm not sure." onPress={() => handleSafetyChoice("unsure")} />
-        <Choice label="Yes." onPress={() => handleSafetyChoice("yes")} />
-        <Choice label="I'd rather not answer." onPress={() => handleSafetyChoice("prefer_not")} />
-      </GlassCard> : step === "different-route" ? <GlassCard style={styles.card}>
+      {step === "different-route" ? <GlassCard style={styles.card}>
         <ShieldCheck size={28} color={C.sage} /><Text style={styles.eyebrow}>A DIFFERENT ROUTE MAY FIT BETTER</Text><Text style={styles.title}>You do not have to practice a direct conversation first.</Text><Text style={styles.body}>You can review support, documentation, reporting, or safety options instead. Your answer was not stored.</Text><PrimaryButton label="See other options" onPress={() => router.push("/safety")} containerStyle={styles.action} /><Choice label="Return to the lesson" onPress={() => router.back()} /><Choice label="Leave this practice" onPress={() => router.replace("/(tabs)")} />
       </GlassCard> : <GlassCard style={styles.card}>
         <Text style={styles.eyebrow}>THE {config?.scenario.category.toUpperCase()} SCENE</Text><Text style={styles.title}>{config?.scenario.title}</Text><Text style={styles.body}>{config?.scenario.situation}</Text><View style={styles.sceneInset}><Text style={styles.sceneLabel}>WHAT HAPPENS</Text><Text style={styles.body}>{isM1L1 ? "You open. Adam, your colleague, uses two authored pressure turns. Hope coaches one observed Point → Proof → Move behavior, then replays only that exact moment." : `You open. ${config?.scenario.counterpart} uses the deck’s exact authored pressure. Hope checks only “${approvedConfig?.namedMove},” then gives you the same moment to retry.`}</Text></View><PrimaryButton label="Start rehearsal" onPress={() => void startRuntime()} containerStyle={styles.action} /><Choice label="Not now" onPress={() => router.back()} />
