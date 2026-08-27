@@ -438,6 +438,18 @@ describe("data URIs are never handed to native playback", () => {
     expect(source).toContain("currentPlaybackCleanup");
   });
 
+  it("can prepare a line before reveal and play it later without a second network fetch", async () => {
+    const voice = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
+    const prepareStart = voice.indexOf("export async function preparePilotAudio");
+    const preparedPlayStart = voice.indexOf("export async function playPreparedPilotAudio");
+    const preparedPlay = voice.slice(preparedPlayStart, voice.indexOf("/** Play an approved fixed line", preparedPlayStart));
+    expect(prepareStart).toBeGreaterThan(-1);
+    expect(preparedPlayStart).toBeGreaterThan(prepareStart);
+    expect(preparedPlay).toContain("lastUtterance?.source");
+    expect(preparedPlay).toContain("playUtterance()");
+    expect(preparedPlay).not.toContain("fetchSpeechDataUri");
+  });
+
   it("speaks only counterpart text through the user-owned BYSI TTS endpoint", async () => {
     const voice = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();

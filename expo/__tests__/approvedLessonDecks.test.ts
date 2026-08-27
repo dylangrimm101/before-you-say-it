@@ -207,6 +207,27 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(m1L1Runtime).toContain('accessibilityLiveRegion="polite"');
   });
 
+  test("prepares M1 L1 audio before revealing persisted text, then starts it after the reveal paint", async () => {
+    const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
+    const firstPrepare = m1L1Runtime.indexOf("await preparePilotAudio(lineFor(selected))");
+    const firstPersist = m1L1Runtime.indexOf("await persist(ready)", firstPrepare);
+    const firstPaint = m1L1Runtime.indexOf("await afterNextPaint()", firstPersist);
+    const firstPlay = m1L1Runtime.indexOf("await playPreparedPilotAudio()", firstPaint);
+    expect(firstPrepare).toBeGreaterThan(-1);
+    expect(firstPrepare).toBeLessThan(firstPersist);
+    expect(firstPersist).toBeLessThan(firstPaint);
+    expect(firstPaint).toBeLessThan(firstPlay);
+
+    const secondPrepare = m1L1Runtime.indexOf("await preparePilotAudio(lineFor(trap))");
+    const secondPersist = m1L1Runtime.indexOf("await persist(withTrap)", secondPrepare);
+    const secondPaint = m1L1Runtime.indexOf("await afterNextPaint()", secondPersist);
+    const secondPlay = m1L1Runtime.indexOf("await playPreparedPilotAudio()", secondPaint);
+    expect(secondPrepare).toBeGreaterThan(firstPlay);
+    expect(secondPrepare).toBeLessThan(secondPersist);
+    expect(secondPersist).toBeLessThan(secondPaint);
+    expect(secondPaint).toBeLessThan(secondPlay);
+  });
+
   test("keeps the catalog and deck route fail-closed outside development", async () => {
     const catalogScreen = await source("app/approved-lessons.tsx");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");

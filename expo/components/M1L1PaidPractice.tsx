@@ -35,7 +35,7 @@ import {
 } from "@/lib/scenarioPractice";
 import { leaveAfterStrictDictationCleanup } from "@/lib/temporaryRecording";
 import { useDictation } from "@/lib/useDictation";
-import { replaySpeech, resetSpeech, speakPilotAudio, speakPilotAudioToCompletion, useSpeech } from "@/lib/voice";
+import { playPreparedPilotAudio, preparePilotAudio, replaySpeech, resetSpeech, speakPilotAudioToCompletion, unlockAudioPlayback, useSpeech } from "@/lib/voice";
 import { useStore } from "@/providers/store";
 
 interface M1L1PaidPracticeProps {
@@ -69,6 +69,12 @@ function lineFor(turn: NonNullable<PersistedScenarioPracticeRun["run"]["counterp
     voice_key: turn.semanticVoiceKey ?? "contextual_counterpart",
     text: turn.text,
   } as const;
+}
+
+function afterNextPaint(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
 }
 
 /** Isolated accepted M1 L1 runtime. Other lessons and shared scenarios never enter this component. */
@@ -145,6 +151,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
 
   const confirmOpening = useCallback(async (): Promise<void> => {
     if (!value || draft.trim().length < 2) return;
+    void unlockAudioPlayback();
     setBusy(true);
     try {
       const approved = preserveScenarioAttempt(value, "opener", draft, Date.now());
@@ -160,11 +167,13 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       const selected = generated.source === "provider"
         ? m1L1ProviderTurn(approved.run.id, "pushback_one", generated.reply)
         : fallback;
+      const isAudioPrepared = await preparePilotAudio(lineFor(selected));
       const withPressure = attachM1L1PushbackOne(approved, selected, Date.now());
       const ready = transitionScenarioPracticeRun(withPressure, "ready_for_response", Date.now());
       await persist(ready);
       setDraft("");
-      await speakPilotAudio(lineFor(selected));
+      await afterNextPaint();
+      if (isAudioPrepared) await playPreparedPilotAudio();
     } finally {
       setBusy(false);
     }
@@ -172,6 +181,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
 
   const confirmFirstResponse = useCallback(async (): Promise<void> => {
     if (!value || draft.trim().length < 2) return;
+    void unlockAudioPlayback();
     setBusy(true);
     try {
       const approved = preserveScenarioAttempt(value, "response", draft, Date.now());
@@ -190,10 +200,12 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       const trap = generated.source === "provider"
         ? m1L1ProviderTurn(approved.run.id, "evidence_trap", generated.reply)
         : fallback;
+      const isAudioPrepared = await preparePilotAudio(lineFor(trap));
       const withTrap = attachM1L1PushbackTwo(afterResponse, trap, Date.now());
       await persist(withTrap);
       setDraft("");
-      await speakPilotAudio(lineFor(trap));
+      await afterNextPaint();
+      if (isAudioPrepared) await playPreparedPilotAudio();
     } finally {
       setBusy(false);
     }

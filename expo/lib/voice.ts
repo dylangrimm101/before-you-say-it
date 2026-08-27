@@ -541,27 +541,86 @@ const FIXED_SEMANTIC_VOICES: Readonly<Record<Exclude<PilotAudioLine["voice_key"]
   adam_counterpart: "man-adam",
 };
 
-/** Play an approved fixed line through an explicit semantic voice and versioned cache ID. */
-export async function speakPilotAudio(
+function pilotUtterance(
   line: PilotAudioLine,
-  options: { muted?: boolean; contextualPersona?: PersonaVoice } = {},
-): Promise<SpeakOutcome> {
+  contextualPersona?: PersonaVoice,
+): Utterance | null {
   const persona = line.voice_key === "contextual_counterpart"
-    ? options.contextualPersona
+    ? contextualPersona
     : FIXED_SEMANTIC_VOICES[line.voice_key];
   if (!persona) {
     safeLog("[voice] contextual semantic voice was unresolved");
-    return "failed";
+    return null;
   }
   const clean = line.text.replace(/^\(brief pause\)\s*/i, "").trim();
-  if (!clean) return "empty";
-  lastUtterance = {
+  if (!clean) return null;
+  return {
     text: clean,
     persona,
     staticAudioId: line.audio_id,
     leadingPauseMs: line.leading_pause_ms ?? 0,
     source: null,
   };
+}
+
+/**
+ * Fetches and caches an approved line without playing it. This lets a caller
+ * keep its thinking state visible until audio is ready, then reveal persisted
+ * text and start playback together.
+ */
+export async function preparePilotAudio(
+  line: PilotAudioLine,
+  options: { contextualPersona?: PersonaVoice } = {},
+): Promise<boolean> {
+  const utterance = pilotUtterance(line, options.contextualPersona);
+  if (!utterance) return false;
+
+  token += 1;
+  const id = token;
+  stopWeb();
+  await teardownSound();
+  lastUtterance = utterance;
+  publish({ phase: "generating", canReplay: true });
+  try {
+    const cached = utterance.staticAudioId ? await staticCacheSource(utterance.staticAudioId) : null;
+    if (id !== token || lastUtterance !== utterance) return false;
+    if (cached) {
+      utterance.source = cached;
+    } else {
+      const dataUri = await fetchSpeechDataUri(utterance.text, utterance.persona);
+      if (id !== token || lastUtterance !== utterance) return false;
+      utterance.source = utterance.staticAudioId
+        ? await prepareStaticSource(dataUri, utterance.staticAudioId)
+        : await prepareSource(dataUri, id);
+    }
+    if (id !== token || lastUtterance !== utterance) return false;
+    publish({ phase: "idle" });
+    return true;
+  } catch (error) {
+    safeLog("[voice] preparation failed", errorShape(error));
+    if (id !== token || lastUtterance !== utterance) return false;
+    publish({ phase: "failed" });
+    return false;
+  }
+}
+
+/** Starts only a line already prepared by `preparePilotAudio`; it never triggers a late network fetch. */
+export async function playPreparedPilotAudio(): Promise<SpeakOutcome> {
+  if (!lastUtterance?.source) {
+    publish({ phase: "failed" });
+    return "failed";
+  }
+  return await playUtterance();
+}
+
+/** Play an approved fixed line through an explicit semantic voice and versioned cache ID. */
+export async function speakPilotAudio(
+  line: PilotAudioLine,
+  options: { muted?: boolean; contextualPersona?: PersonaVoice } = {},
+): Promise<SpeakOutcome> {
+  const utterance = pilotUtterance(line, options.contextualPersona);
+  if (!utterance) return "empty";
+  lastUtterance = utterance;
   publish({ canReplay: true });
   if (options.muted === true) return "muted";
   return await playUtterance();
