@@ -1,7 +1,3 @@
-const { runClientEnvPreflight } = require("./scripts/client-env-preflight.cjs");
-
-runClientEnvPreflight(__dirname);
-
 module.exports = function (api) {
   api.cache(true);
   return {
