@@ -13,6 +13,7 @@ import {
   m1L1CoachNote,
   m1L1Comparison,
   m1L1EvidenceTrap,
+  m1L1GoodVersion,
   normalizeConvertedLessonProgress,
   selectM1L1PushbackOne,
   semanticVoiceForScenario,
@@ -155,21 +156,14 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(validateM1L1Completion(restored?.run, dynamic.run.id).isValid).toBe(true);
   });
 
-  test("hard-caps retries at two and preserves exact pressure/audio identity", () => {
-    let value = acceptedRun();
+  test("hard-caps M1 L1 at one retry and preserves exact pressure identity", () => {
+    const value = acceptedRun();
     const pressure = value.run.m1L1?.pushbackTwo;
-    const beforeReplay = preserveM1L1Retry(value, "Forbidden capture before replay.", 11);
-    expect(beforeReplay).toEqual(value);
-    value = { ...value, run: { ...value.run, state: "final_retry_available" } };
-    value = stageM1L1PressureReplay(value, true, 12);
-    expect(value.run.m1L1?.beat).toBe(6);
-    expect(preserveM1L1Retry(value, "Blocked until replay proof.", 13)).toEqual(value);
-    value = confirmM1L1PressureReplay(value, value.run.m1L1?.coachedBeat === 1 ? "top_of_scene_reset" : "playback_completed", 14);
-    value = preserveM1L1Retry(value, "Second and final retry.", 15);
-    const capped = preserveM1L1Retry(value, "A forbidden third retry.", 14);
-    expect(value.run.m1L1?.retryCount).toBe(2);
+    const capped = preserveM1L1Retry(value, "A forbidden second retry.", 11);
+    expect(value.run.m1L1?.retryCount).toBe(1);
     expect(capped).toEqual(value);
     expect(value.run.m1L1?.pushbackTwo).toEqual(pressure);
+    expect(M1_L1_CONVERSION.retryCap).toBe(1);
   });
 
   test("persists the two eligible learner moments for replay", () => {
@@ -190,8 +184,8 @@ describe("accepted M1 L1 narrow correction", () => {
 
   test("real start-then-interrupt replay path stays locked until completion or exact-text acknowledgement", async () => {
     const completed = acceptedRun("replay-failure");
-    const available = { ...completed, run: { ...completed.run, state: "final_retry_available" as const, m1L1: { ...completed.run.m1L1!, coachedBeat: 3 as const } } };
-    const staged = stageM1L1PressureReplay(available, true, 200);
+    const available = { ...completed, run: { ...completed.run, state: "hope_coaching" as const, m1L1: { ...completed.run.m1L1!, beat: 5 as const, coachedBeat: 3 as const, retryCount: 0 as const, replayTarget: undefined, replayProof: undefined, replayRequestedAt: undefined, replayCompletedAt: undefined } } };
+    const staged = stageM1L1PressureReplay(available, false, 200);
     let interrupt!: (outcome: "interrupted") => void;
     const startedThenInterrupted = completeM1L1PressureReplay(staged, () => new Promise((resolve) => { interrupt = resolve; }), 201);
     expect(staged.run.state).toBe("replay_pending");
@@ -199,9 +193,9 @@ describe("accepted M1 L1 narrow correction", () => {
     interrupt("interrupted");
     expect(await startedThenInterrupted).toEqual(staged);
     const playedToEnd = await completeM1L1PressureReplay(staged, async () => "completed", 202);
-    expect(playedToEnd.run.state).toBe("ready_for_final_retry_capture");
+    expect(playedToEnd.run.state).toBe("ready_for_retry");
     const acknowledged = confirmM1L1PressureReplay(staged, "text_fallback_acknowledged", 203);
-    expect(acknowledged.run.state).toBe("ready_for_final_retry_capture");
+    expect(acknowledged.run.state).toBe("ready_for_retry");
     expect(acknowledged.run.m1L1?.replayProof).toBe("text_fallback_acknowledged");
   });
 
@@ -280,6 +274,13 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(note?.evidenceQuote).toBe(response);
     expect(note?.worked).toContain("loses the noon request");
     expect(note?.retryDirection).toContain("return to the noon handoff");
+  });
+
+  test("provides a concrete strong version tailored to the selected behavior and moment", () => {
+    expect(m1L1GoodVersion("park_and_return", 3)).toContain("I understand quarter-close");
+    expect(m1L1GoodVersion("park_and_return", 3)).toContain("future files by noon");
+    expect(m1L1GoodVersion("point_placement", 1)).toMatch(/^I need future client files by noon\./);
+    expect(m1L1GoodVersion("grounding_concreteness", 1)).toContain("4:20");
   });
 
   test("keeps the contextually selected behavior locked through retry comparison", () => {

@@ -41,7 +41,7 @@ export interface ConvertedLessonConfig {
   rehearsalHandoffCard: 20;
   returnCard: 21;
   completionCard: 22;
-  retryCap: 2;
+  retryCap: 1;
   launchEligible: false;
 }
 
@@ -120,7 +120,7 @@ export const M1_L1_CONVERSION: ConvertedLessonConfig = {
   rehearsalHandoffCard: 20,
   returnCard: 21,
   completionCard: 22,
-  retryCap: 2,
+  retryCap: 1,
   launchEligible: false,
 };
 
@@ -420,6 +420,30 @@ export function m1L1CoachExchange(exchange: M1L1ExchangeTranscripts): LessonCoac
   }
   const responseNote = m1L1CoachNote(exchange.firstResponse, 3);
   return responseNote ?? m1L1CoachNote(exchange.opener, 1);
+}
+
+/** Supplies a concrete model for the one behavior Hope selected, without changing the learner's retry. */
+export function m1L1GoodVersion(dimension: M1L1DimensionId, coachedBeat: 1 | 3 | 5): string {
+  if (coachedBeat === 3 || coachedBeat === 5) {
+    return ({
+      evidence_discipline: "I understand quarter-close is busy. Yesterday’s file arrived at 4:20, and I still need future files by noon so I have time to review them.",
+      motive_character_language: "I understand quarter-close is busy. The file arrived at 4:20 yesterday, and I need future files by noon.",
+      issue_count: "I understand quarter-close is busy. I want to stay with the handoff timing: can you send future files by noon?",
+      point_placement: "I still need future files by noon. I understand quarter-close is busy, but a 4:20 handoff leaves too little review time.",
+      grounding_concreteness: "I understand quarter-close is busy. Yesterday’s file arrived at 4:20, leaving me 40 minutes to review it. Can you send future files by noon?",
+      move_clarity: "I understand quarter-close is busy. Can you send future client files by noon?",
+      park_and_return: "I understand quarter-close makes the timing difficult. I still need future files by noon so I have enough time to review them. Can we make that work?",
+    } as const)[dimension];
+  }
+  return ({
+    evidence_discipline: "Yesterday’s file arrived at 4:20, leaving me 40 minutes to review it. Can you send future files by noon?",
+    motive_character_language: "The file arrived at 4:20 yesterday, leaving me 40 minutes to review it. Can you send future files by noon?",
+    issue_count: "The late file handoff is leaving too little review time. Can you send future files by noon?",
+    point_placement: "I need future client files by noon. Yesterday’s 4:20 handoff left me only 40 minutes to review the file.",
+    grounding_concreteness: "Yesterday’s file arrived at 4:20, leaving me 40 minutes before the deadline. Can you send future files by noon?",
+    move_clarity: "Yesterday’s file arrived at 4:20, leaving too little review time. Can you send future files by noon?",
+    park_and_return: "I need future client files by noon so I have enough time to review them before the deadline.",
+  } as const)[dimension];
 }
 
 /** Compares the same scoreless flag using a complete, explicit transition table. */

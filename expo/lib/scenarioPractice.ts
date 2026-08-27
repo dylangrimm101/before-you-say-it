@@ -440,23 +440,14 @@ export async function completeM1L1PressureReplay(
   return outcome === "completed" ? confirmM1L1PressureReplay(value, "playback_completed", now) : value;
 }
 
-/** Records retry count with a hard cap of two and rejects final capture before exact replay. */
+/** Records the single allowed retry after exact replay proof. */
 export function preserveM1L1Retry(value: PersistedScenarioPracticeRun, transcript: string, now: number): PersistedScenarioPracticeRun {
   const lesson = value.run.m1L1;
   const clean = transcript.trim();
-  if (!lesson?.selectedDimension || clean.length < 2 || lesson.retryCount >= 2 || lesson.beat !== 6 || !lesson.replayProof || !lesson.replayCompletedAt) return value;
+  if (!lesson?.selectedDimension || clean.length < 2 || lesson.retryCount >= 1 || lesson.beat !== 6 || !lesson.replayProof || !lesson.replayCompletedAt) return value;
   const confirmedAt = Math.max(now, value.run.updatedAt + 1);
   const attempt = { id: `${value.run.id}-m1-l1-retry-${lesson.retryCount + 1}`, kind: "retry" as const, transcript: clean, representation: "confirmed_transcript" as const, confirmedAt };
-  if (lesson.retryCount === 0) {
-    return { ...value, run: { ...value.run, retryAttempt: attempt, m1L1: { ...lesson, beat: 7, retryCount: 1 }, updatedAt: confirmedAt } };
-  }
-  const expectedReplayId = lesson.coachedBeat === 1
-    ? `top-of-scene:${value.run.id}`
-    : lesson.coachedBeat === 3
-      ? lesson.pushbackOne?.resolvedAudioId
-      : lesson.pushbackTwo?.resolvedAudioId;
-  if (!lesson.finalRetryPressureReplayedAt || !lesson.replayProof || lesson.finalRetryPressureAudioId !== expectedReplayId) return value;
-  return { ...value, run: { ...value.run, m1L1: { ...lesson, beat: 7, retryCount: 2, finalRetryAttempt: attempt }, updatedAt: confirmedAt } };
+  return { ...value, run: { ...value.run, retryAttempt: attempt, m1L1: { ...lesson, beat: 7, retryCount: 1 }, updatedAt: confirmedAt } };
 }
 
 export function attachScenarioCoaching(

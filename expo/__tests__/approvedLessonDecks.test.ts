@@ -237,6 +237,10 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(m1L1Runtime).toContain("(step / 7) * 100");
     expect(m1L1Runtime).not.toContain('kind="response-two"');
     expect(m1L1Runtime).not.toContain("confirmSecondResponse");
+    expect(m1L1Runtime).not.toContain("Optional final retry");
+    expect(m1L1Runtime).not.toContain('kind="final-retry"');
+    expect(m1L1Runtime).toContain('state: "attempt_comparison" as const');
+    expect(m1L1Runtime).toContain("A strong version");
   });
 
   test("shows each approved M1 L1 transcript as a sent message while Adam thinks", async () => {
