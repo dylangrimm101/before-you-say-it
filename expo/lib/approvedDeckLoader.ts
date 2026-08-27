@@ -14,7 +14,9 @@ const M1_L1_CONTENT_VERSION = "m1-l1-v2.1-2026-08-24";
 const M1_L1_APPROVED_SHA256 = "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e";
 const STALE_M1_L1_SCENE = "Sunday evening, kitchen. Dishes done, kid finally asleep. You've wanted to say this for two weeks. Your partner is on the couch, half looking at their phone. Not hostile. Tired.";
 const STALE_M1_L1_SCENE_BEATS = "You open. Adam pushes back twice. The second one is <em>“You're acting like this happens all the time.”</em> Then Hope names one change and hands the same moment back to you.";
+const M1_L1_OUTCOME_CARD = /<div\b[^>]*>\s*<span\b[^>]*>\s*What happens\s*<\/span>[\s\S]*?<\/div>/gi;
 const M1_L1_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*You open\.\s*Adam pushes back twice\..*?same moment back to you\.\s*<\/div>\s*<\/div>/is;
+const M1_L1_EMPTY_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*<\/div>\s*<\/div>/gis;
 
 let archivePromise: Promise<Record<string, Uint8Array>> | null = null;
 
@@ -190,8 +192,10 @@ function sliceCards(template: string, throughCard: number): string {
 /** Removes the outcome preview so the handoff gives context without revealing the exchange. */
 export function removeM1L1OutcomePreview(template: string): string {
   return template
+    .replace(M1_L1_OUTCOME_CARD, "")
     .replace(M1_L1_OUTCOME_PREVIEW, "")
-    .replace(STALE_M1_L1_SCENE_BEATS, "");
+    .replace(STALE_M1_L1_SCENE_BEATS, "")
+    .replace(M1_L1_EMPTY_OUTCOME_PREVIEW, "");
 }
 
 /** Converts an approved lesson handoff action into the fail-closed native QA runtime launch. */

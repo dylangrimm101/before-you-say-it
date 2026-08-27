@@ -331,6 +331,12 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(cleaned).toContain("Start voice rehearsal");
     expect(cleaned).not.toContain("What happens");
     expect(cleaned).not.toContain("pushes back twice");
+
+    const emptiedPreview = `<div style="padding:20px"><div style="color:purple">WHAT HAPPENS</div><div style="margin-top:8px"></div></div>`;
+    const cleanedEmptyState = removeM1L1OutcomePreview(`<p>${M1_L1_CONVERSION.scenario.situation}</p>${emptiedPreview}<button>Start voice rehearsal</button>`);
+    expect(cleanedEmptyState).not.toContain("WHAT HAPPENS");
+    expect(cleanedEmptyState).not.toContain('style="padding:20px"');
+    expect(cleanedEmptyState).toContain("Start voice rehearsal");
   });
 
   test("slices handoff before rehearsal and authorizes only Cards 21–22 after return", () => {

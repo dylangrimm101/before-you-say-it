@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { authorizedDeckHtml, installTapTutorialDismissal, materializeApprovedDeckHtml, removeRehearsalContinuationCopy } from "../lib/approvedDeckLoader";
+import { authorizedDeckHtml, installTapTutorialDismissal, materializeApprovedDeckHtml, removeM1L1OutcomePreview, removeRehearsalContinuationCopy } from "../lib/approvedDeckLoader";
 
 const DECK_LIMITS = {
   "M1-L1-Buried-Point.html": 20,
@@ -136,6 +136,15 @@ describe("approved Modules 1 and 2 internal deck port", () => {
       expect(cleaned).toContain("Start rehearsal");
     }
     expect(affectedDeckCount).toBe(1);
+  });
+
+  test("removes the entire M1 L1 What happens card from the approved handoff", async () => {
+    const template = approvedTemplate(await source("assets/lesson-decks/M1-L1-Buried-Point.html"));
+    expect(template).toContain("What happens");
+    const cleaned = removeM1L1OutcomePreview(template);
+    expect(cleaned).not.toMatch(/<span\b[^>]*>\s*What happens\s*<\/span>/i);
+    expect(cleaned).not.toMatch(/<span\b[^>]*>\s*You open\.\s*Adam pushes back twice\./i);
+    expect(cleaned).toContain("Start rehearsal");
   });
 
   test("re-verifies every fetched deck against its authorized boundary before display", async () => {
