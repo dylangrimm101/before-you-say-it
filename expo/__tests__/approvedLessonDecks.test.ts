@@ -98,29 +98,44 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).not.toContain("downloadAsync");
   });
 
-  test("repairs M1 L3 and M1 Close runtime dependency order before their cards mount", async () => {
-    const affectedBundles = [
-      await source("assets/lesson-decks/M1-L3-Park-and-Return.html"),
-      await source("assets/lesson-decks/M1-Close.html"),
-    ];
-    for (const bundle of affectedBundles) {
+  test("materializes every approved deck with safe runtime order and mount monitoring", async () => {
+    const sourceOrders = new Map<string, "react-first" | "react-dom-first">();
+
+    for (const [fileName, limit] of Object.entries(DECK_LIMITS)) {
+      const bundle = await source(`assets/lesson-decks/${fileName}`);
       const externalEncoded = bundle.match(/<script type="__bundler\/ext_resources">\s*(.*?)\s*<\/script>/s)?.[1];
       expect(externalEncoded).toBeTruthy();
       const externalResources = JSON.parse(externalEncoded!) as { id: string }[];
-      expect(externalResources[0]?.id).toContain("react-dom@");
+      const sourceReactIndex = externalResources.findIndex(({ id }) => /\/react@[^/]+\/umd\/react\./i.test(id));
+      const sourceReactDomIndex = externalResources.findIndex(({ id }) => /\/react-dom@/i.test(id));
+      expect(sourceReactIndex).toBeGreaterThan(-1);
+      expect(sourceReactDomIndex).toBeGreaterThan(-1);
+      sourceOrders.set(fileName, sourceReactIndex < sourceReactDomIndex ? "react-first" : "react-dom-first");
 
       const page = materializeApprovedDeckHtml(bundle);
       const reactIndex = page.indexOf("react.production.min.js");
       const reactDomIndex = page.indexOf("react-dom.production.min.js");
       expect(page.startsWith("<!DOCTYPE html>")).toBe(true);
       expect(page).toContain('data-bysi="deck"');
+      expect(cardNumbers(page)).toEqual(Array.from({ length: limit }, (_, index) => index + 1));
       expect(reactIndex).toBeGreaterThan(-1);
       expect(reactDomIndex).toBeGreaterThan(reactIndex);
+      expect(page).toContain("class Component extends DCLogic");
       expect(page).toContain('post("deck-ready")');
       expect(page).toContain('post("deck-render-error")');
+      expect(page).toContain('window.addEventListener("error"');
+      expect(page).toContain('window.addEventListener("unhandledrejection"');
+      expect(page).toContain("document.querySelector('[data-bysi=\"deck\"]')");
+      expect(page).toContain('id="bysi-native-deck-shell"');
       expect(page).not.toContain("__bundler_loading");
+      expect(page).not.toContain('type="__bundler/manifest"');
       expect(page).not.toMatch(/<script\s+src=/i);
+      expect(page).not.toContain("blob:");
     }
+
+    expect(sourceOrders.get("M1-L3-Park-and-Return.html")).toBe("react-dom-first");
+    expect(sourceOrders.get("M1-Close.html")).toBe("react-dom-first");
+    expect(sourceOrders.size).toBe(12);
   });
 
   test("materializes approved decks without blob scripts or the artifact unpacker", async () => {
