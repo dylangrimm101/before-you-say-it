@@ -71,7 +71,12 @@ function completedJourney(input: (typeof JOURNEYS)[number]) {
   }, 102);
   const responded = preserveScenarioAttempt(pressured, "response", input.firstResponse, 103);
   const note = approvedRehearsalCoachNote(config, input.firstResponse);
-  const coached = attachScenarioCoaching(responded, note.note, note.retryDirection, config.coachedBehaviorId, 104);
+  const coached = attachScenarioCoaching(responded, note.note, note.retryDirection, note.coachedBehaviorId, 104, {
+    coachedBeat: note.coachedBeat,
+    selectedDimension: note.selectedDimension,
+    status: note.flags[0].status,
+    evidenceQuote: note.evidenceQuote,
+  });
   const retried = preserveScenarioAttempt(coached, "retry", input.retry, 105);
   const comparedBase = completeScenarioComparison(retried, 106);
   const comparison = approvedRehearsalComparison(config, input.firstResponse, input.retry);
@@ -117,6 +122,12 @@ describe("approved lesson preflight journeys", () => {
         reactionId: `${input.lessonId}-dynamic-pressure`,
       });
       expect(value.run.responseAttempt?.transcript, input.lessonId).toBe(input.firstResponse);
+      expect(value.run.coachingObservation, input.lessonId).toEqual({
+        coachedBeat: 3,
+        selectedDimension: config.coachedBehaviorId,
+        status: "not_met",
+        evidenceQuote: input.firstResponse,
+      });
       expect(value.run.retryAttempt?.transcript, input.lessonId).toBe(input.retry);
       expect(value.run.comparison, input.lessonId).toEqual(approvedRehearsalComparison(config, input.firstResponse, input.retry));
       expect(validateApprovedRehearsalCompletion(config, value.run, value.run.id), input.lessonId).toBe(true);

@@ -23,6 +23,27 @@ export interface ApprovedRehearsalCurrentSignal {
   value: number;
 }
 
+export type ApprovedRehearsalCriterionStatus = "met" | "not_met";
+
+export interface ApprovedRehearsalBehaviorFlag {
+  dimension: string;
+  status: ApprovedRehearsalCriterionStatus;
+  evidenceQuote: string;
+}
+
+/** M1 L1-shaped evidence note used by every shared approved rehearsal. */
+export interface ApprovedRehearsalCoachNote {
+  evidenceQuote: string;
+  worked: string;
+  change: string;
+  note: string;
+  retryDirection: string;
+  coachedBehaviorId: string;
+  coachedBeat: 3;
+  selectedDimension: string;
+  flags: readonly [ApprovedRehearsalBehaviorFlag];
+}
+
 export interface ApprovedRehearsalConfig {
   lessonId: ApprovedRehearsalLessonId;
   moduleId: "bysi_m01_get_to_the_point" | "bysi_m02_make_a_clear_ask";
@@ -50,7 +71,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l2",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l02_cut_the_case",
-    contentVersion: "m1-l2-dynamic-2026-08-28",
+    contentVersion: "m1-l2-dynamic-coaching-v2-2026-08-28",
     scenario: {
       id: "bysi-m01-l02-approval-owner",
       category: "work",
@@ -80,7 +101,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l3",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l03_park_and_return",
-    contentVersion: "m1-l3-dynamic-2026-08-28",
+    contentVersion: "m1-l3-dynamic-coaching-v2-2026-08-28",
     scenario: {
       id: "bysi-m01-l03-march-appointments",
       category: "family",
@@ -110,7 +131,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l4",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l04_make_it_repeatable",
-    contentVersion: "m1-l4-dynamic-2026-08-28",
+    contentVersion: "m1-l4-dynamic-coaching-v2-2026-08-28",
     scenario: {
       id: "bysi-m01-l04-changing-plan",
       category: "partner",
@@ -140,7 +161,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l5",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l05_fit_in_one",
-    contentVersion: "m1-l5-dynamic-2026-08-28",
+    contentVersion: "m1-l5-dynamic-coaching-v2-2026-08-28",
     scenario: {
       id: "bysi-m01-l05-friday-kitchen-table",
       category: "partner",
@@ -170,7 +191,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l1",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l01_clear_ask",
-    contentVersion: "m2-l1-dynamic-2026-08-28",
+    contentVersion: "m2-l1-dynamic-coaching-v2-2026-08-28",
     scenario: {
       id: "bysi-m02-l01-thursday-handoff",
       category: "work",
@@ -200,7 +221,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l2",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l02_say_who",
-    contentVersion: "m2-l2-dynamic-2026-08-28",
+    contentVersion: "m2-l2-dynamic-coaching-v2-2026-08-28",
     scenario: {
       id: "bysi-m02-l02-cupcake-order",
       category: "friends",
@@ -230,7 +251,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l3",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l03_when_they_say_they_cant",
-    contentVersion: "m2-l3-dynamic-2026-08-28",
+    contentVersion: "m2-l3-dynamic-coaching-v2-2026-08-28",
     scenario: {
       id: "bysi-m02-l03-saturday-van",
       category: "family",
@@ -260,7 +281,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l4",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l04_say_whether_no",
-    contentVersion: "m2-l4-dynamic-2026-08-28",
+    contentVersion: "m2-l4-dynamic-coaching-v2-2026-08-28",
     scenario: {
       id: "bysi-m02-l04-thursday-pickup",
       category: "partner",
@@ -289,7 +310,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l5",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l05_ask_for_the_loop",
-    contentVersion: "m2-l5-dynamic-2026-08-28",
+    contentVersion: "m2-l5-dynamic-coaching-v2-2026-08-28",
     scenario: {
       id: "bysi-m02-l05-camp-signup",
       category: "partner",
@@ -334,6 +355,14 @@ export function validateApprovedRehearsalCompletion(
   const pressure = run.counterpartTurn;
   const expectedTurnId = `${run.id}-counterpart-turn-1`;
   const expectedAudioId = `${run.curriculumVersion}-${run.id}-counterpart-turn-1`;
+  const observation = run.coachingObservation;
+  const hasValidObservation = Boolean(observation
+    && observation.coachedBeat === 3
+    && observation.selectedDimension === config.coachedBehaviorId
+    && observation.evidenceQuote === run.responseAttempt?.transcript
+    && observation.status === (approvedRehearsalCriterion(config, observation.evidenceQuote) ? "met" : "not_met")
+    && run.coachedSegment === "pushback_response"
+    && run.coachedBehaviorId === config.coachedBehaviorId);
   const hasValidPressure = Boolean(pressure
     && pressure.id === expectedTurnId
     && pressure.reactionId === `${config.lessonId}-dynamic-pressure`
@@ -348,6 +377,7 @@ export function validateApprovedRehearsalCompletion(
     && context?.scenarioId === config.scenario.id
     && context.counterpartId === config.counterpartId
     && hasValidPressure
+    && hasValidObservation
     && Boolean(run.attempt && run.responseAttempt && run.retryAttempt && run.comparison)
     && (run.attempt?.confirmedAt ?? 0) < (run.responseAttempt?.confirmedAt ?? 0)
     && (run.responseAttempt?.confirmedAt ?? 0) < (run.retryAttempt?.confirmedAt ?? 0)
@@ -419,6 +449,60 @@ const INDEX_SIGNAL_LABELS: Readonly<Record<SharedSignalKey, string>> = {
   repair: "Repair",
 };
 
+interface ApprovedRehearsalCoachingCopy {
+  positiveObservation: string;
+  failureObservation: string;
+  changeInstruction: string;
+}
+
+const COACHING_COPY_BY_LESSON: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCoachingCopy>> = {
+  "m1-l2": {
+    positiveObservation: "held one representative anchor without opening the rest of the case",
+    failureObservation: "the response adds or invites more case material instead of holding one representative anchor",
+    changeInstruction: "use one representative anchor and leave the rest of the case in the folder",
+  },
+  "m1-l3": {
+    positiveObservation: "acknowledged the second issue and made its return point explicit",
+    failureObservation: "the response does not both acknowledge the second issue and say when it will return",
+    changeInstruction: "acknowledge the new issue, finish the current one, and name when the parked issue returns",
+  },
+  "m1-l4": {
+    positiveObservation: "kept the point bounded instead of widening it into a judgment",
+    failureObservation: "the response widens the bounded event into an overall judgment",
+    changeInstruction: "hold the bounded version and keep the wider month out of this response",
+  },
+  "m1-l5": {
+    positiveObservation: "made one conversation purpose identifiable",
+    failureObservation: "the response does not yet make one conversation purpose identifiable",
+    changeInstruction: "name one purpose and keep the other purposes for another conversation",
+  },
+  "m2-l1": {
+    positiveObservation: "kept one answerable action while leaving room for a real answer",
+    failureObservation: "the response does not yet keep one answerable action with room for an answer",
+    changeInstruction: "keep one action, one owner, and room for the other person to answer",
+  },
+  "m2-l2": {
+    positiveObservation: "put the next answerable action to one named person",
+    failureObservation: "the response sends the action back to the group instead of one named person",
+    changeInstruction: "name the one person who owns the next answerable action",
+  },
+  "m2-l3": {
+    positiveObservation: "showed the constraint was heard, traded one part, and restated what remains",
+    failureObservation: "the response does not yet show all three parts: hear it, trade one thing, and say where the ask stands",
+    changeInstruction: "show what you heard, trade one part, and clearly state what remains",
+  },
+  "m2-l4": {
+    positiveObservation: "treated the available no as a real answer without asking again",
+    failureObservation: "the response does not yet honor the available no as a complete answer",
+    changeInstruction: "acknowledge the no and stop without asking again or adding a penalty",
+  },
+  "m2-l5": {
+    positiveObservation: "defined only the condition for coming back and left the middle steps alone",
+    failureObservation: "the response keeps control of the middle steps instead of defining only the return condition",
+    changeInstruction: "name only the condition that should bring the other person back",
+  },
+};
+
 const STRONG_VERSION_BY_LESSON: Readonly<Record<ApprovedRehearsalLessonId, string>> = {
   "m1-l2": "Yesterday’s late file is one example of why the approval step needs a clear owner. Can we decide who owns that approval today?",
   "m1-l3": "You’re right that we should talk about calls. Let’s finish splitting March’s appointments now, and I’ll call you tomorrow so we can come back to that.",
@@ -467,13 +551,30 @@ export function approvedRehearsalIndexImpact(
   return { signalKey, signalLabel, signalValue, beforeIndex, afterIndex, delta, explanation };
 }
 
-export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, transcript: string): { note: string; retryDirection: string } {
-  const met = approvedRehearsalCriterion(config, transcript);
+/**
+ * Produces the same scoreless, exact-wording coaching shape as M1 L1 while
+ * evaluating only this lesson's approved move at the pressure-response beat.
+ */
+export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, transcript: string): ApprovedRehearsalCoachNote {
+  const evidenceQuote = transcript.trim();
+  const status: ApprovedRehearsalCriterionStatus = approvedRehearsalCriterion(config, evidenceQuote) ? "met" : "not_met";
+  const copy = COACHING_COPY_BY_LESSON[config.lessonId];
+  const worked = status === "met"
+    ? `In “${evidenceQuote}” you ${copy.positiveObservation}.`
+    : `In “${evidenceQuote}” ${copy.failureObservation}.`;
+  const change = status === "met"
+    ? "Keep that same choice in the retry."
+    : `On the retry, ${copy.changeInstruction}.`;
   return {
-    note: met
-      ? `You kept the response aligned with “${config.namedMove}” Hope checked only that lesson move.`
-      : `The approved response is saved. Hope could not yet verify “${config.namedMove}” from this wording, so she is checking no other behavior.`,
-    retryDirection: config.retryDirection,
+    evidenceQuote,
+    worked,
+    change,
+    note: `${worked} ${change}`,
+    retryDirection: `Replay this exact moment and ${copy.changeInstruction}.`,
+    coachedBehaviorId: config.coachedBehaviorId,
+    coachedBeat: 3,
+    selectedDimension: config.coachedBehaviorId,
+    flags: [{ dimension: config.coachedBehaviorId, status, evidenceQuote }],
   };
 }
 

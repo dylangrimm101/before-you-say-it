@@ -4,6 +4,7 @@ import { preservePilotAttempt, transitionPilotRun } from "@/lib/practiceSession"
 import type { Difficulty, PersonaVoice, ReactionPattern, Scenario } from "@/types/convo";
 import type {
   PilotBehaviorId,
+  PilotCoachingObservation,
   PilotDayRun,
   PilotModuleState,
   ScenarioCounterpartTurn,
@@ -184,6 +185,17 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
   const stringFields = ["counterpartIdentity", "counterpartReactionId", "resolvedAudioId", "adamReactionId", "adamAudioId", "coachedBehaviorId", "retryResetId", "coachNote", "retryInstruction"] as const;
   for (const key of stringFields) { if (run[key] !== undefined) { if (!nonEmpty(run[key])) return null; (canonicalRun as unknown as Record<string, unknown>)[key] = run[key]; } }
   if (run.coachedSegment !== undefined) { if (run.coachedSegment !== "opener" && run.coachedSegment !== "pushback_response") return null; canonicalRun.coachedSegment = run.coachedSegment; }
+  if (run.coachingObservation !== undefined) {
+    if (!run.coachingObservation || typeof run.coachingObservation !== "object") return null;
+    const observation = run.coachingObservation as Record<string, unknown>;
+    if (observation.coachedBeat !== 3 || !nonEmpty(observation.selectedDimension) || !["met", "not_met"].includes(String(observation.status)) || !nonEmpty(observation.evidenceQuote)) return null;
+    canonicalRun.coachingObservation = {
+      coachedBeat: 3,
+      selectedDimension: observation.selectedDimension,
+      status: observation.status as PilotCoachingObservation["status"],
+      evidenceQuote: observation.evidenceQuote,
+    };
+  }
   if (run.noteFit !== undefined) { if (run.noteFit !== "accepted" && run.noteFit !== "rejected") return null; canonicalRun.noteFit = run.noteFit; }
   if (run.comparison !== undefined) {
     if (!run.comparison || typeof run.comparison !== "object") return null;
@@ -473,6 +485,7 @@ export function attachScenarioCoaching(
   retryInstruction: string,
   behaviorId: PilotBehaviorId,
   now: number,
+  observation?: PilotCoachingObservation,
 ): PersistedScenarioPracticeRun {
   return {
     ...value,
@@ -481,6 +494,8 @@ export function attachScenarioCoaching(
       coachNote: note,
       retryInstruction,
       coachedBehaviorId: behaviorId,
+      coachedSegment: "pushback_response",
+      ...(observation ? { coachingObservation: observation } : {}),
     },
   };
 }

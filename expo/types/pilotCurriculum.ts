@@ -210,6 +210,14 @@ export interface M1L1BehaviorFlag {
   evidenceQuote: string | null;
 }
 
+/** Durable one-behavior observation used by shared approved rehearsals. */
+export interface PilotCoachingObservation {
+  coachedBeat: 3;
+  selectedDimension: string;
+  status: "met" | "not_met";
+  evidenceQuote: string;
+}
+
 /** Isolated M1 L1 state; no other lesson or shared scenario consumes it. */
 export interface M1L1RehearsalState {
   beat: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -261,6 +269,7 @@ export interface PilotDayRun {
   adamAudioId?: string;
   coachedBehaviorId?: PilotBehaviorId;
   coachedSegment?: "opener" | "pushback_response";
+  coachingObservation?: PilotCoachingObservation;
   retryResetId?: string;
   coachNote?: string;
   retryInstruction?: string;

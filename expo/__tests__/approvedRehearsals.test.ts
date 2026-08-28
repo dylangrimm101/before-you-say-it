@@ -20,7 +20,7 @@ describe("approved M1 L2-L5 rehearsals", () => {
     const l4 = approvedRehearsalConfig("m1-l4")!;
     const l5 = approvedRehearsalConfig("m1-l5")!;
 
-    expect(l2.contentVersion).toBe("m1-l2-dynamic-2026-08-28");
+    expect(l2.contentVersion).toBe("m1-l2-dynamic-coaching-v2-2026-08-28");
     expect(l2.scenario.situation).toBe(
       "Wednesday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi points out that the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file was also late, another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.",
     );
@@ -28,7 +28,7 @@ describe("approved M1 L2-L5 rehearsals", () => {
     expect(l2.namedMove).toBe("One anchor. The rest stays in the folder.");
     expect([l2.rehearsalHandoffCard, l2.returnCard, l2.completionCard]).toEqual([20, 21, 22]);
 
-    expect(l3.contentVersion).toBe("m1-l3-dynamic-2026-08-28");
+    expect(l3.contentVersion).toBe("m1-l3-dynamic-coaching-v2-2026-08-28");
     expect(l3.scenario.counterpart).toBe("Renee — your sister");
     expect(l3.scenario.situation).toBe(
       "Sunday evening, you’re on the phone with Renee, your sister. Dad’s March appointments still need to be divided between you. You handled the last four appointments, and you want to decide who will take which March appointments before you hang up, so nothing is left until the last minute.\n\nRenee has been handling more of the regular check-in calls with Dad, and she’s frustrated that you haven’t been calling him as often.",
@@ -51,7 +51,13 @@ describe("approved M1 L2-L5 rehearsals", () => {
     const after = "I hear that. Let's finish March's appointments, and tomorrow we can talk about calls.";
     expect(approvedRehearsalCriterion(l3, before)).toBe(false);
     expect(approvedRehearsalCriterion(l3, after)).toBe(true);
-    expect(approvedRehearsalCoachNote(l3, before).note).toContain("checking no other behavior");
+    expect(approvedRehearsalCoachNote(l3, before)).toMatchObject({
+      evidenceQuote: before,
+      coachedBehaviorId: "park_and_return",
+      coachedBeat: 3,
+      selectedDimension: "park_and_return",
+      flags: [{ dimension: "park_and_return", status: "not_met", evidenceQuote: before }],
+    });
     expect(approvedRehearsalComparison(l3, before, after)).toEqual({
       behaviorId: "park_and_return",
       text: "The retry made “Both on the table. One at a time.” observable. That is the only change Hope checked.",
@@ -80,6 +86,9 @@ describe("approved M1 L2-L5 rehearsals", () => {
       },
       attempt: { id: "run-l4-opener", kind: "opener", transcript: "The plan changed twice.", representation: "confirmed_transcript", confirmedAt: 2 },
       responseAttempt: { id: "run-l4-response", kind: "response", transcript: "I mean those two changes.", representation: "confirmed_transcript", confirmedAt: 4 },
+      coachedBehaviorId: config.coachedBehaviorId,
+      coachedSegment: "pushback_response",
+      coachingObservation: { coachedBeat: 3, selectedDimension: config.coachedBehaviorId, status: "met", evidenceQuote: "I mean those two changes." },
       retryAttempt: { id: "run-l4-retry", kind: "retry", transcript: "I mean the two changes this month.", representation: "confirmed_transcript", confirmedAt: 5 },
       comparison: { behaviorId: config.coachedBehaviorId, text: "Same criterion.", criterionChanged: false },
       state: "attempt_comparison",
@@ -138,7 +147,21 @@ describe("approved M2 L1-L5 rehearsals", () => {
       const config = approvedRehearsalConfig(lessonId)!;
       expect(approvedRehearsalCriterion(config, before)).toBe(false);
       expect(approvedRehearsalCriterion(config, after)).toBe(true);
-      expect(approvedRehearsalCoachNote(config, before).note).toContain("checking no other behavior");
+      const note = approvedRehearsalCoachNote(config, before);
+      expect(note).toMatchObject({
+        evidenceQuote: before,
+        coachedBehaviorId: config.coachedBehaviorId,
+        coachedBeat: 3,
+        selectedDimension: config.coachedBehaviorId,
+        flags: [{ dimension: config.coachedBehaviorId, status: "not_met", evidenceQuote: before }],
+      });
+      expect(note.worked).toContain(`“${before}”`);
+      expect(note.change).toMatch(/^On the retry,/);
+      expect(note.retryDirection).toMatch(/^Replay this exact moment and/);
+      const positive = approvedRehearsalCoachNote(config, after);
+      expect(positive.flags[0].status).toBe("met");
+      expect(positive.worked).toContain(`“${after}”`);
+      expect(positive.change).toBe("Keep that same choice in the retry.");
       expect(approvedRehearsalComparison(config, before, after)).toEqual({
         behaviorId: config.coachedBehaviorId,
         text: `The retry made “${config.namedMove}” observable. That is the only change Hope checked.`,
@@ -168,6 +191,9 @@ describe("approved M2 L1-L5 rehearsals", () => {
       },
       attempt: { id: "run-m2-l3-opener", kind: "opener", transcript: "Can you take Saturday?", representation: "confirmed_transcript", confirmedAt: 2 },
       responseAttempt: { id: "run-m2-l3-response", kind: "response", transcript: "That doesn't help.", representation: "confirmed_transcript", confirmedAt: 4 },
+      coachedBehaviorId: config.coachedBehaviorId,
+      coachedSegment: "pushback_response",
+      coachingObservation: { coachedBeat: 3, selectedDimension: config.coachedBehaviorId, status: "not_met", evidenceQuote: "That doesn't help." },
       retryAttempt: { id: "run-m2-l3-retry", kind: "retry", transcript: "I hear you. Could you take it after two?", representation: "confirmed_transcript", confirmedAt: 5 },
       comparison: { behaviorId: config.coachedBehaviorId, text: "One criterion.", criterionChanged: true },
       state: "attempt_comparison",
