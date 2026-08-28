@@ -129,7 +129,7 @@ describe("required exercised curriculum paths", () => {
     expect(denialBranch).toBeGreaterThan(-1);
     expect(denialBranch).toBeLessThan(recordingStart);
     expect(dictation.slice(denialBranch, recordingStart)).toContain('setStatus("denied")');
-    expect(dictation.slice(denialBranch, recordingStart)).toContain("return;");
+    expect(dictation.slice(denialBranch, recordingStart)).toContain("return false;");
     expect(rehearsal).toContain('label: "Microphone access is off."');
     expect(rehearsal).toContain("Linking.openSettings()");
     expect(rehearsal).toContain('accessibilityLabel="Try again"');

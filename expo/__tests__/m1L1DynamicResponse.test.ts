@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { generateM1L1DynamicReply } from "@/lib/ai";
+import { generateM1L1DynamicReply, requestBysiGeneration } from "@/lib/ai";
 import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
 import { m1L1DynamicReplyPassesQuality, m1L1ProviderTurn } from "@/lib/m1L1DynamicResponse";
 
@@ -80,6 +80,19 @@ describe("M1 L1 constrained dynamic counterpart", () => {
 
     expect(requestCount).toBe(2);
     expect(result).toEqual({ reply: fallback, source: "authored" });
+  });
+
+  test("aborts a stalled provider request within the configured boundary", async () => {
+    let observedSignal: AbortSignal | undefined;
+    globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      observedSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        observedSignal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    }) as typeof fetch;
+
+    await expect(requestBysiGeneration({ type: "rehearsal_turn" }, 5)).rejects.toThrow("aborted");
+    expect(observedSignal?.aborted).toBe(true);
   });
 
   test("builds stable provider identities for persisted playback and resume", () => {

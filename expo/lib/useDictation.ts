@@ -42,7 +42,7 @@ interface UseDictationReturn {
   /** Smoothed microphone energy normalized from silence (0) to loud speech (1). */
   level: number;
   requestPermission: () => Promise<boolean>;
-  start: () => Promise<void>;
+  start: () => Promise<boolean>;
   stop: (turn: TranscriptionTurn) => Promise<string | null>;
   cancel: () => Promise<void>;
   reset: () => Promise<void>;
@@ -111,8 +111,8 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
     }
   }, []);
 
-  const start = useCallback(async (): Promise<void> => {
-    if (operationRef.current || nativeRecordingRef.current || webRecorderRef.current) return;
+  const start = useCallback(async (): Promise<boolean> => {
+    if (operationRef.current || nativeRecordingRef.current || webRecorderRef.current) return false;
     operationRef.current = true;
     setError("");
     try {
@@ -132,14 +132,14 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         setLevel(0.45);
         setStatus("recording");
         tap("medium");
-        return;
+        return true;
       }
 
       const permission = await AudioModule.requestRecordingPermissionsAsync();
       if (!permission.granted) {
         setStatus("denied");
         setError("Microphone access is off.");
-        return;
+        return false;
       }
 
       await setAudioModeAsync({
@@ -151,12 +151,13 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       nativeRecorder.record();
       setStatus("recording");
       tap("medium");
+      return true;
     } catch (e) {
       safeLog("[dictation] start failed", errorShape(e));
       if (isPermissionDenied(e)) {
         setStatus("denied");
         setError("Microphone access is off.");
-        return;
+        return false;
       }
       setStatus("error");
       setError(Platform.OS === "web"
@@ -192,6 +193,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
         setError("Recording cleanup is still pending. Try again before leaving.");
         throw cleanupError;
       }
+      return false;
     } finally {
       operationRef.current = false;
     }
@@ -238,6 +240,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       }
       nativeRecordingRef.current = false;
       webRecorderRef.current = null;
+      if (retryDetachedCleanup === cancel) retryDetachedCleanup = null;
       resetState();
     } catch (e) {
       safeLog("[dictation] strict cleanup failed", errorShape(e));

@@ -11,6 +11,7 @@ import type {
 } from "@/types/pilotCurriculum";
 
 const GENERATE_ENDPOINT = process.env.EXPO_PUBLIC_GENERATE_ENDPOINT?.trim() || "https://beforeyousayit.app/api/generate";
+const BYSI_GENERATION_TIMEOUT_MS = 15_000;
 
 type BysiEntryRoute = "real_conversation" | "recurring_problem" | "desired_skill";
 
@@ -87,6 +88,22 @@ function evidenceEndpoint(url: string): string {
   return url.replace(/^https?:\/\//, "").slice(0, 64);
 }
 
+/** Performs one bounded BYSI request so a provider stall cannot trap the rehearsal UI. */
+export async function requestBysiGeneration(payload: Record<string, unknown>, timeoutMs: number = BYSI_GENERATION_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(GENERATE_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function postBysi<T>(payload: Record<string, unknown>): Promise<T> {
   const type = typeof payload.type === "string" ? payload.type : "unknown";
   const contract = payload.contract as { entry_route?: unknown } | undefined;
@@ -97,11 +114,7 @@ async function postBysi<T>(payload: Record<string, unknown>): Promise<T> {
     provider: "user-owned-claude-backend",
     type,
   });
-  const response = await fetch(GENERATE_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const response = await requestBysiGeneration(payload);
   safeLog("[evidence] BYSI generation response", {
     endpoint: evidenceEndpoint(GENERATE_ENDPOINT),
     entryRoute,

@@ -28,9 +28,12 @@ import {
   attachM1L1PushbackTwo,
   preserveM1L1Retry,
   preserveScenarioAttempt,
+  m1L1CaptureKindForState,
+  m1L1ReplayPressure,
   scenarioRunForRoute,
   stageM1L1PressureReplay,
   transitionScenarioPracticeRun,
+  type M1L1CaptureKind,
   type PersistedScenarioPracticeRun,
 } from "@/lib/scenarioPractice";
 import { leaveAfterStrictDictationCleanup } from "@/lib/temporaryRecording";
@@ -45,7 +48,7 @@ interface M1L1PaidPracticeProps {
   onDiscard: () => Promise<void>;
 }
 
-type CaptureKind = "opener" | "response-one" | "retry";
+type CaptureKind = M1L1CaptureKind;
 
 function reviewState(kind: CaptureKind): PersistedScenarioPracticeRun["run"]["state"] {
   if (kind === "opener") return "confirm_attempt_transcript";
@@ -80,8 +83,14 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
   const { activeScenarioRun, replaceActiveScenarioRunStrict } = useStore();
   const restored = scenarioRunForRoute(activeScenarioRun, convertedLesson.scenario.id);
   const [value, setValue] = useState<PersistedScenarioPracticeRun | null>(restored?.run.id === requestedRunId ? restored : null);
-  const [draft, setDraft] = useState<string>("");
-  const [captureKind, setCaptureKind] = useState<CaptureKind | null>(null);
+  const [draft, setDraft] = useState<string>(() => {
+    const run = restored?.run;
+    if (run?.state === "confirm_attempt_transcript") return run.attempt?.transcript ?? "";
+    if (run?.state === "confirm_response_transcript") return run.responseAttempt?.transcript ?? "";
+    if (run?.state === "confirm_retry_transcript") return run.retryAttempt?.transcript ?? "";
+    return "";
+  });
+  const [captureKind, setCaptureKind] = useState<CaptureKind | null>(() => restored ? m1L1CaptureKindForState(restored.run.state) : null);
   const [permissionKind, setPermissionKind] = useState<CaptureKind | null>(null);
   const [isMicrophonePrepared, setIsMicrophonePrepared] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
@@ -107,7 +116,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
 
   const run = value?.run;
   const lesson = run?.m1L1;
-  const currentPressure = lesson?.coachedBeat === 3 ? lesson.pushbackOne : undefined;
+  const currentPressure = run ? m1L1ReplayPressure(run) : undefined;
   const step = Math.min(lesson?.beat ?? 1, 7);
   const progressLabel = `Step ${step} of 7`;
 
@@ -132,9 +141,15 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
   const beginRecording = useCallback(async (kind: CaptureKind): Promise<void> => {
     if (!value || speech.phase === "speaking" || speech.phase === "generating") return;
     setDraft("");
-    setCaptureKind(kind);
-    await persist(transitionScenarioPracticeRun(value, listeningState(kind), Date.now()));
-    await dictation.start();
+    const started = await dictation.start();
+    if (!started) throw new Error("Microphone capture did not start");
+    try {
+      await persist(transitionScenarioPracticeRun(value, listeningState(kind), Date.now()));
+      setCaptureKind(kind);
+    } catch (error: unknown) {
+      await dictation.cancel();
+      throw error;
+    }
   }, [dictation, persist, speech.phase, value]);
 
   const requestCapture = useCallback(async (kind: CaptureKind): Promise<void> => {
@@ -188,12 +203,14 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
   }, [persist, value]);
 
   const stopRecording = useCallback(async (): Promise<void> => {
-    if (!value || !captureKind || captureTransitionInFlightRef.current) return;
+    const activeCaptureKind = captureKind ?? (value ? m1L1CaptureKindForState(value.run.state) : null);
+    if (!value || !activeCaptureKind || captureTransitionInFlightRef.current) return;
     captureTransitionInFlightRef.current = true;
     try {
-      const text = await dictation.stop(captureKind === "opener" ? "opener" : "reply");
+      const text = await dictation.stop(activeCaptureKind === "opener" ? "opener" : "reply");
       if (text) setDraft(text);
-      await persist(transitionScenarioPracticeRun(value, reviewState(captureKind), Date.now()));
+      setCaptureKind(activeCaptureKind);
+      await persist(transitionScenarioPracticeRun(value, reviewState(activeCaptureKind), Date.now()));
     } catch (error: unknown) {
       safeLog("[m1-l1] recording stop failed", errorShape(error));
       Alert.alert("We couldn’t open transcript review", "Your rehearsal is still saved. Stop again, or leave and return to resume.");
@@ -366,7 +383,8 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
     if (!value || value.run.state !== "replay_pending" || replayTransitionInFlightRef.current) return;
     replayTransitionInFlightRef.current = true;
     try {
-      const confirmed = confirmM1L1PressureReplay(value, "text_fallback_acknowledged", Date.now());
+      const proof = value.run.m1L1?.replayTarget === "top_of_scene" ? "top_of_scene_reset" : "text_fallback_acknowledged";
+      const confirmed = confirmM1L1PressureReplay(value, proof, Date.now());
       if (confirmed === value) return;
       await replaceActiveScenarioRunStrict(confirmed, activeRunRevision(value));
       setValue(confirmed);
@@ -444,10 +462,10 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
         {state === "ready_for_attempt" ? <Reveal><Text style={styles.title}>Open the conversation.</Text><Pressable onPress={() => setIsOpenerHintVisible((current) => !current)} style={styles.hintButton} accessibilityRole="button" accessibilityState={{ expanded: isOpenerHintVisible }}><Text style={styles.hintButtonText}>Need help starting?</Text></Pressable>{isOpenerHintVisible ? <ProductCard style={styles.hintCard}><SectionLabel tone={C.purple}>A way to think about it</SectionLabel><Text style={styles.body}>Describe one thing Adam could have done differently. Then say what you need going forward.</Text></ProductCard> : null}<Capture title="Your opener" kind="opener" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /></Reveal> : null}
         {state === "ready_for_response" && lesson.pushbackOne ? <Capture title="Respond to Pushback 1." kind="response-one" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /> : null}
         {isListening ? dictation.status === "transcribing" ? <Reveal><Text style={styles.title}>Preparing your transcript…</Text><Thinking /><Text style={styles.body}>Your recording has stopped. You’ll approve the wording next.</Text></Reveal> : <Reveal><Text style={styles.title}>Recording this turn.</Text><MicControl state="listening" level={dictation.level} onPress={() => void stopRecording()} glyph={<Square size={24} color={C.onAccent} fill={C.onAccent} />} accessibilityLabel="Done speaking" /><Text style={styles.body}>Stopping does not submit. You approve the transcript next.</Text></Reveal> : null}
-        {isReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve this exact transcript.</Text>{dictation.error ? <Text style={styles.body}>{dictation.error} You can type your wording below.</Text> : null}<TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel="Edit confirmed transcript" /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2} onPress={() => void (captureKind === "opener" ? confirmOpening() : captureKind === "response-one" ? confirmFirstResponse() : confirmRetry())} containerStyle={styles.action} /></Reveal> : null}
+        {isReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve this exact transcript.</Text>{dictation.error ? <Text style={styles.body}>{dictation.error} You can type your wording below.</Text> : null}<TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel="Edit confirmed transcript" /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2} onPress={() => { const kind = captureKind ?? m1L1CaptureKindForState(state); void (kind === "opener" ? confirmOpening() : kind === "response-one" ? confirmFirstResponse() : confirmRetry()); }} containerStyle={styles.action} /></Reveal> : null}
         {state === "hope_coaching" && lesson.coachedBeat ? <Reveal><StatusPill label="Hope · one observed behavior" tone="purple" /><ProductCard accent style={styles.card}><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Exact-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={lesson.coachedBeat === 1 ? "Reset to the top of the scene" : "Replay the exact flagged pressure"} onPress={() => void replayFlaggedMoment(false)} containerStyle={styles.action} /></Reveal> : null}
         {state === "ready_for_retry" ? <Capture title="Retry only the flagged moment." kind="retry" value={draft} onChange={setDraft} onRecord={requestCapture} onType={typeCapture} /> : null}
-        {state === "replay_pending" ? <Reveal><StatusPill label="Replay required" tone="amber" /><Text style={styles.title}>The exact pressure did not finish starting.</Text><Text style={styles.body}>{currentPressure?.text ?? "Return to the top of the scene and retry your opener."}</Text>{currentPressure ? <><PrimaryButton label="Try the exact audio again" onPress={() => void retryPendingReplay()} containerStyle={styles.action} /><Pressable onPress={() => void acknowledgeReplayFallback()} style={styles.secondary}><Text style={styles.secondaryText}>I read the exact pressure — continue</Text></Pressable></> : null}</Reveal> : null}
+        {state === "replay_pending" ? <Reveal><StatusPill label="Replay required" tone="amber" /><Text style={styles.title}>The exact pressure did not finish starting.</Text><Text style={styles.body}>{currentPressure?.text ?? "Return to the top of the scene and retry your opener."}</Text>{currentPressure ? <PrimaryButton label="Try the exact audio again" onPress={() => void retryPendingReplay()} containerStyle={styles.action} /> : null}<Pressable onPress={() => void acknowledgeReplayFallback()} style={styles.secondary}><Text style={styles.secondaryText}>{lesson.replayTarget === "top_of_scene" ? "Reset to the top of the scene" : "I read the exact pressure — continue"}</Text></Pressable></Reveal> : null}
         {state === "attempt_comparison" && run.comparison ? <Reveal><StatusPill label="Final feedback" tone="purple" /><Text style={styles.title}>What changed or held</Text><Text style={styles.body}>{run.comparison.text}</Text>{goodVersion ? <ProductCard accent style={styles.card}><SectionLabel tone={C.purple}>A strong version</SectionLabel><Text style={styles.body}>{goodVersion}</Text></ProductCard> : null}<PrimaryButton label="See my results" onPress={() => onReturnToDeck(run.id)} containerStyle={styles.action} /></Reveal> : null}
         {speech.phase === "failed" ? <PrimaryButton label="Try the same audio again" onPress={() => void replaySpeech().catch((error: unknown) => safeLog("[m1-l1] audio replay failed", errorShape(error)))} containerStyle={styles.action} /> : null}
       </ScrollView>

@@ -36,6 +36,8 @@ import {
   completeM1L1PressureReplay,
   createScenarioPracticeRun,
   initializeM1L1Run,
+  m1L1CaptureKindForState,
+  m1L1ReplayPressure,
   normalizeScenarioPracticeRun,
   preserveM1L1Retry,
   preserveScenarioAttempt,
@@ -98,6 +100,24 @@ class MemoryStorage implements ConvertedProgressStorage {
 }
 
 describe("accepted M1 L1 narrow correction", () => {
+  test("reconstructs capture identity from every durable listening and transcript-review checkpoint", () => {
+    expect(m1L1CaptureKindForState("listening_attempt")).toBe("opener");
+    expect(m1L1CaptureKindForState("confirm_attempt_transcript")).toBe("opener");
+    expect(m1L1CaptureKindForState("listening_response")).toBe("response-one");
+    expect(m1L1CaptureKindForState("confirm_response_transcript")).toBe("response-one");
+    expect(m1L1CaptureKindForState("listening_retry")).toBe("retry");
+    expect(m1L1CaptureKindForState("confirm_retry_transcript")).toBe("retry");
+    expect(m1L1CaptureKindForState("hope_coaching")).toBeNull();
+  });
+
+  test("resolves both supported pressure replay beats instead of stranding beat five", () => {
+    const run = acceptedRun("replay-pressure").run;
+    expect(run.m1L1?.pushbackOne).toBeDefined();
+    expect(run.m1L1?.pushbackTwo).toBeDefined();
+    expect(m1L1ReplayPressure({ ...run, m1L1: { ...run.m1L1!, coachedBeat: 3 } })).toEqual(run.m1L1?.pushbackOne);
+    expect(m1L1ReplayPressure({ ...run, m1L1: { ...run.m1L1!, coachedBeat: 5 } })).toEqual(run.m1L1?.pushbackTwo);
+    expect(m1L1ReplayPressure({ ...run, m1L1: { ...run.m1L1!, coachedBeat: 1 } })).toBeUndefined();
+  });
   test("uses the accepted identity, work context, no invented duration, and remains development-only", () => {
     expect(M1_L1_CONVERSION.moduleId).toBe("bysi_m01_get_to_the_point");
     expect(M1_L1_CONVERSION.practiceId).toBe("bysi_m01_l01_buried_point");

@@ -28,6 +28,23 @@ export interface PersistedScenarioPracticeRun {
   run: PilotDayRun;
 }
 
+export type M1L1CaptureKind = "opener" | "response-one" | "retry";
+
+/** Reconstructs ephemeral capture identity from a durable M1 L1 checkpoint. */
+export function m1L1CaptureKindForState(state: PilotModuleState): M1L1CaptureKind | null {
+  if (state === "listening_attempt" || state === "confirm_attempt_transcript") return "opener";
+  if (state === "listening_response" || state === "confirm_response_transcript") return "response-one";
+  if (state === "listening_retry" || state === "confirm_retry_transcript") return "retry";
+  return null;
+}
+
+/** Returns the exact persisted pressure selected for replay by the coached beat. */
+export function m1L1ReplayPressure(run: PilotDayRun): ScenarioCounterpartTurn | undefined {
+  if (run.m1L1?.coachedBeat === 3) return run.m1L1.pushbackOne;
+  if (run.m1L1?.coachedBeat === 5) return run.m1L1.pushbackTwo;
+  return undefined;
+}
+
 export interface ScenarioCounterpartPresentation {
   name: string;
   role: string;

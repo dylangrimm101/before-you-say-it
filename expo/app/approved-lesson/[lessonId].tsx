@@ -386,6 +386,13 @@ export default function ApprovedLessonDeckScreen() {
     return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
   }
   if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to the internal lesson catalog and choose another deck." />;
+  if (isReturning && !hasValidReturn) {
+    return <Unavailable
+      title="We couldn’t verify that rehearsal result."
+      body="The saved rehearsal does not match this lesson result. Return to the rehearsal and complete the retry again."
+      onRetry={() => rehearsalConfig && router.replace({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: rehearsalConfig.lessonId } })}
+    />;
+  }
   if (isReturning && hasValidReturn && indexImpact && strongVersion && returningRun?.responseAttempt && returningRun.retryAttempt && returningRun.comparison) {
     return <LessonCompletionScreen
       impact={indexImpact}
