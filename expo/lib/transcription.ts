@@ -7,6 +7,7 @@ export type TranscriptionTurn = "opener" | "reply";
 const CONFIGURED_ENDPOINT = process.env.EXPO_PUBLIC_TRANSCRIBE_ENDPOINT?.trim() ?? "";
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") ?? "";
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const TRANSCRIPTION_TIMEOUT_MS = 15_000;
 
 /** Public endpoint URL only; transcription provider credentials remain server-side. */
 export const TRANSCRIBE_ENDPOINT = CONFIGURED_ENDPOINT || (
@@ -72,11 +73,22 @@ export async function transcribeRecording(
     provider: "supabase-openai-transcription",
     turn,
   });
-  const response = await fetch(TRANSCRIBE_ENDPOINT, {
-    method: "POST",
-    headers: requestHeaders(),
-    body,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TRANSCRIPTION_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(TRANSCRIBE_ENDPOINT, {
+      method: "POST",
+      headers: requestHeaders(),
+      body,
+      signal: controller.signal,
+    });
+  } catch (error: unknown) {
+    if (controller.signal.aborted) throw new TranscriptionUnavailableError(408);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   safeLog("[evidence] native transcription response", {
     endpoint: evidenceEndpoint(TRANSCRIBE_ENDPOINT),
     ok: response.ok,

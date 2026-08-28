@@ -13,6 +13,9 @@ describe("server-side recording transcription", () => {
     expect(client).toContain("nativeAudio as unknown as Blob");
     expect(client).not.toContain("EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY");
     expect(client).not.toContain("transcription-model");
+    expect(client).toContain("TRANSCRIPTION_TIMEOUT_MS");
+    expect(client).toContain("signal: controller.signal");
+    expect(client).toContain("new TranscriptionUnavailableError(408)");
   });
 
   test("keeps the provider credential and provider request on the server", async () => {

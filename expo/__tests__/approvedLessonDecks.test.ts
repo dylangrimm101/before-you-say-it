@@ -371,6 +371,8 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(m1L1Runtime).toContain("replayTransitionInFlightRef.current");
     expect(m1L1Runtime).toContain("recording start failed");
     expect(m1L1Runtime).toContain("recording stop failed");
+    expect(m1L1Runtime).toContain("Preparing your transcript…");
+    expect(m1L1Runtime).toContain("Your recording has stopped. You’ll approve the wording next.");
     expect(m1L1Runtime).toContain("flagged replay failed");
     expect(m1L1Runtime).not.toContain("void persist(coached);");
     expect(m1L1Runtime).not.toContain("void unlockAudioPlayback();");

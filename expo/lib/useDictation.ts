@@ -21,6 +21,7 @@ import {
 export type DictationStatus = "idle" | "recording" | "transcribing" | "denied" | "error";
 
 let retryDetachedCleanup: (() => Promise<void>) | null = null;
+const WEB_RECORDER_STOP_TIMEOUT_MS = 1_500;
 
 const NATIVE_RECORDING_OPTIONS = {
   ...RecordingPresets.HIGH_QUALITY,
@@ -373,9 +374,25 @@ function preferredWebMimeType(): string {
 function stopWebRecorder(recorder: MediaRecorder): Promise<void> {
   if (recorder.state === "inactive") return Promise.resolve();
   return new Promise<void>((resolve, reject) => {
-    recorder.onstop = (): void => resolve();
-    recorder.onerror = (): void => reject(new Error("Browser microphone recorder failed"));
-    recorder.stop();
+    let isSettled = false;
+    const settle = (error?: Error): void => {
+      if (isSettled) return;
+      isSettled = true;
+      clearTimeout(timeout);
+      if (error) reject(error);
+      else resolve();
+    };
+    const timeout = setTimeout(() => {
+      if (recorder.state === "inactive") settle();
+      else settle(new Error("Browser microphone recorder did not stop"));
+    }, WEB_RECORDER_STOP_TIMEOUT_MS);
+    recorder.onstop = (): void => settle();
+    recorder.onerror = (): void => settle(new Error("Browser microphone recorder failed"));
+    try {
+      recorder.stop();
+    } catch (error: unknown) {
+      settle(error instanceof Error ? error : new Error("Browser microphone recorder failed"));
+    }
   });
 }
 

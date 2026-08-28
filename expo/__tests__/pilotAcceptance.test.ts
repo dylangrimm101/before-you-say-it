@@ -156,6 +156,8 @@ describe("required exercised curriculum paths", () => {
     expect(dictation).toContain("navigator.mediaDevices.getUserMedia({ audio: true })");
     expect(dictation).toContain("new MediaRecorder(stream");
     expect(dictation).toContain("await stopWebRecorder(webRecorder)");
+    expect(dictation).toContain("WEB_RECORDER_STOP_TIMEOUT_MS");
+    expect(dictation).toContain('recorder.state === "inactive"');
     expect(dictation).toContain("webStreamRef.current?.getTracks().forEach");
     expect(dictation).toContain("transcribeRecording(uri, mediaType, turn)");
     expect(dictation).not.toContain("readAudioPayload");
