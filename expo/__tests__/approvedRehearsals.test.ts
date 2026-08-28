@@ -20,7 +20,10 @@ describe("approved M1 L2-L5 rehearsals", () => {
     const l4 = approvedRehearsalConfig("m1-l4")!;
     const l5 = approvedRehearsalConfig("m1-l5")!;
 
-    expect(l2.scenario.situation).toContain("Wednesday, end of day");
+    expect(l2.contentVersion).toBe("m1-l2-approved-2026-08-28");
+    expect(l2.scenario.situation).toBe(
+      "Wednesday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi points out that the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file was also late, another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.",
+    );
     expect(l2.authoredPressureText).toBe("Okay, but that's still one example. What else are you basing this on?");
     expect(l2.namedMove).toBe("One anchor. The rest stays in the folder.");
     expect([l2.rehearsalHandoffCard, l2.returnCard, l2.completionCard]).toEqual([20, 21, 22]);
