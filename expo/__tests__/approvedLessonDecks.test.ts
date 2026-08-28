@@ -370,7 +370,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect((rehearsalConfigs.match(/lessonId: "m[12]-l[1-5]"/g) ?? [])).toHaveLength(9);
     expect(dictation).toContain("WEB_RECORDER_STOP_TIMEOUT_MS = 1_500");
     expect(dictation).toContain("await stopWebRecorder(webRecorder)");
-    expect(transcription).toContain("TRANSCRIPTION_TIMEOUT_MS = 15_000");
+    expect(transcription).toContain("TRANSCRIPTION_TIMEOUT_MS = 45_000");
     expect(transcription).toContain("signal: controller.signal");
     for (const runtime of [m1L1Runtime, sharedRuntime]) {
       expect(runtime).toContain("Preparing your transcript…");

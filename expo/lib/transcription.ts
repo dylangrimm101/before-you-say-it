@@ -7,7 +7,7 @@ export type TranscriptionTurn = "opener" | "reply";
 const CONFIGURED_ENDPOINT = process.env.EXPO_PUBLIC_TRANSCRIBE_ENDPOINT?.trim() ?? "";
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/$/, "") ?? "";
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
-const TRANSCRIPTION_TIMEOUT_MS = 15_000;
+const TRANSCRIPTION_TIMEOUT_MS = 45_000;
 
 /** Public endpoint URL only; transcription provider credentials remain server-side. */
 export const TRANSCRIBE_ENDPOINT = CONFIGURED_ENDPOINT || (
