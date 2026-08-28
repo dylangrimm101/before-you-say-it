@@ -121,10 +121,16 @@ describe("approved Modules 1 and 2 internal deck port", () => {
       expect(reactIndex).toBeGreaterThan(-1);
       expect(reactDomIndex).toBeGreaterThan(reactIndex);
       expect(page).toContain("class Component extends DCLogic");
-      expect(page).toContain('post("deck-ready")');
-      expect(page).toContain('post("deck-render-error")');
+      expect(page).toContain('post("deck-ready", runtimeFailure || "none")');
+      expect(page).toContain('post("deck-render-error", runtimeFailure || "mount-timeout")');
       expect(page).toContain('window.addEventListener("error"');
+      expect(page).toContain('runtimeFailure = "javascript-error"');
       expect(page).toContain('window.addEventListener("unhandledrejection"');
+      expect(page).toContain('runtimeFailure = "unhandled-rejection"');
+      expect(page).toContain('attempts >= 120');
+      expect(page).toContain('post("deck-render-error", runtimeFailure || "mount-timeout")');
+      expect(page).not.toContain('window.addEventListener("error", function () { post("deck-render-error")');
+      expect(page).not.toContain('window.addEventListener("unhandledrejection", function () { post("deck-render-error")');
       expect(page).toContain("document.querySelector('[data-bysi=\"deck\"]')");
       expect(page).toContain('id="bysi-native-deck-shell"');
       expect(page).not.toContain("__bundler_loading");

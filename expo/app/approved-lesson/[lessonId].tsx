@@ -245,14 +245,16 @@ export default function ApprovedLessonDeckScreen() {
   }, [rehearsalConfig, resetNotice, undoConvertedLessonReset]);
 
   const handleDeckMessage = useCallback(async (raw: string): Promise<void> => {
-    let message: { type?: unknown; label?: unknown; runId?: unknown };
+    let message: { type?: unknown; label?: unknown; runId?: unknown; category?: unknown };
     try {
-      message = JSON.parse(raw) as { type?: unknown; label?: unknown; runId?: unknown };
+      message = JSON.parse(raw) as { type?: unknown; label?: unknown; runId?: unknown; category?: unknown };
     } catch {
       return;
     }
     if (message.type === "deck-render-error") {
-      safeLog("[approved-lessons] deck runtime did not mount", { lessonId: lesson?.id ?? "unknown" });
+      safeLog("[approved-lessons] deck runtime did not mount", {
+        category: typeof message.category === "string" ? message.category : "unknown",
+      });
       setLoadError(true);
       return;
     }

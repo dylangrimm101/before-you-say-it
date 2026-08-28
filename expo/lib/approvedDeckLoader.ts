@@ -133,22 +133,23 @@ function orderedExternalResources(resources: ExternalResource[]): ExternalResour
 const DECK_RUNTIME_MONITOR = `<script>
 (function () {
   var finished = false;
-  function post(type) {
+  var runtimeFailure = null;
+  function post(type, category) {
     if (finished || !window.ReactNativeWebView) return;
     finished = true;
-    window.ReactNativeWebView.postMessage(JSON.stringify({ type: type }));
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: type, category: category || "none" }));
   }
-  window.addEventListener("error", function () { post("deck-render-error"); });
-  window.addEventListener("unhandledrejection", function () { post("deck-render-error"); });
+  window.addEventListener("error", function () { runtimeFailure = "javascript-error"; });
+  window.addEventListener("unhandledrejection", function () { runtimeFailure = "unhandled-rejection"; });
   var attempts = 0;
   function verifyMount() {
     if (document.querySelector('[data-bysi="deck"]')) {
-      post("deck-ready");
+      post("deck-ready", runtimeFailure || "none");
       return;
     }
     attempts += 1;
-    if (attempts >= 40) {
-      post("deck-render-error");
+    if (attempts >= 120) {
+      post("deck-render-error", runtimeFailure || "mount-timeout");
       return;
     }
     window.setTimeout(verifyMount, 100);
