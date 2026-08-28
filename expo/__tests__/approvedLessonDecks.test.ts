@@ -360,6 +360,27 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(secondPaint).toBeLessThan(secondPlay);
   });
 
+  test("bounds Stop and opens transcript review safely across every interactive approved lesson", async () => {
+    const sharedRuntime = await source("components/ScenarioPaidPractice.tsx");
+    const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
+    const dictation = await source("lib/useDictation.ts");
+    const transcription = await source("lib/transcription.ts");
+    const rehearsalConfigs = await source("lib/approvedRehearsals.ts");
+
+    expect((rehearsalConfigs.match(/lessonId: "m[12]-l[1-5]"/g) ?? [])).toHaveLength(9);
+    expect(dictation).toContain("WEB_RECORDER_STOP_TIMEOUT_MS = 1_500");
+    expect(dictation).toContain("await stopWebRecorder(webRecorder)");
+    expect(transcription).toContain("TRANSCRIPTION_TIMEOUT_MS = 15_000");
+    expect(transcription).toContain("signal: controller.signal");
+    for (const runtime of [m1L1Runtime, sharedRuntime]) {
+      expect(runtime).toContain("Preparing your transcript…");
+      expect(runtime).toContain("Your recording has stopped. You’ll approve the wording next.");
+      expect(runtime).toContain("recording stop failed");
+      expect(runtime).toContain("captureTransitionInFlightRef.current");
+      expect(runtime).toContain("confirm_retry_transcript");
+    }
+  });
+
   test("serializes typed transcript approvals and catches stale-write protection without a developer error toast", async () => {
     const m1L1Runtime = await source("components/M1L1PaidPractice.tsx");
     expect(m1L1Runtime).toContain("approvalInFlightRef.current");
