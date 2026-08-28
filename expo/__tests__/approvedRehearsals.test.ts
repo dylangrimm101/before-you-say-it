@@ -20,7 +20,7 @@ describe("approved M1 L2-L5 rehearsals", () => {
     const l4 = approvedRehearsalConfig("m1-l4")!;
     const l5 = approvedRehearsalConfig("m1-l5")!;
 
-    expect(l2.contentVersion).toBe("m1-l2-dynamic-coaching-v2-2026-08-28");
+    expect(l2.contentVersion).toBe("m1-l2-two-pressure-coaching-v3-2026-08-28");
     expect(l2.scenario.situation).toBe(
       "Wednesday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi points out that the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file was also late, another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.",
     );
@@ -28,7 +28,7 @@ describe("approved M1 L2-L5 rehearsals", () => {
     expect(l2.namedMove).toBe("One anchor. The rest stays in the folder.");
     expect([l2.rehearsalHandoffCard, l2.returnCard, l2.completionCard]).toEqual([20, 21, 22]);
 
-    expect(l3.contentVersion).toBe("m1-l3-dynamic-coaching-v2-2026-08-28");
+    expect(l3.contentVersion).toBe("m1-l3-two-pressure-coaching-v3-2026-08-28");
     expect(l3.scenario.counterpart).toBe("Renee — your sister");
     expect(l3.scenario.situation).toBe(
       "Sunday evening, you’re on the phone with Renee, your sister. Dad’s March appointments still need to be divided between you. You handled the last four appointments, and you want to decide who will take which March appointments before you hang up, so nothing is left until the last minute.\n\nRenee has been handling more of the regular check-in calls with Dad, and she’s frustrated that you haven’t been calling him as often.",
@@ -65,7 +65,7 @@ describe("approved M1 L2-L5 rehearsals", () => {
     });
   });
 
-  test("accepts completion only for the exact run, manifest, counterpart, and persisted dynamic pressure", () => {
+  test("rejects legacy one-pressure completion even when its old identity fields match", () => {
     const config = approvedRehearsalConfig("m1-l4")!;
     const wrapper = createScenarioPracticeRun(config.scenario, "steady", "defensive", "run-l4", 1);
     const run: PilotDayRun = {
@@ -94,7 +94,7 @@ describe("approved M1 L2-L5 rehearsals", () => {
       state: "attempt_comparison",
       updatedAt: 5,
     };
-    expect(validateApprovedRehearsalCompletion(config, run, "run-l4")).toBe(true);
+    expect(validateApprovedRehearsalCompletion(config, run, "run-l4")).toBe(false);
     expect(validateApprovedRehearsalCompletion(config, { ...run, counterpartTurn: { ...run.counterpartTurn!, id: "different-turn" } }, "run-l4")).toBe(false);
     expect(validateApprovedRehearsalCompletion(config, run, "other-run")).toBe(false);
   });
@@ -170,7 +170,7 @@ describe("approved M2 L1-L5 rehearsals", () => {
     }
   });
 
-  test("accepts a Module 2 return only for the exact run and dynamic manifest", () => {
+  test("rejects a Module 2 legacy run without the second pressure and replay proof", () => {
     const config = approvedRehearsalConfig("m2-l3")!;
     const wrapper = createScenarioPracticeRun(config.scenario, "steady", "defensive", "run-m2-l3", 1);
     const run: PilotDayRun = {
@@ -200,7 +200,7 @@ describe("approved M2 L1-L5 rehearsals", () => {
       updatedAt: 5,
     };
 
-    expect(validateApprovedRehearsalCompletion(config, run, "run-m2-l3")).toBe(true);
+    expect(validateApprovedRehearsalCompletion(config, run, "run-m2-l3")).toBe(false);
     expect(validateApprovedRehearsalCompletion(config, { ...run, convertedModuleId: "bysi_m01_get_to_the_point" }, "run-m2-l3")).toBe(false);
     expect(validateApprovedRehearsalCompletion(config, { ...run, counterpartIdentity: "different" }, "run-m2-l3")).toBe(false);
     expect(validateApprovedRehearsalCompletion(config, run, "other-run")).toBe(false);

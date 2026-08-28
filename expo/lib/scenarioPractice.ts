@@ -188,9 +188,9 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
   if (run.coachingObservation !== undefined) {
     if (!run.coachingObservation || typeof run.coachingObservation !== "object") return null;
     const observation = run.coachingObservation as Record<string, unknown>;
-    if (observation.coachedBeat !== 3 || !nonEmpty(observation.selectedDimension) || !["met", "not_met"].includes(String(observation.status)) || !nonEmpty(observation.evidenceQuote)) return null;
+    if (![1, 3, 5].includes(observation.coachedBeat as number) || !nonEmpty(observation.selectedDimension) || !["met", "not_met"].includes(String(observation.status)) || !nonEmpty(observation.evidenceQuote)) return null;
     canonicalRun.coachingObservation = {
-      coachedBeat: 3,
+      coachedBeat: observation.coachedBeat as 1 | 3 | 5,
       selectedDimension: observation.selectedDimension,
       status: observation.status as PilotCoachingObservation["status"],
       evidenceQuote: observation.evidenceQuote,
@@ -202,6 +202,47 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
     const comparison = run.comparison as Record<string, unknown>;
     if (!nonEmpty(comparison.behaviorId) || !nonEmpty(comparison.text) || typeof comparison.criterionChanged !== "boolean") return null;
     canonicalRun.comparison = { behaviorId: comparison.behaviorId as PilotBehaviorId, text: comparison.text, criterionChanged: comparison.criterionChanged };
+  }
+  if (run.approvedRehearsal !== undefined) {
+    if (!run.approvedRehearsal || typeof run.approvedRehearsal !== "object") return null;
+    const item = run.approvedRehearsal as Record<string, unknown>;
+    if (!Number.isSafeInteger(item.beat) || (item.beat as number) < 1 || (item.beat as number) > 7 || ![0, 1].includes(item.retryCount as number)) return null;
+    const pushbackOne = item.pushbackOne === undefined ? undefined : counterpartTurn(item.pushbackOne);
+    const pushbackTwo = item.pushbackTwo === undefined ? undefined : counterpartTurn(item.pushbackTwo);
+    const second = item.secondResponseAttempt === undefined ? undefined : attempt(item.secondResponseAttempt, "response", `${String(run.id)}-approved-response-2`);
+    if (pushbackOne === null || pushbackTwo === null || second === null) return null;
+    if (item.coachedBeat !== undefined && ![1, 3, 5].includes(item.coachedBeat as number)) return null;
+    if (item.selectedDimension !== undefined && !nonEmpty(item.selectedDimension)) return null;
+    if (item.replayTarget !== undefined && !["top_of_scene", "pushback_one", "pushback_two"].includes(String(item.replayTarget))) return null;
+    if (item.replayProof !== undefined && !["playback_completed", "text_fallback_acknowledged", "top_of_scene_reset"].includes(String(item.replayProof))) return null;
+    if (["replayRequestedAt", "replayCompletedAt"].some((key) => item[key] !== undefined && !timestamp(item[key]))) return null;
+    if (item.replayAudioId !== undefined && !nonEmpty(item.replayAudioId)) return null;
+    const lesson: NonNullable<PilotDayRun["approvedRehearsal"]> = {
+      beat: item.beat as NonNullable<PilotDayRun["approvedRehearsal"]>["beat"],
+      retryCount: item.retryCount as 0 | 1,
+      ...(pushbackOne ? { pushbackOne } : {}),
+      ...(pushbackTwo ? { pushbackTwo } : {}),
+      ...(second ? { secondResponseAttempt: second } : {}),
+      ...(item.coachedBeat !== undefined ? { coachedBeat: item.coachedBeat as 1 | 3 | 5 } : {}),
+      ...(nonEmpty(item.selectedDimension) ? { selectedDimension: item.selectedDimension } : {}),
+      ...(item.replayTarget ? { replayTarget: item.replayTarget as NonNullable<PilotDayRun["approvedRehearsal"]>["replayTarget"] } : {}),
+      ...(item.replayRequestedAt !== undefined ? { replayRequestedAt: item.replayRequestedAt as number } : {}),
+      ...(nonEmpty(item.replayAudioId) ? { replayAudioId: item.replayAudioId } : {}),
+      ...(item.replayProof ? { replayProof: item.replayProof as NonNullable<PilotDayRun["approvedRehearsal"]>["replayProof"] } : {}),
+      ...(item.replayCompletedAt !== undefined ? { replayCompletedAt: item.replayCompletedAt as number } : {}),
+    };
+    if ((pushbackOne || pushbackTwo || second) && !opener) return null;
+    if (pushbackTwo && (!pushbackOne || !response)) return null;
+    if (second && !pushbackTwo) return null;
+    if (pushbackOne && (pushbackOne.authoredAt ?? 0) <= (opener?.confirmedAt ?? 0)) return null;
+    if (pushbackTwo && ((pushbackOne?.authoredAt ?? 0) >= (response?.confirmedAt ?? 0) || (pushbackTwo.authoredAt ?? 0) <= (response?.confirmedAt ?? 0))) return null;
+    if (second && (pushbackTwo?.authoredAt ?? 0) >= second.confirmedAt) return null;
+    const hasReplayRequest = Boolean(lesson.replayTarget && lesson.replayRequestedAt && lesson.replayAudioId);
+    const hasReplayCompletion = Boolean(lesson.replayProof && lesson.replayCompletedAt);
+    if ((lesson.replayTarget || lesson.replayRequestedAt || lesson.replayAudioId) && !hasReplayRequest) return null;
+    if ((lesson.replayProof || lesson.replayCompletedAt) && !hasReplayCompletion) return null;
+    if (run.state === "replay_pending" && (!hasReplayRequest || hasReplayCompletion)) return null;
+    canonicalRun.approvedRehearsal = lesson;
   }
   if (run.m1L1 !== undefined) {
     if (!run.m1L1 || typeof run.m1L1 !== "object") return null;
@@ -318,7 +359,90 @@ export function attachScenarioCounterpartTurn(
   return { ...value, run: { ...value.run, counterpartTurn: turn, adamReactionId: turn.id, adamAudioId: turn.id, updatedAt: now } };
 }
 
-/** Stores Hope's evidence-linked note without changing scenario identity. */
+/** Initializes the reusable two-pressure approved-lesson exchange. */
+export function initializeApprovedRehearsalRun(value: PersistedScenarioPracticeRun, now: number): PersistedScenarioPracticeRun {
+  if (value.run.approvedRehearsal) return value;
+  return { ...value, run: { ...value.run, approvedRehearsal: { beat: 1, retryCount: 0 }, updatedAt: Math.max(now, value.run.updatedAt) } };
+}
+
+export function approvedRehearsalReplayPressure(run: PilotDayRun): ScenarioCounterpartTurn | undefined {
+  if (run.approvedRehearsal?.coachedBeat === 3) return run.approvedRehearsal.pushbackOne;
+  if (run.approvedRehearsal?.coachedBeat === 5) return run.approvedRehearsal.pushbackTwo;
+  return undefined;
+}
+
+export function attachApprovedRehearsalPushbackOne(value: PersistedScenarioPracticeRun, turn: ScenarioCounterpartTurn, now: number): PersistedScenarioPracticeRun {
+  const lesson = value.run.approvedRehearsal;
+  if (!lesson || lesson.pushbackOne || !value.run.attempt) return value;
+  const authoredAt = Math.max(now, value.run.attempt.confirmedAt + 1);
+  const pressure = { ...turn, authoredAt };
+  return { ...value, run: { ...value.run, counterpartTurn: pressure, approvedRehearsal: { ...lesson, beat: 2, pushbackOne: pressure }, updatedAt: authoredAt } };
+}
+
+export function advanceApprovedRehearsalFirstResponse(value: PersistedScenarioPracticeRun, now: number): PersistedScenarioPracticeRun {
+  const lesson = value.run.approvedRehearsal;
+  if (!lesson?.pushbackOne || !value.run.responseAttempt) return value;
+  const updatedAt = Math.max(now, value.run.updatedAt + 1);
+  return { ...value, run: { ...value.run, state: "ready_for_second_pressure", approvedRehearsal: { ...lesson, beat: 3 }, updatedAt } };
+}
+
+export function attachApprovedRehearsalPushbackTwo(value: PersistedScenarioPracticeRun, turn: ScenarioCounterpartTurn, now: number): PersistedScenarioPracticeRun {
+  const lesson = value.run.approvedRehearsal;
+  if (!lesson?.pushbackOne || lesson.pushbackTwo || !value.run.responseAttempt) return value;
+  const authoredAt = Math.max(now, value.run.responseAttempt.confirmedAt + 1);
+  const pressure = { ...turn, authoredAt };
+  return { ...value, run: { ...value.run, state: "ready_for_second_response", approvedRehearsal: { ...lesson, beat: 4, pushbackTwo: pressure }, updatedAt: authoredAt } };
+}
+
+export function preserveApprovedRehearsalSecondResponse(value: PersistedScenarioPracticeRun, transcript: string, now: number): PersistedScenarioPracticeRun {
+  const lesson = value.run.approvedRehearsal;
+  const clean = transcript.trim();
+  if (!lesson?.pushbackTwo || lesson.secondResponseAttempt || clean.length < 2) return value;
+  const confirmedAt = Math.max(now, (lesson.pushbackTwo.authoredAt ?? now) + 1);
+  const secondResponseAttempt = { id: `${value.run.id}-approved-response-2`, kind: "response" as const, transcript: clean, representation: "confirmed_transcript" as const, confirmedAt };
+  return { ...value, run: { ...value.run, approvedRehearsal: { ...lesson, beat: 5, secondResponseAttempt }, updatedAt: confirmedAt } };
+}
+
+export function attachApprovedRehearsalCoaching(value: PersistedScenarioPracticeRun, note: string, retryInstruction: string, behaviorId: PilotBehaviorId, observation: PilotCoachingObservation, now: number): PersistedScenarioPracticeRun {
+  const lesson = value.run.approvedRehearsal;
+  if (!lesson?.secondResponseAttempt) return value;
+  const updatedAt = Math.max(now, value.run.updatedAt + 1);
+  return { ...value, run: { ...value.run, state: "hope_coaching", coachNote: note, retryInstruction, coachedBehaviorId: behaviorId, coachedSegment: observation.coachedBeat === 1 ? "opener" : "pushback_response", coachingObservation: observation, approvedRehearsal: { ...lesson, coachedBeat: observation.coachedBeat, selectedDimension: observation.selectedDimension }, updatedAt } };
+}
+
+export function stageApprovedRehearsalReplay(value: PersistedScenarioPracticeRun, now: number): PersistedScenarioPracticeRun {
+  const lesson = value.run.approvedRehearsal;
+  if (value.run.state !== "hope_coaching" || !lesson?.coachedBeat || !lesson.selectedDimension) return value;
+  const replayTarget = lesson.coachedBeat === 1 ? "top_of_scene" : lesson.coachedBeat === 3 ? "pushback_one" : "pushback_two";
+  const pressure = replayTarget === "pushback_one" ? lesson.pushbackOne : replayTarget === "pushback_two" ? lesson.pushbackTwo : undefined;
+  const replayAudioId = replayTarget === "top_of_scene" ? `top-of-scene:${value.run.id}` : pressure?.resolvedAudioId;
+  if (!replayAudioId) return value;
+  const replayRequestedAt = Math.max(now, value.run.updatedAt + 1);
+  return { ...value, run: { ...value.run, state: "replay_pending", approvedRehearsal: { ...lesson, beat: 6, replayTarget, replayAudioId, replayRequestedAt, replayProof: undefined, replayCompletedAt: undefined }, updatedAt: replayRequestedAt } };
+}
+
+export function confirmApprovedRehearsalReplay(value: PersistedScenarioPracticeRun, proof: NonNullable<NonNullable<PilotDayRun["approvedRehearsal"]>["replayProof"]>, now: number): PersistedScenarioPracticeRun {
+  const lesson = value.run.approvedRehearsal;
+  if (value.run.state !== "replay_pending" || !lesson?.replayTarget || !lesson.replayAudioId || !lesson.replayRequestedAt) return value;
+  if (lesson.replayTarget === "top_of_scene" ? proof !== "top_of_scene_reset" : proof === "top_of_scene_reset") return value;
+  const replayCompletedAt = Math.max(now, value.run.updatedAt + 1);
+  return { ...value, run: { ...value.run, state: "ready_for_retry", approvedRehearsal: { ...lesson, replayProof: proof, replayCompletedAt }, updatedAt: replayCompletedAt } };
+}
+
+export async function completeApprovedRehearsalReplay(value: PersistedScenarioPracticeRun, playToCompletion: () => Promise<"completed" | "interrupted" | "failed" | "blocked" | "empty" | "muted">, now: number = Date.now()): Promise<PersistedScenarioPracticeRun> {
+  if (value.run.state !== "replay_pending") return value;
+  const outcome = await playToCompletion();
+  return outcome === "completed" ? confirmApprovedRehearsalReplay(value, "playback_completed", now) : value;
+}
+
+export function preserveApprovedRehearsalRetry(value: PersistedScenarioPracticeRun, transcript: string, now: number): PersistedScenarioPracticeRun {
+  const lesson = value.run.approvedRehearsal;
+  if (!lesson?.replayProof || !lesson.replayCompletedAt || lesson.retryCount >= 1) return value;
+  const preserved = preserveScenarioAttempt(value, "retry", transcript, Math.max(now, value.run.updatedAt + 1));
+  if (!preserved.run.retryAttempt) return value;
+  return { ...preserved, run: { ...preserved.run, approvedRehearsal: { ...lesson, beat: 7, retryCount: 1 } } };
+}
+
 /** Initializes the isolated accepted M1 L1 seven-step state. */
 export function initializeM1L1Run(value: PersistedScenarioPracticeRun, now: number): PersistedScenarioPracticeRun {
   if (value.run.m1L1) return value;
@@ -508,11 +632,17 @@ export function completeScenarioComparison(
   const { run } = value;
   if (!run.counterpartTurn || !run.responseAttempt || !run.retryAttempt) return value;
   const behavior = run.coachedBehaviorId ?? "pushback_response";
+  const coachedOriginal = run.coachingObservation?.coachedBeat === 1
+    ? run.attempt?.transcript
+    : run.coachingObservation?.coachedBeat === 5
+      ? run.approvedRehearsal?.secondResponseAttempt?.transcript
+      : run.responseAttempt.transcript;
+  if (!coachedOriginal) return value;
   return {
     ...value,
     run: {
       ...transitionPilotRun(run, "attempt_comparison", now),
-      comparison: comparePilotAttempts(behavior, run.responseAttempt.transcript, run.retryAttempt.transcript),
+      comparison: comparePilotAttempts(behavior, coachedOriginal, run.retryAttempt.transcript),
     },
   };
 }
@@ -522,7 +652,9 @@ export function scenarioPracticePresentation(value: unknown): ScenarioPracticePr
   const normalized = normalizeScenarioPracticeRun(value);
   if (!normalized) return UNAVAILABLE_PRESENTATION;
   const context = normalized.run.scenarioContext;
-  const pressure = normalized.run.counterpartTurn;
+  const pressure = normalized.run.approvedRehearsal?.coachedBeat
+    ? approvedRehearsalReplayPressure(normalized.run)
+    : normalized.run.counterpartTurn;
   if (!context || !pressure) return { isAvailable: true };
   const continuityLabel = "Same pressure moment" as const;
   return {
@@ -553,7 +685,10 @@ export function scenarioContinuitySnapshot(value: PersistedScenarioPracticeRun):
     counterpartRole: context?.counterpartRole,
     counterpartTurnId: run.counterpartTurn?.id,
     counterpartTurnText: run.counterpartTurn?.text,
+    secondCounterpartTurnId: run.approvedRehearsal?.pushbackTwo?.id,
+    secondCounterpartTurnText: run.approvedRehearsal?.pushbackTwo?.text,
     firstApprovedResponse: run.responseAttempt?.transcript,
+    secondApprovedResponse: run.approvedRehearsal?.secondResponseAttempt?.transcript,
     retryApprovedResponse: run.m1L1?.finalRetryAttempt?.transcript ?? run.retryAttempt?.transcript,
   };
 }

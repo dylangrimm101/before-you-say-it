@@ -11,18 +11,28 @@ import { DIFFICULTY } from "@/constants/scenarios";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import { generateApprovedRehearsalDynamicReply, generateDebrief, nextCounterpartTurn } from "@/lib/ai";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
-import { m1L1CoachNote, m1L1Comparison, type ConvertedLessonConfig } from "@/lib/convertedLesson";
+import type { ConvertedLessonConfig } from "@/lib/convertedLesson";
 import {
-  approvedRehearsalCoachNote,
+  approvedRehearsalCoachExchange,
   approvedRehearsalComparison,
   type ApprovedRehearsalConfig,
 } from "@/lib/approvedRehearsals";
 import {
+  advanceApprovedRehearsalFirstResponse,
+  approvedRehearsalReplayPressure,
+  attachApprovedRehearsalCoaching,
+  attachApprovedRehearsalPushbackOne,
+  attachApprovedRehearsalPushbackTwo,
   attachScenarioCoaching,
   attachScenarioCounterpartTurn,
+  completeApprovedRehearsalReplay,
   completeScenarioComparison,
+  confirmApprovedRehearsalReplay,
+  preserveApprovedRehearsalRetry,
+  preserveApprovedRehearsalSecondResponse,
   preserveScenarioAttempt,
   scenarioPracticePresentation,
+  stageApprovedRehearsalReplay,
   scenarioRunForRoute,
   transitionScenarioPracticeRun,
   type PersistedScenarioPracticeRun,
@@ -32,7 +42,7 @@ import { errorShape, safeLog } from "@/lib/redact";
 import { playSharedScenarioPressure } from "@/lib/scenarioAudio";
 import { leaveAfterStrictDictationCleanup } from "@/lib/temporaryRecording";
 import { useDictation } from "@/lib/useDictation";
-import { replaySpeech, resetSpeech, speakPilotAudio, useSpeech } from "@/lib/voice";
+import { replaySpeech, resetSpeech, speakPilotAudio, speakPilotAudioToCompletion, useSpeech } from "@/lib/voice";
 import { useStore } from "@/providers/store";
 import type { Scenario, Turn } from "@/types/convo";
 import { SESSION_SCHEMA_VERSION, type SessionRecord } from "@/types/privacy";
@@ -71,6 +81,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     const seeded = restored?.run;
     if (seeded?.state === "confirm_attempt_transcript") return seeded.attempt?.transcript ?? "";
     if (seeded?.state === "confirm_response_transcript") return seeded.responseAttempt?.transcript ?? "";
+    if (seeded?.state === "confirm_second_response_transcript") return seeded.approvedRehearsal?.secondResponseAttempt?.transcript ?? "";
     if (seeded?.state === "confirm_retry_transcript") return seeded.retryAttempt?.transcript ?? "";
     return "";
   });
@@ -82,7 +93,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
   const discardInFlightRef = useRef<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
-  const [pendingVoiceKind, setPendingVoiceKind] = useState<"opener" | "response" | "retry" | null>(null);
+  const [pendingVoiceKind, setPendingVoiceKind] = useState<"opener" | "response" | "second-response" | "retry" | null>(null);
   const [isMicrophonePrepared, setIsMicrophonePrepared] = useState<boolean>(false);
   const dictation = useDictation();
   const speech = useSpeech();
@@ -103,9 +114,20 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
   const run = value?.run;
   const context = run?.scenarioContext;
   const state = run?.state;
-  const pressure = run?.counterpartTurn;
+  const lessonState = run?.approvedRehearsal;
+  const pressureOne = lessonState?.pushbackOne ?? run?.counterpartTurn;
+  const pressureTwo = lessonState?.pushbackTwo;
+  const coachedPressure = run ? approvedRehearsalReplayPressure(run) : undefined;
+  const isSecondPressureState = state === "ready_for_second_response" || state === "listening_second_response" || state === "confirm_second_response_transcript";
+  const pressure = isSecondPressureState ? pressureTwo : state === "hope_coaching" || state === "replay_pending" || state === "ready_for_retry" || state === "listening_retry" || state === "confirm_retry_transcript" || state === "attempt_comparison" ? coachedPressure ?? pressureOne : pressureOne;
   const presentation = scenarioPracticePresentation(value);
-  const counterpartPresentation = presentation.isAvailable ? presentation.counterpart : undefined;
+  const counterpartPresentation: ScenarioCounterpartPresentation | undefined = pressure && context ? {
+    name: context.counterpartName,
+    role: context.counterpartRole,
+    text: pressure.text,
+    continuityLabel: "Same pressure moment",
+    accessibilityLabel: `${context.counterpartName}, ${context.counterpartRole}. Same pressure moment. ${pressure.text}`,
+  } : presentation.isAvailable ? presentation.counterpart : undefined;
   const leaveAfterCleanup = useCallback(async (): Promise<void> => {
     try {
       await leaveAfterStrictDictationCleanup(dictation.cancel, () => router.back());
@@ -143,7 +165,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
   }, [discardAfterCleanup, isLessonPractice, leaveAfterCleanup]);
   const difficultyLabel = context ? DIFFICULTY[context.difficulty].label : "";
 
-  const startRecording = useCallback(async (kind: "opener" | "response" | "retry"): Promise<void> => {
+  const startRecording = useCallback(async (kind: "opener" | "response" | "second-response" | "retry"): Promise<void> => {
     if (!value || speech.phase === "speaking" || speech.phase === "generating" || captureTransitionInFlightRef.current) return;
     captureTransitionInFlightRef.current = true;
     setDraft("");
@@ -151,7 +173,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     try {
       const started = await dictation.start();
       if (!started) throw new Error("Microphone capture did not start");
-      const nextState = kind === "opener" ? "listening_attempt" : kind === "response" ? "listening_response" : "listening_retry";
+      const nextState = kind === "opener" ? "listening_attempt" : kind === "response" ? "listening_response" : kind === "second-response" ? "listening_second_response" : "listening_retry";
       try {
         await persist(transitionScenarioPracticeRun(value, nextState, Date.now()));
       } catch (error: unknown) {
@@ -166,7 +188,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     }
   }, [dictation, persist, speech.phase, value]);
 
-  const beginCapture = useCallback(async (kind: "opener" | "response" | "retry"): Promise<void> => {
+  const beginCapture = useCallback(async (kind: "opener" | "response" | "second-response" | "retry"): Promise<void> => {
     if (isLessonPractice && !isMicrophonePrepared) {
       setPendingVoiceKind(kind);
       return;
@@ -197,7 +219,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     if (!kind || !value || captureTransitionInFlightRef.current) return;
     captureTransitionInFlightRef.current = true;
     try {
-      const review = kind === "opener" ? "confirm_attempt_transcript" : kind === "response" ? "confirm_response_transcript" : "confirm_retry_transcript";
+      const review = kind === "opener" ? "confirm_attempt_transcript" : kind === "response" ? "confirm_response_transcript" : kind === "second-response" ? "confirm_second_response_transcript" : "confirm_retry_transcript";
       await persist(transitionScenarioPracticeRun(value, review, Date.now()));
       setPendingVoiceKind(null);
     } catch (caught: unknown) {
@@ -214,7 +236,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     try {
       const text = await dictation.stop(state === "listening_attempt" ? "opener" : "reply");
       if (text) setDraft(text);
-      const review = state === "listening_attempt" ? "confirm_attempt_transcript" : state === "listening_response" ? "confirm_response_transcript" : "confirm_retry_transcript";
+      const review = state === "listening_attempt" ? "confirm_attempt_transcript" : state === "listening_response" ? "confirm_response_transcript" : state === "listening_second_response" ? "confirm_second_response_transcript" : "confirm_retry_transcript";
       await persist(transitionScenarioPracticeRun(value, review, Date.now()));
     } catch (caught: unknown) {
       safeLog("[approved-rehearsal] recording stop failed", errorShape(caught));
@@ -224,7 +246,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     }
   }, [dictation, persist, state, value]);
 
-  const openTypedReview = useCallback(async (review: "confirm_attempt_transcript" | "confirm_response_transcript" | "confirm_retry_transcript"): Promise<void> => {
+  const openTypedReview = useCallback(async (review: "confirm_attempt_transcript" | "confirm_response_transcript" | "confirm_second_response_transcript" | "confirm_retry_transcript"): Promise<void> => {
     if (!value || captureTransitionInFlightRef.current) return;
     captureTransitionInFlightRef.current = true;
     try {
@@ -250,11 +272,13 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
         ? await generateApprovedRehearsalDynamicReply({
           scenario,
           lessonId: approvedRehearsal.lessonId,
+          kind: "pushback_one",
           counterpartId: approvedRehearsal.counterpartId,
           namedMove: approvedRehearsal.namedMove,
           coachedBehaviorId: approvedRehearsal.coachedBehaviorId,
           retryDirection: approvedRehearsal.retryDirection,
           approvedTranscript: openingTranscript,
+          openingTranscript,
           authoredFallback: approvedRehearsal.authoredPressureText,
           runId: approved.run.id,
         })
@@ -267,14 +291,17 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
         );
       const pressureText = result.reply.trim();
       if (!pressureText) throw new Error("Counterpart pressure is unavailable");
-      const withPressure = attachScenarioCounterpartTurn(approved, {
+      const pressureTurn = {
         id: `${approved.run.id}-counterpart-turn-1`,
         text: pressureText,
-        source: "source" in result ? result.source : "provider",
-        reactionId: approvedRehearsal ? `${approvedRehearsal.lessonId}-dynamic-pressure` : `${approved.run.id}-provider-pressure`,
-        semanticVoiceKey: "contextual_counterpart",
+        source: ("source" in result ? result.source : "provider") as "provider" | "authored",
+        reactionId: approvedRehearsal ? `${approvedRehearsal.lessonId}-dynamic-pressure-1` : `${approved.run.id}-provider-pressure`,
+        semanticVoiceKey: "contextual_counterpart" as const,
         resolvedAudioId: `${approved.run.curriculumVersion}-${approved.run.id}-counterpart-turn-1`,
-      }, Date.now());
+      };
+      const withPressure = approvedRehearsal
+        ? attachApprovedRehearsalPushbackOne(approved, pressureTurn, Date.now())
+        : attachScenarioCounterpartTurn(approved, pressureTurn, Date.now());
       setDraft("");
       await persist(transitionScenarioPracticeRun(withPressure, "ready_for_response", Date.now()));
       await playSharedScenarioPressure(withPressure.run.counterpartTurn!, context.contextualPersona, speakPilotAudio);
@@ -288,7 +315,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
   }, [approvedRehearsal, context, convertedLesson, draft, persist, scenario, value]);
 
   const confirmResponse = useCallback(async (): Promise<void> => {
-    if (!value || !context || !pressure || draft.trim().length < 2 || approvalInFlightRef.current) return;
+    if (!value || !context || !pressureOne || draft.trim().length < 2 || approvalInFlightRef.current) return;
     approvalInFlightRef.current = true;
     setBusy(true);
     setError("");
@@ -296,54 +323,103 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     try {
       await persist(approved);
       const response = approved.run.responseAttempt?.transcript ?? draft.trim();
-      const lessonNote = convertedLesson
-        ? m1L1CoachNote(response)
-        : approvedRehearsal
-          ? approvedRehearsalCoachNote(approvedRehearsal, response)
-          : null;
-      const coachingObservation = lessonNote && "note" in lessonNote ? {
-        coachedBeat: lessonNote.coachedBeat,
-        selectedDimension: lessonNote.selectedDimension,
-        status: lessonNote.flags[0].status,
-        evidenceQuote: lessonNote.evidenceQuote,
-      } : undefined;
-      const generated = lessonNote ? null : await generateDebrief(scenario, context.difficulty, [
+      if (approvedRehearsal) {
+        const advanced = advanceApprovedRehearsalFirstResponse(approved, Date.now());
+        const openingTranscript = approved.run.attempt?.transcript ?? "";
+        const result = await generateApprovedRehearsalDynamicReply({
+          scenario,
+          lessonId: approvedRehearsal.lessonId,
+          kind: "pushback_two",
+          counterpartId: approvedRehearsal.counterpartId,
+          namedMove: approvedRehearsal.namedMove,
+          coachedBehaviorId: approvedRehearsal.coachedBehaviorId,
+          retryDirection: approvedRehearsal.retryDirection,
+          approvedTranscript: response,
+          openingTranscript,
+          firstPressure: pressureOne.text,
+          firstResponse: response,
+          authoredFallback: approvedRehearsal.authoredPressureTwoText,
+          runId: approved.run.id,
+        });
+        const pressureText = result.reply.trim();
+        if (!pressureText) throw new Error("Second counterpart pressure is unavailable");
+        const withSecondPressure = attachApprovedRehearsalPushbackTwo(advanced, {
+          id: `${approved.run.id}-counterpart-turn-2`,
+          text: pressureText,
+          source: result.source,
+          reactionId: `${approvedRehearsal.lessonId}-dynamic-pressure-2`,
+          semanticVoiceKey: "contextual_counterpart",
+          resolvedAudioId: `${approved.run.curriculumVersion}-${approved.run.id}-counterpart-turn-2`,
+        }, Date.now());
+        setDraft("");
+        await persist(withSecondPressure);
+        await playSharedScenarioPressure(withSecondPressure.run.approvedRehearsal!.pushbackTwo!, context.contextualPersona, speakPilotAudio);
+        return;
+      }
+      const generated = await generateDebrief(scenario, context.difficulty, [
         turn(approved.run.attempt?.id ?? `${approved.run.id}-opener`, "user", approved.run.attempt?.transcript ?? ""),
-        turn(pressure.id, "them", pressure.text),
+        turn(pressureOne.id, "them", pressureOne.text),
         turn(approved.run.responseAttempt?.id ?? `${approved.run.id}-response`, "user", response),
       ], context.reaction, context.objective);
-      const debrief = generated?.debrief;
-      const flag = debrief?.flags[0];
-      const coached = attachScenarioCoaching(
-        approved,
-        lessonNote ? ("note" in lessonNote ? lessonNote.note : `${lessonNote.worked} ${lessonNote.change}`) : flag?.quote ? `In “${flag.quote},” ${flag.issue}` : debrief?.headline ?? "",
-        lessonNote?.retryDirection ?? flag?.reframe ?? debrief?.nextRep ?? "Answer the same pressure again with one concrete next step.",
-        lessonNote?.coachedBehaviorId ?? (convertedLesson ? "point_proof_move" : approvedRehearsal?.coachedBehaviorId ?? "pushback_response"),
-        Date.now(),
-        coachingObservation,
-      );
+      const flag = generated.debrief.flags[0];
+      const coached = attachScenarioCoaching(approved, flag?.quote ? `In “${flag.quote},” ${flag.issue}` : generated.debrief.headline, flag?.reframe ?? generated.debrief.nextRep ?? "Answer the same pressure again with one concrete next step.", "pushback_response", Date.now());
       setDraft("");
       await persist(coached);
     } catch {
-      setError("Hope could not finish the feedback. Your approved transcripts are saved.");
-      await persist(transitionScenarioPracticeRun(approved, "model_error", Date.now()));
+      setError(approvedRehearsal ? `${context.counterpartName}'s second response did not come through. Your approved transcripts are saved.` : "Hope could not finish the feedback. Your approved transcripts are saved.");
+      await persist(transitionScenarioPracticeRun(approved, approvedRehearsal ? "network_error" : "model_error", Date.now()));
     } finally {
       approvalInFlightRef.current = false;
       setBusy(false);
     }
-  }, [approvedRehearsal, context, convertedLesson, draft, persist, pressure, scenario, value]);
+  }, [approvedRehearsal, context, draft, persist, pressureOne, scenario, value]);
+
+  const confirmSecondResponse = useCallback(async (): Promise<void> => {
+    if (!value || !approvedRehearsal || draft.trim().length < 2 || approvalInFlightRef.current) return;
+    approvalInFlightRef.current = true;
+    setBusy(true);
+    setError("");
+    const responded = preserveApprovedRehearsalSecondResponse(value, draft, Date.now());
+    try {
+      await persist(responded);
+      const opener = responded.run.attempt?.transcript;
+      const firstResponse = responded.run.responseAttempt?.transcript;
+      const secondResponse = responded.run.approvedRehearsal?.secondResponseAttempt?.transcript;
+      if (!opener || !firstResponse || !secondResponse) throw new Error("Approved exchange is incomplete");
+      const note = approvedRehearsalCoachExchange(approvedRehearsal, { opener, firstResponse, secondResponse });
+      const coached = attachApprovedRehearsalCoaching(responded, note.note, note.retryDirection, note.coachedBehaviorId, {
+        coachedBeat: note.coachedBeat,
+        selectedDimension: note.selectedDimension,
+        status: note.flags[0].status,
+        evidenceQuote: note.evidenceQuote,
+      }, Date.now());
+      setDraft("");
+      await persist(coached);
+    } catch (caught: unknown) {
+      safeLog("[approved-rehearsal] exchange coaching failed", errorShape(caught));
+      setError("Hope could not finish the feedback. Your approved exchange is saved.");
+      await persist(transitionScenarioPracticeRun(responded, "model_error", Date.now()));
+    } finally {
+      approvalInFlightRef.current = false;
+      setBusy(false);
+    }
+  }, [approvedRehearsal, draft, persist, value]);
 
   const confirmRetry = useCallback(async (): Promise<void> => {
     if (!value || draft.trim().length < 2 || approvalInFlightRef.current) return;
     approvalInFlightRef.current = true;
-    const approved = preserveScenarioAttempt(value, "retry", draft, Date.now());
+    const approved = approvedRehearsal
+      ? preserveApprovedRehearsalRetry(value, draft, Date.now())
+      : preserveScenarioAttempt(value, "retry", draft, Date.now());
     const comparedBase = completeScenarioComparison(approved, Date.now());
-    const compared = comparedBase.run.responseAttempt && comparedBase.run.retryAttempt
-      ? convertedLesson
-        ? { ...comparedBase, run: { ...comparedBase.run, comparison: m1L1Comparison(comparedBase.run.responseAttempt.transcript, comparedBase.run.retryAttempt.transcript) } }
-        : approvedRehearsal
-          ? { ...comparedBase, run: { ...comparedBase.run, comparison: approvedRehearsalComparison(approvedRehearsal, comparedBase.run.responseAttempt.transcript, comparedBase.run.retryAttempt.transcript) } }
-          : comparedBase
+    const coachedBeat = comparedBase.run.coachingObservation?.coachedBeat;
+    const original = coachedBeat === 1
+      ? comparedBase.run.attempt?.transcript
+      : coachedBeat === 5
+        ? comparedBase.run.approvedRehearsal?.secondResponseAttempt?.transcript
+        : comparedBase.run.responseAttempt?.transcript;
+    const compared = approvedRehearsal && original && comparedBase.run.retryAttempt
+      ? { ...comparedBase, run: { ...comparedBase.run, comparison: approvedRehearsalComparison(approvedRehearsal, original, comparedBase.run.retryAttempt.transcript) } }
       : comparedBase;
     try {
       await persist(compared);
@@ -354,12 +430,31 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     } finally {
       approvalInFlightRef.current = false;
     }
-  }, [approvedRehearsal, convertedLesson, draft, persist, value]);
+  }, [approvedRehearsal, draft, persist, value]);
 
   const replayPressureForRetry = useCallback(async (): Promise<void> => {
-    if (!value || !pressure || !context || replayTransitionInFlightRef.current) return;
+    if (!value || !context || replayTransitionInFlightRef.current) return;
     replayTransitionInFlightRef.current = true;
     try {
+      if (approvedRehearsal) {
+        const staged = value.run.state === "replay_pending" ? value : stageApprovedRehearsalReplay(value, Date.now());
+        if (staged === value && value.run.state !== "replay_pending") return;
+        if (staged !== value) await persist(staged);
+        if (staged.run.approvedRehearsal?.replayTarget === "top_of_scene") {
+          await persist(confirmApprovedRehearsalReplay(staged, "top_of_scene_reset", Date.now()));
+          return;
+        }
+        const exactPressure = approvedRehearsalReplayPressure(staged.run);
+        if (!exactPressure) return;
+        const confirmed = await completeApprovedRehearsalReplay(staged, () => speakPilotAudioToCompletion({
+          audio_id: exactPressure.resolvedAudioId ?? exactPressure.id,
+          voice_key: exactPressure.semanticVoiceKey ?? "contextual_counterpart",
+          text: exactPressure.text,
+        }), Date.now());
+        if (confirmed !== staged) await persist(confirmed);
+        return;
+      }
+      if (!pressure) return;
       await persist(transitionScenarioPracticeRun(value, "ready_for_retry", Date.now()));
       await playSharedScenarioPressure(pressure, context.contextualPersona, speakPilotAudio);
     } catch (caught: unknown) {
@@ -368,7 +463,13 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     } finally {
       replayTransitionInFlightRef.current = false;
     }
-  }, [context, persist, pressure, value]);
+  }, [approvedRehearsal, context, persist, pressure, value]);
+
+  const acknowledgeReplayFallback = useCallback(async (): Promise<void> => {
+    if (!value || value.run.state !== "replay_pending") return;
+    const proof = value.run.approvedRehearsal?.replayTarget === "top_of_scene" ? "top_of_scene_reset" : "text_fallback_acknowledged";
+    await persist(confirmApprovedRehearsalReplay(value, proof, Date.now()));
+  }, [persist, value]);
 
   const finish = useCallback(async (): Promise<void> => {
     if (!value || !context || !run?.retryAttempt || !pressure) return;
@@ -401,14 +502,19 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     return <View style={[styles.root, styles.center]}><Backdrop /><Text style={styles.title}>{unavailableTitle}</Text><Text style={styles.body}>{unavailableBody}</Text><PrimaryButton label="Back to Scenarios" onPress={() => router.replace("/(tabs)/library")} containerStyle={styles.action} /></View>;
   }
 
-  const isListening = state === "listening_attempt" || state === "listening_response" || state === "listening_retry";
-  const reviewKind = state === "confirm_attempt_transcript" ? "opening" : state === "confirm_response_transcript" ? "response" : "retry";
-  const showReview = state === "confirm_attempt_transcript" || state === "confirm_response_transcript" || state === "confirm_retry_transcript";
+  const isListening = state === "listening_attempt" || state === "listening_response" || state === "listening_second_response" || state === "listening_retry";
+  const reviewKind = state === "confirm_attempt_transcript" ? "opening" : state === "confirm_response_transcript" ? "first response" : state === "confirm_second_response_transcript" ? "second response" : "retry";
+  const showReview = state === "confirm_attempt_transcript" || state === "confirm_response_transcript" || state === "confirm_second_response_transcript" || state === "confirm_retry_transcript";
+  const coachedOriginal = run.coachingObservation?.coachedBeat === 1
+    ? run.attempt?.transcript
+    : run.coachingObservation?.coachedBeat === 5
+      ? run.approvedRehearsal?.secondResponseAttempt?.transcript
+      : run.responseAttempt?.transcript;
 
   return <View style={styles.root}><Backdrop />
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
       <Pressable onPress={handleClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Leave rehearsal"><X size={21} color={C.textSoft} /></Pressable>
-      <View style={styles.headerCopy}><Text style={styles.headerTitle}>{context.counterpartName}</Text><Text style={styles.headerMeta}>{context.counterpartRole} · {difficultyLabel}</Text></View><View style={styles.close} />
+      <View style={styles.headerCopy}><Text style={styles.headerTitle}>{context.counterpartName}</Text><Text style={styles.headerMeta}>{approvedRehearsal ? `Step ${Math.min(lessonState?.beat ?? 1, 7)} of 7` : `${context.counterpartRole} · ${difficultyLabel}`}</Text></View><View style={styles.close} />
     </View>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 150 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -416,18 +522,20 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
         <ProductCard style={styles.identityCard}><View><SectionLabel>Counterpart</SectionLabel><Text style={styles.identityValue}>{context.counterpartLabel}</Text></View><View><SectionLabel>Objective</SectionLabel><Text style={styles.identityValue}>{context.objective}</Text></View><View><SectionLabel>Pressure level</SectionLabel><Text style={styles.identityValue}>{difficultyLabel} · {DIFFICULTY[context.difficulty].note}</Text></View></ProductCard>
 
         {isLessonPractice ? <ConversationThread run={run} counterpartName={context.counterpartName} /> : null}
-        {busy && state === "confirm_attempt_transcript" ? <CounterpartThinking name={context.counterpartName} /> : null}
+        {busy && (state === "confirm_attempt_transcript" || state === "confirm_response_transcript") ? <CounterpartThinking name={context.counterpartName} /> : null}
         {pendingVoiceKind ? <ProductCard accent style={styles.permissionCard}><SectionLabel tone={C.purple}>Use your voice for this rehearsal</SectionLabel><Text style={styles.body}>BYSI asks for microphone access only while you’re practicing. You can type this turn instead.</Text>{dictation.status === "denied" ? <><Text style={styles.title}>Microphone access is off</Text><Text style={styles.body}>Turn it on in Settings, or type this turn instead.</Text><PrimaryButton label="Open Settings" onPress={() => void Linking.openSettings()} containerStyle={styles.action} /></> : <PrimaryButton label="Allow microphone" onPress={() => void allowMicrophone()} containerStyle={styles.action} />}<Pressable onPress={() => void openTypedFallback()} style={styles.permissionSecondary}><Text style={styles.permissionSecondaryText}>Type this turn instead</Text></Pressable><Pressable onPress={() => setPendingVoiceKind(null)} style={styles.permissionSecondary}><Text style={styles.permissionSecondaryText}>Back to rehearsal</Text></Pressable></ProductCard> : null}
         {state === "ready_for_attempt" ? <Reveal><Text style={styles.title}>Open the conversation with {context.counterpartName}.</Text><Text style={styles.body}>Say the first thing you want {context.counterpartRole} to hear. You will approve the transcript before {context.counterpartName} responds.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("opener")} onType={() => void openTypedReview("confirm_attempt_transcript")} /></Reveal> : null}
-        {isListening ? dictation.status === "transcribing" ? <Reveal><Text style={styles.title}>Preparing your transcript…</Text><Thinking /><Text style={styles.body}>Your recording has stopped. You’ll approve the wording next.</Text></Reveal> : <View style={styles.listening}><Text style={styles.title}>Recording your {state === "listening_attempt" ? "opening" : state === "listening_response" ? "response" : "retry"}.</Text><MicControl state="listening" level={dictation.level} onPress={() => void stopRecording()} glyph={<Square size={24} color={C.onAccent} fill={C.onAccent} />} accessibilityLabel="Done speaking" /><Text style={styles.body}>Tap when you are done. Nothing advances until you approve the transcript.</Text></View> : null}
-        {showReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve your {reviewKind}.</Text>{dictation.error ? <Text style={styles.body}>{dictation.error} You can type your wording below.</Text> : null}{error ? <Text style={styles.body}>{error}</Text> : null}{reviewKind !== "opening" && pressure ? <CounterpartCard presentation={counterpartPresentation} /> : null}<TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel={`Edit ${reviewKind} transcript`} /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2 || busy} onPress={() => void (reviewKind === "opening" ? confirmOpening() : reviewKind === "response" ? confirmResponse() : confirmRetry())} containerStyle={styles.action} />{busy ? <ActivityIndicator color={C.purple} style={styles.busy} /> : null}</Reveal> : null}
+        {isListening ? dictation.status === "transcribing" ? <Reveal><Text style={styles.title}>Preparing your transcript…</Text><Thinking /><Text style={styles.body}>Your recording has stopped. You’ll approve the wording next.</Text></Reveal> : <View style={styles.listening}><Text style={styles.title}>Recording your {state === "listening_attempt" ? "opening" : state === "listening_response" ? "first response" : state === "listening_second_response" ? "second response" : "retry"}.</Text><MicControl state="listening" level={dictation.level} onPress={() => void stopRecording()} glyph={<Square size={24} color={C.onAccent} fill={C.onAccent} />} accessibilityLabel="Done speaking" /><Text style={styles.body}>Tap when you are done. Nothing advances until you approve the transcript.</Text></View> : null}
+        {showReview ? <Reveal><StatusPill label="Transcript review" tone="purple" /><Text style={styles.title}>Approve your {reviewKind}.</Text>{dictation.error ? <Text style={styles.body}>{dictation.error} You can type your wording below.</Text> : null}{error ? <Text style={styles.body}>{error}</Text> : null}{reviewKind !== "opening" && pressure ? <CounterpartCard presentation={counterpartPresentation} /> : null}<TextInput value={draft} onChangeText={setDraft} multiline style={styles.input} accessibilityLabel={`Edit ${reviewKind} transcript`} /><PrimaryButton label="Approve this transcript" disabled={draft.trim().length < 2 || busy} onPress={() => void (reviewKind === "opening" ? confirmOpening() : reviewKind === "first response" ? confirmResponse() : reviewKind === "second response" ? confirmSecondResponse() : confirmRetry())} containerStyle={styles.action} />{busy ? <ActivityIndicator color={C.purple} style={styles.busy} /> : null}</Reveal> : null}
         {state === "ready_for_response" && pressure ? <Reveal><CounterpartCard presentation={counterpartPresentation} />{speech.phase === "speaking" || speech.phase === "generating" ? <Text style={styles.speaking}>{context.counterpartName} is speaking…</Text> : speech.phase === "failed" ? <PrimaryButton label="Try audio again" onPress={() => void replaySpeech()} containerStyle={styles.action} /> : null}<Text style={styles.title}>Respond to the pressure.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("response")} onType={() => void openTypedReview("confirm_response_transcript")} /></Reveal> : null}
+        {state === "ready_for_second_response" && pressureTwo ? <Reveal><CounterpartCard presentation={counterpartPresentation} />{speech.phase === "speaking" || speech.phase === "generating" ? <Text style={styles.speaking}>{context.counterpartName} is speaking…</Text> : speech.phase === "failed" ? <PrimaryButton label="Try audio again" onPress={() => void replaySpeech()} containerStyle={styles.action} /> : null}<Text style={styles.title}>Respond to Pushback 2.</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("second-response")} onType={() => void openTypedReview("confirm_second_response_transcript")} /></Reveal> : null}
         {state === "hope_coaching" && pressure ? <Reveal><StatusPill label="Hope · one observed behavior" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><ProductCard accent style={styles.coachCard}><SectionLabel tone={C.purple}>Hope noticed</SectionLabel><Text style={styles.body}>{run.coachNote}</Text><SectionLabel tone={C.purple}>Same-moment retry</SectionLabel><Text style={styles.body}>{run.retryInstruction}</Text></ProductCard><PrimaryButton label={`Retry the same ${context.counterpartName} moment`} onPress={() => void replayPressureForRetry()} containerStyle={styles.action} /></Reveal> : null}
-        {state === "ready_for_retry" && pressure ? <Reveal><StatusPill label="Same-moment retry" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Answer the exact same turn again.</Text><Text style={styles.body}>{run.retryInstruction}</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("retry")} onType={() => void openTypedReview("confirm_retry_transcript")} /></Reveal> : null}
-        {state === "attempt_comparison" && pressure && run.responseAttempt && run.retryAttempt && run.comparison ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="First approved response" text={run.responseAttempt.transcript} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label={isLessonPractice ? "See my results" : "Continue"} onPress={() => { if (isLessonPractice && onReturnToDeck) onReturnToDeck(run.id); else void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now())); }} containerStyle={styles.action} /></Reveal> : null}
+        {state === "replay_pending" ? <Reveal><StatusPill label="Replay required" tone="amber" /><Text style={styles.title}>Replay the exact flagged moment.</Text><CounterpartCard presentation={counterpartPresentation} />{pressure ? <PrimaryButton label="Try the exact audio again" onPress={() => void replayPressureForRetry()} containerStyle={styles.action} /> : null}<Pressable onPress={() => void acknowledgeReplayFallback()} style={styles.permissionSecondary}><Text style={styles.permissionSecondaryText}>{lessonState?.replayTarget === "top_of_scene" ? "Reset to the top of the scene" : "I read the exact pressure — continue"}</Text></Pressable></Reveal> : null}
+        {state === "ready_for_retry" && (pressure || lessonState?.replayTarget === "top_of_scene") ? <Reveal><StatusPill label="Same-moment retry" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Answer the exact same turn again.</Text><Text style={styles.body}>{run.retryInstruction}</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("retry")} onType={() => void openTypedReview("confirm_retry_transcript")} /></Reveal> : null}
+        {state === "attempt_comparison" && run.retryAttempt && run.comparison && coachedOriginal ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="Original approved response" text={coachedOriginal} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label={isLessonPractice ? "See my results" : "Continue"} onPress={() => { if (isLessonPractice && onReturnToDeck) onReturnToDeck(run.id); else void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now())); }} containerStyle={styles.action} /></Reveal> : null}
         {state === "transfer_cue" ? <Reveal><StatusPill label="Hope · wrap-up" tone="purple" /><Text style={styles.title}>Take the clearer wording into the real conversation.</Text><Text style={styles.body}>This completion belongs to {context.title}, with {context.counterpartName} as {context.counterpartRole}. No unrelated practice fixture was used.</Text><PrimaryButton label="Complete scenario" onPress={() => void finish()} containerStyle={styles.action} /></Reveal> : null}
         {state === "complete" ? <Reveal><StatusPill label="Scenario complete" tone="green" /><Text style={styles.title}>{context.title} is complete.</Text><Text style={styles.body}>You practiced one {context.counterpartName} pressure moment twice at {difficultyLabel.toLowerCase()} difficulty.</Text><PrimaryButton label="Back to Scenarios" onPress={() => router.replace("/(tabs)/library")} containerStyle={styles.action} /></Reveal> : null}
-        {state === "network_error" || state === "model_error" ? <Reveal><StatusPill label="Saved checkpoint" tone="amber" /><Text style={styles.title}>{error}</Text><PrimaryButton label="Return to this scenario" onPress={() => void persist(transitionScenarioPracticeRun(value, state === "network_error" ? "confirm_attempt_transcript" : "confirm_response_transcript", Date.now()))} containerStyle={styles.action} /></Reveal> : null}
+        {state === "network_error" || state === "model_error" ? <Reveal><StatusPill label="Saved checkpoint" tone="amber" /><Text style={styles.title}>{error}</Text><PrimaryButton label="Return to this scenario" onPress={() => void persist(transitionScenarioPracticeRun(value, state === "network_error" ? (run.responseAttempt ? "confirm_response_transcript" : "confirm_attempt_transcript") : (run.approvedRehearsal?.secondResponseAttempt ? "confirm_second_response_transcript" : "confirm_response_transcript"), Date.now()))} containerStyle={styles.action} /></Reveal> : null}
       </ScrollView>
     </KeyboardAvoidingView>
     {busy && state !== "confirm_attempt_transcript" ? <StateDock bottomInset={insets.bottom}><View style={styles.processing}><ActivityIndicator color={C.purple} /><Text style={styles.body}>Hope is reviewing your approved words</Text></View></StateDock> : null}
@@ -443,6 +551,8 @@ function ConversationThread({ run, counterpartName }: { run: PersistedScenarioPr
     run.attempt ? { id: run.attempt.id, speaker: "You", text: run.attempt.transcript, mine: true } : null,
     run.counterpartTurn ? { id: run.counterpartTurn.id, speaker: counterpartName, text: run.counterpartTurn.text, mine: false } : null,
     run.responseAttempt ? { id: run.responseAttempt.id, speaker: "You", text: run.responseAttempt.transcript, mine: true } : null,
+    run.approvedRehearsal?.pushbackTwo ? { id: run.approvedRehearsal.pushbackTwo.id, speaker: counterpartName, text: run.approvedRehearsal.pushbackTwo.text, mine: false } : null,
+    run.approvedRehearsal?.secondResponseAttempt ? { id: run.approvedRehearsal.secondResponseAttempt.id, speaker: "You", text: run.approvedRehearsal.secondResponseAttempt.transcript, mine: true } : null,
     run.retryAttempt ? { id: run.retryAttempt.id, speaker: "You · retry", text: run.retryAttempt.transcript, mine: true } : null,
   ].filter((message): message is { id: string; speaker: string; text: string; mine: boolean } => Boolean(message));
   if (messages.length === 0) return null;

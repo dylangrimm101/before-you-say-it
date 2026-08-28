@@ -16,11 +16,13 @@ function dynamicInput(lessonId: ApprovedRehearsalLessonId) {
   return {
     scenario: config.scenario,
     lessonId: config.lessonId,
+    kind: "pushback_one" as const,
     counterpartId: config.counterpartId,
     namedMove: config.namedMove,
     coachedBehaviorId: config.coachedBehaviorId,
     retryDirection: config.retryDirection,
     approvedTranscript: `My approved opening for ${lessonId}.`,
+    openingTranscript: `My approved opening for ${lessonId}.`,
     authoredFallback: config.authoredPressureText,
     runId: `run-${lessonId}`,
   };
@@ -65,9 +67,30 @@ describe("all approved lesson dynamic counterparts", () => {
           coached_behavior_id: config.coachedBehaviorId,
           named_move_private: config.namedMove,
         },
-        variation_seed: `run-${lessonId}-${lessonId}-pressure-0`,
+        variation_seed: `run-${lessonId}-${lessonId}-pushback_one-0`,
       });
     }
+  });
+
+  test("sends the full exchange when generating Pushback 2", async () => {
+    let payload: Record<string, unknown> | undefined;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      payload = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({ mode: "turn", text: "Then tell me exactly what you want me to own now." }), { status: 200 });
+    }) as typeof fetch;
+    const base = dynamicInput("m2-l1");
+    const config = approvedRehearsalConfig("m2-l1")!;
+    const result = await generateApprovedRehearsalDynamicReply({
+      ...base, kind: "pushback_two", approvedTranscript: "I still need the whole thing.",
+      firstPressure: "I can't do Thursday.", firstResponse: "I still need the whole thing.", authoredFallback: config.authoredPressureTwoText,
+    });
+    expect(result.source).toBe("provider");
+    expect(payload).toMatchObject({
+      turn: "close",
+      transcript: { user_turn_1: base.openingTranscript, counterpart_pushback: "I can't do Thursday.", user_turn_2: "I still need the whole thing." },
+      lesson_constraints: { pressure_kind: "pushback_two", first_pressure: "I can't do Thursday.", first_response: "I still need the whole thing." },
+      variation_seed: "run-m2-l1-m2-l1-pushback_two-0",
+    });
   });
 
   test("rejects coaching leakage and falls back only after two unusable model replies", async () => {

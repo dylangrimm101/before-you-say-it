@@ -212,10 +212,25 @@ export interface M1L1BehaviorFlag {
 
 /** Durable one-behavior observation used by shared approved rehearsals. */
 export interface PilotCoachingObservation {
-  coachedBeat: 3;
+  coachedBeat: 1 | 3 | 5;
   selectedDimension: string;
   status: "met" | "not_met";
   evidenceQuote: string;
+}
+
+export interface ApprovedRehearsalState {
+  beat: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  pushbackOne?: ScenarioCounterpartTurn;
+  pushbackTwo?: ScenarioCounterpartTurn;
+  secondResponseAttempt?: PilotAttemptRecord;
+  coachedBeat?: 1 | 3 | 5;
+  selectedDimension?: string;
+  retryCount: 0 | 1;
+  replayTarget?: "top_of_scene" | "pushback_one" | "pushback_two";
+  replayRequestedAt?: number;
+  replayAudioId?: string;
+  replayProof?: "playback_completed" | "text_fallback_acknowledged" | "top_of_scene_reset";
+  replayCompletedAt?: number;
 }
 
 /** Isolated M1 L1 state; no other lesson or shared scenario consumes it. */
@@ -275,7 +290,9 @@ export interface PilotDayRun {
   retryInstruction?: string;
   noteFit?: "accepted" | "rejected";
   comparison?: PilotComparison;
-  /** Present only for accepted M1 L1; keeps the seven-step plan isolated. */
+  /** Present only for shared approved lesson rehearsals using the M1 L1-shaped exchange. */
+  approvedRehearsal?: ApprovedRehearsalState;
+  /** Present only for accepted M1 L1; keeps the specialized evaluator isolated. */
   m1L1?: M1L1RehearsalState;
   completedAt?: number;
   createdAt: number;

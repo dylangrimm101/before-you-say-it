@@ -39,7 +39,7 @@ export interface ApprovedRehearsalCoachNote {
   note: string;
   retryDirection: string;
   coachedBehaviorId: string;
-  coachedBeat: 3;
+  coachedBeat: 1 | 3 | 5;
   selectedDimension: string;
   flags: readonly [ApprovedRehearsalBehaviorFlag];
 }
@@ -52,6 +52,7 @@ export interface ApprovedRehearsalConfig {
   scenario: Scenario;
   counterpartId: string;
   authoredPressureText: string;
+  authoredPressureTwoText: string;
   coachedBehaviorId: string;
   namedMoveId: string;
   namedMove: string;
@@ -71,7 +72,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l2",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l02_cut_the_case",
-    contentVersion: "m1-l2-dynamic-coaching-v2-2026-08-28",
+    contentVersion: "m1-l2-two-pressure-coaching-v3-2026-08-28",
     scenario: {
       id: "bysi-m01-l02-approval-owner",
       category: "work",
@@ -87,6 +88,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     },
     counterpartId: "ravi",
     authoredPressureText: "Okay, but that's still one example. What else are you basing this on?",
+    authoredPressureTwoText: "So are you saying there are more examples I need to hear before we decide?",
     coachedBehaviorId: "one_anchor",
     namedMoveId: "one-anchor-folder",
     namedMove: "One anchor. The rest stays in the folder.",
@@ -101,7 +103,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l3",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l03_park_and_return",
-    contentVersion: "m1-l3-dynamic-coaching-v2-2026-08-28",
+    contentVersion: "m1-l3-two-pressure-coaching-v3-2026-08-28",
     scenario: {
       id: "bysi-m01-l03-march-appointments",
       category: "family",
@@ -117,6 +119,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     },
     counterpartId: "renee",
     authoredPressureText: "You never even call him.",
+    authoredPressureTwoText: "When exactly are we coming back to the calls, then?",
     coachedBehaviorId: "park_and_return",
     namedMoveId: "both-on-table-one-at-time",
     namedMove: "Both on the table. One at a time.",
@@ -131,7 +134,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l4",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l04_make_it_repeatable",
-    contentVersion: "m1-l4-dynamic-coaching-v2-2026-08-28",
+    contentVersion: "m1-l4-two-pressure-coaching-v3-2026-08-28",
     scenario: {
       id: "bysi-m01-l04-changing-plan",
       category: "partner",
@@ -147,6 +150,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     },
     counterpartId: "theo",
     authoredPressureText: "So you're saying I don't think about your schedule.",
+    authoredPressureTwoText: "Are you talking about those two changes, or everything lately?",
     coachedBehaviorId: "bounded_repeatable_point",
     namedMoveId: "catch-it-say-it-back",
     namedMove: "Catch it. Say it back.",
@@ -161,7 +165,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l5",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l05_fit_in_one",
-    contentVersion: "m1-l5-dynamic-coaching-v2-2026-08-28",
+    contentVersion: "m1-l5-two-pressure-coaching-v3-2026-08-28",
     scenario: {
       id: "bysi-m01-l05-friday-kitchen-table",
       category: "partner",
@@ -177,6 +181,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     },
     counterpartId: "adam-m1-l5",
     authoredPressureText: "Is this you asking, or is this you working up to the signups?",
+    authoredPressureTwoText: "Which one do you actually want us to decide tonight?",
     coachedBehaviorId: "one_conversation_purpose",
     namedMoveId: "pick-one-keep-rest",
     namedMove: "Pick one. Keep the rest.",
@@ -191,7 +196,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l1",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l01_clear_ask",
-    contentVersion: "m2-l1-dynamic-coaching-v2-2026-08-28",
+    contentVersion: "m2-l1-two-pressure-coaching-v3-2026-08-28",
     scenario: {
       id: "bysi-m02-l01-thursday-handoff",
       category: "work",
@@ -207,6 +212,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     },
     counterpartId: "maya",
     authoredPressureText: "I can't do Thursday.",
+    authoredPressureTwoText: "What exactly are you asking me to commit to now?",
     coachedBehaviorId: "clear_answerable_ask",
     namedMoveId: "one-action-one-owner-room-to-answer",
     namedMove: "One action. One owner. Room to answer.",
@@ -221,7 +227,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l2",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l02_say_who",
-    contentVersion: "m2-l2-dynamic-coaching-v2-2026-08-28",
+    contentVersion: "m2-l2-two-pressure-coaching-v3-2026-08-28",
     scenario: {
       id: "bysi-m02-l02-cupcake-order",
       category: "friends",
@@ -237,6 +243,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     },
     counterpartId: "renee-m2-l2",
     authoredPressureText: "Why me?",
+    authoredPressureTwoText: "The order is under Jen's name and card, so who needs to do the next step?",
     coachedBehaviorId: "named_ask_owner",
     namedMoveId: "say-who-youre-asking",
     namedMove: "Say who you're asking.",
@@ -251,7 +258,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l3",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l03_when_they_say_they_cant",
-    contentVersion: "m2-l3-dynamic-coaching-v2-2026-08-28",
+    contentVersion: "m2-l3-two-pressure-coaching-v3-2026-08-28",
     scenario: {
       id: "bysi-m02-l03-saturday-van",
       category: "family",
@@ -267,6 +274,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     },
     counterpartId: "marcus",
     authoredPressureText: "I can't do a whole Saturday. Theo's got a game and I'm not free till two.",
+    authoredPressureTwoText: "All right, what part are you still asking me to take?",
     coachedBehaviorId: "hear_trade_state",
     namedMoveId: "hear-it-trade-one-say-where-it-stands",
     namedMove: "Hear it. Trade one thing. Say where it stands.",
@@ -281,7 +289,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l4",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l04_say_whether_no",
-    contentVersion: "m2-l4-dynamic-coaching-v2-2026-08-28",
+    contentVersion: "m2-l4-two-pressure-coaching-v3-2026-08-28",
     scenario: {
       id: "bysi-m02-l04-thursday-pickup",
       category: "partner",
@@ -296,6 +304,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     },
     counterpartId: "sam-m2-l4",
     authoredPressureText: "No, I can't do pickup tomorrow.",
+    authoredPressureTwoText: "I need to know whether no is actually okay here.",
     coachedBehaviorId: "honor_available_no",
     namedMoveId: "say-whether-no-is-available",
     namedMove: "Say whether no is available.",
@@ -310,7 +319,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l5",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l05_ask_for_the_loop",
-    contentVersion: "m2-l5-dynamic-coaching-v2-2026-08-28",
+    contentVersion: "m2-l5-two-pressure-coaching-v3-2026-08-28",
     scenario: {
       id: "bysi-m02-l05-camp-signup",
       category: "partner",
@@ -325,6 +334,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     },
     counterpartId: "sam-m2-l5",
     authoredPressureText: "What counts as at risk?",
+    authoredPressureTwoText: "So if none of that happens, do you want me to handle the steps without checking each one?",
     coachedBehaviorId: "loop_not_last_step",
     namedMoveId: "ask-for-loop-not-last-step",
     namedMove: "Ask for the loop, not the last step.",
@@ -352,35 +362,65 @@ export function validateApprovedRehearsalCompletion(
 ): boolean {
   if (!run || !requestedRunId || run.id !== requestedRunId) return false;
   const context = run.scenarioContext;
-  const pressure = run.counterpartTurn;
-  const expectedTurnId = `${run.id}-counterpart-turn-1`;
-  const expectedAudioId = `${run.curriculumVersion}-${run.id}-counterpart-turn-1`;
+  const lesson = run.approvedRehearsal;
+  const pressureOne = lesson?.pushbackOne;
+  const pressureTwo = lesson?.pushbackTwo;
   const observation = run.coachingObservation;
+  const observedTranscript = observation?.coachedBeat === 1
+    ? run.attempt?.transcript
+    : observation?.coachedBeat === 5
+      ? lesson?.secondResponseAttempt?.transcript
+      : run.responseAttempt?.transcript;
   const hasValidObservation = Boolean(observation
-    && observation.coachedBeat === 3
+    && [1, 3, 5].includes(observation.coachedBeat)
     && observation.selectedDimension === config.coachedBehaviorId
-    && observation.evidenceQuote === run.responseAttempt?.transcript
+    && observation.evidenceQuote === observedTranscript
     && observation.status === (approvedRehearsalCriterion(config, observation.evidenceQuote) ? "met" : "not_met")
-    && run.coachedSegment === "pushback_response"
-    && run.coachedBehaviorId === config.coachedBehaviorId);
-  const hasValidPressure = Boolean(pressure
-    && pressure.id === expectedTurnId
-    && pressure.reactionId === `${config.lessonId}-dynamic-pressure`
-    && pressure.semanticVoiceKey === "contextual_counterpart"
-    && pressure.resolvedAudioId === expectedAudioId
-    && pressure.text.trim().length >= 3
-    && (pressure.source === "provider" || (pressure.source === "authored" && pressure.text === config.authoredPressureText)));
+    && run.coachedSegment === (observation.coachedBeat === 1 ? "opener" : "pushback_response")
+    && run.coachedBehaviorId === config.coachedBehaviorId
+    && lesson?.coachedBeat === observation.coachedBeat
+    && lesson.selectedDimension === config.coachedBehaviorId);
+  const hasValidPressureOne = Boolean(pressureOne
+    && run.counterpartTurn?.id === pressureOne.id
+    && pressureOne.id === `${run.id}-counterpart-turn-1`
+    && pressureOne.reactionId === `${config.lessonId}-dynamic-pressure-1`
+    && pressureOne.semanticVoiceKey === "contextual_counterpart"
+    && pressureOne.resolvedAudioId === `${run.curriculumVersion}-${run.id}-counterpart-turn-1`
+    && pressureOne.text.trim().length >= 3
+    && (pressureOne.source === "provider" || (pressureOne.source === "authored" && pressureOne.text === config.authoredPressureText)));
+  const hasValidPressureTwo = Boolean(pressureTwo
+    && pressureTwo.id === `${run.id}-counterpart-turn-2`
+    && pressureTwo.reactionId === `${config.lessonId}-dynamic-pressure-2`
+    && pressureTwo.semanticVoiceKey === "contextual_counterpart"
+    && pressureTwo.resolvedAudioId === `${run.curriculumVersion}-${run.id}-counterpart-turn-2`
+    && pressureTwo.text.trim().length >= 3
+    && (pressureTwo.source === "provider" || (pressureTwo.source === "authored" && pressureTwo.text === config.authoredPressureTwoText)));
+  const expectedReplayAudioId = observation?.coachedBeat === 1
+    ? `top-of-scene:${run.id}`
+    : observation?.coachedBeat === 3
+      ? pressureOne?.resolvedAudioId
+      : pressureTwo?.resolvedAudioId;
+  const hasValidReplay = Boolean(lesson?.replayProof
+    && lesson.replayCompletedAt
+    && lesson.replayAudioId === expectedReplayAudioId
+    && (observation?.coachedBeat === 1 ? lesson.replayProof === "top_of_scene_reset" : lesson.replayProof !== "top_of_scene_reset"));
   return run.convertedModuleId === config.moduleId
     && run.practiceId === config.practiceId
     && run.contentVersion === config.contentVersion
     && run.counterpartIdentity === config.counterpartId
     && context?.scenarioId === config.scenario.id
     && context.counterpartId === config.counterpartId
-    && hasValidPressure
+    && hasValidPressureOne
+    && hasValidPressureTwo
     && hasValidObservation
-    && Boolean(run.attempt && run.responseAttempt && run.retryAttempt && run.comparison)
-    && (run.attempt?.confirmedAt ?? 0) < (run.responseAttempt?.confirmedAt ?? 0)
-    && (run.responseAttempt?.confirmedAt ?? 0) < (run.retryAttempt?.confirmedAt ?? 0)
+    && hasValidReplay
+    && Boolean(run.attempt && run.responseAttempt && lesson?.secondResponseAttempt && run.retryAttempt && run.comparison)
+    && (run.attempt?.confirmedAt ?? 0) < (pressureOne?.authoredAt ?? 0)
+    && (pressureOne?.authoredAt ?? 0) < (run.responseAttempt?.confirmedAt ?? 0)
+    && (run.responseAttempt?.confirmedAt ?? 0) < (pressureTwo?.authoredAt ?? 0)
+    && (pressureTwo?.authoredAt ?? 0) < (lesson?.secondResponseAttempt?.confirmedAt ?? 0)
+    && (lesson?.secondResponseAttempt?.confirmedAt ?? 0) < (run.retryAttempt?.confirmedAt ?? 0)
+    && lesson?.retryCount === 1
     && run.state === "attempt_comparison";
 }
 
@@ -526,7 +566,12 @@ export function approvedRehearsalIndexImpact(
   run: PilotDayRun,
   currentSignals: readonly ApprovedRehearsalCurrentSignal[],
 ): ApprovedRehearsalIndexImpact | null {
-  const original = run.responseAttempt?.transcript;
+  const coachedBeat = run.coachingObservation?.coachedBeat;
+  const original = coachedBeat === 1
+    ? run.attempt?.transcript
+    : coachedBeat === 5
+      ? run.approvedRehearsal?.secondResponseAttempt?.transcript
+      : run.responseAttempt?.transcript;
   const retry = run.retryAttempt?.transcript;
   if (!original || !retry) return null;
   const beforeMet = approvedRehearsalCriterion(config, original);
@@ -555,7 +600,7 @@ export function approvedRehearsalIndexImpact(
  * Produces the same scoreless, exact-wording coaching shape as M1 L1 while
  * evaluating only this lesson's approved move at the pressure-response beat.
  */
-export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, transcript: string): ApprovedRehearsalCoachNote {
+export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, transcript: string, coachedBeat: 1 | 3 | 5 = 3): ApprovedRehearsalCoachNote {
   const evidenceQuote = transcript.trim();
   const status: ApprovedRehearsalCriterionStatus = approvedRehearsalCriterion(config, evidenceQuote) ? "met" : "not_met";
   const copy = COACHING_COPY_BY_LESSON[config.lessonId];
@@ -570,12 +615,24 @@ export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, tran
     worked,
     change,
     note: `${worked} ${change}`,
-    retryDirection: `Replay this exact moment and ${copy.changeInstruction}.`,
+    retryDirection: coachedBeat === 1
+      ? `Reset to the top of the scene and ${copy.changeInstruction}.`
+      : `Replay this exact moment and ${copy.changeInstruction}.`,
     coachedBehaviorId: config.coachedBehaviorId,
-    coachedBeat: 3,
+    coachedBeat,
     selectedDimension: config.coachedBehaviorId,
     flags: [{ dimension: config.coachedBehaviorId, status, evidenceQuote }],
   };
+}
+
+/** Selects one exact learner beat from the full exchange, prioritizing an observable miss before reinforcing success. */
+export function approvedRehearsalCoachExchange(config: ApprovedRehearsalConfig, exchange: { opener: string; firstResponse: string; secondResponse: string }): ApprovedRehearsalCoachNote {
+  const candidates = [
+    approvedRehearsalCoachNote(config, exchange.secondResponse, 5),
+    approvedRehearsalCoachNote(config, exchange.firstResponse, 3),
+    approvedRehearsalCoachNote(config, exchange.opener, 1),
+  ] as const;
+  return candidates.find((candidate) => candidate.flags[0].status === "not_met") ?? candidates[0];
 }
 
 export function approvedRehearsalComparison(config: ApprovedRehearsalConfig, before: string, after: string): { behaviorId: string; text: string; criterionChanged: boolean } {

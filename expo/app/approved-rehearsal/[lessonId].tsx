@@ -9,7 +9,7 @@ import { Backdrop } from "@/components/ui";
 import { C, GUTTER, T } from "@/constants/theme";
 import { approvedRehearsalConfig, approvedRehearsalRuntimeEnabled } from "@/lib/approvedRehearsals";
 import { conversionRuntimeEnabled, isAcceptedM1L1ResumeRun, M1_L1_CONVERSION } from "@/lib/convertedLesson";
-import { createScenarioPracticeRun, initializeM1L1Run } from "@/lib/scenarioPractice";
+import { createScenarioPracticeRun, initializeApprovedRehearsalRun, initializeM1L1Run } from "@/lib/scenarioPractice";
 import { useStore } from "@/providers/store";
 
 export default function ApprovedRehearsalRoute(): React.JSX.Element {
@@ -34,7 +34,8 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
       && run.contentVersion === config.contentVersion
       && run.scenarioContext?.scenarioId === config.scenario.id
       && run.scenarioContext.counterpartId === config.counterpartId
-      && run.counterpartIdentity === config.counterpartId);
+      && run.counterpartIdentity === config.counterpartId
+      && Boolean(run.approvedRehearsal));
   const resumable = isAvailable && isAcceptedIdentity && run?.state !== "complete";
   const hasConflict = isAvailable && Boolean(activeScenarioRun) && !resumable;
   const preservationStarted = useRef<boolean>(false);
@@ -44,7 +45,7 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
   const createAcceptedRun = useCallback(async (): Promise<void> => {
     if (!config) throw new Error("Approved rehearsal config is unavailable");
     const base = createScenarioPracticeRun(config.scenario, "steady", "defensive", `lesson-${config.lessonId}-${Date.now().toString(36)}`);
-    const created = isM1L1 ? initializeM1L1Run(base, Date.now()) : base;
+    const created = isM1L1 ? initializeM1L1Run(base, Date.now()) : initializeApprovedRehearsalRun(base, Date.now());
     const context = created.run.scenarioContext;
     if (!context) throw new Error("Approved rehearsal context is unavailable");
     await replaceActiveScenarioRunStrict({

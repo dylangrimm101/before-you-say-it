@@ -237,11 +237,15 @@ export interface M1L1DynamicReplyResult {
 export interface ApprovedRehearsalDynamicReplyInput {
   scenario: Scenario;
   lessonId: string;
+  kind: "pushback_one" | "pushback_two";
   counterpartId: string;
   namedMove: string;
   coachedBehaviorId: string;
   retryDirection: string;
   approvedTranscript: string;
+  openingTranscript: string;
+  firstPressure?: string;
+  firstResponse?: string;
   authoredFallback: string;
   runId: string;
 }
@@ -263,7 +267,9 @@ export function approvedRehearsalDynamicReplyPassesQuality(reply: string): boole
 /** Generates a scenario-aware pressure for an approved lesson, with its authored line as a fail-safe only. */
 export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehearsalDynamicReplyInput): Promise<M1L1DynamicReplyResult> {
   const pressureObjective = [
-    `Reply directly to the learner's approved opening as ${input.scenario.counterpart}.`,
+    input.kind === "pushback_one"
+      ? `Reply directly to the learner's approved opening as ${input.scenario.counterpart}.`
+      : `Reply to the full exchange as ${input.scenario.counterpart} and create a second, distinct test of the same behavior.`,
     `Create a realistic moment where the learner can practice the behavior identified internally as ${input.coachedBehaviorId}.`,
     `Keep every fact consistent with the scenario and persona, keep the issue unresolved, and do not explain or name the teaching move “${input.namedMove}”.`,
     `The later retry guidance will be: ${input.retryDirection}`,
@@ -273,18 +279,18 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
     try {
       const result = await postBysi<BysiTurnResponse>({
         type: "rehearsal_turn",
-        turn: "pushback",
+        turn: input.kind === "pushback_one" ? "pushback" : "close",
         contract: {
           ...bysiContract(input.scenario, undefined, input.scenario.goal),
           pressure_condition: `${input.scenario.persona} ${pressureObjective}`,
         },
         transcript: {
-          user_turn_1: input.approvedTranscript,
-          counterpart_pushback: "",
-          user_turn_2: "",
+          user_turn_1: input.openingTranscript,
+          counterpart_pushback: input.firstPressure ?? "",
+          user_turn_2: input.firstResponse ?? "",
           counterpart_close: "",
         } satisfies BysiTranscript,
-        avoid_repeating: [input.authoredFallback],
+        avoid_repeating: [input.firstPressure ?? "", input.authoredFallback].filter(Boolean),
         lesson_constraints: {
           lesson_id: input.lessonId,
           counterpart_id: input.counterpartId,
@@ -293,13 +299,17 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
           scenario_context: `${input.scenario.title}. ${input.scenario.situation}`,
           counterpart_persona: input.scenario.persona,
           learner_goal: input.scenario.goal,
+          pressure_kind: input.kind,
+          opening_transcript: input.openingTranscript,
+          first_pressure: input.firstPressure ?? "",
+          first_response: input.firstResponse ?? "",
           coached_behavior_id: input.coachedBehaviorId,
           named_move_private: input.namedMove,
           pressure_objective: pressureObjective,
           output: "One short, natural in-character reply of no more than three sentences.",
           reject: ["invented facts", "instant agreement", "coaching language", "teaching-move disclosure", "topic changes"],
         },
-        variation_seed: `${input.runId}-${input.lessonId}-pressure-${attempt}`,
+        variation_seed: `${input.runId}-${input.lessonId}-${input.kind}-${attempt}`,
       });
       const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
       if (reply && approvedRehearsalDynamicReplyPassesQuality(reply)) return { reply, source: "provider" };

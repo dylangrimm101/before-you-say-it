@@ -318,6 +318,13 @@ export default function ApprovedLessonDeckScreen() {
         ? approvedRehearsalIndexImpact(approvedConfig, returningRun, currentSignals)
         : null;
   }, [approvedConfig, indexEvidence.rows, isM1L1, returningRun]);
+  const coachedOriginalResponse = isM1L1
+    ? returningRun?.m1L1?.coachedBeat === 1 ? returningRun.attempt?.transcript : returningRun?.responseAttempt?.transcript
+    : returningRun?.coachingObservation?.coachedBeat === 1
+      ? returningRun.attempt?.transcript
+      : returningRun?.coachingObservation?.coachedBeat === 5
+        ? returningRun.approvedRehearsal?.secondResponseAttempt?.transcript
+        : returningRun?.responseAttempt?.transcript;
   const strongVersion = isM1L1
     ? returningRun?.m1L1?.selectedDimension && returningRun.m1L1.coachedBeat
       ? m1L1GoodVersion(returningRun.m1L1.selectedDimension, returningRun.m1L1.coachedBeat)
@@ -393,10 +400,10 @@ export default function ApprovedLessonDeckScreen() {
       onRetry={() => rehearsalConfig && router.replace({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: rehearsalConfig.lessonId } })}
     />;
   }
-  if (isReturning && hasValidReturn && indexImpact && strongVersion && returningRun?.responseAttempt && returningRun.retryAttempt && returningRun.comparison) {
+  if (isReturning && hasValidReturn && indexImpact && strongVersion && coachedOriginalResponse && returningRun?.retryAttempt && returningRun.comparison) {
     return <LessonCompletionScreen
       impact={indexImpact}
-      originalResponse={returningRun.responseAttempt.transcript}
+      originalResponse={coachedOriginalResponse}
       retryResponse={returningRun.retryAttempt.transcript}
       comparison={returningRun.comparison.text}
       strongVersion={strongVersion}
