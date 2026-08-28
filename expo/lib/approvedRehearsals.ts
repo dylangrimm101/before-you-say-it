@@ -50,7 +50,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l2",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l02_cut_the_case",
-    contentVersion: "m1-l2-approved-2026-08-28",
+    contentVersion: "m1-l2-dynamic-2026-08-28",
     scenario: {
       id: "bysi-m01-l02-approval-owner",
       category: "work",
@@ -80,7 +80,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l3",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l03_park_and_return",
-    contentVersion: "m1-l3-approved-2026-08-28",
+    contentVersion: "m1-l3-dynamic-2026-08-28",
     scenario: {
       id: "bysi-m01-l03-march-appointments",
       category: "family",
@@ -110,7 +110,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l4",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l04_make_it_repeatable",
-    contentVersion: "m1-l4-approved-2026-08-24",
+    contentVersion: "m1-l4-dynamic-2026-08-28",
     scenario: {
       id: "bysi-m01-l04-changing-plan",
       category: "partner",
@@ -140,7 +140,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l5",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l05_fit_in_one",
-    contentVersion: "m1-l5-approved-2026-08-24",
+    contentVersion: "m1-l5-dynamic-2026-08-28",
     scenario: {
       id: "bysi-m01-l05-friday-kitchen-table",
       category: "partner",
@@ -170,7 +170,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l1",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l01_clear_ask",
-    contentVersion: "m2-l1-approved-2026-08-24",
+    contentVersion: "m2-l1-dynamic-2026-08-28",
     scenario: {
       id: "bysi-m02-l01-thursday-handoff",
       category: "work",
@@ -200,7 +200,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l2",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l02_say_who",
-    contentVersion: "m2-l2-approved-2026-08-24",
+    contentVersion: "m2-l2-dynamic-2026-08-28",
     scenario: {
       id: "bysi-m02-l02-cupcake-order",
       category: "friends",
@@ -230,7 +230,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l3",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l03_when_they_say_they_cant",
-    contentVersion: "m2-l3-approved-2026-08-24",
+    contentVersion: "m2-l3-dynamic-2026-08-28",
     scenario: {
       id: "bysi-m02-l03-saturday-van",
       category: "family",
@@ -260,7 +260,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l4",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l04_say_whether_no",
-    contentVersion: "m2-l4-approved-2026-08-24",
+    contentVersion: "m2-l4-dynamic-2026-08-28",
     scenario: {
       id: "bysi-m02-l04-thursday-pickup",
       category: "partner",
@@ -289,7 +289,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l5",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l05_ask_for_the_loop",
-    contentVersion: "m2-l5-approved-2026-08-24",
+    contentVersion: "m2-l5-dynamic-2026-08-28",
     scenario: {
       id: "bysi-m02-l05-camp-signup",
       category: "partner",
@@ -332,14 +332,22 @@ export function validateApprovedRehearsalCompletion(
   if (!run || !requestedRunId || run.id !== requestedRunId) return false;
   const context = run.scenarioContext;
   const pressure = run.counterpartTurn;
+  const expectedTurnId = `${run.id}-counterpart-turn-1`;
+  const expectedAudioId = `${run.curriculumVersion}-${run.id}-counterpart-turn-1`;
+  const hasValidPressure = Boolean(pressure
+    && pressure.id === expectedTurnId
+    && pressure.reactionId === `${config.lessonId}-dynamic-pressure`
+    && pressure.semanticVoiceKey === "contextual_counterpart"
+    && pressure.resolvedAudioId === expectedAudioId
+    && pressure.text.trim().length >= 3
+    && (pressure.source === "provider" || (pressure.source === "authored" && pressure.text === config.authoredPressureText)));
   return run.convertedModuleId === config.moduleId
     && run.practiceId === config.practiceId
     && run.contentVersion === config.contentVersion
     && run.counterpartIdentity === config.counterpartId
     && context?.scenarioId === config.scenario.id
     && context.counterpartId === config.counterpartId
-    && pressure?.source === "authored"
-    && pressure.text === config.authoredPressureText
+    && hasValidPressure
     && Boolean(run.attempt && run.responseAttempt && run.retryAttempt && run.comparison)
     && (run.attempt?.confirmedAt ?? 0) < (run.responseAttempt?.confirmedAt ?? 0)
     && (run.responseAttempt?.confirmedAt ?? 0) < (run.retryAttempt?.confirmedAt ?? 0)

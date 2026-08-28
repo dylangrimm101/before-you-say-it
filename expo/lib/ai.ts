@@ -234,6 +234,84 @@ export interface M1L1DynamicReplyResult {
   source: "provider" | "authored";
 }
 
+export interface ApprovedRehearsalDynamicReplyInput {
+  scenario: Scenario;
+  lessonId: string;
+  counterpartId: string;
+  namedMove: string;
+  coachedBehaviorId: string;
+  retryDirection: string;
+  approvedTranscript: string;
+  authoredFallback: string;
+  runId: string;
+}
+
+const SHARED_REHEARSAL_COACHING_LEAKAGE = /\b(?:learner|lesson|practice|rehearsal|coach|coaching|rubric|transcript|named move|try saying|you should say|good job|well done)\b/i;
+
+/** Rejects unsafe or instructional shared-lesson replies before they reach the learner. */
+export function approvedRehearsalDynamicReplyPassesQuality(reply: string): boolean {
+  const clean = reply.trim();
+  const words = clean.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? [];
+  return clean.length >= 3
+    && clean.length <= 320
+    && words.length >= 2
+    && words.length <= 55
+    && !SHARED_REHEARSAL_COACHING_LEAKAGE.test(clean)
+    && counterpartLinePassesQuality(clean, "pushback");
+}
+
+/** Generates a scenario-aware pressure for an approved lesson, with its authored line as a fail-safe only. */
+export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehearsalDynamicReplyInput): Promise<M1L1DynamicReplyResult> {
+  const pressureObjective = [
+    `Reply directly to the learner's approved opening as ${input.scenario.counterpart}.`,
+    `Create a realistic moment where the learner can practice the behavior identified internally as ${input.coachedBehaviorId}.`,
+    `Keep every fact consistent with the scenario and persona, keep the issue unresolved, and do not explain or name the teaching move “${input.namedMove}”.`,
+    `The later retry guidance will be: ${input.retryDirection}`,
+  ].join(" ");
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const result = await postBysi<BysiTurnResponse>({
+        type: "rehearsal_turn",
+        turn: "pushback",
+        contract: {
+          ...bysiContract(input.scenario, undefined, input.scenario.goal),
+          pressure_condition: `${input.scenario.persona} ${pressureObjective}`,
+        },
+        transcript: {
+          user_turn_1: input.approvedTranscript,
+          counterpart_pushback: "",
+          user_turn_2: "",
+          counterpart_close: "",
+        } satisfies BysiTranscript,
+        avoid_repeating: [input.authoredFallback],
+        lesson_constraints: {
+          lesson_id: input.lessonId,
+          counterpart_id: input.counterpartId,
+          counterpart: input.scenario.counterpart,
+          approved_transcript: input.approvedTranscript,
+          scenario_context: `${input.scenario.title}. ${input.scenario.situation}`,
+          counterpart_persona: input.scenario.persona,
+          learner_goal: input.scenario.goal,
+          coached_behavior_id: input.coachedBehaviorId,
+          named_move_private: input.namedMove,
+          pressure_objective: pressureObjective,
+          output: "One short, natural in-character reply of no more than three sentences.",
+          reject: ["invented facts", "instant agreement", "coaching language", "teaching-move disclosure", "topic changes"],
+        },
+        variation_seed: `${input.runId}-${input.lessonId}-pressure-${attempt}`,
+      });
+      const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
+      if (reply && approvedRehearsalDynamicReplyPassesQuality(reply)) return { reply, source: "provider" };
+      safeLog("[ai] approved rehearsal quality gate rejected line", { attempt, lessonId: input.lessonId });
+    } catch (error) {
+      safeLog("[ai] approved rehearsal counterpart request failed", { attempt, lessonId: input.lessonId, ...errorShape(error) });
+    }
+  }
+
+  return { reply: input.authoredFallback, source: "authored" };
+}
+
 function m1L1ConversationContext(input: M1L1DynamicReplyInput): string {
   return [
     input.scenario.title,

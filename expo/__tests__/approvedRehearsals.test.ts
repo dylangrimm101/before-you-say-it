@@ -20,7 +20,7 @@ describe("approved M1 L2-L5 rehearsals", () => {
     const l4 = approvedRehearsalConfig("m1-l4")!;
     const l5 = approvedRehearsalConfig("m1-l5")!;
 
-    expect(l2.contentVersion).toBe("m1-l2-approved-2026-08-28");
+    expect(l2.contentVersion).toBe("m1-l2-dynamic-2026-08-28");
     expect(l2.scenario.situation).toBe(
       "Wednesday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi points out that the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file was also late, another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.",
     );
@@ -28,7 +28,7 @@ describe("approved M1 L2-L5 rehearsals", () => {
     expect(l2.namedMove).toBe("One anchor. The rest stays in the folder.");
     expect([l2.rehearsalHandoffCard, l2.returnCard, l2.completionCard]).toEqual([20, 21, 22]);
 
-    expect(l3.contentVersion).toBe("m1-l3-approved-2026-08-28");
+    expect(l3.contentVersion).toBe("m1-l3-dynamic-2026-08-28");
     expect(l3.scenario.counterpart).toBe("Renee — your sister");
     expect(l3.scenario.situation).toBe(
       "Sunday evening, you’re on the phone with Renee, your sister. Dad’s March appointments still need to be divided between you. You handled the last four appointments, and you want to decide who will take which March appointments before you hang up, so nothing is left until the last minute.\n\nRenee has been handling more of the regular check-in calls with Dad, and she’s frustrated that you haven’t been calling him as often.",
@@ -59,7 +59,7 @@ describe("approved M1 L2-L5 rehearsals", () => {
     });
   });
 
-  test("accepts completion only for the exact run, manifest, counterpart, and authored pressure", () => {
+  test("accepts completion only for the exact run, manifest, counterpart, and persisted dynamic pressure", () => {
     const config = approvedRehearsalConfig("m1-l4")!;
     const wrapper = createScenarioPracticeRun(config.scenario, "steady", "defensive", "run-l4", 1);
     const run: PilotDayRun = {
@@ -69,7 +69,15 @@ describe("approved M1 L2-L5 rehearsals", () => {
       contentVersion: config.contentVersion,
       counterpartIdentity: config.counterpartId,
       scenarioContext: { ...wrapper.run.scenarioContext!, counterpartId: config.counterpartId },
-      counterpartTurn: { id: "pressure", text: config.authoredPressureText, source: "authored", authoredAt: 3 },
+      counterpartTurn: {
+        id: "run-l4-counterpart-turn-1",
+        text: "I changed the plan because things came up. Why are you making this about your whole schedule?",
+        source: "provider",
+        reactionId: "m1-l4-dynamic-pressure",
+        semanticVoiceKey: "contextual_counterpart",
+        resolvedAudioId: "scenario-paid-practice-v1-run-l4-counterpart-turn-1",
+        authoredAt: 3,
+      },
       attempt: { id: "run-l4-opener", kind: "opener", transcript: "The plan changed twice.", representation: "confirmed_transcript", confirmedAt: 2 },
       responseAttempt: { id: "run-l4-response", kind: "response", transcript: "I mean those two changes.", representation: "confirmed_transcript", confirmedAt: 4 },
       retryAttempt: { id: "run-l4-retry", kind: "retry", transcript: "I mean the two changes this month.", representation: "confirmed_transcript", confirmedAt: 5 },
@@ -78,7 +86,7 @@ describe("approved M1 L2-L5 rehearsals", () => {
       updatedAt: 5,
     };
     expect(validateApprovedRehearsalCompletion(config, run, "run-l4")).toBe(true);
-    expect(validateApprovedRehearsalCompletion(config, { ...run, counterpartTurn: { ...run.counterpartTurn!, text: "Different line" } }, "run-l4")).toBe(false);
+    expect(validateApprovedRehearsalCompletion(config, { ...run, counterpartTurn: { ...run.counterpartTurn!, id: "different-turn" } }, "run-l4")).toBe(false);
     expect(validateApprovedRehearsalCompletion(config, run, "other-run")).toBe(false);
   });
 });
@@ -139,7 +147,7 @@ describe("approved M2 L1-L5 rehearsals", () => {
     }
   });
 
-  test("accepts a Module 2 return only for the exact run and authored manifest", () => {
+  test("accepts a Module 2 return only for the exact run and dynamic manifest", () => {
     const config = approvedRehearsalConfig("m2-l3")!;
     const wrapper = createScenarioPracticeRun(config.scenario, "steady", "defensive", "run-m2-l3", 1);
     const run: PilotDayRun = {
@@ -149,7 +157,15 @@ describe("approved M2 L1-L5 rehearsals", () => {
       contentVersion: config.contentVersion,
       counterpartIdentity: config.counterpartId,
       scenarioContext: { ...wrapper.run.scenarioContext!, counterpartId: config.counterpartId },
-      counterpartTurn: { id: "pressure", text: config.authoredPressureText, source: "authored", authoredAt: 3 },
+      counterpartTurn: {
+        id: "run-m2-l3-counterpart-turn-1",
+        text: "I can't give you the whole Saturday. Theo's game is fixed, and two is the earliest I can be there.",
+        source: "provider",
+        reactionId: "m2-l3-dynamic-pressure",
+        semanticVoiceKey: "contextual_counterpart",
+        resolvedAudioId: "scenario-paid-practice-v1-run-m2-l3-counterpart-turn-1",
+        authoredAt: 3,
+      },
       attempt: { id: "run-m2-l3-opener", kind: "opener", transcript: "Can you take Saturday?", representation: "confirmed_transcript", confirmedAt: 2 },
       responseAttempt: { id: "run-m2-l3-response", kind: "response", transcript: "That doesn't help.", representation: "confirmed_transcript", confirmedAt: 4 },
       retryAttempt: { id: "run-m2-l3-retry", kind: "retry", transcript: "I hear you. Could you take it after two?", representation: "confirmed_transcript", confirmedAt: 5 },

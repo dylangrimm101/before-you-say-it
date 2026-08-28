@@ -62,8 +62,11 @@ function completedJourney(input: (typeof JOURNEYS)[number]) {
   const opened = preserveScenarioAttempt(identified, "opener", input.opener, 101);
   const pressured = attachScenarioCounterpartTurn(opened, {
     id: `${runId}-counterpart-turn-1`,
-    text: config.authoredPressureText,
-    source: "authored",
+    text: `Dynamic pressure for ${input.lessonId}`,
+    source: "provider",
+    reactionId: `${input.lessonId}-dynamic-pressure`,
+    semanticVoiceKey: "contextual_counterpart",
+    resolvedAudioId: `${opened.run.curriculumVersion}-${runId}-counterpart-turn-1`,
     authoredAt: 102,
   }, 102);
   const responded = preserveScenarioAttempt(pressured, "response", input.firstResponse, 103);
@@ -108,7 +111,11 @@ describe("approved lesson preflight journeys", () => {
       const journey = completedJourney(input);
       const { config, value } = journey;
       expect(value.run.state, input.lessonId).toBe("attempt_comparison");
-      expect(value.run.counterpartTurn?.text, input.lessonId).toBe(config.authoredPressureText);
+      expect(value.run.counterpartTurn, input.lessonId).toMatchObject({
+        text: `Dynamic pressure for ${input.lessonId}`,
+        source: "provider",
+        reactionId: `${input.lessonId}-dynamic-pressure`,
+      });
       expect(value.run.responseAttempt?.transcript, input.lessonId).toBe(input.firstResponse);
       expect(value.run.retryAttempt?.transcript, input.lessonId).toBe(input.retry);
       expect(value.run.comparison, input.lessonId).toEqual(approvedRehearsalComparison(config, input.firstResponse, input.retry));

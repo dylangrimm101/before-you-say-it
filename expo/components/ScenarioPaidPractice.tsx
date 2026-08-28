@@ -9,7 +9,7 @@ import { ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductU
 import { Backdrop, MicControl, PrimaryButton, Reveal, StateDock, Thinking } from "@/components/ui";
 import { DIFFICULTY } from "@/constants/scenarios";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
-import { generateDebrief, nextCounterpartTurn } from "@/lib/ai";
+import { generateApprovedRehearsalDynamicReply, generateDebrief, nextCounterpartTurn } from "@/lib/ai";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { m1L1CoachNote, m1L1Comparison, type ConvertedLessonConfig } from "@/lib/convertedLesson";
 import {
@@ -245,20 +245,33 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
     const approved = preserveScenarioAttempt(value, "opener", draft, Date.now());
     try {
       await persist(approved);
-      const authoredPressure = convertedLesson?.authoredPressureText ?? approvedRehearsal?.authoredPressureText;
-      const result = authoredPressure ? null : await nextCounterpartTurn(
-        scenario,
-        context.difficulty,
-        [turn(approved.run.attempt?.id ?? `${approved.run.id}-opener`, "user", approved.run.attempt?.transcript ?? draft.trim())],
-        context.reaction,
-        context.objective,
-      );
-      const pressureText = authoredPressure ?? result?.reply ?? "";
+      const openingTranscript = approved.run.attempt?.transcript ?? draft.trim();
+      const result = approvedRehearsal
+        ? await generateApprovedRehearsalDynamicReply({
+          scenario,
+          lessonId: approvedRehearsal.lessonId,
+          counterpartId: approvedRehearsal.counterpartId,
+          namedMove: approvedRehearsal.namedMove,
+          coachedBehaviorId: approvedRehearsal.coachedBehaviorId,
+          retryDirection: approvedRehearsal.retryDirection,
+          approvedTranscript: openingTranscript,
+          authoredFallback: approvedRehearsal.authoredPressureText,
+          runId: approved.run.id,
+        })
+        : await nextCounterpartTurn(
+          scenario,
+          context.difficulty,
+          [turn(approved.run.attempt?.id ?? `${approved.run.id}-opener`, "user", openingTranscript)],
+          context.reaction,
+          context.objective,
+        );
+      const pressureText = result.reply.trim();
       if (!pressureText) throw new Error("Counterpart pressure is unavailable");
       const withPressure = attachScenarioCounterpartTurn(approved, {
         id: `${approved.run.id}-counterpart-turn-1`,
         text: pressureText,
-        source: authoredPressure ? "authored" : "provider",
+        source: "source" in result ? result.source : "provider",
+        reactionId: approvedRehearsal ? `${approvedRehearsal.lessonId}-dynamic-pressure` : `${approved.run.id}-provider-pressure`,
         semanticVoiceKey: "contextual_counterpart",
         resolvedAudioId: `${approved.run.curriculumVersion}-${approved.run.id}-counterpart-turn-1`,
       }, Date.now());
