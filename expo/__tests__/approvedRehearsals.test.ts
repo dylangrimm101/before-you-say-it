@@ -44,7 +44,11 @@ describe("approved M1 L2-L5 rehearsals", () => {
     expect(l4.authoredPressureText).toBe("So you're saying I don't think about your schedule.");
     expect([l4.rehearsalHandoffCard, l4.returnCard, l4.completionCard]).toEqual([17, 18, 19]);
 
+    expect(l5.contentVersion).toBe("m1-l5-detailed-scene-v5-2026-08-29");
     expect(l5.scenario.counterpart).toBe("Adam");
+    expect(l5.scenario.situation).toBe(
+      "Friday night, you’re at the kitchen table with Adam, who shares responsibility for your child’s calendar, after the kid has gone to bed. This month, most of the calendar has fallen to you—including camp signups, the dentist, and both birthday RSVPs. You want several things addressed, but raising all of them at once could leave none of them clear. Choose one purpose for tonight and keep the others for later. Adam has his own read of the month and may question which issue you actually want him to address.",
+    );
     expect(l5.authoredPressureText).toBe("Is this you asking, or is this you working up to the signups?");
     expect([l5.rehearsalHandoffCard, l5.returnCard, l5.completionCard]).toEqual([18, 19, 20]);
   });

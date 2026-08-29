@@ -210,7 +210,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(cleaned).toContain("Start rehearsal");
   });
 
-  test("installs the approved detailed M1 L3 and M1 L4 scenes in production handoffs", async () => {
+  test("installs the approved detailed M1 L3, M1 L4, and M1 L5 scenes in production handoffs", async () => {
     const cases = [
       {
         fileName: "M1-L3-Park-and-Return.html",
@@ -221,6 +221,11 @@ describe("approved Modules 1 and 2 internal deck port", () => {
         fileName: "M1-L4-Make-It-Repeatable.html",
         oldScene: "Thursday night, the house is finally quiet. The plan changed twice this month after you had already rearranged work. By now it has become a month of things in your head.",
         approvedScene: "Thursday night, you’re talking with Theo, your partner, after the house is quiet. Twice this month, Theo agreed to handle school pickup, so you rearranged work around that plan. Both times, he changed the plan after your schedule was already set, leaving you to move meetings again. You want future changes discussed before either of you commits—not to suggest that Theo never considers your schedule.",
+      },
+      {
+        fileName: "M1-L5-Fit-in-One.html",
+        oldScene: "Friday night, kitchen table. The kid went down at seven for once. Neither of you is running on four hours.",
+        approvedScene: "Friday night, you’re at the kitchen table with Adam, who shares responsibility for your child’s calendar, after the kid has gone to bed. This month, most of the calendar has fallen to you—including camp signups, the dentist, and both birthday RSVPs. You want several things addressed, but raising all of them at once could leave none of them clear. Choose one purpose for tonight and keep the others for later. Adam has his own read of the month and may question which issue you actually want him to address.",
       },
     ] as const;
 

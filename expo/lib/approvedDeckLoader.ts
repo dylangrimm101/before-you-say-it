@@ -18,6 +18,8 @@ const STALE_M1_L3_SCENE = "Sunday evening, on the phone with your sister. You wa
 const APPROVED_M1_L3_SCENE = "Sunday evening, you’re on the phone with your sister, Renee. Dad’s March appointments still need to be divided, and you handled the last four. You want to agree on who will take each March appointment before you hang up. Renee has been handling more of Dad’s regular check-in calls and may raise that you haven’t been calling as often.";
 const STALE_M1_L4_SCENE = "Thursday night, the house is finally quiet. The plan changed twice this month after you had already rearranged work. By now it has become a month of things in your head.";
 const APPROVED_M1_L4_SCENE = "Thursday night, you’re talking with Theo, your partner, after the house is quiet. Twice this month, Theo agreed to handle school pickup, so you rearranged work around that plan. Both times, he changed the plan after your schedule was already set, leaving you to move meetings again. You want future changes discussed before either of you commits—not to suggest that Theo never considers your schedule.";
+const STALE_M1_L5_SCENE = "Friday night, kitchen table. The kid went down at seven for once. Neither of you is running on four hours.";
+const APPROVED_M1_L5_SCENE = "Friday night, you’re at the kitchen table with Adam, who shares responsibility for your child’s calendar, after the kid has gone to bed. This month, most of the calendar has fallen to you—including camp signups, the dentist, and both birthday RSVPs. You want several things addressed, but raising all of them at once could leave none of them clear. Choose one purpose for tonight and keep the others for later. Adam has his own read of the month and may question which issue you actually want him to address.";
 const M1_L1_OUTCOME_CARD = /<div\b[^>]*>\s*<span\b[^>]*>\s*What happens\s*<\/span>[\s\S]*?<\/div>/gi;
 const M1_L1_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*You open\.\s*Adam pushes back twice\..*?same moment back to you\.\s*<\/div>\s*<\/div>/is;
 const M1_L1_EMPTY_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*<\/div>\s*<\/div>/gis;
@@ -259,7 +261,8 @@ export function removeM1L1OutcomePreview(template: string): string {
 export function alignApprovedRehearsalScene(template: string): string {
   return template
     .replace(STALE_M1_L3_SCENE, APPROVED_M1_L3_SCENE)
-    .replace(STALE_M1_L4_SCENE, APPROVED_M1_L4_SCENE);
+    .replace(STALE_M1_L4_SCENE, APPROVED_M1_L4_SCENE)
+    .replace(STALE_M1_L5_SCENE, APPROVED_M1_L5_SCENE);
 }
 
 /** Converts an approved lesson handoff action into the fail-closed native QA runtime launch. */
