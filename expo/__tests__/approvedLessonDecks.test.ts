@@ -210,7 +210,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(cleaned).toContain("Start rehearsal");
   });
 
-  test("installs the approved detailed M1 L3 through M2 L2 scenes in production handoffs", async () => {
+  test("installs the approved detailed M1 L3 through M2 L3 scenes in production handoffs", async () => {
     const cases = [
       {
         fileName: "M1-L3-Park-and-Return.html",
@@ -236,6 +236,11 @@ describe("approved Modules 1 and 2 internal deck port", () => {
         fileName: "M2-L2-Say-Who.html",
         oldScene: "Thursday afternoon, outside the school. You asked the group, there was the pause, and nobody has answered yet. Renee, Cory and Angela are still standing there. The bakery needs the cupcake order confirmed by five.",
         approvedScene: "Thursday afternoon, outside the school after pickup, you’re standing with Renee, Cory, Angela, and Jen. The group’s cupcake order must be confirmed with the bakery by 5 PM. You already asked whether someone could handle it, but after a pause no one answered. Renee has collected everyone’s cash, while the order is under Jen’s name and card. You need to leave knowing who will take the next answerable action. Address one person directly rather than sending the request back to the group; Renee may ask why the request belongs to her.",
+      },
+      {
+        fileName: "M2-L3-When-They-Say-They-Cant.html",
+        oldScene: "Thursday night, on the phone with your brother Marcus about Saturday. Ellie gets the keys in the morning and the van goes back Sunday night.",
+        approvedScene: "Thursday night, you’re on the phone with your brother, Marcus, arranging who will handle the van on Saturday. Ellie will have the keys that morning, and the van must be returned Sunday night, so Saturday’s plan needs to be settled before the weekend. You want to leave with a clear agreement about which part of Saturday Marcus can take. Marcus may say he cannot do the whole day because Theo has a game and he is not free until 2 PM. Hear the constraint, trade one part of the original ask, and clearly restate what you are still asking him to do.",
       },
     ] as const;
 

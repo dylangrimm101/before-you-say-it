@@ -24,6 +24,8 @@ const STALE_M2_L1_SCENE = "Thursday morning, before standup. The handoff brief h
 const APPROVED_M2_L1_SCENE = "Thursday morning, before standup, you’re speaking with Maya, your teammate who prepares the revised two-page handoff brief for a 4 PM review. The brief has arrived late three weeks in a row, and you’ve mentioned the pattern twice without making a specific request. You need to leave the conversation knowing what Maya can deliver in time for today’s review and by when. Maya may say she cannot finish the whole brief today, so make one clear, answerable ask while leaving room for a real constraint.";
 const STALE_M2_L2_SCENE = "Thursday afternoon, outside the school. You asked the group, there was the pause, and nobody has answered yet. Renee, Cory and Angela are still standing there. The bakery needs the cupcake order confirmed by five.";
 const APPROVED_M2_L2_SCENE = "Thursday afternoon, outside the school after pickup, you’re standing with Renee, Cory, Angela, and Jen. The group’s cupcake order must be confirmed with the bakery by 5 PM. You already asked whether someone could handle it, but after a pause no one answered. Renee has collected everyone’s cash, while the order is under Jen’s name and card. You need to leave knowing who will take the next answerable action. Address one person directly rather than sending the request back to the group; Renee may ask why the request belongs to her.";
+const STALE_M2_L3_SCENE = "Thursday night, on the phone with your brother Marcus about Saturday. Ellie gets the keys in the morning and the van goes back Sunday night.";
+const APPROVED_M2_L3_SCENE = "Thursday night, you’re on the phone with your brother, Marcus, arranging who will handle the van on Saturday. Ellie will have the keys that morning, and the van must be returned Sunday night, so Saturday’s plan needs to be settled before the weekend. You want to leave with a clear agreement about which part of Saturday Marcus can take. Marcus may say he cannot do the whole day because Theo has a game and he is not free until 2 PM. Hear the constraint, trade one part of the original ask, and clearly restate what you are still asking him to do.";
 const M1_L1_OUTCOME_CARD = /<div\b[^>]*>\s*<span\b[^>]*>\s*What happens\s*<\/span>[\s\S]*?<\/div>/gi;
 const M1_L1_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*You open\.\s*Adam pushes back twice\..*?same moment back to you\.\s*<\/div>\s*<\/div>/is;
 const M1_L1_EMPTY_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*<\/div>\s*<\/div>/gis;
@@ -268,7 +270,8 @@ export function alignApprovedRehearsalScene(template: string): string {
     .replace(STALE_M1_L4_SCENE, APPROVED_M1_L4_SCENE)
     .replace(STALE_M1_L5_SCENE, APPROVED_M1_L5_SCENE)
     .replace(STALE_M2_L1_SCENE, APPROVED_M2_L1_SCENE)
-    .replace(STALE_M2_L2_SCENE, APPROVED_M2_L2_SCENE);
+    .replace(STALE_M2_L2_SCENE, APPROVED_M2_L2_SCENE)
+    .replace(STALE_M2_L3_SCENE, APPROVED_M2_L3_SCENE);
 }
 
 /** Converts an approved lesson handoff action into the fail-closed native QA runtime launch. */

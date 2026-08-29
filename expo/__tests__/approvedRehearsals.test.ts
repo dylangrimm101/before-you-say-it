@@ -131,7 +131,11 @@ describe("approved M2 L1-L5 rehearsals", () => {
     );
     expect(l2.authoredPressureText).toBe("Why me?");
     expect(l2.namedMove).toBe("Say who you're asking.");
+    expect(l3.contentVersion).toBe("m2-l3-detailed-scene-v5-2026-08-29");
     expect(l3.scenario.counterpart).toBe("Marcus — your brother");
+    expect(l3.scenario.situation).toBe(
+      "Thursday night, you’re on the phone with your brother, Marcus, arranging who will handle the van on Saturday. Ellie will have the keys that morning, and the van must be returned Sunday night, so Saturday’s plan needs to be settled before the weekend. You want to leave with a clear agreement about which part of Saturday Marcus can take. Marcus may say he cannot do the whole day because Theo has a game and he is not free until 2 PM. Hear the constraint, trade one part of the original ask, and clearly restate what you are still asking him to do.",
+    );
     expect(l3.authoredPressureText).toBe("I can't do a whole Saturday. Theo's got a game and I'm not free till two.");
     expect(l3.namedMove).toBe("Hear it. Trade one thing. Say where it stands.");
     expect(l4.scenario.counterpart).toBe("Sam");
