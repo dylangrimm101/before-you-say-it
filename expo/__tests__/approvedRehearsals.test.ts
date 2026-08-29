@@ -145,7 +145,11 @@ describe("approved M2 L1-L5 rehearsals", () => {
     );
     expect(l4.authoredPressureText).toBe("No, I can't do pickup tomorrow.");
     expect(l4.namedMove).toBe("Say whether no is available.");
+    expect(l5.contentVersion).toBe("m2-l5-detailed-scene-v5-2026-08-29");
     expect(l5.scenario.counterpart).toBe("Sam");
+    expect(l5.scenario.situation).toBe(
+      "A weeknight at the kitchen table, you’re talking with Sam, your partner, about handling the camp signup. Registration opens next month, and early-bird pricing ends six weeks later. You have managed the signup for the last three summers, but this year you want Sam to own it. You need Sam to return to you only if a change in timing or cost puts the signup at risk—not for approval at every step. Define a clear condition for checking back while leaving the steps in between with Sam. Sam may ask what counts as “at risk” and whether they should proceed without checking each step.",
+    );
     expect(l5.authoredPressureText).toBe("What counts as at risk?");
     expect(l5.namedMove).toBe("Ask for the loop, not the last step.");
 

@@ -210,7 +210,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(cleaned).toContain("Start rehearsal");
   });
 
-  test("installs the approved detailed M1 L3 through M2 L4 scenes in production handoffs", async () => {
+  test("installs the approved detailed M1 L3 through M2 L5 scenes in production handoffs", async () => {
     const cases = [
       {
         fileName: "M1-L3-Park-and-Return.html",
@@ -246,6 +246,11 @@ describe("approved Modules 1 and 2 internal deck port", () => {
         fileName: "M2-L4-Say-Whether-No.html",
         oldScene: "Wednesday night at home, talking to Sam about tomorrow. The client dinner is Thursday and it won't move. Pickup is at 5:30.",
         approvedScene: "Wednesday night at home, you’re talking with Sam, your partner, about school pickup tomorrow. You have a client dinner on Thursday that cannot move, and pickup is at 5:30. You need to know whether Sam can handle pickup, but you can make another arrangement if the answer is no. Ask directly while making clear that no is genuinely available. Sam may say they cannot do pickup and then check whether no is actually okay. If you offered room to say no, honor the answer without asking again or adding a penalty.",
+      },
+      {
+        fileName: "M2-L5-Ask-for-the-Loop.html",
+        oldScene: "A weeknight at the kitchen table with Sam. Camp signup opens next month, early-bird closes six weeks after that, and you have run it the last three summers.",
+        approvedScene: "A weeknight at the kitchen table, you’re talking with Sam, your partner, about handling the camp signup. Registration opens next month, and early-bird pricing ends six weeks later. You have managed the signup for the last three summers, but this year you want Sam to own it. You need Sam to return to you only if a change in timing or cost puts the signup at risk—not for approval at every step. Define a clear condition for checking back while leaving the steps in between with Sam. Sam may ask what counts as “at risk” and whether they should proceed without checking each step.",
       },
     ] as const;
 
