@@ -1,13 +1,15 @@
+import * as Crypto from "expo-crypto";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Bookmark, Check, MoreHorizontal, RotateCcw, ShieldCheck, Sparkles, TrendingUp } from "lucide-react-native";
+import { ArrowLeft, Bookmark, Check, MoreHorizontal, RotateCcw, ShieldCheck, Sparkles, Star, TrendingUp } from "lucide-react-native";
+import { useMutation } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, ActivityIndicator, Alert, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Alert, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
 import { approvedLessonDeck } from "@/constants/approvedLessons";
 import { ProductCard, SectionLabel } from "@/components/PaidProductUI";
-import { Backdrop, PrimaryButton, Reveal, useReducedMotion } from "@/components/ui";
+import { Backdrop, GhostButton, PrimaryButton, Reveal, useReducedMotion } from "@/components/ui";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { C, GUTTER, T, font, radius, shadow } from "@/constants/theme";
 import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
@@ -15,6 +17,8 @@ import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
 import { approvedRehearsalConfig, approvedRehearsalIndexImpact, approvedRehearsalStrongVersion, validateApprovedRehearsalCompletion, type ApprovedRehearsalIndexImpact } from "@/lib/approvedRehearsals";
 import { conversionRuntimeEnabled, m1L1GoodVersion, m1L1IndexImpact, M1_L1_CONVERSION, validateM1L1Completion, type ConvertedLessonProgress, type M1L1IndexImpact, type TransferChoice } from "@/lib/convertedLesson";
 import { progressHistoryPresentation, SCORED_PRACTICE_HISTORY_VERSION, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
+import { isFeedbackLessonId, LESSON_FEEDBACK_MAX_LENGTH, type FeedbackLessonId } from "@/lib/lessonFeedback";
+import { submitLessonFeedback } from "@/lib/lessonFeedbackService";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useStore } from "@/providers/store";
 
@@ -40,6 +44,7 @@ export default function ApprovedLessonDeckScreen() {
   const isM1L1 = conversionRuntimeEnabled(params.lessonId);
   const approvedConfig = approvedRehearsalConfig(params.lessonId);
   const rehearsalConfig = isM1L1 ? M1_L1_CONVERSION : approvedConfig;
+  const feedbackLessonId = lesson && isFeedbackLessonId(lesson.id) ? lesson.id : null;
   const isConverted = Boolean(rehearsalConfig);
   const isReturning = isConverted && params.returnFromRehearsal === "1" && !lessonWasReset;
   const returningRun = activeScenarioRun?.run;
@@ -54,6 +59,7 @@ export default function ApprovedLessonDeckScreen() {
   const [loadError, setLoadError] = useState<boolean>(false);
   const [loadAttempt, setLoadAttempt] = useState<number>(0);
   const [isLessonMenuOpen, setIsLessonMenuOpen] = useState<boolean>(false);
+  const [feedbackContext, setFeedbackContext] = useState<{ id: string; lessonId: FeedbackLessonId; contentVersion: string; lessonTitle: string } | null>(null);
   const [isResetting, setIsResetting] = useState<boolean>(false);
   const [resetNotice, setResetNotice] = useState<{ message: string; snapshot: ConvertedLessonProgress[]; canUndo: boolean } | null>(null);
 
@@ -333,7 +339,7 @@ export default function ApprovedLessonDeckScreen() {
 
   const finishLesson = useCallback(async (): Promise<void> => {
     const retryAttempt = returningRun?.retryAttempt;
-    if (!activeScenarioRun || !returningRun || !retryAttempt || !indexImpact || !rehearsalConfig || isCompleting) return;
+    if (!activeScenarioRun || !returningRun || !retryAttempt || !indexImpact || !rehearsalConfig || !feedbackLessonId || !lesson || isCompleting) return;
     setIsCompleting(true);
     const completedAt = Date.now();
     const record: ScoredPracticeRecord = {
@@ -379,18 +385,30 @@ export default function ApprovedLessonDeckScreen() {
       });
       await saveScoredPracticeRecord(record);
       setCompletionCommitted(true);
-      router.replace("/(tabs)");
+      setFeedbackContext({
+        id: Crypto.randomUUID(),
+        lessonId: feedbackLessonId,
+        contentVersion: rehearsalConfig.contentVersion,
+        lessonTitle: lesson.title,
+      });
     } catch (error: unknown) {
       safeLog("[converted-lesson] native completion failed", errorShape(error));
       Alert.alert("We couldn’t finish securely", "Your rehearsal is still available. Please try again.");
       setIsCompleting(false);
     }
-  }, [activeScenarioRun, clearActiveScenarioRunStrict, indexImpact, isCompleting, isStrongVersionSaved, lesson?.title, markPendingConvertedLessonPrivateContentDeleted, promotePendingConvertedLessonCompletion, rehearsalConfig, returningRun, router, saveScoredPracticeRecord, strongVersion, writePendingConvertedLessonCompletion]);
+  }, [activeScenarioRun, clearActiveScenarioRunStrict, feedbackLessonId, indexImpact, isCompleting, isStrongVersionSaved, lesson, markPendingConvertedLessonPrivateContentDeleted, promotePendingConvertedLessonCompletion, rehearsalConfig, returningRun, saveScoredPracticeRecord, strongVersion, writePendingConvertedLessonCompletion]);
 
   if (!__DEV__) {
     return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
   }
   if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to the internal lesson catalog and choose another deck." />;
+  if (feedbackContext) {
+    return <LessonFeedbackScreen
+      feedback={feedbackContext}
+      bottomInset={insets.bottom}
+      onDone={() => router.replace("/(tabs)")}
+    />;
+  }
   if (isReturning && !hasValidReturn) {
     return <Unavailable
       title="We couldn’t verify that rehearsal result."
@@ -524,6 +542,74 @@ function LessonCompletionScreen({ impact, originalResponse, retryResponse, compa
   </ScrollView></View>;
 }
 
+function LessonFeedbackScreen({ feedback, bottomInset, onDone }: { feedback: { id: string; lessonId: FeedbackLessonId; contentVersion: string; lessonTitle: string }; bottomInset: number; onDone: () => void }): React.JSX.Element {
+  const [rating, setRating] = useState<number | null>(null);
+  const [comment, setComment] = useState<string>("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const submission = useMutation({ mutationFn: submitLessonFeedback });
+  const ratingLabels = ["", "Not useful", "A little useful", "Useful", "Very useful", "Extremely useful"] as const;
+
+  const handleSubmit = useCallback(async (): Promise<void> => {
+    if (rating === null || submission.isPending) return;
+    setSubmitError(null);
+    try {
+      await submission.mutateAsync({
+        id: feedback.id,
+        lessonId: feedback.lessonId,
+        contentVersion: feedback.contentVersion,
+        rating,
+        comment,
+      });
+      onDone();
+    } catch (error: unknown) {
+      safeLog("[lesson-feedback] submission failed", errorShape(error));
+      setSubmitError("We couldn’t send your feedback. You can try again or skip for now.");
+    }
+  }, [comment, feedback, onDone, rating, submission]);
+
+  return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <Backdrop />
+    <ScrollView
+      contentContainerStyle={[styles.feedbackScroll, { paddingBottom: bottomInset + 28 }]}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      showsVerticalScrollIndicator={false}
+    >
+      <Reveal><SectionLabel tone={C.purple}>One last thing</SectionLabel><Text style={styles.feedbackTitle}>How was this lesson?</Text><Text style={styles.feedbackLede}>{feedback.lessonTitle}</Text></Reveal>
+      <Reveal index={1}><ProductCard style={styles.ratingCard}><Text style={styles.ratingPrompt}>Tap a rating</Text><View style={styles.stars} accessibilityRole="radiogroup">
+        {[1, 2, 3, 4, 5].map((value) => {
+          const isSelected = rating !== null && value <= rating;
+          return <Pressable
+            key={value}
+            onPress={() => { setRating(value); setSubmitError(null); }}
+            style={({ pressed }) => [styles.starButton, pressed && styles.starButtonPressed]}
+            accessibilityRole="radio"
+            accessibilityLabel={`${value} ${value === 1 ? "star" : "stars"}, ${ratingLabels[value]}`}
+            accessibilityState={{ checked: rating === value }}
+          >
+            <Star size={34} color={isSelected ? C.amber : C.dim} fill={isSelected ? C.amber : "transparent"} strokeWidth={1.8} />
+          </Pressable>;
+        })}
+      </View><Text style={styles.ratingMeaning}>{rating === null ? "Choose between 1 and 5 stars" : ratingLabels[rating]}</Text></ProductCard></Reveal>
+      <Reveal index={2}><View style={styles.feedbackInputGroup}><Text style={styles.feedbackInputLabel}>Let us know what you think</Text><Text style={styles.feedbackOptional}>Optional</Text><TextInput
+        value={comment}
+        onChangeText={(value) => { setComment(value); setSubmitError(null); }}
+        maxLength={LESSON_FEEDBACK_MAX_LENGTH}
+        multiline
+        textAlignVertical="top"
+        placeholder="What worked well—or what should we improve?"
+        placeholderTextColor={C.dim}
+        style={styles.feedbackInput}
+        accessibilityLabel="Optional lesson feedback"
+      /><Text style={styles.feedbackCount}>{comment.length} / {LESSON_FEEDBACK_MAX_LENGTH}</Text></View></Reveal>
+      {submitError ? <Text style={styles.feedbackError} accessibilityLiveRegion="polite">{submitError}</Text> : null}
+      <PrimaryButton label={submission.isPending ? "Sending…" : "Submit feedback"} disabled={rating === null || submission.isPending} onPress={() => void handleSubmit()} containerStyle={styles.feedbackSubmit} />
+      <GhostButton label="Skip" disabled={submission.isPending} onPress={onDone} containerStyle={styles.feedbackSkip} />
+      <Text style={styles.feedbackPrivacy}>We save only your rating, this optional note, and the lesson version—never your rehearsal audio or transcript.</Text>
+    </ScrollView>
+  </KeyboardAvoidingView>;
+}
+
 function Unavailable({ title, body, onRetry }: { title: string; body: string; onRetry?: () => void }) {
   return (
     <View style={[styles.root, styles.unavailable]}>
@@ -548,6 +634,24 @@ const styles = StyleSheet.create({
   indexImpactCard: { marginTop: 24, gap: 10 }, impactTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }, impactResult: { fontFamily: font.bold, fontSize: 18, lineHeight: 23, color: C.text, marginTop: 7 }, indexTransition: { gap: 9 }, indexNumbers: { flexDirection: "row", alignItems: "baseline", gap: 8 }, indexBefore: { fontFamily: font.semi, fontSize: 31, color: C.dim, textDecorationLine: "line-through" }, indexArrow: { fontFamily: font.regular, fontSize: 23, color: C.dim }, indexAfter: { fontFamily: font.bold, fontSize: 54, lineHeight: 60, color: C.purple, letterSpacing: -1.5 }, indexOutOf: { fontFamily: font.regular, fontSize: 14, color: C.dim }, indexTrack: { height: 8, overflow: "hidden", borderRadius: 4, backgroundColor: "rgba(81,40,136,0.11)" }, indexFill: { height: "100%", borderRadius: 4, backgroundColor: C.purple }, impactExplanation: { ...T.support, color: C.text }, signalNote: { ...T.caption, marginTop: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
   comparisonCard: { marginTop: 14, gap: 12 }, responseBlock: { gap: 5 }, responseLabel: { fontFamily: font.bold, fontSize: 11, letterSpacing: 0.7, textTransform: "uppercase", color: C.dim }, responseText: { fontFamily: font.medium, fontSize: 16, lineHeight: 23, color: C.text }, responseDivider: { height: StyleSheet.hairlineWidth, backgroundColor: C.line }, comparisonText: { ...T.support, color: C.purple, paddingTop: 4 },
   strongCard: { marginTop: 14, gap: 10 }, strongText: { fontFamily: font.medium, fontSize: 18, lineHeight: 27, color: C.text }, saveStrongButton: { minHeight: 52, borderRadius: radius.pill, borderWidth: 1, borderColor: C.purple, paddingHorizontal: 15, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 }, saveStrongButtonSaved: { backgroundColor: C.purple }, saveIcon: { width: 24, alignItems: "center" }, saveStrongText: { fontFamily: font.semi, fontSize: 14, color: C.purple }, saveStrongTextSaved: { color: C.onAccent }, finishButton: { marginTop: 22 }, privacyNote: { ...T.caption, textAlign: "center", marginTop: 10, paddingHorizontal: 20 },
+  feedbackScroll: { flexGrow: 1, justifyContent: "center", paddingHorizontal: GUTTER, paddingTop: 56 },
+  feedbackTitle: { fontFamily: font.bold, fontSize: 34, lineHeight: 41, letterSpacing: -0.8, color: C.text, marginTop: 10 },
+  feedbackLede: { ...T.support, marginTop: 8 },
+  ratingCard: { marginTop: 26, alignItems: "center" },
+  ratingPrompt: { fontFamily: font.semi, fontSize: 14, color: C.textSoft },
+  stars: { flexDirection: "row", justifyContent: "center", marginTop: 12 },
+  starButton: { width: 52, minHeight: 52, alignItems: "center", justifyContent: "center", borderRadius: 18 },
+  starButtonPressed: { backgroundColor: C.purpleSoft, transform: [{ scale: 0.94 }] },
+  ratingMeaning: { ...T.caption, minHeight: 20, marginTop: 6, color: C.textSoft },
+  feedbackInputGroup: { marginTop: 18 },
+  feedbackInputLabel: { fontFamily: font.semi, fontSize: 16, color: C.text },
+  feedbackOptional: { ...T.caption, position: "absolute", right: 0, top: 2 },
+  feedbackInput: { minHeight: 132, marginTop: 10, borderRadius: 20, borderWidth: 1, borderColor: C.lineStrong, backgroundColor: C.surfaceHigh, paddingHorizontal: 16, paddingVertical: 14, fontFamily: font.regular, fontSize: 16, lineHeight: 23, color: C.text },
+  feedbackCount: { ...T.caption, alignSelf: "flex-end", marginTop: 5 },
+  feedbackError: { ...T.support, color: C.clay, marginTop: 12, textAlign: "center" },
+  feedbackSubmit: { marginTop: 20 },
+  feedbackSkip: { marginTop: 8 },
+  feedbackPrivacy: { ...T.caption, marginTop: 12, paddingHorizontal: 12, textAlign: "center" },
   lessonMenu: { position: "absolute", right: 12, zIndex: 8, width: 278, borderRadius: 18, padding: 12, backgroundColor: "rgba(255,255,255,0.98)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
   lessonMenuLabel: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.2, color: C.dim, paddingHorizontal: 6, paddingBottom: 7 },
   lessonMenuAction: { minHeight: 70, borderRadius: 14, padding: 10, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.claySoft },
