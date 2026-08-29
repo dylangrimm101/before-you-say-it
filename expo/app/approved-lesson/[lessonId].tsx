@@ -322,9 +322,7 @@ export default function ApprovedLessonDeckScreen() {
     ? returningRun?.m1L1?.coachedBeat === 1 ? returningRun.attempt?.transcript : returningRun?.responseAttempt?.transcript
     : returningRun?.coachingObservation?.coachedBeat === 1
       ? returningRun.attempt?.transcript
-      : returningRun?.coachingObservation?.coachedBeat === 5
-        ? returningRun.approvedRehearsal?.secondResponseAttempt?.transcript
-        : returningRun?.responseAttempt?.transcript;
+      : returningRun?.responseAttempt?.transcript;
   const strongVersion = isM1L1
     ? returningRun?.m1L1?.selectedDimension && returningRun.m1L1.coachedBeat
       ? m1L1GoodVersion(returningRun.m1L1.selectedDimension, returningRun.m1L1.coachedBeat)

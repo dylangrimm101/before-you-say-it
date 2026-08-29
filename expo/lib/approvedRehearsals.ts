@@ -39,7 +39,7 @@ export interface ApprovedRehearsalCoachNote {
   note: string;
   retryDirection: string;
   coachedBehaviorId: string;
-  coachedBeat: 1 | 3 | 5;
+  coachedBeat: 1 | 3;
   selectedDimension: string;
   flags: readonly [ApprovedRehearsalBehaviorFlag];
 }
@@ -72,7 +72,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l2",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l02_cut_the_case",
-    contentVersion: "m1-l2-two-pressure-coaching-v3-2026-08-28",
+    contentVersion: "m1-l2-two-pressure-m1-l1-parity-v4-2026-08-29",
     scenario: {
       id: "bysi-m01-l02-approval-owner",
       category: "work",
@@ -103,7 +103,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l3",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l03_park_and_return",
-    contentVersion: "m1-l3-two-pressure-coaching-v3-2026-08-28",
+    contentVersion: "m1-l3-two-pressure-m1-l1-parity-v4-2026-08-29",
     scenario: {
       id: "bysi-m01-l03-march-appointments",
       category: "family",
@@ -134,7 +134,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l4",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l04_make_it_repeatable",
-    contentVersion: "m1-l4-two-pressure-coaching-v3-2026-08-28",
+    contentVersion: "m1-l4-two-pressure-m1-l1-parity-v4-2026-08-29",
     scenario: {
       id: "bysi-m01-l04-changing-plan",
       category: "partner",
@@ -165,7 +165,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l5",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l05_fit_in_one",
-    contentVersion: "m1-l5-two-pressure-coaching-v3-2026-08-28",
+    contentVersion: "m1-l5-two-pressure-m1-l1-parity-v4-2026-08-29",
     scenario: {
       id: "bysi-m01-l05-friday-kitchen-table",
       category: "partner",
@@ -196,7 +196,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l1",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l01_clear_ask",
-    contentVersion: "m2-l1-two-pressure-coaching-v3-2026-08-28",
+    contentVersion: "m2-l1-two-pressure-m1-l1-parity-v4-2026-08-29",
     scenario: {
       id: "bysi-m02-l01-thursday-handoff",
       category: "work",
@@ -227,7 +227,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l2",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l02_say_who",
-    contentVersion: "m2-l2-two-pressure-coaching-v3-2026-08-28",
+    contentVersion: "m2-l2-two-pressure-m1-l1-parity-v4-2026-08-29",
     scenario: {
       id: "bysi-m02-l02-cupcake-order",
       category: "friends",
@@ -258,7 +258,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l3",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l03_when_they_say_they_cant",
-    contentVersion: "m2-l3-two-pressure-coaching-v3-2026-08-28",
+    contentVersion: "m2-l3-two-pressure-m1-l1-parity-v4-2026-08-29",
     scenario: {
       id: "bysi-m02-l03-saturday-van",
       category: "family",
@@ -289,7 +289,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l4",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l04_say_whether_no",
-    contentVersion: "m2-l4-two-pressure-coaching-v3-2026-08-28",
+    contentVersion: "m2-l4-two-pressure-m1-l1-parity-v4-2026-08-29",
     scenario: {
       id: "bysi-m02-l04-thursday-pickup",
       category: "partner",
@@ -319,7 +319,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m2-l5",
     moduleId: MODULE_TWO_ID,
     practiceId: "bysi_m02_l05_ask_for_the_loop",
-    contentVersion: "m2-l5-two-pressure-coaching-v3-2026-08-28",
+    contentVersion: "m2-l5-two-pressure-m1-l1-parity-v4-2026-08-29",
     scenario: {
       id: "bysi-m02-l05-camp-signup",
       category: "partner",
@@ -368,11 +368,9 @@ export function validateApprovedRehearsalCompletion(
   const observation = run.coachingObservation;
   const observedTranscript = observation?.coachedBeat === 1
     ? run.attempt?.transcript
-    : observation?.coachedBeat === 5
-      ? lesson?.secondResponseAttempt?.transcript
-      : run.responseAttempt?.transcript;
+    : run.responseAttempt?.transcript;
   const hasValidObservation = Boolean(observation
-    && [1, 3, 5].includes(observation.coachedBeat)
+    && [1, 3].includes(observation.coachedBeat)
     && observation.selectedDimension === config.coachedBehaviorId
     && observation.evidenceQuote === observedTranscript
     && observation.status === (approvedRehearsalCriterion(config, observation.evidenceQuote) ? "met" : "not_met")
@@ -397,9 +395,7 @@ export function validateApprovedRehearsalCompletion(
     && (pressureTwo.source === "provider" || (pressureTwo.source === "authored" && pressureTwo.text === config.authoredPressureTwoText)));
   const expectedReplayAudioId = observation?.coachedBeat === 1
     ? `top-of-scene:${run.id}`
-    : observation?.coachedBeat === 3
-      ? pressureOne?.resolvedAudioId
-      : pressureTwo?.resolvedAudioId;
+    : pressureOne?.resolvedAudioId;
   const hasValidReplay = Boolean(lesson?.replayProof
     && lesson.replayCompletedAt
     && lesson.replayAudioId === expectedReplayAudioId
@@ -414,12 +410,11 @@ export function validateApprovedRehearsalCompletion(
     && hasValidPressureTwo
     && hasValidObservation
     && hasValidReplay
-    && Boolean(run.attempt && run.responseAttempt && lesson?.secondResponseAttempt && run.retryAttempt && run.comparison)
+    && Boolean(run.attempt && run.responseAttempt && run.retryAttempt && run.comparison)
     && (run.attempt?.confirmedAt ?? 0) < (pressureOne?.authoredAt ?? 0)
     && (pressureOne?.authoredAt ?? 0) < (run.responseAttempt?.confirmedAt ?? 0)
     && (run.responseAttempt?.confirmedAt ?? 0) < (pressureTwo?.authoredAt ?? 0)
-    && (pressureTwo?.authoredAt ?? 0) < (lesson?.secondResponseAttempt?.confirmedAt ?? 0)
-    && (lesson?.secondResponseAttempt?.confirmedAt ?? 0) < (run.retryAttempt?.confirmedAt ?? 0)
+    && (pressureTwo?.authoredAt ?? 0) < (run.retryAttempt?.confirmedAt ?? 0)
     && lesson?.retryCount === 1
     && run.state === "attempt_comparison";
 }
@@ -569,9 +564,7 @@ export function approvedRehearsalIndexImpact(
   const coachedBeat = run.coachingObservation?.coachedBeat;
   const original = coachedBeat === 1
     ? run.attempt?.transcript
-    : coachedBeat === 5
-      ? run.approvedRehearsal?.secondResponseAttempt?.transcript
-      : run.responseAttempt?.transcript;
+    : run.responseAttempt?.transcript;
   const retry = run.retryAttempt?.transcript;
   if (!original || !retry) return null;
   const beforeMet = approvedRehearsalCriterion(config, original);
@@ -600,7 +593,7 @@ export function approvedRehearsalIndexImpact(
  * Produces the same scoreless, exact-wording coaching shape as M1 L1 while
  * evaluating only this lesson's approved move at the pressure-response beat.
  */
-export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, transcript: string, coachedBeat: 1 | 3 | 5 = 3): ApprovedRehearsalCoachNote {
+export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, transcript: string, coachedBeat: 1 | 3 = 3): ApprovedRehearsalCoachNote {
   const evidenceQuote = transcript.trim();
   const status: ApprovedRehearsalCriterionStatus = approvedRehearsalCriterion(config, evidenceQuote) ? "met" : "not_met";
   const copy = COACHING_COPY_BY_LESSON[config.lessonId];
@@ -625,10 +618,9 @@ export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, tran
   };
 }
 
-/** Selects one exact learner beat from the full exchange, prioritizing an observable miss before reinforcing success. */
-export function approvedRehearsalCoachExchange(config: ApprovedRehearsalConfig, exchange: { opener: string; firstResponse: string; secondResponse: string }): ApprovedRehearsalCoachNote {
+/** Selects one exact learner beat from the M1 L1-shaped exchange, prioritizing an observable miss before reinforcing success. */
+export function approvedRehearsalCoachExchange(config: ApprovedRehearsalConfig, exchange: { opener: string; firstResponse: string }): ApprovedRehearsalCoachNote {
   const candidates = [
-    approvedRehearsalCoachNote(config, exchange.secondResponse, 5),
     approvedRehearsalCoachNote(config, exchange.firstResponse, 3),
     approvedRehearsalCoachNote(config, exchange.opener, 1),
   ] as const;

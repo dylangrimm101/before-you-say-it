@@ -27,7 +27,6 @@ import {
   initializeApprovedRehearsalRun,
   normalizeScenarioPracticeRun,
   preserveApprovedRehearsalRetry,
-  preserveApprovedRehearsalSecondResponse,
   preserveScenarioAttempt,
   stageApprovedRehearsalReplay,
 } from "@/lib/scenarioPractice";
@@ -36,18 +35,17 @@ const JOURNEYS: readonly {
   lessonId: ApprovedRehearsalLessonId;
   opener: string;
   firstResponse: string;
-  secondResponse: string;
   retry: string;
 }[] = [
-  { lessonId: "m1-l2", opener: "The approval step needs one owner.", firstResponse: "There are lots of examples and every time it becomes a problem.", secondResponse: "There are also several more examples and another email.", retry: "Yesterday’s late file is one example. Can we decide who owns approval?" },
-  { lessonId: "m1-l3", opener: "Can we split March's appointments?", firstResponse: "That's not what we're discussing.", secondResponse: "We are not discussing calls.", retry: "That’s fair. Let’s finish March’s appointments, and tomorrow we can talk about calls." },
-  { lessonId: "m1-l4", opener: "The plan changed twice after I rearranged work.", firstResponse: "You never think about my schedule.", secondResponse: "You always change everything.", retry: "I mean the two plan changes this month, not your schedule overall." },
-  { lessonId: "m1-l5", opener: "I want to talk about the plan.", firstResponse: "It's about the plan and signups and everything else.", secondResponse: "There are several things to cover.", retry: "I’m asking for one thing: decide the current plan tonight." },
-  { lessonId: "m2-l1", opener: "Can you finish the handoff brief by Thursday?", firstResponse: "No, do everything anyway.", secondResponse: "Do all of it and also send another report.", retry: "What part of the brief can you finish by Friday?" },
-  { lessonId: "m2-l2", opener: "Can someone confirm the cupcake order?", firstResponse: "Can somebody handle it?", secondResponse: "Anyone in the group can do it.", retry: "Jen, can you confirm the order?" },
-  { lessonId: "m2-l3", opener: "Can you take the van Saturday?", firstResponse: "That doesn't help.", secondResponse: "No, that still does not help.", retry: "I hear the game is fixed. Could you take the van after two, so that leaves the morning with me?" },
-  { lessonId: "m2-l4", opener: "Can you do pickup tomorrow?", firstResponse: "But I need you to reconsider.", secondResponse: "Are you sure? Please reconsider.", retry: "Okay. Thanks for telling me." },
-  { lessonId: "m2-l5", opener: "Can you own the camp signup?", firstResponse: "Keep me copied on every step.", secondResponse: "Send me every step for approval.", retry: "Come back if the signup is at risk." },
+  { lessonId: "m1-l2", opener: "The approval step needs one owner.", firstResponse: "There is also another late file, plus several emails and then the March pattern.", retry: "Yesterday’s late file is one example. Can we decide who owns approval?" },
+  { lessonId: "m1-l3", opener: "Can we split March's appointments?", firstResponse: "That's not what we're discussing.", retry: "That’s fair. Let’s finish March’s appointments, and tomorrow we can talk about calls." },
+  { lessonId: "m1-l4", opener: "The plan changed twice after I rearranged work.", firstResponse: "You never think about my schedule.", retry: "I mean the two plan changes this month, not your schedule overall." },
+  { lessonId: "m1-l5", opener: "I want to talk about the plan.", firstResponse: "It's about the plan and signups and everything else.", retry: "I’m asking for one thing: decide the current plan tonight." },
+  { lessonId: "m2-l1", opener: "Can you finish the handoff brief by Thursday?", firstResponse: "No, do everything anyway.", retry: "What part of the brief can you finish by Friday?" },
+  { lessonId: "m2-l2", opener: "Can someone confirm the cupcake order?", firstResponse: "Can somebody handle it?", retry: "Jen, can you confirm the order?" },
+  { lessonId: "m2-l3", opener: "Can you take the van Saturday?", firstResponse: "That doesn't help.", retry: "I hear the game is fixed. Could you take the van after two, so that leaves the morning with me?" },
+  { lessonId: "m2-l4", opener: "Can you do pickup tomorrow?", firstResponse: "But I need you to reconsider.", retry: "Okay. Thanks for telling me." },
+  { lessonId: "m2-l5", opener: "Can you own the camp signup?", firstResponse: "Keep me copied on every step.", retry: "Come back if the signup is at risk." },
 ];
 
 function completedJourney(input: (typeof JOURNEYS)[number]) {
@@ -78,9 +76,8 @@ function completedJourney(input: (typeof JOURNEYS)[number]) {
     reactionId: `${input.lessonId}-dynamic-pressure-2`, semanticVoiceKey: "contextual_counterpart",
     resolvedAudioId: `${opened.run.curriculumVersion}-${runId}-counterpart-turn-2`,
   }, 105);
-  const respondedAgain = preserveApprovedRehearsalSecondResponse(pressuredAgain, input.secondResponse, 106);
-  const note = approvedRehearsalCoachExchange(config, { opener: input.opener, firstResponse: input.firstResponse, secondResponse: input.secondResponse });
-  const coached = attachApprovedRehearsalCoaching(respondedAgain, note.note, note.retryDirection, note.coachedBehaviorId, {
+  const note = approvedRehearsalCoachExchange(config, { opener: input.opener, firstResponse: input.firstResponse });
+  const coached = attachApprovedRehearsalCoaching(pressuredAgain, note.note, note.retryDirection, note.coachedBehaviorId, {
     coachedBeat: note.coachedBeat, selectedDimension: note.selectedDimension, status: note.flags[0].status, evidenceQuote: note.evidenceQuote,
   }, 107);
   const replayed = confirmApprovedRehearsalReplay(stageApprovedRehearsalReplay(coached, 108), "text_fallback_acknowledged", 109);
@@ -103,14 +100,13 @@ function completionRecord(journey: ReturnType<typeof completedJourney>, customWo
   };
 }
 
-describe("approved lesson two-pressure journeys", () => {
-  test("drives every shared lesson through two pressures, exact-beat coaching, replay, retry, and return validation", () => {
+describe("approved lesson M1 L1-shaped journeys", () => {
+  test("drives every shared lesson through opening, two pushbacks, one response, coaching, replay, retry, and return validation", () => {
     for (const input of JOURNEYS) {
       const { config, value, note } = completedJourney(input);
       expect(value.run.state, input.lessonId).toBe("attempt_comparison");
       expect(value.run.approvedRehearsal?.pushbackOne?.reactionId, input.lessonId).toBe(`${input.lessonId}-dynamic-pressure-1`);
       expect(value.run.approvedRehearsal?.pushbackTwo?.reactionId, input.lessonId).toBe(`${input.lessonId}-dynamic-pressure-2`);
-      expect(value.run.approvedRehearsal?.secondResponseAttempt?.transcript, input.lessonId).toBe(input.secondResponse);
       expect(value.run.coachingObservation, input.lessonId).toEqual({ coachedBeat: note.coachedBeat, selectedDimension: config.coachedBehaviorId, status: "not_met", evidenceQuote: note.evidenceQuote });
       expect(value.run.approvedRehearsal?.replayProof, input.lessonId).toBe("text_fallback_acknowledged");
       expect(value.run.retryAttempt?.transcript, input.lessonId).toBe(input.retry);
@@ -128,7 +124,7 @@ describe("approved lesson two-pressure journeys", () => {
       const saved = normalizeConvertedLessonProgress([completionRecord(journey, strongVersion)])[0];
       expect(unsaved?.customWording, input.lessonId).toBeUndefined();
       expect(saved?.customWording, input.lessonId).toBe(strongVersion);
-      for (const transcript of [input.opener, input.firstResponse, input.secondResponse, input.retry]) {
+      for (const transcript of [input.opener, input.firstResponse, input.retry]) {
         expect(JSON.stringify(saved), input.lessonId).not.toContain(transcript);
       }
     }

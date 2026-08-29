@@ -212,7 +212,7 @@ export interface M1L1BehaviorFlag {
 
 /** Durable one-behavior observation used by shared approved rehearsals. */
 export interface PilotCoachingObservation {
-  coachedBeat: 1 | 3 | 5;
+  coachedBeat: 1 | 3;
   selectedDimension: string;
   status: "met" | "not_met";
   evidenceQuote: string;
@@ -222,11 +222,10 @@ export interface ApprovedRehearsalState {
   beat: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   pushbackOne?: ScenarioCounterpartTurn;
   pushbackTwo?: ScenarioCounterpartTurn;
-  secondResponseAttempt?: PilotAttemptRecord;
-  coachedBeat?: 1 | 3 | 5;
+  coachedBeat?: 1 | 3;
   selectedDimension?: string;
   retryCount: 0 | 1;
-  replayTarget?: "top_of_scene" | "pushback_one" | "pushback_two";
+  replayTarget?: "top_of_scene" | "pushback_one";
   replayRequestedAt?: number;
   replayAudioId?: string;
   replayProof?: "playback_completed" | "text_fallback_acknowledged" | "top_of_scene_reset";
