@@ -210,7 +210,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(cleaned).toContain("Start rehearsal");
   });
 
-  test("installs the approved detailed M1 L3, M1 L4, and M1 L5 scenes in production handoffs", async () => {
+  test("installs the approved detailed M1 L3 through M2 L1 scenes in production handoffs", async () => {
     const cases = [
       {
         fileName: "M1-L3-Park-and-Return.html",
@@ -226,6 +226,11 @@ describe("approved Modules 1 and 2 internal deck port", () => {
         fileName: "M1-L5-Fit-in-One.html",
         oldScene: "Friday night, kitchen table. The kid went down at seven for once. Neither of you is running on four hours.",
         approvedScene: "Friday night, you’re at the kitchen table with Adam, who shares responsibility for your child’s calendar, after the kid has gone to bed. This month, most of the calendar has fallen to you—including camp signups, the dentist, and both birthday RSVPs. You want several things addressed, but raising all of them at once could leave none of them clear. Choose one purpose for tonight and keep the others for later. Adam has his own read of the month and may question which issue you actually want him to address.",
+      },
+      {
+        fileName: "M2-L1-Clear-Ask.html",
+        oldScene: "Thursday morning, before standup. The handoff brief has landed late three weeks running and the review is at 4. You've mentioned it twice without asking for anything.",
+        approvedScene: "Thursday morning, before standup, you’re speaking with Maya, your teammate who prepares the revised two-page handoff brief for a 4 PM review. The brief has arrived late three weeks in a row, and you’ve mentioned the pattern twice without making a specific request. You need to leave the conversation knowing what Maya can deliver in time for today’s review and by when. Maya may say she cannot finish the whole brief today, so make one clear, answerable ask while leaving room for a real constraint.",
       },
     ] as const;
 

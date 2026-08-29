@@ -20,6 +20,8 @@ const STALE_M1_L4_SCENE = "Thursday night, the house is finally quiet. The plan 
 const APPROVED_M1_L4_SCENE = "Thursday night, you’re talking with Theo, your partner, after the house is quiet. Twice this month, Theo agreed to handle school pickup, so you rearranged work around that plan. Both times, he changed the plan after your schedule was already set, leaving you to move meetings again. You want future changes discussed before either of you commits—not to suggest that Theo never considers your schedule.";
 const STALE_M1_L5_SCENE = "Friday night, kitchen table. The kid went down at seven for once. Neither of you is running on four hours.";
 const APPROVED_M1_L5_SCENE = "Friday night, you’re at the kitchen table with Adam, who shares responsibility for your child’s calendar, after the kid has gone to bed. This month, most of the calendar has fallen to you—including camp signups, the dentist, and both birthday RSVPs. You want several things addressed, but raising all of them at once could leave none of them clear. Choose one purpose for tonight and keep the others for later. Adam has his own read of the month and may question which issue you actually want him to address.";
+const STALE_M2_L1_SCENE = "Thursday morning, before standup. The handoff brief has landed late three weeks running and the review is at 4. You've mentioned it twice without asking for anything.";
+const APPROVED_M2_L1_SCENE = "Thursday morning, before standup, you’re speaking with Maya, your teammate who prepares the revised two-page handoff brief for a 4 PM review. The brief has arrived late three weeks in a row, and you’ve mentioned the pattern twice without making a specific request. You need to leave the conversation knowing what Maya can deliver in time for today’s review and by when. Maya may say she cannot finish the whole brief today, so make one clear, answerable ask while leaving room for a real constraint.";
 const M1_L1_OUTCOME_CARD = /<div\b[^>]*>\s*<span\b[^>]*>\s*What happens\s*<\/span>[\s\S]*?<\/div>/gi;
 const M1_L1_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*You open\.\s*Adam pushes back twice\..*?same moment back to you\.\s*<\/div>\s*<\/div>/is;
 const M1_L1_EMPTY_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*<\/div>\s*<\/div>/gis;
@@ -262,7 +264,8 @@ export function alignApprovedRehearsalScene(template: string): string {
   return template
     .replace(STALE_M1_L3_SCENE, APPROVED_M1_L3_SCENE)
     .replace(STALE_M1_L4_SCENE, APPROVED_M1_L4_SCENE)
-    .replace(STALE_M1_L5_SCENE, APPROVED_M1_L5_SCENE);
+    .replace(STALE_M1_L5_SCENE, APPROVED_M1_L5_SCENE)
+    .replace(STALE_M2_L1_SCENE, APPROVED_M2_L1_SCENE);
 }
 
 /** Converts an approved lesson handoff action into the fail-closed native QA runtime launch. */

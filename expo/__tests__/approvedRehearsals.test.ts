@@ -117,8 +117,11 @@ describe("approved M2 L1-L5 rehearsals", () => {
     const l5 = approvedRehearsalConfig("m2-l5")!;
 
     expect(l1.moduleId).toBe("bysi_m02_make_a_clear_ask");
+    expect(l1.contentVersion).toBe("m2-l1-detailed-scene-v5-2026-08-29");
     expect(l1.scenario.counterpart).toBe("Maya");
-    expect(l1.scenario.situation).toContain("Thursday morning, before standup");
+    expect(l1.scenario.situation).toBe(
+      "Thursday morning, before standup, you’re speaking with Maya, your teammate who prepares the revised two-page handoff brief for a 4 PM review. The brief has arrived late three weeks in a row, and you’ve mentioned the pattern twice without making a specific request. You need to leave the conversation knowing what Maya can deliver in time for today’s review and by when. Maya may say she cannot finish the whole brief today, so make one clear, answerable ask while leaving room for a real constraint.",
+    );
     expect(l1.authoredPressureText).toBe("I can't do Thursday.");
     expect(l1.namedMove).toBe("One action. One owner. Room to answer.");
     expect(l2.scenario.counterpart).toBe("Renee");
