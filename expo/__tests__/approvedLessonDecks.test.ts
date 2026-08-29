@@ -210,7 +210,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(cleaned).toContain("Start rehearsal");
   });
 
-  test("installs the approved detailed M1 L3 through M2 L3 scenes in production handoffs", async () => {
+  test("installs the approved detailed M1 L3 through M2 L4 scenes in production handoffs", async () => {
     const cases = [
       {
         fileName: "M1-L3-Park-and-Return.html",
@@ -241,6 +241,11 @@ describe("approved Modules 1 and 2 internal deck port", () => {
         fileName: "M2-L3-When-They-Say-They-Cant.html",
         oldScene: "Thursday night, on the phone with your brother Marcus about Saturday. Ellie gets the keys in the morning and the van goes back Sunday night.",
         approvedScene: "Thursday night, you’re on the phone with your brother, Marcus, arranging who will handle the van on Saturday. Ellie will have the keys that morning, and the van must be returned Sunday night, so Saturday’s plan needs to be settled before the weekend. You want to leave with a clear agreement about which part of Saturday Marcus can take. Marcus may say he cannot do the whole day because Theo has a game and he is not free until 2 PM. Hear the constraint, trade one part of the original ask, and clearly restate what you are still asking him to do.",
+      },
+      {
+        fileName: "M2-L4-Say-Whether-No.html",
+        oldScene: "Wednesday night at home, talking to Sam about tomorrow. The client dinner is Thursday and it won't move. Pickup is at 5:30.",
+        approvedScene: "Wednesday night at home, you’re talking with Sam, your partner, about school pickup tomorrow. You have a client dinner on Thursday that cannot move, and pickup is at 5:30. You need to know whether Sam can handle pickup, but you can make another arrangement if the answer is no. Ask directly while making clear that no is genuinely available. Sam may say they cannot do pickup and then check whether no is actually okay. If you offered room to say no, honor the answer without asking again or adding a penalty.",
       },
     ] as const;
 

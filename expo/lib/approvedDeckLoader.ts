@@ -26,6 +26,8 @@ const STALE_M2_L2_SCENE = "Thursday afternoon, outside the school. You asked the
 const APPROVED_M2_L2_SCENE = "Thursday afternoon, outside the school after pickup, you’re standing with Renee, Cory, Angela, and Jen. The group’s cupcake order must be confirmed with the bakery by 5 PM. You already asked whether someone could handle it, but after a pause no one answered. Renee has collected everyone’s cash, while the order is under Jen’s name and card. You need to leave knowing who will take the next answerable action. Address one person directly rather than sending the request back to the group; Renee may ask why the request belongs to her.";
 const STALE_M2_L3_SCENE = "Thursday night, on the phone with your brother Marcus about Saturday. Ellie gets the keys in the morning and the van goes back Sunday night.";
 const APPROVED_M2_L3_SCENE = "Thursday night, you’re on the phone with your brother, Marcus, arranging who will handle the van on Saturday. Ellie will have the keys that morning, and the van must be returned Sunday night, so Saturday’s plan needs to be settled before the weekend. You want to leave with a clear agreement about which part of Saturday Marcus can take. Marcus may say he cannot do the whole day because Theo has a game and he is not free until 2 PM. Hear the constraint, trade one part of the original ask, and clearly restate what you are still asking him to do.";
+const STALE_M2_L4_SCENE = "Wednesday night at home, talking to Sam about tomorrow. The client dinner is Thursday and it won't move. Pickup is at 5:30.";
+const APPROVED_M2_L4_SCENE = "Wednesday night at home, you’re talking with Sam, your partner, about school pickup tomorrow. You have a client dinner on Thursday that cannot move, and pickup is at 5:30. You need to know whether Sam can handle pickup, but you can make another arrangement if the answer is no. Ask directly while making clear that no is genuinely available. Sam may say they cannot do pickup and then check whether no is actually okay. If you offered room to say no, honor the answer without asking again or adding a penalty.";
 const M1_L1_OUTCOME_CARD = /<div\b[^>]*>\s*<span\b[^>]*>\s*What happens\s*<\/span>[\s\S]*?<\/div>/gi;
 const M1_L1_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*You open\.\s*Adam pushes back twice\..*?same moment back to you\.\s*<\/div>\s*<\/div>/is;
 const M1_L1_EMPTY_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*<\/div>\s*<\/div>/gis;
@@ -271,7 +273,8 @@ export function alignApprovedRehearsalScene(template: string): string {
     .replace(STALE_M1_L5_SCENE, APPROVED_M1_L5_SCENE)
     .replace(STALE_M2_L1_SCENE, APPROVED_M2_L1_SCENE)
     .replace(STALE_M2_L2_SCENE, APPROVED_M2_L2_SCENE)
-    .replace(STALE_M2_L3_SCENE, APPROVED_M2_L3_SCENE);
+    .replace(STALE_M2_L3_SCENE, APPROVED_M2_L3_SCENE)
+    .replace(STALE_M2_L4_SCENE, APPROVED_M2_L4_SCENE);
 }
 
 /** Converts an approved lesson handoff action into the fail-closed native QA runtime launch. */

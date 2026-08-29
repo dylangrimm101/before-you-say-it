@@ -138,7 +138,11 @@ describe("approved M2 L1-L5 rehearsals", () => {
     );
     expect(l3.authoredPressureText).toBe("I can't do a whole Saturday. Theo's got a game and I'm not free till two.");
     expect(l3.namedMove).toBe("Hear it. Trade one thing. Say where it stands.");
+    expect(l4.contentVersion).toBe("m2-l4-detailed-scene-v5-2026-08-29");
     expect(l4.scenario.counterpart).toBe("Sam");
+    expect(l4.scenario.situation).toBe(
+      "Wednesday night at home, you’re talking with Sam, your partner, about school pickup tomorrow. You have a client dinner on Thursday that cannot move, and pickup is at 5:30. You need to know whether Sam can handle pickup, but you can make another arrangement if the answer is no. Ask directly while making clear that no is genuinely available. Sam may say they cannot do pickup and then check whether no is actually okay. If you offered room to say no, honor the answer without asking again or adding a penalty.",
+    );
     expect(l4.authoredPressureText).toBe("No, I can't do pickup tomorrow.");
     expect(l4.namedMove).toBe("Say whether no is available.");
     expect(l5.scenario.counterpart).toBe("Sam");
