@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { authorizedDeckHtml, installTapTutorialDismissal, materializeApprovedDeckHtml, removeM1L1OutcomePreview, removeRehearsalContinuationCopy } from "../lib/approvedDeckLoader";
+import { alignApprovedRehearsalScene, authorizedDeckHtml, installTapTutorialDismissal, materializeApprovedDeckHtml, removeM1L1OutcomePreview, removeRehearsalContinuationCopy } from "../lib/approvedDeckLoader";
 
 const DECK_LIMITS = {
   "M1-L1-Buried-Point.html": 20,
@@ -208,6 +208,28 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(cleaned).not.toMatch(/<span\b[^>]*>\s*What happens\s*<\/span>/i);
     expect(cleaned).not.toMatch(/<span\b[^>]*>\s*You open\.\s*Adam pushes back twice\./i);
     expect(cleaned).toContain("Start rehearsal");
+  });
+
+  test("installs the approved detailed M1 L3 and M1 L4 scenes in production handoffs", async () => {
+    const cases = [
+      {
+        fileName: "M1-L3-Park-and-Return.html",
+        oldScene: "Sunday evening, on the phone with your sister. You want March's appointments split before you hang up.",
+        approvedScene: "Sunday evening, you’re on the phone with your sister, Renee. Dad’s March appointments still need to be divided, and you handled the last four. You want to agree on who will take each March appointment before you hang up. Renee has been handling more of Dad’s regular check-in calls and may raise that you haven’t been calling as often.",
+      },
+      {
+        fileName: "M1-L4-Make-It-Repeatable.html",
+        oldScene: "Thursday night, the house is finally quiet. The plan changed twice this month after you had already rearranged work. By now it has become a month of things in your head.",
+        approvedScene: "Thursday night, you’re talking with Theo, your partner, after the house is quiet. Twice this month, Theo agreed to handle school pickup, so you rearranged work around that plan. Both times, he changed the plan after your schedule was already set, leaving you to move meetings again. You want future changes discussed before either of you commits—not to suggest that Theo never considers your schedule.",
+      },
+    ] as const;
+
+    for (const rehearsal of cases) {
+      const sourceTemplate = approvedTemplate(await source(`assets/lesson-decks/${rehearsal.fileName}`));
+      const productionTemplate = alignApprovedRehearsalScene(sourceTemplate);
+      expect(productionTemplate).toContain(rehearsal.approvedScene);
+      expect(productionTemplate).not.toContain(rehearsal.oldScene);
+    }
   });
 
   test("re-verifies every fetched deck against its authorized boundary before display", async () => {

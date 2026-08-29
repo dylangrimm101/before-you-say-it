@@ -14,6 +14,10 @@ const M1_L1_CONTENT_VERSION = "m1-l1-v2.1-2026-08-24";
 const M1_L1_APPROVED_SHA256 = "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e";
 const STALE_M1_L1_SCENE = "Sunday evening, kitchen. Dishes done, kid finally asleep. You've wanted to say this for two weeks. Your partner is on the couch, half looking at their phone. Not hostile. Tired.";
 const STALE_M1_L1_SCENE_BEATS = "You open. Adam pushes back twice. The second one is <em>“You're acting like this happens all the time.”</em> Then Hope names one change and hands the same moment back to you.";
+const STALE_M1_L3_SCENE = "Sunday evening, on the phone with your sister. You want March's appointments split before you hang up.";
+const APPROVED_M1_L3_SCENE = "Sunday evening, you’re on the phone with your sister, Renee. Dad’s March appointments still need to be divided, and you handled the last four. You want to agree on who will take each March appointment before you hang up. Renee has been handling more of Dad’s regular check-in calls and may raise that you haven’t been calling as often.";
+const STALE_M1_L4_SCENE = "Thursday night, the house is finally quiet. The plan changed twice this month after you had already rearranged work. By now it has become a month of things in your head.";
+const APPROVED_M1_L4_SCENE = "Thursday night, you’re talking with Theo, your partner, after the house is quiet. Twice this month, Theo agreed to handle school pickup, so you rearranged work around that plan. Both times, he changed the plan after your schedule was already set, leaving you to move meetings again. You want future changes discussed before either of you commits—not to suggest that Theo never considers your schedule.";
 const M1_L1_OUTCOME_CARD = /<div\b[^>]*>\s*<span\b[^>]*>\s*What happens\s*<\/span>[\s\S]*?<\/div>/gi;
 const M1_L1_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*You open\.\s*Adam pushes back twice\..*?same moment back to you\.\s*<\/div>\s*<\/div>/is;
 const M1_L1_EMPTY_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*<\/div>\s*<\/div>/gis;
@@ -251,11 +255,18 @@ export function removeM1L1OutcomePreview(template: string): string {
     .replace(M1_L1_EMPTY_OUTCOME_PREVIEW, "");
 }
 
+/** Applies approved scene-copy revisions at runtime without modifying bundled lesson sources. */
+export function alignApprovedRehearsalScene(template: string): string {
+  return template
+    .replace(STALE_M1_L3_SCENE, APPROVED_M1_L3_SCENE)
+    .replace(STALE_M1_L4_SCENE, APPROVED_M1_L4_SCENE);
+}
+
 /** Converts an approved lesson handoff action into the fail-closed native QA runtime launch. */
 export function convertedHandoffDeckHtml(rawHtml: string, handoffCard: number): string {
   return replaceEncodedTemplate(rawHtml, (source) => {
     const sliced = sliceCards(source, handoffCard);
-    const withAcceptedScene = removeM1L1OutcomePreview(sliced)
+    const withAcceptedScene = alignApprovedRehearsalScene(removeM1L1OutcomePreview(sliced))
       .replace(STALE_M1_L1_SCENE, M1_L1_CONVERSION.scenario.situation);
     if (sliced.includes(STALE_M1_L1_SCENE) && withAcceptedScene.includes(STALE_M1_L1_SCENE)) {
       throw new Error("Converted lesson scene could not be aligned");

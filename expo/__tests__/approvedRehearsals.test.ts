@@ -28,15 +28,19 @@ describe("approved M1 L2-L5 rehearsals", () => {
     expect(l2.namedMove).toBe("One anchor. The rest stays in the folder.");
     expect([l2.rehearsalHandoffCard, l2.returnCard, l2.completionCard]).toEqual([20, 21, 22]);
 
-    expect(l3.contentVersion).toBe("m1-l3-two-pressure-m1-l1-parity-v4-2026-08-29");
+    expect(l3.contentVersion).toBe("m1-l3-detailed-scene-v5-2026-08-29");
     expect(l3.scenario.counterpart).toBe("Renee — your sister");
     expect(l3.scenario.situation).toBe(
-      "Sunday evening, you’re on the phone with Renee, your sister. Dad’s March appointments still need to be divided between you. You handled the last four appointments, and you want to decide who will take which March appointments before you hang up, so nothing is left until the last minute.\n\nRenee has been handling more of the regular check-in calls with Dad, and she’s frustrated that you haven’t been calling him as often.",
+      "Sunday evening, you’re on the phone with your sister, Renee. Dad’s March appointments still need to be divided, and you handled the last four. You want to agree on who will take each March appointment before you hang up. Renee has been handling more of Dad’s regular check-in calls and may raise that you haven’t been calling as often.",
     );
     expect(l3.authoredPressureText).toBe("You never even call him.");
     expect(l3.namedMove).toBe("Both on the table. One at a time.");
 
+    expect(l4.contentVersion).toBe("m1-l4-detailed-scene-v5-2026-08-29");
     expect(l4.scenario.counterpart).toBe("Theo");
+    expect(l4.scenario.situation).toBe(
+      "Thursday night, you’re talking with Theo, your partner, after the house is quiet. Twice this month, Theo agreed to handle school pickup, so you rearranged work around that plan. Both times, he changed the plan after your schedule was already set, leaving you to move meetings again. You want future changes discussed before either of you commits—not to suggest that Theo never considers your schedule.",
+    );
     expect(l4.authoredPressureText).toBe("So you're saying I don't think about your schedule.");
     expect([l4.rehearsalHandoffCard, l4.returnCard, l4.completionCard]).toEqual([17, 18, 19]);
 
