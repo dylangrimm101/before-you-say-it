@@ -124,8 +124,11 @@ describe("approved M2 L1-L5 rehearsals", () => {
     );
     expect(l1.authoredPressureText).toBe("I can't do Thursday.");
     expect(l1.namedMove).toBe("One action. One owner. Room to answer.");
-    expect(l2.scenario.counterpart).toBe("Renee");
-    expect(l2.scenario.situation).toContain("outside the school");
+    expect(l2.contentVersion).toBe("m2-l2-detailed-scene-v5-2026-08-29");
+    expect(l2.scenario.counterpart).toBe("Renee — another parent");
+    expect(l2.scenario.situation).toBe(
+      "Thursday afternoon, outside the school after pickup, you’re standing with Renee, Cory, Angela, and Jen. The group’s cupcake order must be confirmed with the bakery by 5 PM. You already asked whether someone could handle it, but after a pause no one answered. Renee has collected everyone’s cash, while the order is under Jen’s name and card. You need to leave knowing who will take the next answerable action. Address one person directly rather than sending the request back to the group; Renee may ask why the request belongs to her.",
+    );
     expect(l2.authoredPressureText).toBe("Why me?");
     expect(l2.namedMove).toBe("Say who you're asking.");
     expect(l3.scenario.counterpart).toBe("Marcus — your brother");
