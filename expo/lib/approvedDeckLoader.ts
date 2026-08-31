@@ -14,6 +14,8 @@ const M1_L1_CONTENT_VERSION = "m1-l1-v2.1-2026-08-24";
 const M1_L1_APPROVED_SHA256 = "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e";
 const STALE_M1_L1_SCENE = "Sunday evening, kitchen. Dishes done, kid finally asleep. You've wanted to say this for two weeks. Your partner is on the couch, half looking at their phone. Not hostile. Tired.";
 const STALE_M1_L1_SCENE_BEATS = "You open. Adam pushes back twice. The second one is <em>“You're acting like this happens all the time.”</em> Then Hope names one change and hands the same moment back to you.";
+const STALE_M1_L2_SCENE = "Wednesday, end of day. You've told Ravi the approval step needs a clear owner and used yesterday's late file. He isn't brushing you off. He just isn't accepting that example.";
+const APPROVED_M1_L2_SCENE = "Wednesday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi points out that the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file was also late, another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.";
 const STALE_M1_L3_SCENE = "Sunday evening, on the phone with your sister. You want March's appointments split before you hang up.";
 const APPROVED_M1_L3_SCENE = "Sunday evening, you’re on the phone with your sister, Renee. Dad’s March appointments still need to be divided, and you handled the last four. You want to agree on who will take each March appointment before you hang up. Renee has been handling more of Dad’s regular check-in calls and may raise that you haven’t been calling as often.";
 const STALE_M1_L4_SCENE = "Thursday night, the house is finally quiet. The plan changed twice this month after you had already rearranged work. By now it has become a month of things in your head.";
@@ -270,6 +272,7 @@ export function removeM1L1OutcomePreview(template: string): string {
 /** Applies approved scene-copy revisions at runtime without modifying bundled lesson sources. */
 export function alignApprovedRehearsalScene(template: string): string {
   return template
+    .replace(STALE_M1_L2_SCENE, APPROVED_M1_L2_SCENE)
     .replace(STALE_M1_L3_SCENE, APPROVED_M1_L3_SCENE)
     .replace(STALE_M1_L4_SCENE, APPROVED_M1_L4_SCENE)
     .replace(STALE_M1_L5_SCENE, APPROVED_M1_L5_SCENE)

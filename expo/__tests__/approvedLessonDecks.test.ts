@@ -210,8 +210,13 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(cleaned).toContain("Start rehearsal");
   });
 
-  test("installs the approved detailed M1 L3 through M2 L5 scenes in production handoffs", async () => {
+  test("installs the approved detailed M1 L2 through M2 L5 scenes in production handoffs", async () => {
     const cases = [
+      {
+        fileName: "M1-L2-Cut-the-Case.html",
+        oldScene: "Wednesday, end of day. You've told Ravi the approval step needs a clear owner and used yesterday's late file. He isn't brushing you off. He just isn't accepting that example.",
+        approvedScene: "Wednesday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi points out that the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file was also late, another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.",
+      },
       {
         fileName: "M1-L3-Park-and-Return.html",
         oldScene: "Sunday evening, on the phone with your sister. You want March's appointments split before you hang up.",
