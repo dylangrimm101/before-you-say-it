@@ -115,7 +115,7 @@ describe("remaining native acquisition and paid experience", () => {
     expect(store).toContain("__DEV__ && devForceUnpaid");
     expect(store).toContain("purchasedPro || (__DEV__ && devPro)");
     expect(today).toContain('access.entitlement !== "pro"');
-    expect(today).toContain('pathname: "/module/[day]"');
+    expect(today).toContain('pathname: "/approved-lesson/[lessonId]"');
   });
 
   test("the earned offer is three stages and rejects an incomplete free result", async () => {
@@ -166,13 +166,11 @@ describe("remaining native acquisition and paid experience", () => {
     expect(purchased).not.toContain("streak");
   });
 
-  test("first practice and Today derive from first focus and real checkpoints", async () => {
+  test("first practice and Today derive from durable approved-deck checkpoints", async () => {
     const today = await source("app/(tabs)/index.tsx");
-    const todayLogic = await source("lib/today.ts");
     const purchased = await source("app/purchase-success.tsx");
-    expect(todayLogic).toContain("session?.sharedResult?.first_focus?.recommended_module_id ?? null");
-    expect(today).toContain("run.moduleId === moduleId");
-    expect(today).toContain("todayActivityPresentation(activeRun?.state");
+    expect(today).toContain("nextLaunchDeck(convertedLessonProgress, moduleCloseProgress)");
+    expect(today).toContain('pathname: "/approved-lesson/[lessonId]"');
     expect(purchased).toContain("Start my first practice");
   });
 

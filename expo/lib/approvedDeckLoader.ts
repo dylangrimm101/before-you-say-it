@@ -163,6 +163,7 @@ const NATIVE_DECK_SHELL = `<style id="bysi-native-deck-shell">
 html,body{margin:0!important;padding:0!important;width:100%!important;height:100%!important;overflow:hidden!important;background:#FAF7F2!important}
 body *{visibility:hidden!important}
 [data-bysi="deck"],[data-bysi="deck"] *{visibility:visible!important}
+[data-bysi="deck"] button>*{pointer-events:none!important}
 [data-bysi="deck"]{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;transform:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;margin:0!important}
 </style>`;
 
@@ -175,8 +176,8 @@ function isolateNativeDeck(template: string): string {
 const REHEARSAL_CONTINUATION_PARAGRAPH = /<p\b[^>]*>\s*The rehearsal runs in the voice engine\..*?<\/p>/gs;
 const TAP_TUTORIAL_MARKER = "showHint:st.hint && i === 0,";
 const DECK_GO_MARKER = "go(d) {\n";
-const FULL_CARD_TAP_ZONE_MARKER = "showTapZones:!c.handoff && !c.transfer && !q && !c.dquiz,";
-const INTERACTIVE_SAFE_TAP_ZONE = "showTapZones:!c.handoff && !c.transfer && !q && !c.dquiz && !(c.chips && c.chips.length) && !(c.rooms && c.rooms.length),";
+const FULL_CARD_TAP_ZONE_PATTERN = /showTapZones:([^,\n]+),/;
+const INTERACTIVE_TAP_ZONE_GUARD = " && !(c.chips && c.chips.length) && !(c.rooms && c.rooms.length)";
 
 /** Makes the first tutorial tap dismiss its overlay without advancing Card 1. */
 export function installTapTutorialDismissal(template: string): string {
@@ -190,13 +191,25 @@ export function installTapTutorialDismissal(template: string): string {
 
 /** Keeps full-card navigation layers from covering chips or room-switcher tabs. */
 export function protectInteractiveDeckControls(template: string): string {
-  if (!template.includes(FULL_CARD_TAP_ZONE_MARKER)) return template;
-  return template.replace(FULL_CARD_TAP_ZONE_MARKER, INTERACTIVE_SAFE_TAP_ZONE);
+  return template.replace(FULL_CARD_TAP_ZONE_PATTERN, (line, expression: string) => {
+    if (expression.includes("c.chips") && expression.includes("c.rooms")) return line;
+    return `showTapZones:${expression}${INTERACTIVE_TAP_ZONE_GUARD},`;
+  });
 }
 
 /** Removes the redundant continuation paragraph from rehearsal handoff cards. */
 export function removeRehearsalContinuationCopy(template: string): string {
   return template.replace(REHEARSAL_CONTINUATION_PARAGRAPH, "");
+}
+
+const NARROW_M1_L3_QUIZ = '<div data-bysi-card-content="quiz" style="flex:1;display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;padding:0 20px 8px">';
+const NARROW_M2_L2_STANDARD = '<div data-bysi-card-content="standard" style="flex:1;display:flex;flex-direction:column;gap:20px;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;padding-bottom:8px">';
+
+/** Makes the two source-identified narrow cards scroll above their fixed deck footer. */
+export function protectKnownNarrowCards(template: string): string {
+  return template
+    .replace('<div style="flex:1;display:flex;flex-direction:column;gap:10px;min-height:0;padding:0 20px">', NARROW_M1_L3_QUIZ)
+    .replace('<div style="flex:1;display:flex;flex-direction:column;gap:20px;min-height:0">', NARROW_M2_L2_STANDARD);
 }
 
 /** Flattens the approved artifact into one same-origin page for native WebViews. */
@@ -206,9 +219,11 @@ export function materializeApprovedDeckHtml(bundleHtml: string): string {
   const externalEncoded = bundleHtml.match(EXTERNAL_RESOURCES_PATTERN)?.[1];
   if (!templateEncoded || !manifestEncoded || !externalEncoded) throw new Error("Approved lesson bundle metadata is missing");
 
-  let template = protectInteractiveDeckControls(
-    installTapTutorialDismissal(
-      removeRehearsalContinuationCopy(JSON.parse(templateEncoded) as string),
+  let template = protectKnownNarrowCards(
+    protectInteractiveDeckControls(
+      installTapTutorialDismissal(
+        removeRehearsalContinuationCopy(JSON.parse(templateEncoded) as string),
+      ),
     ),
   );
   const manifest = JSON.parse(manifestEncoded) as Record<string, BundleEntry>;
@@ -241,6 +256,44 @@ function replaceEncodedTemplate(rawHtml: string, transform: (template: string) =
   const template = transform(JSON.parse(encodedTemplate) as string);
   const encoded = JSON.stringify(template).replace(/<\//g, "<\\u002F");
   return `${rawHtml.slice(0, templateMatch.index)}${rawHtml.slice(templateMatch.index).replace(encodedTemplate, () => encoded)}`;
+}
+
+const CLOSE_CARD_SIX = "  { n:6, type:'Chained payoff', chain:true";
+const CLOSE_CARD_TAIL = "  { n:7, type:'Your moves', moves:true },\n  { n:8, type:'Transfer', transfer:true },\n  { n:9, type:'Bridge', bridge:true },\n";
+
+/** Restores the three canonical close cards whose render branches and copy ship in the R2 deck. */
+export function completeModuleCloseDeckHtml(rawHtml: string): string {
+  return replaceEncodedTemplate(rawHtml, (template) => {
+    const cardsStart = template.indexOf("const CARDS = [");
+    const cardsEnd = template.indexOf("\n];", cardsStart);
+    if (cardsStart < 0 || cardsEnd < 0) throw new Error("Approved module close cards are missing");
+    const cardBlock = template.slice(cardsStart, cardsEnd);
+    const inventory = Array.from(cardBlock.matchAll(/\{ n:(\d+), type:/g), (match) => Number(match[1]));
+    if (inventory.join(",") !== "1,2,3,4,5,6" && inventory.join(",") !== "1,2,3,4,5,6,7,8,9") {
+      throw new Error("Approved module close source inventory changed");
+    }
+    if (!cardBlock.includes(CLOSE_CARD_SIX)
+      || !template.includes("isMoves:!!c.moves")
+      || !template.includes("isTransfer:!!c.transfer")
+      || !template.includes("isBridge:!!c.bridge")) {
+      throw new Error("Approved module close canonical render branches are missing");
+    }
+    let completed = inventory.length === 9
+      ? template
+      : `${template.slice(0, cardsEnd)}\n${CLOSE_CARD_TAIL}${template.slice(cardsEnd)}`;
+    if (inventory.length === 9 && !cardBlock.includes(CLOSE_CARD_TAIL.trim())) throw new Error("Approved module close tail changed");
+    if (completed.includes("const L1_VALS = ['send the revised brief'")) {
+      if (!completed.includes("componentDidUpdate(prevProps)")) {
+        completed = completed.replace("  componentDidMount() { this.runBeats(); }", "  componentDidMount() { this.runBeats(); }\n  componentDidUpdate(prevProps) {\n    if (prevProps.motion !== this.props.motion) { this._beatFor = null; this.runBeats(); }\n  }");
+      }
+      completed = completed
+        .replace("      if (!mo) { this.setState({ beat:2 }); return; }", "      if (!mo) return;")
+        .replace("    if (n !== i) this.setState({ i:n, hint:false });", "    if (n !== i) this.setState({ i:n, hint:false }, () => this.runBeats());")
+        .replace("    /* Card 6's two beats are scheduled once per arrival at the card. */\n    if (c.chain) this.runBeats();\n\n", "")
+        .replace("    const beat = st.beat;", "    const beat = !mo && c.chain ? 2 : st.beat;");
+    }
+    return completed;
+  });
 }
 
 function sliceCards(template: string, throughCard: number): string {
@@ -362,6 +415,10 @@ async function approvedDeckSource(archivePath: string): Promise<string> {
 /** Downloads the approved handoff once and returns only the authorized lesson slice. */
 export async function loadApprovedDeckHtml(archivePath: string, reviewThroughCard: number): Promise<string> {
   return materializeApprovedDeckHtml(authorizedDeckHtml(await approvedDeckSource(archivePath), reviewThroughCard));
+}
+
+export async function loadModuleCloseDeckHtml(archivePath: string): Promise<string> {
+  return materializeApprovedDeckHtml(completeModuleCloseDeckHtml(await approvedDeckSource(archivePath)));
 }
 
 export async function loadConvertedHandoffDeckHtml(archivePath: string, handoffCard: number): Promise<string> {

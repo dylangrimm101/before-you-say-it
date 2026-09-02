@@ -686,7 +686,7 @@ export function approvedCustomWording(value: unknown): string | null {
 }
 
 export function conversionRuntimeEnabled(lessonId: string | null | undefined): lessonId is ConvertedLessonId {
-  return __DEV__ && lessonId === M1_L1_CONVERSION.lessonId;
+  return lessonId === M1_L1_CONVERSION.lessonId;
 }
 
 export function createM1L1Attempt(id: string, kind: PilotAttemptRecord["kind"], transcript: string, confirmedAt: number): PilotAttemptRecord {
