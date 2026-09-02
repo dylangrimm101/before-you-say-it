@@ -72,7 +72,7 @@ export function ScenarioPaidPractice(props: ScenarioPaidPracticeProps): React.JS
 function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson, approvedRehearsal, onReturnToDeck, onDiscard }: ScenarioPaidPracticeProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { activeScenarioRun, replaceActiveScenarioRunStrict, upsertSession } = useStore();
+  const { activeScenarioRun, replaceActiveScenarioRunStrict, clearActiveScenarioRunStrict, upsertSession } = useStore();
   const restored = scenarioRunForRoute(activeScenarioRun, scenario.id);
   const [value, setValue] = useState<PersistedScenarioPracticeRun | null>(
     restored && (!requestedRunId || restored.run.id === requestedRunId) ? restored : null,
@@ -145,9 +145,33 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
       discardInFlightRef.current = false;
     }
   }, [dictation, onDiscard]);
+  const abandonNormalRun = useCallback(async (): Promise<void> => {
+    if (discardInFlightRef.current) return;
+    const expected = activeRunRevision(valueRef.current);
+    if (!expected) return;
+    discardInFlightRef.current = true;
+    try {
+      await dictation.cancel();
+      await clearActiveScenarioRunStrict(expected);
+      router.replace("/(tabs)/library");
+    } catch (caught: unknown) {
+      safeLog("[scenario] abandon failed", errorShape(caught));
+      setError("We couldn’t abandon this rehearsal safely. It remains saved; try again.");
+    } finally {
+      discardInFlightRef.current = false;
+    }
+  }, [clearActiveScenarioRunStrict, dictation, router]);
   const handleClose = useCallback((): void => {
     if (!isLessonPractice) {
-      void leaveAfterCleanup();
+      Alert.alert(
+        "Leave this rehearsal?",
+        "Save it to resume this exact scenario later, or abandon it to start fresh.",
+        [
+          { text: "Keep practicing", style: "cancel" },
+          { text: "Save and leave", onPress: () => { void leaveAfterCleanup(); } },
+          { text: "Abandon rehearsal", style: "destructive", onPress: () => { void abandonNormalRun(); } },
+        ],
+      );
       return;
     }
     Alert.alert(
@@ -159,7 +183,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
         { text: "Discard this rehearsal", style: "destructive", onPress: () => { void discardAfterCleanup(); } },
       ],
     );
-  }, [discardAfterCleanup, isLessonPractice, leaveAfterCleanup]);
+  }, [abandonNormalRun, discardAfterCleanup, isLessonPractice, leaveAfterCleanup]);
   const difficultyLabel = context ? DIFFICULTY[context.difficulty].label : "";
 
   const startRecording = useCallback(async (kind: "opener" | "response" | "retry"): Promise<void> => {
@@ -447,9 +471,10 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
 
   const finish = useCallback(async (): Promise<void> => {
     if (!value || !context || !run?.retryAttempt || !pressure) return;
-    const completed = transitionScenarioPracticeRun(value, "complete", Date.now());
-    await persist(completed);
-    const record: SessionRecord = {
+    try {
+      const completed = transitionScenarioPracticeRun(value, "complete", Date.now());
+      await persist(completed);
+      const record: SessionRecord = {
       schemaVersion: SESSION_SCHEMA_VERSION,
       id: run.id,
       scenarioId: context.scenarioId,
@@ -466,9 +491,31 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
       startedAt: run.createdAt,
       endedAt: Date.now(),
       contentRetained: false,
-    };
-    await upsertSession(record);
-  }, [context, persist, pressure, run, upsertSession, value]);
+      };
+      await upsertSession(record);
+      const expected = activeRunRevision(completed);
+      if (!expected) throw new Error("Completed scenario revision is unavailable");
+      await clearActiveScenarioRunStrict(expected);
+      router.replace("/(tabs)/library");
+    } catch (caught: unknown) {
+      safeLog("[scenario] completion cleanup failed", errorShape(caught));
+      setError("We couldn’t finish this scenario safely. Your completed rehearsal is saved; use Back to Scenarios to retry cleanup.");
+    }
+  }, [clearActiveScenarioRunStrict, context, persist, pressure, router, run, upsertSession, value]);
+  const leaveCompleted = useCallback(async (): Promise<void> => {
+    const expected = activeRunRevision(valueRef.current);
+    if (!expected) {
+      router.replace("/(tabs)/library");
+      return;
+    }
+    try {
+      await clearActiveScenarioRunStrict(expected);
+      router.replace("/(tabs)/library");
+    } catch (caught: unknown) {
+      safeLog("[scenario] completed run cleanup failed", errorShape(caught));
+      setError("We couldn’t clear the completed rehearsal yet. Try returning to Scenarios again.");
+    }
+  }, [clearActiveScenarioRunStrict, router]);
 
   if (!value || !context || !run || !presentation.isAvailable) {
     const unavailableTitle = presentation.isAvailable ? "This scenario run is unavailable." : presentation.title;
@@ -505,7 +552,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
         {state === "ready_for_retry" && (pressure || lessonState?.replayTarget === "top_of_scene") ? <Reveal><StatusPill label="Same-moment retry" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Answer the exact same turn again.</Text><Text style={styles.body}>{run.retryInstruction}</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("retry")} onType={() => void openTypedReview("confirm_retry_transcript")} /></Reveal> : null}
         {state === "attempt_comparison" && run.retryAttempt && run.comparison && coachedOriginal ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="Original approved response" text={coachedOriginal} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label={isLessonPractice ? "See my results" : "Continue"} onPress={() => { if (isLessonPractice && onReturnToDeck) onReturnToDeck(run.id); else void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now())); }} containerStyle={styles.action} /></Reveal> : null}
         {state === "transfer_cue" ? <Reveal><StatusPill label="Hope · wrap-up" tone="purple" /><Text style={styles.title}>Take the clearer wording into the real conversation.</Text><Text style={styles.body}>This completion belongs to {context.title}, with {context.counterpartName} as {context.counterpartRole}. No unrelated practice fixture was used.</Text><PrimaryButton label="Complete scenario" onPress={() => void finish()} containerStyle={styles.action} /></Reveal> : null}
-        {state === "complete" ? <Reveal><StatusPill label="Scenario complete" tone="green" /><Text style={styles.title}>{context.title} is complete.</Text><Text style={styles.body}>You practiced one {context.counterpartName} pressure moment twice at {difficultyLabel.toLowerCase()} difficulty.</Text><PrimaryButton label="Back to Scenarios" onPress={() => router.replace("/(tabs)/library")} containerStyle={styles.action} /></Reveal> : null}
+        {state === "complete" ? <Reveal><StatusPill label="Scenario complete" tone="green" /><Text style={styles.title}>{context.title} is complete.</Text><Text style={styles.body}>You practiced one {context.counterpartName} pressure moment twice at {difficultyLabel.toLowerCase()} difficulty.</Text>{error ? <Text style={styles.body}>{error}</Text> : null}<PrimaryButton label="Back to Scenarios" onPress={() => void leaveCompleted()} containerStyle={styles.action} /></Reveal> : null}
         {state === "network_error" || state === "model_error" ? <Reveal><StatusPill label="Saved checkpoint" tone="amber" /><Text style={styles.title}>{error}</Text><PrimaryButton label="Return to this scenario" onPress={() => void persist(transitionScenarioPracticeRun(value, state === "network_error" ? (run.responseAttempt ? "confirm_response_transcript" : "confirm_attempt_transcript") : "confirm_response_transcript", Date.now()))} containerStyle={styles.action} /></Reveal> : null}
       </ScrollView>
     </KeyboardAvoidingView>

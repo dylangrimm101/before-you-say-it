@@ -11,17 +11,21 @@ import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import { providerLabel, subscriptionSnapshot } from "@/lib/commerce";
 import { PRO_ENTITLEMENT, useCustomerInfo, useRestorePurchases } from "@/lib/purchases";
 import { errorShape, safeLog } from "@/lib/redact";
+import { useAuth } from "@/providers/auth";
 import { useStore } from "@/providers/store";
 
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { entitlement, devProEnabled, reset } = useStore();
+  const { user, isAuthLoading, isAuthConfigured } = useAuth();
   const customer = useCustomerInfo();
   const restore = useRestorePurchases();
   const [message, setMessage] = useState<string>("");
   const subscription = useMemo(() => subscriptionSnapshot(customer.data, PRO_ENTITLEMENT), [customer.data]);
   const providerIsVerified = Boolean(subscription && subscription.provider !== "unknown");
+  const accountTitle = isAuthLoading ? "Checking account…" : user ? "Account connected" : isAuthConfigured ? "Web continuation" : "Account status unavailable";
+  const accountDetail = isAuthLoading ? "Checking the authenticated account state" : user ? `Signed in as ${user.email ?? "your web account"}` : isAuthConfigured ? "Not signed in · this journey is stored locally" : "Login is not configured in this build";
 
   const restorePurchase = async (): Promise<void> => {
     if (restore.isPending) return;
@@ -47,7 +51,7 @@ export default function SettingsScreen() {
     <Reveal><Text style={styles.title}>Your practice, access, and privacy.</Text><Text style={styles.intro}>Only settings with working behavior are shown here.</Text></Reveal>
     <Reveal index={1}><ProductCard accent style={styles.subscriptionHero}><View style={styles.heroIcon}><CreditCard size={22} color={entitlement === "pro" ? C.sage : C.purple} /></View><View style={styles.heroCopy}><SectionLabel tone={entitlement === "pro" ? C.sage : C.dim}>Subscription</SectionLabel><Text style={styles.heroTitle}>{__DEV__ && devProEnabled ? "QA access is active" : entitlement === "pro" ? "Pro is active" : "No active subscription"}</Text><Text style={styles.heroDetail}>{__DEV__ && devProEnabled ? "Local override · no store entitlement created" : subscription ? `${providerLabel(subscription.provider)}${subscription.willRenew === false ? " · does not renew" : ""}` : "Provider not verified"}</Text></View><StatusPill label={__DEV__ && devProEnabled ? "QA only" : providerIsVerified ? "Verified provider" : "Unavailable"} tone={__DEV__ && devProEnabled ? "amber" : providerIsVerified ? "green" : "neutral"} /></ProductCard></Reveal>
     <Reveal index={2} style={styles.section}><SectionLabel>Access</SectionLabel><SettingsGroup><SettingsRow icon={<RefreshCw size={18} color={C.purple} />} title={restore.isPending ? "Restoring…" : "Restore purchases"} detail="Check this App Store or Google Play account" onPress={() => void restorePurchase()} disabled={restore.isPending} /><SettingsRow icon={<CreditCard size={18} color={C.purple} />} title="Billing and cancellation" detail={providerIsVerified ? `Manage with ${providerLabel(subscription?.provider ?? "unknown")}` : "Available only when the provider is verified"} onPress={() => void manage()} last /></SettingsGroup>{message ? <View style={styles.message}><Text style={styles.messageText}>{message}</Text></View> : null}</Reveal>
-    <Reveal index={3} style={styles.section}><SectionLabel>Device journey</SectionLabel><SettingsGroup><SettingsRow icon={<LogIn size={18} color={C.purple} />} title="Web continuation" detail="Not signed in · this journey is stored locally" onPress={() => router.push("/continue-from-web")} /><SettingsRow icon={<Mic2 size={18} color={C.purple} />} title="Microphone access" detail="Review permission in device Settings" onPress={() => void Linking.openSettings()} last /></SettingsGroup></Reveal>
+    <Reveal index={3} style={styles.section}><SectionLabel>Device journey</SectionLabel><SettingsGroup><SettingsRow icon={<LogIn size={18} color={C.purple} />} title={accountTitle} detail={accountDetail} onPress={() => router.push("/continue-from-web")} disabled={isAuthLoading || Boolean(user) || !isAuthConfigured} /><SettingsRow icon={<Mic2 size={18} color={C.purple} />} title="Microphone access" detail="Review permission in device Settings" onPress={() => void Linking.openSettings()} last /></SettingsGroup></Reveal>
     {__DEV__ ? <Reveal index={4} style={styles.section}><SectionLabel>Internal testing</SectionLabel><SettingsGroup><SettingsRow icon={<FlaskConical size={18} color={C.purple} />} title="QA access lab" detail="Switch unpaid access, review modules, and preview the paywall" onPress={() => router.push("/qa-access")} last /></SettingsGroup></Reveal> : null}
     <Reveal index={5} style={styles.section}><SectionLabel>Privacy & data</SectionLabel><SettingsGroup><SettingsRow icon={<ShieldCheck size={18} color={C.purple} />} title="Privacy & details" detail="Storage, providers, retention, and deletion" onPress={() => router.push("/privacy")} /><SettingsRow icon={<Trash2 size={18} color={C.clay} />} title="Reset all data" detail="Remove BYSI data stored on this device" onPress={confirmReset} destructive last /></SettingsGroup><Text style={styles.resetNote}>Resetting local data does not cancel a subscription. Use verified provider management for billing changes.</Text></Reveal>
     <Reveal index={6} style={styles.section}><SectionLabel>Support</SectionLabel><SettingsGroup><SettingsRow icon={<HelpCircle size={18} color={C.purple} />} title="Contact support" detail="Email the BYSI team" onPress={() => void Linking.openURL("mailto:support@beforeyousayit.app")} last /></SettingsGroup><View style={styles.version}><Text style={styles.versionName}>BEFORE YOU SAY IT</Text><Text style={styles.versionValue}>Version {Constants.expoConfig?.version ?? "unavailable"}</Text></View></Reveal>

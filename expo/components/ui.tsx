@@ -11,6 +11,8 @@ import {
   StyleSheet,
   Text,
   View,
+  type AccessibilityRole,
+  type AccessibilityState,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -150,6 +152,8 @@ interface PressCardProps {
   disabled?: boolean;
   haptic?: "light" | "medium" | "heavy";
   accessibilityLabel?: string;
+  accessibilityRole?: AccessibilityRole;
+  accessibilityState?: AccessibilityState;
   /** Adds the 440ms left-to-right confirmation sheen used by primary actions. */
   wipeOnPress?: boolean;
 }
@@ -163,6 +167,8 @@ export function PressCard({
   disabled,
   haptic = "light",
   accessibilityLabel,
+  accessibilityRole,
+  accessibilityState,
   wipeOnPress = false,
 }: PressCardProps) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -190,9 +196,9 @@ export function PressCard({
     <Pressable
       disabled={disabled}
       style={containerStyle}
-      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityRole={accessibilityRole ?? (onPress ? "button" : undefined)}
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: Boolean(disabled) }}
+      accessibilityState={{ ...accessibilityState, disabled: Boolean(disabled) }}
       onPressIn={() => {
         to(0.972);
         if (!disabled) tap(haptic);
