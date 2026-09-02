@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, Target, UserRound } from "lucide-react-native";
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PaidHeader, ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
@@ -17,6 +17,8 @@ import { voiceForScenario } from "@/constants/personas";
 import { CATEGORIES, DIFFICULTY } from "@/constants/scenarios";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { canStartRehearsal } from "@/lib/access";
+import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
+import { scenarioStartDisposition } from "@/lib/scenarioLifecycle";
 import { createScenarioPracticeRun } from "@/lib/scenarioPractice";
 import { useStore } from "@/providers/store";
 import type { Difficulty, ReactionPattern } from "@/types/convo";
@@ -32,7 +34,7 @@ export default function ScenarioBrief() {
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { findScenario, profile, access, createActiveScenarioRunStrict } = useStore();
+  const { findScenario, profile, access, activeScenarioRun, createActiveScenarioRunStrict, archiveActiveScenarioRunStrict } = useStore();
   const [level, setLevel] = useState<Difficulty>(
     (params.level as Difficulty) ?? "steady",
   );
@@ -65,25 +67,43 @@ export default function ScenarioBrief() {
       return;
     }
 
-    const runId = `scenario-${scenario.id}-${Date.now().toString(36)}`;
-    await createActiveScenarioRunStrict(createScenarioPracticeRun(
-      scenario,
-      level,
-      params.reaction ?? profile?.reaction ?? "not-sure",
-      runId,
-      Date.now(),
-      voiceForScenario(scenario, profile?.persona ?? "woman-hope"),
-    ));
-    router.push({
-      pathname: "/rehearse/[id]",
-      params: {
-        id: scenario.id,
-        difficulty: level,
-        reaction: params.reaction ?? profile?.reaction ?? "not-sure",
-        scenarioRunId: runId,
-        ...(params.challengeDay ? { challengeDay: params.challengeDay } : {}),
-      },
-    });
+    const disposition = scenarioStartDisposition(activeScenarioRun, scenario.id);
+    if (disposition.kind === "protected_conflict") {
+      Alert.alert("A lesson rehearsal is still active", "Return to that lesson to finish or discard it before starting a standalone scenario.");
+      return;
+    }
+    if (disposition.kind === "resume") {
+      router.push({ pathname: "/rehearse/[id]", params: { id: scenario.id, scenarioRunId: disposition.runId } });
+      return;
+    }
+    try {
+      if (disposition.kind === "retire_then_create") {
+        const expected = activeRunRevision(activeScenarioRun);
+        if (!expected || expected.runId !== disposition.runId) throw new Error("Active scenario identity changed");
+        await archiveActiveScenarioRunStrict(expected);
+      }
+      const runId = `scenario-${scenario.id}-${Date.now().toString(36)}`;
+      await createActiveScenarioRunStrict(createScenarioPracticeRun(
+        scenario,
+        level,
+        params.reaction ?? profile?.reaction ?? "not-sure",
+        runId,
+        Date.now(),
+        voiceForScenario(scenario, profile?.persona ?? "woman-hope"),
+      ));
+      router.push({
+        pathname: "/rehearse/[id]",
+        params: {
+          id: scenario.id,
+          difficulty: level,
+          reaction: params.reaction ?? profile?.reaction ?? "not-sure",
+          scenarioRunId: runId,
+          ...(params.challengeDay ? { challengeDay: params.challengeDay } : {}),
+        },
+      });
+    } catch {
+      Alert.alert("Couldn’t start the rehearsal", "Your existing rehearsal is still safe. Try again.");
+    }
   };
 
   return (
@@ -144,6 +164,8 @@ export default function ScenarioBrief() {
                   onPress={() => setLevel(item)}
                   containerStyle={styles.levelHit}
                   accessibilityLabel={`${detail.label}: ${detail.note}`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
                 >
                   <View style={[styles.level, selected && styles.levelSelected]}>
                     <SelectionWipe selected={selected} />

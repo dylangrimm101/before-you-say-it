@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
-import { Backdrop, PressCard, Reveal } from "@/components/ui";
+import { Backdrop, PressCard, PrimaryButton, Reveal } from "@/components/ui";
 import { CURRICULUM_MODULES, isModuleId } from "@/constants/modules";
 import { C, GUTTER, T, font } from "@/constants/theme";
 import {
@@ -35,7 +35,7 @@ export default function InternalReviewEvidenceScreen() {
   const sheet = String(params.sheet ?? "path");
 
   if (DEFAULT_CURRICULUM_VISIBILITY !== "internal_review") {
-    return <View style={[styles.root, styles.center]}><Backdrop /><ShieldCheck size={28} color={C.sage} /><Text style={styles.title}>Review evidence is unavailable.</Text><Text style={styles.body}>Production visibility is closed.</Text></View>;
+    return <View style={[styles.root, styles.center]}><Backdrop /><ShieldCheck size={28} color={C.sage} /><Text style={styles.title}>Review evidence is unavailable.</Text><Text style={styles.body}>Production visibility is closed.</Text><PrimaryButton label="Back to Today" onPress={() => router.replace("/(tabs)")} containerStyle={{ alignSelf: "stretch", marginTop: 24 }} /></View>;
   }
 
   return <View style={styles.root}><Backdrop /><View style={[styles.header, { paddingTop: insets.top + 8 }]}><PressCard onPress={() => router.back()} accessibilityLabel="Close evidence sheet"><View style={styles.back}><ArrowLeft size={18} color={C.text} /></View></PressCard><View style={styles.headerCopy}><Text style={styles.headerTitle}>Deterministic state sheet</Text><Text style={styles.headerMeta}>{sheet}</Text></View></View><ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 44 }]} showsVerticalScrollIndicator={false}><Reveal><StatusPill label="Internal review evidence · not a physical click-through" tone="amber" /><Text style={styles.title}>{titleFor(sheet)}</Text><Text style={styles.body}>{bodyFor(sheet)}</Text></Reveal><EvidenceBody sheet={sheet} /></ScrollView></View>;

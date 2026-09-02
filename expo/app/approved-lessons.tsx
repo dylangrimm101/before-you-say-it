@@ -5,7 +5,7 @@ import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PaidHeader, SectionLabel, StatusPill } from "@/components/PaidProductUI";
-import { Backdrop, PressCard, Reveal } from "@/components/ui";
+import { Backdrop, PressCard, PrimaryButton, Reveal } from "@/components/ui";
 import { APPROVED_LESSON_DECKS, type ApprovedLessonDeck } from "@/constants/approvedLessons";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
 
@@ -21,6 +21,7 @@ export default function ApprovedLessonsScreen() {
         <BookOpen size={30} color={C.sage} />
         <Text style={styles.closedTitle}>Lesson review is unavailable.</Text>
         <Text style={styles.closedBody}>Approved source decks are available only in internal development builds.</Text>
+        <PrimaryButton label="Back to Today" onPress={() => router.replace("/(tabs)")} containerStyle={{ alignSelf: "stretch", marginTop: 24 }} />
       </View>
     );
   }

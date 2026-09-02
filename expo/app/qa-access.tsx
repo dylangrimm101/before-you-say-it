@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PaidHeader, ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
-import { Backdrop, PressCard, Reveal, tap } from "@/components/ui";
+import { Backdrop, PressCard, PrimaryButton, Reveal, tap } from "@/components/ui";
 import { CURRICULUM_MODULES, type ModuleId } from "@/constants/modules";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import { useStore } from "@/providers/store";
@@ -24,6 +24,7 @@ export default function QaAccessScreen() {
         <ShieldCheck size={30} color={C.sage} />
         <Text style={styles.closedTitle}>QA access is unavailable.</Text>
         <Text style={styles.closedBody}>Production access continues to require an active trial or subscription.</Text>
+        <PrimaryButton label="Back to Today" onPress={() => router.replace("/(tabs)")} containerStyle={{ alignSelf: "stretch", marginTop: 24 }} />
       </View>
     );
   }

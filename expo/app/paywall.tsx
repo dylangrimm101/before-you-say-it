@@ -357,7 +357,7 @@ function IapBlocker() {
 }
 
 function PlanChoice({ label, price, selected, onPress }: { label: string; price: string; selected: boolean; onPress: () => void }) {
-  return <PressCard onPress={onPress} accessibilityLabel={`${label}, ${price}`}><View style={[styles.plan, selected && styles.planSelected]}><View><Text style={styles.planLabel}>{label}</Text><Text style={styles.planPrice}>{price}</Text></View>{selected ? <Check size={18} color={C.purple} /> : null}</View></PressCard>;
+  return <PressCard onPress={onPress} accessibilityLabel={`${label}, ${price}`} accessibilityRole="radio" accessibilityState={{ selected }}><View style={[styles.plan, selected && styles.planSelected]}><View><Text style={styles.planLabel}>{label}</Text><Text style={styles.planPrice}>{price}</Text></View>{selected ? <Check size={18} color={C.purple} /> : null}</View></PressCard>;
 }
 
 function TimelineRow({ label, detail, active = false, last = false }: { label: string; detail: string; active?: boolean; last?: boolean }) {

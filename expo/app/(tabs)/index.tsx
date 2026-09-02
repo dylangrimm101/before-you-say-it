@@ -18,7 +18,6 @@ import {
   TODAY_CHART_DURATION_MS,
   TODAY_ENTRANCE_DURATION_MS,
   TODAY_ENTRANCE_STAGGER_MS,
-  TODAY_PIN_STEP,
   todayActivityPresentation,
   todayIndexPresentation,
   todayRecentPractice,
@@ -41,30 +40,9 @@ interface DeckLayerProps {
   children: React.ReactNode;
   entrance: Animated.Value;
   order: number;
-  scrollOffset: Animated.Value;
 }
 
-function pinnedTranslation(order: number, scrollOffset: Animated.Value): Animated.AnimatedInterpolation<number> {
-  const naturalTop = order * (TODAY_CARD_HEIGHT + TODAY_CARD_GAP);
-  const pinnedTop = order * TODAY_PIN_STEP;
-  const pinThreshold = naturalTop - pinnedTop;
-  if (pinThreshold === 0) {
-    return scrollOffset.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
-      extrapolateLeft: "clamp",
-      extrapolateRight: "extend",
-    });
-  }
-  return scrollOffset.interpolate({
-    inputRange: [0, pinThreshold, pinThreshold + 1],
-    outputRange: [0, 0, 1],
-    extrapolateLeft: "clamp",
-    extrapolateRight: "extend",
-  });
-}
-
-function DeckLayer({ children, entrance, order, scrollOffset }: DeckLayerProps) {
+function DeckLayer({ children, entrance, order }: DeckLayerProps) {
   return (
     <Animated.View
       style={[
@@ -73,7 +51,6 @@ function DeckLayer({ children, entrance, order, scrollOffset }: DeckLayerProps) 
           zIndex: 10 + order * 10,
           opacity: entrance,
           transform: [
-            { translateY: pinnedTranslation(order, scrollOffset) },
             { translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
             { scale: entrance.interpolate({ inputRange: [0, 1], outputRange: [0.978, 1] }) },
           ],
@@ -135,8 +112,8 @@ function ActivityCard({ activity, copy, tint, onPress }: { activity: TodayActivi
         <View style={styles.activityMeta}><Text style={[styles.activityKind, isCurrent && styles.activityKindCurrent]}>{activity.key}</Text></View>
         {isCompleted ? <View style={styles.check}><Check size={12} color={C.onAccent} strokeWidth={3} /></View> : null}
       </View>
-      <Text numberOfLines={2} style={[styles.activityTitle, !isCurrent && styles.activityTitleQuiet]}>{copy.title}</Text>
-      <Text numberOfLines={3} style={[styles.activityBody, !isCurrent && styles.activityBodyQuiet]}>{copy.body}</Text>
+      <Text style={[styles.activityTitle, !isCurrent && styles.activityTitleQuiet]}>{copy.title}</Text>
+      <Text style={[styles.activityBody, !isCurrent && styles.activityBodyQuiet]}>{copy.body}</Text>
       {isCurrent && activity.ctaLabel ? <Pressable onPress={onPress} style={({ pressed }) => [styles.primaryAction, pressed && styles.primaryActionPressed]} accessibilityRole="button" accessibilityLabel={activity.ctaLabel}><Text style={styles.primaryActionText}>{activity.ctaLabel}</Text></Pressable> : <View style={styles.quietState}><Text style={styles.quietStateText}>{isCompleted ? "Complete · Review" : "Up next"}</Text></View>}
     </View>
   );
@@ -160,14 +137,7 @@ export default function TodayScreen() {
   const activities = useMemo(() => todayActivityPresentation(undefined, false), []);
   const entrances = useRef<Animated.Value[]>(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
   const chartProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
-  const scrollOffset = useRef<Animated.Value>(new Animated.Value(0)).current;
-  const onDeckScroll = useMemo(
-    () => Animated.event(
-      [{ nativeEvent: { contentOffset: { y: scrollOffset } } }],
-      { useNativeDriver: true },
-    ),
-    [scrollOffset],
-  );
+
 
   useEffect(() => {
     if (isReduced) {
@@ -202,11 +172,9 @@ export default function TodayScreen() {
       <Animated.ScrollView
         style={styles.deck}
         contentContainerStyle={[styles.deckContent, { paddingBottom: insets.bottom + 116 }]}
-        onScroll={onDeckScroll}
-        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       >
-        <DeckLayer entrance={entrances[0]} order={0} scrollOffset={scrollOffset}>
+        <DeckLayer entrance={entrances[0]} order={0}>
           <IndexCard index={index} chartProgress={chartProgress} hasLessonUpdate={scoredPracticeHistory.length > 0} onDetails={openProgress} />
         </DeckLayer>
         {TODAY_ACTIVITY_KEYS.map((key, activityIndex) => {
@@ -216,7 +184,7 @@ export default function TodayScreen() {
           const copy = key === "lesson" && nextDeck
             ? { title: nextDeck.shortName, body: nextDeck.isCloseDeck ? "Bring the five moves together and complete the module." : `Module ${nextDeck.module} · Lesson ${nextDeck.lesson}` }
             : recommended ? activityCopy(key, recommended, moduleDay) : { title: key === "review" ? "See what changed" : `${key[0]?.toUpperCase() ?? ""}${key.slice(1)}`, body: "Complete the current approved lesson to continue." };
-          return <DeckLayer key={key} entrance={entrances[order]} order={order} scrollOffset={scrollOffset}><ActivityCard activity={activity} copy={copy} tint={CARD_TINTS[activityIndex]} onPress={openCurrentActivity} /></DeckLayer>;
+          return <DeckLayer key={key} entrance={entrances[order]} order={order}><ActivityCard activity={activity} copy={copy} tint={CARD_TINTS[activityIndex]} onPress={openCurrentActivity} /></DeckLayer>;
         })}
         <Pressable onPress={openPath} accessibilityRole="button" accessibilityLabel="View your practice path" style={styles.pathLink}><Text style={styles.pathText}>View your path</Text><ChevronRight size={15} color={C.purple} /></Pressable>
       </Animated.ScrollView>
@@ -236,7 +204,7 @@ const styles = StyleSheet.create({
   dayLabel: { fontFamily: font.semi, fontSize: 10, lineHeight: 12, letterSpacing: 0.6, textTransform: "uppercase", color: C.dim }, dayLabelToday: { color: C.purple },
   deck: { flex: 1 }, deckContent: { paddingHorizontal: 20, isolation: "isolate" },
   cardLayer: { paddingBottom: TODAY_CARD_GAP },
-  card: { height: TODAY_CARD_HEIGHT, borderRadius: TODAY_CARD_RADIUS, padding: TODAY_CARD_PADDING, backgroundColor: C.onAccent, borderWidth: 1, borderColor: C.line, ...shadow.layer },
+  card: { minHeight: TODAY_CARD_HEIGHT, borderRadius: TODAY_CARD_RADIUS, padding: TODAY_CARD_PADDING, backgroundColor: C.onAccent, borderWidth: 1, borderColor: C.line, ...shadow.layer },
   indexCard: { backgroundColor: "#FCFAFF", borderColor: "rgba(81,40,136,0.2)", shadowColor: C.purple, shadowOffset: { width: 0, height: 13 }, shadowOpacity: 0.12, shadowRadius: 28, elevation: 7 },
   cardCurrent: { borderColor: "rgba(81,40,136,0.22)", shadowColor: C.purple, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.14, shadowRadius: 26, elevation: 8 },
   cardTopRow: { minHeight: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
