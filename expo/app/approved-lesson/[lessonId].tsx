@@ -12,7 +12,7 @@ import { ProductCard, SectionLabel } from "@/components/PaidProductUI";
 import { Backdrop, GhostButton, PrimaryButton, Reveal, useReducedMotion } from "@/components/ui";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { C, GUTTER, T, font, radius, shadow } from "@/constants/theme";
-import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
+import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadModuleCloseDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
 import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
 import { approvedRehearsalConfig, approvedRehearsalIndexImpact, approvedRehearsalStrongVersion, validateApprovedRehearsalCompletion, type ApprovedRehearsalIndexImpact } from "@/lib/approvedRehearsals";
 import { conversionRuntimeEnabled, m1L1GoodVersion, m1L1IndexImpact, M1_L1_CONVERSION, validateM1L1Completion, type ConvertedLessonProgress, type M1L1IndexImpact, type TransferChoice } from "@/lib/convertedLesson";
@@ -22,7 +22,7 @@ import { submitLessonFeedback } from "@/lib/lessonFeedbackService";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useStore } from "@/providers/store";
 
-/** Renders an approved source deck behind a strict internal-review boundary. */
+/** Renders the canonical approved deck used by the two-module launch curriculum. */
 export default function ApprovedLessonDeckScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -35,6 +35,7 @@ export default function ApprovedLessonDeckScreen() {
     promotePendingConvertedLessonCompletion,
     resetConvertedLesson,
     saveScoredPracticeRecord,
+    saveModuleCloseCompletion,
     scoredPracticeHistory,
     activePracticeSession,
     undoConvertedLessonReset,
@@ -73,13 +74,15 @@ export default function ApprovedLessonDeckScreen() {
     let isActive = true;
     setDeckHtml(null);
     setLoadError(false);
-    if (!__DEV__ || !lesson) return () => { isActive = false; };
+    if (!lesson) return () => { isActive = false; };
 
-    const loader = isReturning && rehearsalConfig
-      ? loadReturnedDeckHtml(lesson.archivePath, rehearsalConfig.returnCard, rehearsalConfig.completionCard, isApprovedMoveSaved)
-      : rehearsalConfig
-        ? loadConvertedHandoffDeckHtml(lesson.archivePath, rehearsalConfig.rehearsalHandoffCard)
-        : loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard);
+    const loader = lesson.isCloseDeck
+      ? loadModuleCloseDeckHtml(lesson.archivePath)
+      : isReturning && rehearsalConfig
+        ? loadReturnedDeckHtml(lesson.archivePath, rehearsalConfig.returnCard, rehearsalConfig.completionCard, isApprovedMoveSaved)
+        : rehearsalConfig
+          ? loadConvertedHandoffDeckHtml(lesson.archivePath, rehearsalConfig.rehearsalHandoffCard)
+          : loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard);
     loader.then((html) => { if (isActive) setDeckHtml(html); })
       .catch((error: unknown) => {
         safeLog("[approved-lessons] approved archive failed", errorShape(error));
@@ -92,14 +95,13 @@ export default function ApprovedLessonDeckScreen() {
     if (!lesson) return "true;";
     const boundary = lesson.reviewThroughCard;
     const total = lesson.cardCount;
-    const shouldStopDeckNavigation = lesson.isCloseDeck;
     return `
       (function () {
         var boundary = ${boundary};
         var total = ${total};
-        var stopDeckNavigation = ${shouldStopDeckNavigation ? "true" : "false"};
-        var blockedLabels = ${isConverted ? "[]" : '["start rehearsal", "start voice rehearsal", "continue lesson preview"]'};
+        var blockedLabels = ${isConverted || lesson.isCloseDeck ? "[]" : '["start rehearsal", "start voice rehearsal", "continue lesson preview"]'};
         var expectedRunId = ${JSON.stringify(params.runId ?? "")};
+        var closeCompletionPosted = false;
         function textOf(node) {
           return String(node && (node.innerText || node.textContent) || "").trim().toLowerCase();
         }
@@ -181,14 +183,6 @@ export default function ApprovedLessonDeckScreen() {
             event.stopImmediatePropagation();
             return false;
           }
-          if (stopDeckNavigation && currentCounter()) {
-            var isBack = label === "back" || label === "×" || label.indexOf("restart") >= 0;
-            if (!isBack) {
-              event.preventDefault();
-              event.stopImmediatePropagation();
-              return false;
-            }
-          }
           if (${isReturning ? "true" : "false"}) {
             window.setTimeout(function () {
               var message = null;
@@ -198,12 +192,18 @@ export default function ApprovedLessonDeckScreen() {
           }
           return true;
         }, true);
+        function postCloseCompletion() {
+          if (!${lesson.isCloseDeck ? "true" : "false"} || closeCompletionPosted || currentCounter() !== "9 / 9") return;
+          closeCompletionPosted = true;
+          if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type:"module-close-complete" }));
+        }
         function enforce() {
           suppressArtifactHostDiagnostic();
           fitApprovedFrame();
           disableDeferredActions();
           enableApprovedMoveCompletion();
           protectScrollableCardContent();
+          postCloseCompletion();
         }
         new MutationObserver(enforce).observe(document, { childList: true, subtree: true });
         window.addEventListener("resize", enforce);
@@ -265,6 +265,21 @@ export default function ApprovedLessonDeckScreen() {
       return;
     }
     if (message.type === "deck-ready") return;
+    if (message.type === "module-close-complete" && lesson?.isCloseDeck && !completionCommitted) {
+      try {
+        await saveModuleCloseCompletion({
+          lessonId: lesson.id as "m1-close" | "m2-close",
+          module: lesson.module,
+          completedAt: Date.now(),
+          sourceLineage: "approved-r2-close-deck",
+        });
+        setCompletionCommitted(true);
+      } catch (error: unknown) {
+        safeLog("[approved-lessons] module close save failed", errorShape(error));
+        Alert.alert("We couldn’t save module completion", "Stay on this screen and try the completion choice again.");
+      }
+      return;
+    }
     if (message.type === "start-rehearsal" && rehearsalConfig && !isReturning) {
       router.push({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: rehearsalConfig.lessonId } });
       return;
@@ -309,7 +324,7 @@ export default function ApprovedLessonDeckScreen() {
       safeLog("[converted-lesson] progress commit failed", errorShape(error));
       Alert.alert("We couldn’t finish securely", "Progress or rehearsal deletion did not complete. Stay on this screen and try again.");
     }
-  }, [activeScenarioRun, approvedConfig, clearActiveScenarioRunStrict, completionCommitted, isM1L1, isReturning, lesson?.id, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, rehearsalConfig, router, writePendingConvertedLessonCompletion]);
+  }, [activeScenarioRun, approvedConfig, clearActiveScenarioRunStrict, completionCommitted, isM1L1, isReturning, lesson, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, rehearsalConfig, router, saveModuleCloseCompletion, writePendingConvertedLessonCompletion]);
 
   const indexEvidence = useMemo(
     () => progressHistoryPresentation(scoredPracticeHistory, activePracticeSession?.sharedResult),
@@ -398,10 +413,7 @@ export default function ApprovedLessonDeckScreen() {
     }
   }, [activeScenarioRun, clearActiveScenarioRunStrict, feedbackLessonId, indexImpact, isCompleting, isStrongVersionSaved, lesson, markPendingConvertedLessonPrivateContentDeleted, promotePendingConvertedLessonCompletion, rehearsalConfig, returningRun, saveScoredPracticeRecord, strongVersion, writePendingConvertedLessonCompletion]);
 
-  if (!__DEV__) {
-    return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
-  }
-  if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to the internal lesson catalog and choose another deck." />;
+  if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to your path and choose another lesson." />;
   if (feedbackContext) {
     return <LessonFeedbackScreen
       feedback={feedbackContext}
@@ -487,11 +499,11 @@ export default function ApprovedLessonDeckScreen() {
           <View style={styles.lessonMenuCopy}><Text style={styles.lessonMenuTitle}>Reset this lesson</Text><Text style={styles.lessonMenuBody}>Clear its completion and rehearsal, then return to Card 1.</Text></View>
         </Pressable>
       </View> : null}
-      {completionCommitted && !lessonWasReset ? <View style={[styles.completionReset, { bottom: insets.bottom + 18 }]}><Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.completionResetButton} accessibilityRole="button"><RotateCcw size={18} color={C.purple} /><Text style={styles.completionResetText}>{isResetting ? "Resetting…" : "Do this lesson again"}</Text></Pressable></View> : null}
+      {completionCommitted && isConverted && !lessonWasReset ? <View style={[styles.completionReset, { bottom: insets.bottom + 18 }]}><Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.completionResetButton} accessibilityRole="button"><RotateCcw size={18} color={C.purple} /><Text style={styles.completionResetText}>{isResetting ? "Resetting…" : "Do this lesson again"}</Text></Pressable></View> : null}
       {resetNotice ? <View style={[styles.resetNotice, { bottom: insets.bottom + 18 }]}><Text style={styles.resetNoticeText}>{resetNotice.message}</Text>{resetNotice.canUndo ? <Pressable onPress={() => void handleUndoReset()} style={styles.undoButton} accessibilityRole="button"><Text style={styles.undoText}>Undo</Text></Pressable> : null}</View> : null}
-      <View pointerEvents="none" style={[styles.qaBadge, { top: insets.top + 9 }]}>
-        <Text style={styles.qaBadgeText}>{completionCommitted ? "COMPLETE · TRANSCRIPT DELETED" : isReturning ? "REHEARSAL COMPLETE" : "INTERNAL QA"}</Text>
-      </View>
+      {__DEV__ ? <View pointerEvents="none" style={[styles.qaBadge, { top: insets.top + 9 }]}>
+        <Text style={styles.qaBadgeText}>{completionCommitted ? "COMPLETE" : isReturning ? "REHEARSAL COMPLETE" : "INTERNAL QA"}</Text>
+      </View> : null}
     </View>
   );
 }

@@ -9,13 +9,13 @@ const DECK_LIMITS = {
   "M1-L3-Park-and-Return.html": 20,
   "M1-L4-Make-It-Repeatable.html": 17,
   "M1-L5-Fit-in-One.html": 18,
-  "M1-Close.html": 6,
+  "M1-Close.html": 9,
   "M2-L1-Clear-Ask.html": 20,
   "M2-L2-Say-Who.html": 20,
   "M2-L3-When-They-Say-They-Cant.html": 20,
   "M2-L4-Say-Whether-No.html": 20,
   "M2-L5-Ask-for-the-Loop.html": 20,
-  "M2-Close.html": 6,
+  "M2-Close.html": 9,
 } as const;
 
 async function source(path: string): Promise<string> {
@@ -184,11 +184,17 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(m1L2Page).toContain("go(d) {\n    if (this.state.hint && this.state.i === 0)");
   });
 
-  test("keeps full-card tap zones off M1 L1 cards that contain their own controls", async () => {
-    const page = materializeApprovedDeckHtml(await source("assets/lesson-decks/M1-L1-Buried-Point.html"));
-    expect(page).toContain(
-      "showTapZones:!c.handoff && !c.transfer && !q && !c.dquiz && !(c.chips && c.chips.length) && !(c.rooms && c.rooms.length)",
-    );
+  test("keeps full-card tap zones off every card that contains its own controls", async () => {
+    for (const fileName of Object.keys(DECK_LIMITS).filter((name) => !name.includes("Close"))) {
+      const raw = await source(`assets/lesson-decks/${fileName}`);
+      const template = approvedTemplate(raw);
+      if (!template.includes("c.chips") && !template.includes("c.rooms")) continue;
+      const page = materializeApprovedDeckHtml(raw);
+      const tapZoneLine = page.split("\n").find((line) => line.includes("showTapZones:"));
+      expect(tapZoneLine, fileName).toContain("!(c.chips && c.chips.length)");
+      expect(page).toContain("!(c.rooms && c.rooms.length)");
+      expect(page).toContain('[data-bysi="deck"] button>*{pointer-events:none!important}');
+    }
   });
 
   test("removes the redundant voice-engine continuation paragraph from every handoff that contains it", async () => {
@@ -495,16 +501,17 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(m1L1Runtime).not.toContain("void unlockAudioPlayback();");
   });
 
-  test("keeps the catalog and deck route fail-closed outside development", async () => {
+  test("keeps the catalog internal while release customers use only approved launch decks", async () => {
     const catalogScreen = await source("app/approved-lessons.tsx");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
     const qa = await source("app/qa-access.tsx");
     expect(catalogScreen).toContain("if (!__DEV__)");
-    expect(deckScreen).toContain("if (!__DEV__)");
+    expect(deckScreen).not.toContain('if (!__DEV__) {\n    return <Unavailable title="Lesson review is unavailable.');
     expect(qa).toContain('router.push("/approved-lessons")');
-    expect(deckScreen).toContain('var blockedLabels = ${isConverted ? "[]"');
+    expect(deckScreen).toContain('var blockedLabels = ${isConverted || lesson.isCloseDeck ? "[]"');
     expect(deckScreen).toContain('["start rehearsal", "start voice rehearsal", "continue lesson preview"]');
     expect(deckScreen).toContain("conversionRuntimeEnabled(params.lessonId)");
+    expect(deckScreen).toContain("loadModuleCloseDeckHtml");
   });
 
   test("keeps deck review isolated from purchases while giving every approved rehearsal a native evidence-based completion", async () => {

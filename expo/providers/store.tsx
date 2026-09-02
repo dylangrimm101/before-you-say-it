@@ -25,6 +25,7 @@ import {
 import { clearLiveSessionContent } from "@/lib/ephemeral";
 import { completedReviewPracticeIds, migrateLegacyPilotProgress } from "@/lib/curriculumMigration";
 import { normalizeConvertedLessonProgress, type ConvertedLessonProgress } from "@/lib/convertedLesson";
+import { mergeModuleCloseProgress, normalizeModuleCloseProgress, type ModuleCloseProgress } from "@/lib/launchCurriculum";
 import {
   resetConvertedLessonProgress,
   restoreConvertedLessonProgress,
@@ -79,6 +80,7 @@ const KEYS = {
   activeScenarioRun: "cc.activeScenarioRun.v1",
   archivedScenarioRuns: "cc.archivedScenarioRuns.v1",
   convertedLessonProgress: "cc.convertedLessonProgress.v1",
+  moduleCloseProgress: "cc.moduleCloseProgress.v1",
   convertedCompletionPending: "cc.convertedCompletionPending.v1",
   nativeJourneyStarted: "cc.nativeJourneyStarted.v1",
   /** Development-only entitlement overrides. Never read in a release build. */
@@ -125,6 +127,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
   const [activePracticeSession, setActivePracticeSession] = useState<ActivePracticeSession | null>(null);
   const [activeScenarioRun, setActiveScenarioRun] = useState<PersistedScenarioPracticeRun | null>(null);
   const [convertedLessonProgress, setConvertedLessonProgress] = useState<ConvertedLessonProgress[]>([]);
+  const [moduleCloseProgress, setModuleCloseProgress] = useState<ModuleCloseProgress[]>([]);
   const [nativeJourneyStarted, setNativeJourneyStarted] = useState<boolean>(false);
   const [devPro, setDevPro] = useState<boolean>(false);
   const [devForceUnpaid, setDevForceUnpaid] = useState<boolean>(false);
@@ -133,7 +136,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     let alive = true;
     const load = async () => {
       try {
-        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, convertedProgress, journeyStarted, dp, devUnpaid] = await Promise.all([
+        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, convertedProgress, moduleCloses, journeyStarted, dp, devUnpaid] = await Promise.all([
           AsyncStorage.getItem(KEYS.profile),
           AsyncStorage.getItem(KEYS.sessions),
           AsyncStorage.getItem(KEYS.sessionsLegacy),
@@ -149,6 +152,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           AsyncStorage.getItem(KEYS.activePracticeSession),
           AsyncStorage.getItem(KEYS.activeScenarioRun),
           AsyncStorage.getItem(KEYS.convertedLessonProgress),
+          AsyncStorage.getItem(KEYS.moduleCloseProgress),
           AsyncStorage.getItem(KEYS.nativeJourneyStarted),
           __DEV__ ? AsyncStorage.getItem(KEYS.devPro) : Promise.resolve(null),
           __DEV__ ? AsyncStorage.getItem(KEYS.devForceUnpaid) : Promise.resolve(null),
@@ -182,6 +186,14 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           }
         }
         if (recoveredProgress) setConvertedLessonProgress(recoveredProgress);
+        if (moduleCloses) {
+          const parsedModuleCloses = JSON.parse(moduleCloses) as unknown;
+          const normalizedModuleCloses = normalizeModuleCloseProgress(parsedModuleCloses);
+          setModuleCloseProgress(normalizedModuleCloses);
+          if (JSON.stringify(parsedModuleCloses) !== JSON.stringify(normalizedModuleCloses)) {
+            await AsyncStorage.setItem(KEYS.moduleCloseProgress, JSON.stringify(normalizedModuleCloses));
+          }
+        }
         if (practiceSession) {
           const normalized = normalizePracticeSession(JSON.parse(practiceSession) as unknown);
           setActivePracticeSession(normalized);
@@ -413,6 +425,13 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     setConvertedLessonProgress(next);
   }, []);
 
+  const saveModuleCloseCompletion = useCallback(async (record: ModuleCloseProgress): Promise<void> => {
+    const current = await AsyncStorage.getItem(KEYS.moduleCloseProgress);
+    const next = mergeModuleCloseProgress(current ? JSON.parse(current) as unknown : [], record);
+    await AsyncStorage.setItem(KEYS.moduleCloseProgress, JSON.stringify(next));
+    setModuleCloseProgress(next);
+  }, []);
+
   /** Clears one lesson's completion and any exact active rehearsal; deleted private content is never restored by Undo. */
   const resetConvertedLesson = useCallback(async (identity: {
     lessonId: ConvertedLessonProgress["lessonId"];
@@ -608,6 +627,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     setActivePracticeSession(null);
     setActiveScenarioRun(null);
     setConvertedLessonProgress([]);
+    setModuleCloseProgress([]);
     setNativeJourneyStarted(false);
     clearLiveSessionContent();
     cancelDailyReminder().catch(() => {});
@@ -629,6 +649,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         KEYS.activeScenarioRun,
         KEYS.archivedScenarioRuns,
         KEYS.convertedLessonProgress,
+        KEYS.moduleCloseProgress,
         KEYS.convertedCompletionPending,
         KEYS.nativeJourneyStarted,
         KEYS.anonymousUserId,
@@ -909,6 +930,8 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     activePracticeSession,
     activeScenarioRun,
     convertedLessonProgress,
+    moduleCloseProgress,
+    saveModuleCloseCompletion,
     nativeJourneyStarted,
     beginNativeJourney,
     saveActivePracticeSession,

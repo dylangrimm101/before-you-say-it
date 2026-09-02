@@ -378,7 +378,7 @@ export function approvedRehearsalAuthoredCorpus(config: ApprovedRehearsalConfig)
 }
 
 export function approvedRehearsalRuntimeEnabled(lessonId: string | null | undefined): lessonId is ApprovedRehearsalLessonId {
-  return __DEV__ && Boolean(approvedRehearsalConfig(lessonId));
+  return Boolean(approvedRehearsalConfig(lessonId));
 }
 
 /** Validates every durable pressure invariant for one shared approved lesson. */
