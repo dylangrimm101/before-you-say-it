@@ -158,7 +158,8 @@ describe("preview pilot access", () => {
     const module = await Bun.file(`${import.meta.dir}/../app/module/[day].tsx`).text();
     const paywall = await Bun.file(`${import.meta.dir}/../app/paywall.tsx`).text();
 
-    expect(settings).toContain('{__DEV__ ? <Reveal index={4}');
+    expect(settings).toContain('{__DEV__ ? <Reveal index={5}');
+    expect(settings).toContain('title="QA access lab"');
     expect(settings).toContain('router.push("/qa-access")');
     expect(qa).toContain("if (!__DEV__)");
     expect(qa).toContain("Production access continues to require an active trial or subscription.");

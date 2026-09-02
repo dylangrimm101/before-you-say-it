@@ -80,9 +80,9 @@ describe("launch route recovery and account truth", () => {
   test("settings derives account copy from the authenticated user", () => {
     const settings = source("app/settings.tsx");
     expect(settings).toContain("useAuth()");
-    expect(settings).toContain("Account connected");
+    expect(settings).toContain('user ? "Account"');
     expect(settings).toContain("Signed in as");
-    expect(settings).toContain("Account status unavailable");
+    expect(settings).toContain("On this device");
   });
 });
 
