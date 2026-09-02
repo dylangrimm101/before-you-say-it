@@ -12,8 +12,19 @@ import type {
   PilotModule,
 } from "@/types/pilotCurriculum";
 
-const GENERATE_ENDPOINT = process.env.EXPO_PUBLIC_GENERATE_ENDPOINT?.trim() || "https://beforeyousayit.app/api/generate";
+const GENERATE_ENDPOINT = process.env.EXPO_PUBLIC_GENERATE_ENDPOINT?.trim() ?? "";
 const BYSI_GENERATION_TIMEOUT_MS = 15_000;
+
+function configuredGenerateEndpoint(): string {
+  if (!GENERATE_ENDPOINT) throw new Error("BYSI generation endpoint is not configured");
+  try {
+    const parsed = new URL(GENERATE_ENDPOINT);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash || !parsed.pathname.endsWith("/api/generate")) throw new Error();
+    return parsed.toString();
+  } catch {
+    throw new Error("BYSI generation endpoint configuration is invalid");
+  }
+}
 
 type BysiEntryRoute = "real_conversation" | "recurring_problem" | "desired_skill";
 
@@ -92,10 +103,11 @@ function evidenceEndpoint(url: string): string {
 
 /** Performs one bounded BYSI request so a provider stall cannot trap the rehearsal UI. */
 export async function requestBysiGeneration(payload: Record<string, unknown>, timeoutMs: number = BYSI_GENERATION_TIMEOUT_MS): Promise<Response> {
+  const endpoint = configuredGenerateEndpoint();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(GENERATE_ENDPOINT, {
+    return await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -107,18 +119,19 @@ export async function requestBysiGeneration(payload: Record<string, unknown>, ti
 }
 
 async function postBysi<T>(payload: Record<string, unknown>): Promise<T> {
+  const endpoint = configuredGenerateEndpoint();
   const type = typeof payload.type === "string" ? payload.type : "unknown";
   const contract = payload.contract as { entry_route?: unknown } | undefined;
   const entryRoute = typeof contract?.entry_route === "string" ? contract.entry_route : "unknown";
   safeLog("[evidence] BYSI generation request", {
-    endpoint: evidenceEndpoint(GENERATE_ENDPOINT),
+    endpoint: evidenceEndpoint(endpoint),
     entryRoute,
     provider: "user-owned-claude-backend",
     type,
   });
   const response = await requestBysiGeneration(payload);
   safeLog("[evidence] BYSI generation response", {
-    endpoint: evidenceEndpoint(GENERATE_ENDPOINT),
+    endpoint: evidenceEndpoint(endpoint),
     entryRoute,
     ok: response.ok,
     status: response.status,

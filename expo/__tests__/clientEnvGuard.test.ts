@@ -6,6 +6,9 @@ describe("client environment repopulation guard", () => {
   test("removes private and secret-like public variables while preserving allowed public config", () => {
     const fixture = [
       "EXPO_PUBLIC_SUPABASE_URL=https://example.invalid",
+      "EXPO_PUBLIC_GENERATE_ENDPOINT=https://example.invalid/api/generate",
+      "EXPO_PUBLIC_TRANSCRIBE_ENDPOINT=https://example.invalid/functions/v1/transcribe",
+      "EXPO_PUBLIC_TTS_ENDPOINT=https://example.invalid/api/tts",
       "OPENAI_API_KEY=fixture-not-a-secret",
       "SUPABASE_ACCESS_TOKEN=fixture-not-a-secret",
       "EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY=fixture-not-a-secret",
@@ -14,6 +17,9 @@ describe("client environment repopulation guard", () => {
     const sanitized = sanitizeClientEnv(fixture);
     expect(sanitized.removedNames.sort()).toEqual(["EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY", "OPENAI_API_KEY", "SUPABASE_ACCESS_TOKEN"]);
     expect(sanitized.content).toContain("EXPO_PUBLIC_SUPABASE_URL");
+    expect(sanitized.content).toContain("EXPO_PUBLIC_GENERATE_ENDPOINT");
+    expect(sanitized.content).toContain("EXPO_PUBLIC_TRANSCRIBE_ENDPOINT");
+    expect(sanitized.content).toContain("EXPO_PUBLIC_TTS_ENDPOINT");
     expect(sanitized.content).toContain("EXPO_PUBLIC_PROJECT_ID");
     expect(prohibitedClientEnvNames(sanitized.content)).toEqual([]);
     expect(sanitized.content).not.toContain("fixture-not-a-secret");

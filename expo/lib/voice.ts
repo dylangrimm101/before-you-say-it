@@ -15,7 +15,18 @@ import {
 import type { PersonaVoice } from "@/types/convo";
 import type { PilotAudioLine } from "@/types/pilotCurriculum";
 
-const TTS_ENDPOINT = process.env.EXPO_PUBLIC_TTS_ENDPOINT?.trim() || "https://beforeyousayit.app/api/tts";
+const TTS_ENDPOINT = process.env.EXPO_PUBLIC_TTS_ENDPOINT?.trim() ?? "";
+
+function configuredTtsEndpoint(): string {
+  if (!TTS_ENDPOINT) throw new Error("BYSI voice endpoint is not configured");
+  try {
+    const parsed = new URL(TTS_ENDPOINT);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash || !parsed.pathname.endsWith("/api/tts")) throw new Error();
+    return parsed.toString();
+  } catch {
+    throw new Error("BYSI voice endpoint configuration is invalid");
+  }
+}
 
 type BysiVoiceRole = "hope" | "adam";
 
@@ -128,13 +139,14 @@ export async function unlockAudioPlayback(): Promise<boolean> {
 }
 
 async function fetchSpeechDataUri(text: string, persona: PersonaVoice): Promise<string> {
+  const endpoint = configuredTtsEndpoint();
   const role = roleForPersona(persona);
   safeLog("[evidence] BYSI TTS request", {
-    endpoint: evidenceEndpoint(TTS_ENDPOINT),
+    endpoint: evidenceEndpoint(endpoint),
     provider: "user-owned-bysi-tts",
     role,
   });
-  const response = await fetch(TTS_ENDPOINT, {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role, text }),
@@ -142,7 +154,7 @@ async function fetchSpeechDataUri(text: string, persona: PersonaVoice): Promise<
   const contentType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown";
   if (!response.ok) {
     safeLog("[evidence] BYSI TTS response", {
-      endpoint: evidenceEndpoint(TTS_ENDPOINT),
+      endpoint: evidenceEndpoint(endpoint),
       ok: false,
       role,
       status: response.status,
@@ -155,7 +167,7 @@ async function fetchSpeechDataUri(text: string, persona: PersonaVoice): Promise<
   const blob = await response.blob();
   safeLog("[evidence] BYSI TTS response", {
     count: blob.size,
-    endpoint: evidenceEndpoint(TTS_ENDPOINT),
+    endpoint: evidenceEndpoint(endpoint),
     ok: true,
     role,
     status: response.status,
