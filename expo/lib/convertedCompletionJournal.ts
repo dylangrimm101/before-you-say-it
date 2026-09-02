@@ -1,7 +1,6 @@
 import { ACTIVE_SCENARIO_RUN_KEY, QUARANTINED_SCENARIO_RUN_KEY, type ActiveRunRevision } from "@/lib/activeScenarioRunRepository";
 import { normalizeConvertedLessonProgress, type ConvertedLessonProgress } from "@/lib/convertedLesson";
 import { commitConvertedProgress, type ConvertedProgressStorage } from "@/lib/convertedProgressRepository";
-import { deleteBaselineAudioStrict } from "@/lib/baselineAudio";
 import { normalizeScenarioPracticeRun } from "@/lib/scenarioPractice";
 
 export const CONVERTED_COMPLETION_PENDING_KEY = "cc.convertedCompletionPending.v1";
@@ -17,6 +16,14 @@ export interface PendingConvertedCompletion {
 
 export interface ConvertedCompletionStorage extends ConvertedProgressStorage {
   removeItem(key: string): Promise<void>;
+}
+
+async function platformSafePrivateCleanup(runId: string): Promise<void> {
+  // Browser capture is memory-backed; do not even load the native File/Directory
+  // module during durable completion. Native still uses verified strict deletion.
+  if (process.env.EXPO_OS === "web" || typeof document !== "undefined") return;
+  const { deleteBaselineAudioStrict } = await import("@/lib/baselineAudio");
+  await deleteBaselineAudioStrict(runId);
 }
 
 function parsePending(raw: string | null): PendingConvertedCompletion | null {
@@ -86,7 +93,7 @@ async function clearExpectedActiveKeyAfterDeletion(storage: ConvertedCompletionS
 /** Resumes strict private cleanup first, then clears/quarantines the expected active bytes and promotes exactly once. */
 export async function recoverPendingConvertedCompletion(
   storage: ConvertedCompletionStorage,
-  strictPrivateCleanup: (runId: string) => Promise<void> = deleteBaselineAudioStrict,
+  strictPrivateCleanup: (runId: string) => Promise<void> = platformSafePrivateCleanup,
 ): Promise<ConvertedLessonProgress[] | null> {
   let pending = await readPendingConvertedCompletion(storage);
   if (!pending) return null;
