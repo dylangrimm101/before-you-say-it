@@ -203,6 +203,22 @@ describe("baseline audio lifecycle", () => {
     expect(navigations).toBe(1);
   });
 
+  it("web strict cleanup never invokes unsupported native file deletion", async () => {
+    const prior = process.env.EXPO_OS;
+    process.env.EXPO_OS = "web";
+    const retainedUri = "file:///app/Documents/baseline-audio/web-run.m4a";
+    createdDirs.add("file:///app/Documents/baseline-audio");
+    disk.set(retainedUri, { uri: retainedUri, exists: true });
+    failedDeletes.add(retainedUri);
+    try {
+      await expect(deleteBaselineAudioStrict("web-run")).resolves.toBeUndefined();
+      await expect(deleteAllBaselineAudioStrict()).resolves.toBeUndefined();
+    } finally {
+      if (prior === undefined) delete process.env.EXPO_OS;
+      else process.env.EXPO_OS = prior;
+    }
+  });
+
   it("strict deletion fails closed and leaves retained content visibly pending", async () => {
     disk.set("file:///app/Caches/rec-1.m4a", { uri: "file:///app/Caches/rec-1.m4a", exists: true });
     await keepBaselineAudio("s-1", "file:///app/Caches/rec-1.m4a");

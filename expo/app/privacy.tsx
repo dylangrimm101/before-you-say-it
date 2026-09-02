@@ -142,7 +142,7 @@ export default function PrivacyScreen() {
             body={
               consent.saveCustomScenarioText
                 ? `${customScenarios.length} saved on this device, because you turned that on below.`
-                : "Not saved to your scenario library. The Day 1 baseline record may retain its bounded topic and counterpart through Day 30, or until app data is deleted."
+                : "Not saved to your scenario library or durable rehearsal records. Custom title, situation, objective, and counterpart text stay out of storage unless you opt in."
             }
           />
           <Bullet

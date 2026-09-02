@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CHALLENGE_TOTAL_DAYS } from "@/constants/challenge";
@@ -23,6 +24,7 @@ import {
   type ConsentState,
 } from "@/lib/consent";
 import { clearLiveSessionContent } from "@/lib/ephemeral";
+import { hydrateJsonEntry } from "@/lib/hydration";
 import { completedReviewPracticeIds, migrateLegacyPilotProgress } from "@/lib/curriculumMigration";
 import { normalizeConvertedLessonProgress, type ConvertedLessonProgress } from "@/lib/convertedLesson";
 import {
@@ -44,12 +46,17 @@ import {
   firstOpenDay,
   streakFromDays,
 } from "@/lib/progress";
-import { useIsPro } from "@/lib/purchases";
+import { clearPurchasesIdentity, useIsPro } from "@/lib/purchases";
+import { sanitizeActivePracticeSessionForPersistence, sanitizeActiveScenarioRunForPersistence, sanitizeSessionForPersistence } from "@/lib/privacyPersistence";
 import { errorShape, safeLog } from "@/lib/redact";
 import { normalizeScenarioPracticeRun, type PersistedScenarioPracticeRun } from "@/lib/scenarioPractice";
 import { appendScoredPracticeRecord, normalizeScoredPracticeHistory, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
 import { cancelChallengeNudge, cancelDailyReminder, requestReminderPermission, syncChallengeNudge } from "@/lib/reminders";
-import { capRecords, migrateSessions } from "@/lib/sessionMigration";
+import { capRecords } from "@/lib/sessionMigration";
+import { migrateSessionStorage } from "@/lib/sessionStorageMigration";
+import { resetAllDataStrict } from "@/lib/resetAllData";
+import { supabase } from "@/lib/supabase";
+import { deleteGeneratedVoiceCacheStrict } from "@/lib/voice";
 import {
   associatePracticeSessionUser,
   normalizePracticeSession,
@@ -78,6 +85,7 @@ const KEYS = {
   activePracticeSession: "cc.activePracticeSession.v1",
   activeScenarioRun: "cc.activeScenarioRun.v1",
   archivedScenarioRuns: "cc.archivedScenarioRuns.v1",
+  quarantinedScenarioRun: "cc.quarantinedScenarioRun.v1",
   convertedLessonProgress: "cc.convertedLessonProgress.v1",
   convertedCompletionPending: "cc.convertedCompletionPending.v1",
   nativeJourneyStarted: "cc.nativeJourneyStarted.v1",
@@ -110,6 +118,7 @@ function hasProfileFreeText(raw: unknown): boolean {
 }
 
 export const [StoreProvider, useStore] = createContextHook(() => {
+  const queryClient = useQueryClient();
   const [hydrated, setHydrated] = useState<boolean>(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
@@ -133,7 +142,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     let alive = true;
     const load = async () => {
       try {
-        const [p, sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, convertedProgress, journeyStarted, dp, devUnpaid] = await Promise.all([
+        const [p, _sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, convertedProgress, journeyStarted, dp, devUnpaid] = await Promise.all([
           AsyncStorage.getItem(KEYS.profile),
           AsyncStorage.getItem(KEYS.sessions),
           AsyncStorage.getItem(KEYS.sessionsLegacy),
@@ -154,6 +163,8 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           __DEV__ ? AsyncStorage.getItem(KEYS.devForceUnpaid) : Promise.resolve(null),
         ]);
         if (!alive) return;
+        const hydrationFailure = (key: string, error: unknown): void => safeLog("[store] malformed hydration key", { key, ...errorShape(error) });
+        const storedConsent = normalizeConsent(cs);
 
         if (__DEV__ && dp === "1") setDevPro(true);
         if (__DEV__ && devUnpaid === "1") setDevForceUnpaid(true);
@@ -174,7 +185,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         }
         setActiveScenarioRun(normalizedScenarioRun);
         if (convertedProgress && !recoveredProgress) {
-          const parsedConvertedProgress = JSON.parse(convertedProgress) as unknown;
+          const parsedConvertedProgress = hydrateJsonEntry<unknown>(convertedProgress, [], KEYS.convertedLessonProgress, hydrationFailure);
           const normalizedConvertedProgress = normalizeConvertedLessonProgress(parsedConvertedProgress);
           setConvertedLessonProgress(normalizedConvertedProgress);
           if (JSON.stringify(parsedConvertedProgress) !== JSON.stringify(normalizedConvertedProgress)) {
@@ -183,55 +194,52 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         }
         if (recoveredProgress) setConvertedLessonProgress(recoveredProgress);
         if (practiceSession) {
-          const normalized = normalizePracticeSession(JSON.parse(practiceSession) as unknown);
-          setActivePracticeSession(normalized);
+          const parsedPracticeSession = hydrateJsonEntry<unknown>(practiceSession, null, KEYS.activePracticeSession, hydrationFailure);
+          const normalized = normalizePracticeSession(parsedPracticeSession);
+          const privacySafeSession = normalized ? sanitizeActivePracticeSessionForPersistence(normalized, storedConsent) : null;
+          setActivePracticeSession(privacySafeSession);
           if (!normalized) await AsyncStorage.removeItem(KEYS.activePracticeSession);
           else if (
-            (JSON.parse(practiceSession) as { schemaVersion?: unknown }).schemaVersion !== normalized.schemaVersion
-            || JSON.stringify(JSON.parse(practiceSession)) !== JSON.stringify(normalized)
+            (parsedPracticeSession as { schemaVersion?: unknown } | null)?.schemaVersion !== normalized.schemaVersion
+            || JSON.stringify(parsedPracticeSession) !== JSON.stringify(privacySafeSession)
           ) {
-            await AsyncStorage.setItem(KEYS.activePracticeSession, JSON.stringify(normalized));
+            await AsyncStorage.setItem(KEYS.activePracticeSession, JSON.stringify(privacySafeSession));
           }
         }
 
-        const storedConsent = normalizeConsent(cs);
         let removedContent = false;
 
-        // --- Sessions: minimize, then delete the legacy key outright. ---
-        const primary = migrateSessions(sv2 ?? "[]");
-        let records = primary.records;
-        if (sv1 !== null) {
-          const legacy = migrateSessions(sv1);
-          if (sv2 === null) records = legacy.records;
-          if (legacy.removedContentFrom > 0) removedContent = true;
-          // Write the minimized set before removing the source, so a crash in
-          // between leaves the old data recoverable rather than half-deleted.
-          await AsyncStorage.setItem(KEYS.sessions, JSON.stringify(records));
-          await AsyncStorage.removeItem(KEYS.sessionsLegacy);
+        // --- Sessions: choose a usable source and retire v1 only after a
+        // canonical v2 write has been read back and verified. ---
+        const migratedSessions = await migrateSessionStorage(AsyncStorage, KEYS.sessionsLegacy, KEYS.sessions, {
+          preserveCustomScenarioText: storedConsent.saveCustomScenarioText,
+        });
+        const records = migratedSessions.records;
+        if (migratedSessions.removedContentFrom > 0) removedContent = true;
+        if (sv1 !== null || migratedSessions.removedContentFrom > 0) {
           safeLog("[store] session content removed", {
-            removed: legacy.removedContentFrom,
+            removed: migratedSessions.removedContentFrom,
             kept: records.length,
             schemaVersion: 2,
           });
-        } else if (primary.removedContentFrom > 0) {
-          removedContent = true;
-          await AsyncStorage.setItem(KEYS.sessions, JSON.stringify(records));
         }
         setSessions(records);
 
         // --- Profile: keep the coarse fields, drop the free text. ---
         if (p) {
-          const parsed = JSON.parse(p) as Profile;
+          const parsed = hydrateJsonEntry<Profile | null>(p, null, KEYS.profile, hydrationFailure);
+          if (parsed) {
           if (hasProfileFreeText(parsed)) {
             removedContent = true;
             await AsyncStorage.setItem(KEYS.profile, JSON.stringify(persistableProfile(parsed)));
           }
           setProfile(persistableProfile(parsed));
+          }
         }
 
         // --- Custom scenarios: exact text is opt-in, and was never opted into. ---
         if (c) {
-          const parsed = JSON.parse(c) as Scenario[];
+          const parsed = hydrateJsonEntry<unknown>(c, [], KEYS.custom, hydrationFailure);
           if (storedConsent.saveCustomScenarioText) {
             setCustomScenarios(Array.isArray(parsed) ? parsed : []);
           } else {
@@ -240,16 +248,16 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           }
         }
 
-        if (d) setDrillLog(JSON.parse(d) as DrillResult[]);
+        if (d) setDrillLog(hydrateJsonEntry<DrillResult[]>(d, [], KEYS.drills, hydrationFailure));
         if (r) {
           await cancelDailyReminder();
           await AsyncStorage.removeItem(KEYS.reminder);
         }
-        if (ch) setChallengeLog(JSON.parse(ch) as ChallengeLogEntry[]);
-        if (f) setFreeze(JSON.parse(f) as FreezeState);
+        if (ch) setChallengeLog(hydrateJsonEntry<ChallengeLogEntry[]>(ch, [], KEYS.challenge, hydrationFailure));
+        if (f) setFreeze(hydrateJsonEntry<FreezeState>(f, DEFAULT_FREEZE, KEYS.freeze, hydrationFailure));
         setConsent(storedConsent);
         if (pp) {
-          const parsed = JSON.parse(pp) as unknown;
+          const parsed = hydrateJsonEntry<unknown>(pp, [], KEYS.pilotProgress, hydrationFailure);
           if (Array.isArray(parsed)) {
             const valid = parsed.filter((entry): entry is PilotProgressEntry => {
               if (!entry || typeof entry !== "object") return false;
@@ -269,7 +277,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           }
         }
         if (scoredHistory) {
-          const parsedHistory = JSON.parse(scoredHistory) as unknown;
+          const parsedHistory = hydrateJsonEntry<unknown>(scoredHistory, [], KEYS.scoredPracticeHistory, hydrationFailure);
           const normalizedHistory = normalizeScoredPracticeHistory(parsedHistory);
           setScoredPracticeHistory(normalizedHistory);
           if (JSON.stringify(parsedHistory) !== JSON.stringify(normalizedHistory)) {
@@ -316,8 +324,22 @@ export const [StoreProvider, useStore] = createContextHook(() => {
   const setSaveCustomScenarioText = useCallback(
     async (enabled: boolean) => {
       if (!enabled) {
+        const privateConsent = { ...consent, saveCustomScenarioText: false };
+        const sanitizedSessions = sessions.map((record) => sanitizeSessionForPersistence(record, privateConsent));
+        const sanitizedRun = activeScenarioRun
+          ? sanitizeActiveScenarioRunForPersistence(activeScenarioRun, privateConsent)
+          : null;
+        const sanitizedPracticeSession = activePracticeSession
+          ? sanitizeActivePracticeSessionForPersistence(activePracticeSession, privateConsent)
+          : null;
         setCustomScenarios([]);
-        await AsyncStorage.removeItem(KEYS.custom).catch(() => {});
+        setSessions(sanitizedSessions);
+        setActiveScenarioRun(sanitizedRun);
+        setActivePracticeSession(sanitizedPracticeSession);
+        await AsyncStorage.removeItem(KEYS.custom);
+        await AsyncStorage.setItem(KEYS.sessions, JSON.stringify(sanitizedSessions));
+        if (sanitizedRun) await AsyncStorage.setItem(KEYS.activeScenarioRun, JSON.stringify(sanitizedRun));
+        if (sanitizedPracticeSession) await AsyncStorage.setItem(KEYS.activePracticeSession, JSON.stringify(sanitizedPracticeSession));
       }
       setConsent((prev) => {
         const next = { ...prev, saveCustomScenarioText: enabled };
@@ -327,7 +349,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         return next;
       });
     },
-    [],
+    [activePracticeSession, activeScenarioRun, consent, sessions],
   );
 
   const dismissMigrationNotice = useCallback(async () => {
@@ -365,26 +387,28 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     const protectedSession = session && activePracticeSession
       ? protectImmutablePracticeRecords(activePracticeSession, session)
       : session;
+    const privacySafeSession = protectedSession ? sanitizeActivePracticeSessionForPersistence(protectedSession, consent) : null;
+    // Keep exact custom context only in memory for the current app run.
     setActivePracticeSession(protectedSession);
     try {
-      if (protectedSession) await AsyncStorage.setItem(KEYS.activePracticeSession, JSON.stringify(protectedSession));
+      if (privacySafeSession) await AsyncStorage.setItem(KEYS.activePracticeSession, JSON.stringify(privacySafeSession));
       else await AsyncStorage.removeItem(KEYS.activePracticeSession);
     } catch (e) {
       safeLog("[store] active practice session save failed", errorShape(e));
     }
-  }, [activePracticeSession]);
+  }, [activePracticeSession, consent]);
 
   /** Creates a run only when the durable active slot is empty. */
   const createActiveScenarioRunStrict = useCallback(async (value: PersistedScenarioPracticeRun): Promise<void> => {
-    const normalized = await replaceActiveScenarioRunCAS(AsyncStorage, value, null);
-    setActiveScenarioRun(normalized);
-  }, []);
+    const normalized = await replaceActiveScenarioRunCAS(AsyncStorage, sanitizeActiveScenarioRunForPersistence(value, consent), null);
+    setActiveScenarioRun(consent.saveCustomScenarioText ? normalized : (normalizeScenarioPracticeRun(value) ?? normalized));
+  }, [consent]);
 
   /** Compare-and-swap writes a valid active run against the latest durable revision. */
   const replaceActiveScenarioRunStrict = useCallback(async (value: PersistedScenarioPracticeRun, expected: ActiveRunRevision | null): Promise<void> => {
-    const normalized = await replaceActiveScenarioRunCAS(AsyncStorage, value, expected);
-    setActiveScenarioRun(normalized);
-  }, []);
+    const normalized = await replaceActiveScenarioRunCAS(AsyncStorage, sanitizeActiveScenarioRunForPersistence(value, consent), expected);
+    setActiveScenarioRun(consent.saveCustomScenarioText ? normalized : (normalizeScenarioPracticeRun(value) ?? normalized));
+  }, [consent]);
 
   /** Strictly deletes retained run audio, then CAS-clears only the expected durable run. */
   const clearActiveScenarioRunStrict = useCallback(async (expected: ActiveRunRevision, afterPrivateCleanup?: () => Promise<void>): Promise<void> => {
@@ -447,11 +471,12 @@ export const [StoreProvider, useStore] = createContextHook(() => {
 
   /** Persist a minimized session record. Content never reaches this function. */
   const upsertSession = useCallback(async (record: SessionRecord) => {
+    const persistableRecord = sanitizeSessionForPersistence(record, consent);
     let snapshot: SessionRecord[] = [];
     setSessions((prev) => {
-      const idx = prev.findIndex((s) => s.id === record.id);
+      const idx = prev.findIndex((s) => s.id === persistableRecord.id);
       const next =
-        idx === -1 ? [record, ...prev] : prev.map((s) => (s.id === record.id ? record : s));
+        idx === -1 ? [persistableRecord, ...prev] : prev.map((s) => (s.id === persistableRecord.id ? persistableRecord : s));
       snapshot = capRecords(next);
       return snapshot;
     });
@@ -460,7 +485,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     } catch (e) {
       safeLog("[store] session save failed", errorShape(e));
     }
-  }, []);
+  }, [consent]);
 
   /** Delete one saved session, along with any recording kept for it. */
   const deleteSession = useCallback(async (id: string) => {
@@ -590,9 +615,22 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     }
   }, []);
 
-  /** Wipe everything this app has stored on the device. */
+  /** Wipe and verify app data, auth identities, refresh tokens, and audio caches. */
   const reset = useCallback(async () => {
-    await deleteAllBaselineAudioStrict();
+    const nextAnonymousId = await resetAllDataStrict({
+      storage: AsyncStorage,
+      appKeys: [KEYS.activePracticeSession, ...Object.values(KEYS)],
+      anonymousKey: KEYS.anonymousUserId,
+      newAnonymousId: newAnonymousUserId,
+      signOutSupabase: async () => {
+        if (!supabase) return;
+        const { error } = await supabase.auth.signOut({ scope: "local" });
+        if (error) throw error;
+      },
+      logOutPurchases: clearPurchasesIdentity,
+      deletePrivateAudio: deleteAllBaselineAudioStrict,
+      deleteGeneratedVoiceCache: deleteGeneratedVoiceCacheStrict,
+    });
     setProfile(null);
     setDevPro(false);
     setDevForceUnpaid(false);
@@ -605,40 +643,15 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     setMigrationNotice(false);
     setPilotProgress([]);
     setScoredPracticeHistory([]);
+    setAnonymousUserId(nextAnonymousId);
     setActivePracticeSession(null);
     setActiveScenarioRun(null);
     setConvertedLessonProgress([]);
     setNativeJourneyStarted(false);
     clearLiveSessionContent();
-    cancelDailyReminder().catch(() => {});
-    cancelChallengeNudge().catch(() => {});
-    try {
-      await AsyncStorage.multiRemove([
-        KEYS.profile,
-        KEYS.sessions,
-        KEYS.sessionsLegacy,
-        KEYS.custom,
-        KEYS.drills,
-        KEYS.reminder,
-        KEYS.challenge,
-        KEYS.freeze,
-        KEYS.consent,
-        KEYS.pilotProgress,
-        KEYS.scoredPracticeHistory,
-        KEYS.activePracticeSession,
-        KEYS.activeScenarioRun,
-        KEYS.archivedScenarioRuns,
-        KEYS.convertedLessonProgress,
-        KEYS.convertedCompletionPending,
-        KEYS.nativeJourneyStarted,
-        KEYS.anonymousUserId,
-        KEYS.devPro,
-        KEYS.devForceUnpaid,
-      ]);
-    } catch (e) {
-      safeLog("[store] reset failed", errorShape(e));
-    }
-  }, []);
+    queryClient.clear();
+    await Promise.allSettled([cancelDailyReminder(), cancelChallengeNudge()]);
+  }, [queryClient]);
 
   const findScenario = useCallback(
     (id: string): Scenario | undefined => {

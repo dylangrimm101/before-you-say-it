@@ -14,6 +14,11 @@ import { errorShape, safeLog } from "@/lib/redact";
 
 export const BASELINE_DIR_NAME = "baseline-audio";
 
+/** Expo inlines EXPO_OS for web bundles; document covers an executing browser. */
+function isWebRuntime(): boolean {
+  return process.env.EXPO_OS === "web" || typeof document !== "undefined";
+}
+
 /**
  * Filename derived from the session id alone. Everything outside a safe
  * character set is removed, so nothing a user typed can shape a path.
@@ -71,6 +76,9 @@ export async function baselineAudioUri(sessionId: string): Promise<string | null
 
 /** Strictly removes one retained recording. Privacy-sensitive callers must surface failures. */
 export async function deleteBaselineAudioStrict(sessionId: string): Promise<void> {
+  // Web recordings are Blob URLs held only in memory. Never construct native
+  // File/Directory objects in browsers, where expo-file-system is unsupported.
+  if (isWebRuntime()) return;
   const file = baselineFile(sessionId);
   if (file.exists) file.delete();
   if (file.exists) throw new Error("Retained recording deletion was not confirmed");
@@ -87,6 +95,7 @@ export async function deleteBaselineAudio(sessionId: string): Promise<void> {
 
 /** Strictly removes every retained recording and verifies the directory is gone. */
 export async function deleteAllBaselineAudioStrict(): Promise<void> {
+  if (isWebRuntime()) return;
   const dir = baselineDir();
   if (!dir.exists) return;
   for (const entry of dir.list()) entry.delete();

@@ -105,6 +105,22 @@ describe("converted completion phase-aware crash journal", () => {
     expect(storage.values.has(QUARANTINED_SCENARIO_RUN_KEY)).toBe(true);
   });
 
+  test("web recovery promotes completion without loading unsupported native file APIs", async () => {
+    resetConvertedProgressQueueForTests();
+    const storage = new MemoryCompletionStorage();
+    await pending(storage);
+    const prior = process.env.EXPO_OS;
+    process.env.EXPO_OS = "web";
+    try {
+      expect(await recoverPendingConvertedCompletion(storage)).toHaveLength(1);
+      expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(false);
+      expect(storage.values.has(CONVERTED_PROGRESS_KEY)).toBe(true);
+    } finally {
+      if (prior === undefined) delete process.env.EXPO_OS;
+      else process.env.EXPO_OS = prior;
+    }
+  });
+
   test("journal identity and phase are enforced", async () => {
     const storage = new MemoryCompletionStorage();
     await pending(storage);

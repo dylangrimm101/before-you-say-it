@@ -38,9 +38,17 @@ export default function SettingsScreen() {
   };
 
   const confirmReset = (): void => {
-    const perform = (): void => { void reset().then(() => router.replace("/entry")); };
+    const perform = (): void => {
+      setMessage("Resetting data…");
+      void reset()
+        .then(() => router.replace("/entry"))
+        .catch((error) => {
+          safeLog("[settings] reset failed", errorShape(error));
+          setMessage("Reset could not be verified. Your data was not reported as cleared; try again.");
+        });
+    };
     if (Platform.OS === "web") { if (globalThis.confirm?.("Reset all BYSI data on this device?")) perform(); return; }
-    Alert.alert("Reset all data?", "This removes local profile, practice history, transcripts, saved scenarios, and progress from this device. It does not cancel a store subscription.", [{ text: "Cancel", style: "cancel" }, { text: "Reset all data", style: "destructive", onPress: perform }]);
+    Alert.alert("Reset all data?", "This removes local profile, practice history, transcripts, saved scenarios, account session, generated audio, and progress from this device. It does not cancel a store subscription.", [{ text: "Cancel", style: "cancel" }, { text: "Reset all data", style: "destructive", onPress: perform }]);
   };
 
   return <View style={styles.root}><Backdrop /><View style={{ paddingTop: insets.top }}><PaidHeader title="Settings" onBack={() => router.back()} /></View><ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 44 }]} showsVerticalScrollIndicator={false}>

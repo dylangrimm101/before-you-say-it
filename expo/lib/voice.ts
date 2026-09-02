@@ -287,6 +287,21 @@ export async function resetSpeech(): Promise<void> {
   publish({ phase: "idle", canReplay: false });
 }
 
+/** Deletes generated speech bytes on every supported platform and verifies native removal. */
+export async function deleteGeneratedVoiceCacheStrict(): Promise<void> {
+  await resetSpeech();
+  webStaticCache.clear();
+  if (Platform.OS === "web") return;
+  // Loaded only on native so web reset never touches unsupported file APIs.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const FS = require("expo-file-system/legacy") as typeof import("expo-file-system/legacy");
+  if (!FS.cacheDirectory) throw new Error("Generated voice cache location is unavailable");
+  const dir = `${FS.cacheDirectory}rehearsal-voice/`;
+  const before = await FS.getInfoAsync(dir);
+  if (before.exists) await FS.deleteAsync(dir, { idempotent: true });
+  if ((await FS.getInfoAsync(dir)).exists) throw new Error("Generated voice cache deletion was not confirmed");
+}
+
 async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
   if (id !== token) return "empty";
 
