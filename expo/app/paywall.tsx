@@ -19,6 +19,7 @@ import {
   type CommercePresentationState,
   type OfferState,
 } from "@/lib/nativeCommerce";
+import { nextLaunchDeck } from "@/lib/launchCurriculum";
 import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useCustomerInfo, useIsPro, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
@@ -36,7 +37,8 @@ export default function Paywall() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ gate?: string; source?: string; moduleId?: string }>();
   const isPro = useIsPro();
-  const { activePracticeSession, saveActivePracticeSession } = useStore();
+  const { activePracticeSession, convertedLessonProgress, moduleCloseProgress, saveActivePracticeSession } = useStore();
+  const nextDeck = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
   const moduleId: ModuleId | null = isModuleId(params.moduleId) ? params.moduleId : activePracticeSession?.recommendation?.moduleId ?? null;
   const { data: offerings, isLoading, error: offeringsError } = useOfferings();
   const purchase = usePurchasePackage();
@@ -68,6 +70,10 @@ export default function Paywall() {
   const practiceFocus = activePracticeSession?.sharedResult?.starting_index?.focus_dimension
     ?? activePracticeSession?.sharedResult?.first_focus?.first_focus_label
     ?? "Specificity";
+  const purchaseSuccessParams = {
+    ...(moduleId ? { moduleId } : {}),
+    ...(params.gate ? { gate: params.gate } : {}),
+  };
 
   useEffect(() => {
     if (params.source !== "debrief") return;
@@ -121,9 +127,10 @@ export default function Paywall() {
 
   useEffect(() => {
     if (!isPro || commerceState !== "ready") return;
-    if (moduleId) router.replace({ pathname: "/module/[day]", params: { day: moduleId } });
+    if (params.gate === "another-rehearsal") router.replace({ pathname: "/(tabs)/library", params: { view: "scenarios" } });
+    else if (nextDeck) router.replace({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: nextDeck } });
     else router.replace("/(tabs)");
-  }, [commerceState, isPro, moduleId, router]);
+  }, [commerceState, isPro, nextDeck, params.gate, router]);
 
   const leave = (): void => {
     if (router.canGoBack()) router.back();
@@ -138,7 +145,7 @@ export default function Paywall() {
 
   const buy = async (): Promise<void> => {
     if (isPro) {
-      router.replace({ pathname: "/purchase-success", params: moduleId ? { moduleId } : {} });
+      router.replace({ pathname: "/purchase-success", params: purchaseSuccessParams });
       return;
     }
     if (!selectedPackage || purchase.isPending) return;
@@ -156,7 +163,7 @@ export default function Paywall() {
       setCommerceState(next.state);
       if (next.shouldRouteToPurchased) {
         tap("success");
-        router.replace({ pathname: "/purchase-success", params: moduleId ? { moduleId } : {} });
+        router.replace({ pathname: "/purchase-success", params: purchaseSuccessParams });
       }
     } catch (error) {
       safeLog("[paywall] purchase failed", errorShape(error));
@@ -172,7 +179,7 @@ export default function Paywall() {
       const next = transitionRestore("restoring", { type: "provider_returned", hasActivePro: restored });
       setCommerceState(next.state);
       if (next.shouldRouteToPurchased) {
-        router.replace({ pathname: "/purchase-success", params: moduleId ? { moduleId } : {} });
+        router.replace({ pathname: "/purchase-success", params: purchaseSuccessParams });
       }
     } catch (error) {
       safeLog("[paywall] restore failed", errorShape(error));
@@ -182,7 +189,7 @@ export default function Paywall() {
 
   const onPrimaryAction = async (): Promise<void> => {
     if (actions.primaryAction === "continue") {
-      router.replace({ pathname: "/purchase-success", params: moduleId ? { moduleId } : {} });
+      router.replace({ pathname: "/purchase-success", params: purchaseSuccessParams });
       return;
     }
     if (actions.primaryAction === "check_access") {

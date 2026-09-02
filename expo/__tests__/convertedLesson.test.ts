@@ -473,6 +473,8 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(validateM1L1Completion(valid.run, "other").reason).toBe("run_id");
     expect(validateM1L1Completion({ ...valid.run, contentVersion: "old" }, valid.run.id).reason).toBe("manifest_identity");
     expect(validateM1L1Completion({ ...valid.run, m1L1: { ...valid.run.m1L1!, pushbackTwo: undefined } }, valid.run.id).reason).toBe("turn_plan");
+    expect(validateM1L1Completion({ ...valid.run, m1L1: { ...valid.run.m1L1!, selectedDimension: undefined } }, valid.run.id).reason).toBe("rehearsal_state");
+    expect(validateM1L1Completion({ ...valid.run, m1L1: { ...valid.run.m1L1!, coachedBeat: undefined } }, valid.run.id).reason).toBe("rehearsal_state");
     const first = valid.run.m1L1!.pushbackOne!;
     const tamperedTurns = [
       { ...first, text: "Unauthorized pressure" },

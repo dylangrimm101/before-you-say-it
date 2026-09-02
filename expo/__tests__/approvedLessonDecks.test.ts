@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { authorizedDeckHtml, installTapTutorialDismissal, materializeApprovedDeckHtml, removeM1L1OutcomePreview, removeRehearsalContinuationCopy, transformApprovedRehearsalHandoff } from "../lib/approvedDeckLoader";
+import { authorizedDeckHtml, completeModuleCloseDeckHtml, installTapTutorialDismissal, isApprovedArchiveDigest, materializeApprovedDeckHtml, removeM1L1OutcomePreview, removeRehearsalContinuationCopy, transformApprovedRehearsalHandoff } from "../lib/approvedDeckLoader";
 import { approvedRehearsalConfig } from "../lib/approvedRehearsals";
 
 const DECK_LIMITS = {
@@ -193,6 +193,7 @@ describe("approved Modules 1 and 2 internal deck port", () => {
       const tapZoneLine = page.split("\n").find((line) => line.includes("showTapZones:"));
       expect(tapZoneLine, fileName).toContain("!(c.chips && c.chips.length)");
       expect(page).toContain("!(c.rooms && c.rooms.length)");
+      expect(page).toContain('[data-bysi="deck"] button{position:relative!important;z-index:1!important}');
       expect(page).toContain('[data-bysi="deck"] button>*{pointer-events:none!important}');
     }
   });
@@ -514,12 +515,13 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).toContain("loadModuleCloseDeckHtml");
   });
 
-  test("keeps deck review isolated from purchases while giving every approved rehearsal a native evidence-based completion", async () => {
+  test("keeps purchase actions out of lessons while enforcing customer entitlement and native evidence-based completion", async () => {
     const catalog = await source("constants/approvedLessons.ts");
     const catalogScreen = await source("app/approved-lessons.tsx");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
     const implementation = `${catalog}\n${catalogScreen}\n${deckScreen}`;
-    expect(implementation).not.toContain("useIsPro");
+    expect(deckScreen).toContain("useIsPro");
+    expect(deckScreen).toContain("canAccessLaunchDeck");
     expect(implementation).not.toContain("purchasePackage");
     expect(implementation).not.toContain("restorePurchases");
     expect(deckScreen).toContain("m1L1IndexImpact");
@@ -540,5 +542,40 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(deckScreen).toContain("Your rehearsal transcript will be deleted");
     expect(deckScreen).not.toContain("Optional custom wording");
     expect(implementation).not.toContain("AsyncStorage");
+  });
+
+  test("pins the complete production archive digest before unzip", async () => {
+    const loader = await source("lib/approvedDeckLoader.ts");
+    expect(isApprovedArchiveDigest("62348a014a52c062bbcd691f88b3b77b618a72bf41014b6719b1b0f1de42fd03")).toBe(true);
+    expect(isApprovedArchiveDigest("0".repeat(64))).toBe(false);
+    expect(loader).toContain("Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, archiveBytes)");
+    expect(loader.indexOf("isApprovedArchiveDigest")).toBeLessThan(loader.indexOf("unzipSync(archiveBytes)"));
+  });
+
+  test("accepts a semantically complete nine-card close when harmless source formatting changes", async () => {
+    const bundle = await source("assets/lesson-decks/M1-Close.html");
+    const match = bundle.match(/<script type="__bundler\/template">\s*(.*?)\s*<\/script>/s);
+    expect(match?.[1]).toBeDefined();
+    const template = JSON.parse(match![1]!) as string;
+    const reformatted = template.replace("{ n:7, type:'Your moves', moves:true },\n  { n:8, type:'Transfer', transfer:true },", "{ n:7, type:'Your moves', moves:true },\n    { n:8, type:'Transfer', transfer:true },");
+    expect(reformatted).not.toBe(template);
+    const encoded = JSON.stringify(reformatted).replace(/<\//g, "<\\u002F");
+    const changedBundle = bundle.replace(match![1]!, encoded);
+    expect(() => completeModuleCloseDeckHtml(changedBundle)).not.toThrow();
+  });
+
+  test("defers rehearsal startup until subscriber access has hydrated", async () => {
+    const rehearsal = await source("app/approved-rehearsal/[lessonId].tsx");
+    expect(rehearsal).toContain('const resumable = isAcceptedIdentity && run?.state !== "complete";');
+    expect(rehearsal).toContain("const hasConflict = Boolean(activeScenarioRun) && !resumable;");
+    expect(rehearsal).toContain('if (step !== "preserving" || preservationStarted.current || !isAvailable) return;');
+    expect(rehearsal).toContain('if (step !== "starting" || startupStarted.current || !isAvailable) return;');
+    expect(rehearsal.indexOf("|| !isAvailable) return;")).toBeLessThan(rehearsal.indexOf("startupStarted.current = true;"));
+  });
+
+  test("does not load obsolete HTML return cards when native completion owns the return", async () => {
+    const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
+    expect(deckScreen).not.toContain("loadReturnedDeckHtml");
+    expect(deckScreen).toContain("LessonCompletionScreen");
   });
 });

@@ -1,6 +1,7 @@
 import {
   LAUNCH_CURRICULUM_MODULES,
   LAUNCH_DECK_IDS,
+  canAccessLaunchDeck,
   launchModuleCompletion,
   mergeModuleCloseProgress,
   nextLaunchDeck,
@@ -39,6 +40,16 @@ describe("customer launch curriculum", () => {
       { lessonId: "m1-close", module: 1, completedAt: 10, sourceLineage: "approved-r2-close-deck" },
       { lessonId: "m2-close", module: 2, completedAt: 20, sourceLineage: "approved-r2-close-deck" },
     ])).toBeUndefined();
+  });
+
+  test("guards paid deck routes by entitlement, completion, and next-step progression", () => {
+    const m1l1 = { lessonId: "m1-l1", completedAt: 1 };
+    expect(canAccessLaunchDeck("m1-l1", false, [], [])).toBe(false);
+    expect(canAccessLaunchDeck("m1-l1", true, [], [])).toBe(true);
+    expect(canAccessLaunchDeck("m1-l2", true, [], [])).toBe(false);
+    expect(canAccessLaunchDeck("m1-l1", true, [m1l1], [])).toBe(true);
+    expect(canAccessLaunchDeck("m1-l2", true, [m1l1], [])).toBe(true);
+    expect(canAccessLaunchDeck("m2-l1", true, [m1l1], [])).toBe(false);
   });
 
   test("normalizes close completion without accepting invented or mismatched records", () => {
@@ -98,6 +109,8 @@ describe("narrow-card and reduced-motion regressions", () => {
     expect(template).toContain("const beat = !mo && c.chain ? 2 : st.beat;");
     expect(template).not.toContain("if (c.chain) this.runBeats();");
     expect(template).toContain("this.setState({ i:n, hint:false }, () => this.runBeats());");
+    expect(template).toContain("const ready = true;");
+    expect(template).not.toContain("const ready = !!st.ask.trim();");
     expect(template).not.toContain("if (!mo) { this.setState({ beat:2 }); return; }");
   });
 });

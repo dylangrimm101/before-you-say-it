@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, RefreshCw, Sparkles } from "lucide-react-native";
 import React from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -7,14 +7,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Backdrop, Eyebrow, GlassCard, GhostButton, PrimaryButton, Reveal, StateDock } from "@/components/ui";
 import { curriculumModule, type ModuleId } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
+import { nextLaunchDeck } from "@/lib/launchCurriculum";
 import { purchasedContinuity } from "@/lib/nativeCommerce";
 import { useCustomerInfo, useIsPro } from "@/lib/purchases";
 import { useStore } from "@/providers/store";
 
 export default function PurchaseSuccess() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ gate?: string }>();
   const insets = useSafeAreaInsets();
-  const { activePracticeSession, sessions, pilotProgress } = useStore();
+  const { activePracticeSession, convertedLessonProgress, moduleCloseProgress, sessions, pilotProgress } = useStore();
+  const nextDeck = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
   const isPro = useIsPro();
   const customer = useCustomerInfo();
   const result = activePracticeSession?.sharedResult;
@@ -22,11 +25,20 @@ export default function PurchaseSuccess() {
   const moduleId: ModuleId | null = continuity.moduleId;
   const module = curriculumModule(moduleId);
   const openNextStep = (): void => {
-    if (moduleId) {
-      router.replace({ pathname: "/module/[day]", params: { day: moduleId } });
+    if (params.gate === "another-rehearsal") {
+      router.replace({ pathname: "/(tabs)/library", params: { view: "scenarios" } });
+      return;
+    }
+    if (!continuity.hasPersonalizedStart && continuity.recoveryDestination) {
+      router.replace(continuity.recoveryDestination as never);
+      return;
+    }
+    if (continuity.hasPersonalizedStart && nextDeck) {
+      router.replace({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: nextDeck } });
       return;
     }
     if (continuity.recoveryDestination) router.replace(continuity.recoveryDestination as never);
+    else router.replace("/(tabs)");
   };
 
   if (!isPro) {
@@ -57,7 +69,7 @@ export default function PurchaseSuccess() {
         </Reveal>
         <Reveal index={2}><View style={styles.truth}><Text style={styles.truthTitle}>{continuity.hasPersonalizedStart ? "Your free result is preserved" : "No repurchase needed"}</Text><Text style={styles.truthBody}>{continuity.hasPersonalizedStart ? "Paid-practice history begins now. No practice record was fabricated by purchase." : "Return to your existing result for the missing focus step. You will not be asked to buy again or repeat approved free work."}</Text></View></Reveal>
       </ScrollView>
-      <StateDock bottomInset={insets.bottom}><PrimaryButton label={continuity.hasPersonalizedStart ? "Start my first practice" : "Complete my starting step"} disabled={!moduleId && !continuity.recoveryDestination} onPress={openNextStep} /><Text style={styles.moduleNote}>{module ? `Begins with ${module.name}` : "Uses your preserved result to establish an evidence-backed first focus."}</Text></StateDock>
+      <StateDock bottomInset={insets.bottom}><PrimaryButton label={continuity.hasPersonalizedStart ? "Start my first practice" : "Complete my starting step"} disabled={params.gate !== "another-rehearsal" && !nextDeck && !continuity.recoveryDestination} onPress={openNextStep} /><Text style={styles.moduleNote}>{nextDeck ? `Continues with ${nextDeck.replace(/-/g, " ").toUpperCase()}` : module ? `Recommended focus: ${module.name}` : "Uses your preserved result to establish an evidence-backed first focus."}</Text></StateDock>
     </View>
   );
 }

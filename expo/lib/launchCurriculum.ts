@@ -92,3 +92,25 @@ export function nextLaunchDeckForModule(
   if (launchModuleCompletion(module, lessonProgress, closeProgress)) return LAUNCH_CURRICULUM_MODULES[module - 1]?.deckIds[0];
   return undefined;
 }
+
+export function isLaunchDeckCompleted(
+  lessonId: LaunchLessonId,
+  lessonProgress: readonly LessonCompletionLike[],
+  closeProgress: readonly ModuleCloseProgress[],
+): boolean {
+  return lessonId.endsWith("-close")
+    ? normalizeModuleCloseProgress(closeProgress).some((entry) => entry.lessonId === lessonId)
+    : lessonProgress.some((entry) => entry.lessonId === lessonId);
+}
+
+/** Route-level access boundary shared by deep links, decks, and rehearsals. */
+export function canAccessLaunchDeck(
+  lessonId: LaunchLessonId,
+  isEntitled: boolean,
+  lessonProgress: readonly LessonCompletionLike[],
+  closeProgress: readonly ModuleCloseProgress[],
+): boolean {
+  if (!isEntitled) return false;
+  return isLaunchDeckCompleted(lessonId, lessonProgress, closeProgress)
+    || nextLaunchDeck(lessonProgress, closeProgress) === lessonId;
+}

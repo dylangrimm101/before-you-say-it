@@ -171,8 +171,15 @@ describe("conversion paywall", () => {
     expect(paywall).toContain("moduleId ? { moduleId } : {}");
     expect(success).toContain("Subscription active");
     expect(success).toContain("Recommended starting module");
-    expect(success).toContain('pathname: "/module/[day]"');
-    expect(success).toContain("day: moduleId");
+    expect(success).toContain('pathname: "/approved-lesson/[lessonId]"');
+    expect(success).toContain("nextLaunchDeck(convertedLessonProgress, moduleCloseProgress)");
+    expect(success).toContain("lessonId: nextDeck");
+    expect(paywall).toContain('params.gate === "another-rehearsal"');
+    expect(paywall).toContain('view: "scenarios"');
+    expect(success).toContain('params.gate === "another-rehearsal"');
+    expect(success).toContain('disabled={params.gate !== "another-rehearsal" && !nextDeck && !continuity.recoveryDestination}');
+    expect(success).toContain("continuity.hasPersonalizedStart && nextDeck");
+    expect(success.indexOf("continuity.recoveryDestination")).toBeLessThan(success.lastIndexOf("nextDeck"));
     expect(success).not.toContain("Continue to Day 1");
   });
 });

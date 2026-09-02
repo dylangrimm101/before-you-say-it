@@ -619,7 +619,13 @@ export function validateM1L1Completion(run: PilotDayRun | null | undefined, requ
     && (rehearsal.pushbackOne.authoredAt ?? 0) < run.responseAttempt.confirmedAt
     && run.responseAttempt.confirmedAt < (rehearsal.pushbackTwo.authoredAt ?? 0);
   if (!ordered) return { isValid: false, reason: "turn_order" };
-  if (![7, 8].includes(rehearsal.beat) || rehearsal.retryCount < 1 || !run.retryAttempt || !run.comparison || run.state !== "attempt_comparison") return { isValid: false, reason: "rehearsal_state" };
+  if (![7, 8].includes(rehearsal.beat)
+    || rehearsal.retryCount < 1
+    || !rehearsal.selectedDimension
+    || !rehearsal.coachedBeat
+    || !run.retryAttempt
+    || !run.comparison
+    || run.state !== "attempt_comparison") return { isValid: false, reason: "rehearsal_state" };
   return { isValid: true };
 }
 

@@ -12,11 +12,13 @@ import { ProductCard, SectionLabel } from "@/components/PaidProductUI";
 import { Backdrop, GhostButton, PrimaryButton, Reveal, useReducedMotion } from "@/components/ui";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { C, GUTTER, T, font, radius, shadow } from "@/constants/theme";
-import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadModuleCloseDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
+import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadModuleCloseDeckHtml } from "@/lib/approvedDeckLoader";
 import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
 import { approvedRehearsalConfig, approvedRehearsalIndexImpact, approvedRehearsalStrongVersion, validateApprovedRehearsalCompletion, type ApprovedRehearsalIndexImpact } from "@/lib/approvedRehearsals";
 import { conversionRuntimeEnabled, m1L1GoodVersion, m1L1IndexImpact, M1_L1_CONVERSION, validateM1L1Completion, type ConvertedLessonProgress, type M1L1IndexImpact, type TransferChoice } from "@/lib/convertedLesson";
 import { progressHistoryPresentation, SCORED_PRACTICE_HISTORY_VERSION, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
+import { canAccessLaunchDeck, nextLaunchDeck } from "@/lib/launchCurriculum";
+import { useIsPro } from "@/lib/purchases";
 import { isFeedbackLessonId, LESSON_FEEDBACK_MAX_LENGTH, type FeedbackLessonId } from "@/lib/lessonFeedback";
 import { submitLessonFeedback } from "@/lib/lessonFeedbackService";
 import { errorShape, safeLog } from "@/lib/redact";
@@ -30,6 +32,9 @@ export default function ApprovedLessonDeckScreen() {
   const lesson = approvedLessonDeck(params.lessonId);
   const {
     activeScenarioRun,
+    convertedLessonProgress,
+    moduleCloseProgress,
+    devProEnabled,
     clearActiveScenarioRunStrict,
     markPendingConvertedLessonPrivateContentDeleted,
     promotePendingConvertedLessonCompletion,
@@ -41,6 +46,10 @@ export default function ApprovedLessonDeckScreen() {
     undoConvertedLessonReset,
     writePendingConvertedLessonCompletion,
   } = useStore();
+  const isPro = useIsPro();
+  const isEntitled = isPro || (__DEV__ && devProEnabled);
+  const hasLaunchAccess = Boolean(lesson && canAccessLaunchDeck(lesson.id, isEntitled, convertedLessonProgress, moduleCloseProgress));
+  const nextDeck = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
   const [lessonWasReset, setLessonWasReset] = useState<boolean>(false);
   const isM1L1 = conversionRuntimeEnabled(params.lessonId);
   const approvedConfig = approvedRehearsalConfig(params.lessonId);
@@ -74,22 +83,20 @@ export default function ApprovedLessonDeckScreen() {
     let isActive = true;
     setDeckHtml(null);
     setLoadError(false);
-    if (!lesson) return () => { isActive = false; };
+    if (!lesson || !hasLaunchAccess || isReturning) return () => { isActive = false; };
 
     const loader = lesson.isCloseDeck
       ? loadModuleCloseDeckHtml(lesson.archivePath)
-      : isReturning && rehearsalConfig
-        ? loadReturnedDeckHtml(lesson.archivePath, rehearsalConfig.returnCard, rehearsalConfig.completionCard, isApprovedMoveSaved)
-        : rehearsalConfig
-          ? loadConvertedHandoffDeckHtml(lesson.archivePath, rehearsalConfig.rehearsalHandoffCard)
-          : loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard);
+      : rehearsalConfig
+        ? loadConvertedHandoffDeckHtml(lesson.archivePath, rehearsalConfig.rehearsalHandoffCard)
+        : loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard);
     loader.then((html) => { if (isActive) setDeckHtml(html); })
       .catch((error: unknown) => {
         safeLog("[approved-lessons] approved archive failed", errorShape(error));
         if (isActive) setLoadError(true);
       });
     return () => { isActive = false; };
-  }, [isApprovedMoveSaved, isReturning, lesson, loadAttempt, rehearsalConfig]);
+  }, [hasLaunchAccess, isReturning, lesson, loadAttempt, rehearsalConfig]);
 
   const reviewGuard = useMemo(() => {
     if (!lesson) return "true;";
@@ -414,6 +421,13 @@ export default function ApprovedLessonDeckScreen() {
   }, [activeScenarioRun, clearActiveScenarioRunStrict, feedbackLessonId, indexImpact, isCompleting, isStrongVersionSaved, lesson, markPendingConvertedLessonPrivateContentDeleted, promotePendingConvertedLessonCompletion, rehearsalConfig, returningRun, saveScoredPracticeRecord, strongVersion, writePendingConvertedLessonCompletion]);
 
   if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to your path and choose another lesson." />;
+  if (!hasLaunchAccess) return <Unavailable
+    title={isEntitled ? "Finish the current lesson first." : "A subscription is required for this lesson."}
+    body={isEntitled ? "Your next available lesson stays in order on your path." : "Start or restore your subscription to open the paid curriculum."}
+    onRetry={() => isEntitled && nextDeck
+      ? router.replace({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: nextDeck } })
+      : router.replace("/paywall")}
+  />;
   if (feedbackContext) {
     return <LessonFeedbackScreen
       feedback={feedbackContext}

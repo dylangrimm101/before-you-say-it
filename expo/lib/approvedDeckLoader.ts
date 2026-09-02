@@ -4,6 +4,7 @@ import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
 import { approvedRehearsalConfigs, type ApprovedRehearsalConfig } from "@/lib/approvedRehearsals";
 
 const APPROVED_HANDOFF_ARCHIVE_URL = "https://r2-pub.rork.com/attachments/xo73vo5tbrhku6f68brbr.zip";
+const APPROVED_HANDOFF_ARCHIVE_SHA256 = "62348a014a52c062bbcd691f88b3b77b618a72bf41014b6719b1b0f1de42fd03";
 const TEMPLATE_PATTERN = /<script type="__bundler\/template">\s*(.*?)\s*<\/script>/s;
 const MANIFEST_PATTERN = /<script type="__bundler\/manifest">\s*(.*?)\s*<\/script>/s;
 const EXTERNAL_RESOURCES_PATTERN = /<script type="__bundler\/ext_resources">\s*(.*?)\s*<\/script>/s;
@@ -23,6 +24,14 @@ let archivePromise: Promise<Record<string, Uint8Array>> | null = null;
 const ARCHIVE_LOAD_ATTEMPTS = 3;
 const ARCHIVE_LOAD_TIMEOUT_MS = 12_000;
 
+export function isApprovedArchiveDigest(digest: string): boolean {
+  return digest === APPROVED_HANDOFF_ARCHIVE_SHA256;
+}
+
+function hexDigest(value: ArrayBuffer): string {
+  return Array.from(new Uint8Array(value), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 /** Binds executable M1 L1 deck bytes to its lesson path and content version. */
 export function isApprovedM1L1DeckDigest(archivePath: string, contentVersion: string, digest: string): boolean {
   return archivePath === M1_L1_ARCHIVE_PATH && contentVersion === M1_L1_CONTENT_VERSION && digest === M1_L1_APPROVED_SHA256;
@@ -36,7 +45,14 @@ async function fetchApprovedArchive(): Promise<Record<string, Uint8Array>> {
     try {
       const response = await fetch(APPROVED_HANDOFF_ARCHIVE_URL, { signal: controller.signal });
       if (!response.ok) throw new Error("Approved lesson archive is unavailable");
-      return unzipSync(new Uint8Array(await response.arrayBuffer()));
+      const archiveBytes = new Uint8Array(await response.arrayBuffer());
+      // Keep the module import lazy so the loader remains testable in Bun while
+      // native builds use Expo's byte-safe digest implementation.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Crypto = require("expo-crypto") as typeof import("expo-crypto");
+      const digest = hexDigest(await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, archiveBytes));
+      if (!isApprovedArchiveDigest(digest)) throw new Error("Approved lesson archive failed authenticity check");
+      return unzipSync(archiveBytes);
     } catch (error: unknown) {
       lastError = error;
     } finally {
@@ -163,6 +179,7 @@ const NATIVE_DECK_SHELL = `<style id="bysi-native-deck-shell">
 html,body{margin:0!important;padding:0!important;width:100%!important;height:100%!important;overflow:hidden!important;background:#FAF7F2!important}
 body *{visibility:hidden!important}
 [data-bysi="deck"],[data-bysi="deck"] *{visibility:visible!important}
+[data-bysi="deck"] button{position:relative!important;z-index:1!important}
 [data-bysi="deck"] button>*{pointer-events:none!important}
 [data-bysi="deck"]{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;transform:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;margin:0!important}
 </style>`;
@@ -278,11 +295,15 @@ export function completeModuleCloseDeckHtml(rawHtml: string): string {
       || !template.includes("isBridge:!!c.bridge")) {
       throw new Error("Approved module close canonical render branches are missing");
     }
+    const cardSevenStart = template.indexOf("{ n:7, type:", cardsStart);
     let completed = inventory.length === 9
-      ? template
+      ? `${template.slice(0, cardSevenStart)}${CLOSE_CARD_TAIL}${template.slice(cardsEnd)}`
       : `${template.slice(0, cardsEnd)}\n${CLOSE_CARD_TAIL}${template.slice(cardsEnd)}`;
-    if (inventory.length === 9 && !cardBlock.includes(CLOSE_CARD_TAIL.trim())) throw new Error("Approved module close tail changed");
+    if (inventory.length === 9 && (cardSevenStart < 0 || cardSevenStart >= cardsEnd)) throw new Error("Approved module close tail is missing");
     if (completed.includes("const L1_VALS = ['send the revised brief'")) {
+      const transferGate = "const ready = !!st.ask.trim();";
+      if (occurrenceCount(completed, transferGate) !== 1) throw new Error("Approved M2 close transfer gate changed");
+      completed = completed.replace(transferGate, "const ready = true;");
       if (!completed.includes("componentDidUpdate(prevProps)")) {
         completed = completed.replace("  componentDidMount() { this.runBeats(); }", "  componentDidMount() { this.runBeats(); }\n  componentDidUpdate(prevProps) {\n    if (prevProps.motion !== this.props.motion) { this._beatFor = null; this.runBeats(); }\n  }");
       }
