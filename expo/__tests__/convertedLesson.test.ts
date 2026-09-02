@@ -54,7 +54,7 @@ function fixtureDeck(duplicateCompletion = false): string {
   return `<html><script type="__bundler/template">${JSON.stringify(template)}</script></html>`;
 }
 
-function acceptedRun(id = "accepted-run"): PersistedScenarioPracticeRun {
+function legacyAuthoredRun(id = "legacy-authored-run"): PersistedScenarioPracticeRun {
   let value = initializeM1L1Run(createScenarioPracticeRun(M1_L1_CONVERSION.scenario, "steady", "defensive", id, 1), 1);
   const context = value.run.scenarioContext!;
   value = { ...value, run: { ...value.run, convertedModuleId: M1_L1_CONVERSION.moduleId, practiceId: M1_L1_CONVERSION.practiceId, contentVersion: M1_L1_CONVERSION.contentVersion, scenarioContext: { ...context, counterpartId: "adam", counterpartName: "Adam", counterpartRole: "your colleague", category: "work" } } };
@@ -71,6 +71,22 @@ function acceptedRun(id = "accepted-run"): PersistedScenarioPracticeRun {
   const original = note.coachedBeat === 1 ? value.run.attempt!.transcript : value.run.responseAttempt!.transcript;
   const comparison = m1L1Comparison(original, value.run.retryAttempt!.transcript, note.selectedDimension, note.coachedBeat);
   return { ...value, run: { ...value.run, state: "attempt_comparison", comparison } };
+}
+
+function acceptedRun(id = "accepted-run"): PersistedScenarioPracticeRun {
+  const authored = legacyAuthoredRun(id);
+  const first = { ...m1L1ProviderTurn(id, "pushback_one", "But quarter close is heavy. What handoff timing would actually leave enough review time?"), authoredAt: authored.run.m1L1!.pushbackOne!.authoredAt };
+  const second = { ...m1L1ProviderTurn(id, "evidence_trap", "I don't think one late handoff makes this a pattern."), authoredAt: authored.run.m1L1!.pushbackTwo!.authoredAt };
+  return {
+    ...authored,
+    run: {
+      ...authored.run,
+      counterpartTurn: first,
+      counterpartReactionId: first.reactionId,
+      resolvedAudioId: first.resolvedAudioId,
+      m1L1: { ...authored.run.m1L1!, pushbackOne: first, pushbackTwo: second },
+    },
+  };
 }
 
 function progress(overrides: Partial<ConvertedLessonProgress> = {}): ConvertedLessonProgress {
@@ -146,9 +162,11 @@ describe("accepted M1 L1 narrow correction", () => {
   test("executes seven steps with two pressures and two required learner turns", () => {
     const value = acceptedRun();
     expect(value.run.attempt).toBeDefined();
-    expect(value.run.m1L1?.pushbackOne?.text).toBe(M1_L1_CONVERSION.pushbackOneBank[0]);
+    expect(value.run.m1L1?.pushbackOne?.source).toBe("provider");
+    expect(value.run.m1L1?.pushbackOne?.text).toContain("quarter close");
     expect(value.run.responseAttempt).toBeDefined();
-    expect(value.run.m1L1?.pushbackTwo?.text).toBe("You're acting like this happens all the time.");
+    expect(value.run.m1L1?.pushbackTwo?.source).toBe("provider");
+    expect(value.run.m1L1?.pushbackTwo?.text).toContain("pattern");
     expect(value.run.m1L1?.secondResponseAttempt).toBeUndefined();
     expect([1, 3]).toContain(value.run.m1L1?.coachedBeat);
     expect(value.run.m1L1?.beat).toBe(7);
@@ -369,6 +387,63 @@ describe("accepted M1 L1 narrow correction", () => {
     expect(comparison.text).toMatch(/improved/i);
   });
 
+  test("rejects a pre-pressure M1 L1 run whose canonical scene was altered", () => {
+    const created = initializeM1L1Run(createScenarioPracticeRun(M1_L1_CONVERSION.scenario, "steady", "defensive", "m1-corrupt-scene", 1), 1);
+    const run = {
+      ...created.run,
+      convertedModuleId: M1_L1_CONVERSION.moduleId,
+      practiceId: M1_L1_CONVERSION.practiceId,
+      contentVersion: M1_L1_CONVERSION.contentVersion,
+      counterpartIdentity: M1_L1_CONVERSION.counterpartId,
+      scenarioContext: {
+        ...created.run.scenarioContext!,
+        counterpartId: M1_L1_CONVERSION.counterpartId,
+        situation: "The spaceship leaves Mars tomorrow.",
+      },
+    };
+    expect(isAcceptedM1L1ResumeRun(run)).toBe(false);
+    expect(normalizeScenarioPracticeRun({ version: 1, run })).toBeNull();
+  });
+
+  test("rejects legacy authored pressure from resume and completion", () => {
+    const legacy = legacyAuthoredRun().run;
+    expect(isAcceptedM1L1ResumeRun(legacy)).toBe(false);
+    expect(validateM1L1Completion(legacy, legacy.id).reason).toBe("pressure_authenticity");
+  });
+
+  test("rejects provider-labelled variants of every authored pressure from resume and completion", () => {
+    const valid = acceptedRun().run;
+    const authoredLines = [...M1_L1_CONVERSION.pushbackOneBank, M1_L1_CONVERSION.authoredEvidenceTrap];
+    for (const line of authoredLines) {
+      const variant = `  ${line.toUpperCase().replace(/\.$/, "!")}  `;
+      const canned = { ...m1L1ProviderTurn(valid.id, "pushback_one", variant), authoredAt: valid.m1L1!.pushbackOne!.authoredAt };
+      const contaminated = {
+        ...valid,
+        counterpartTurn: canned,
+        counterpartReactionId: canned.reactionId,
+        resolvedAudioId: canned.resolvedAudioId,
+        m1L1: { ...valid.m1L1!, pushbackOne: canned },
+      };
+      expect(isAcceptedM1L1ResumeRun(contaminated), line).toBe(false);
+      expect(validateM1L1Completion(contaminated, contaminated.id).reason, line).toBe("pressure_authenticity");
+    }
+  });
+
+  test("rejects provider-labelled canned pressure with an invisible Unicode character", () => {
+    const valid = acceptedRun().run;
+    const invisibleVariant = M1_L1_CONVERSION.pushbackOneBank[0].replace("fair", "fa\u200Bir");
+    const canned = { ...m1L1ProviderTurn(valid.id, "pushback_one", invisibleVariant), authoredAt: valid.m1L1!.pushbackOne!.authoredAt };
+    const contaminated = {
+      ...valid,
+      counterpartTurn: canned,
+      counterpartReactionId: canned.reactionId,
+      resolvedAudioId: canned.resolvedAudioId,
+      m1L1: { ...valid.m1L1!, pushbackOne: canned },
+    };
+    expect(isAcceptedM1L1ResumeRun(contaminated)).toBe(false);
+    expect(validateM1L1Completion(contaminated, contaminated.id).reason).toBe("pressure_authenticity");
+  });
+
   test("resume isolation requires the exact work category and Adam identity", () => {
     const valid = acceptedRun().run;
     const resumable = { ...valid, counterpartIdentity: "adam" };
@@ -407,7 +482,7 @@ describe("accepted M1 L1 narrow correction", () => {
       { ...first, id: "other-run-pushback-1-1" },
     ];
     tamperedTurns.forEach((tampered) => {
-      expect(isCanonicalM1L1PressureTurn(tampered, "pushback_one")).toBe(tampered.id === "other-run-pushback-1-1");
+      expect(isCanonicalM1L1PressureTurn(tampered, "pushback_one")).toBe(false);
       expect(validateM1L1Completion({ ...valid.run, m1L1: { ...valid.run.m1L1!, pushbackOne: tampered } }, valid.run.id).reason).toBe("pressure_authenticity");
     });
     const outOfOrder = { ...first, authoredAt: valid.run.attempt!.confirmedAt - 1 };

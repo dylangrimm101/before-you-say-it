@@ -12,9 +12,7 @@ import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import {
   m1L1CoachExchange,
   m1L1Comparison,
-  m1L1EvidenceTrap,
   m1L1GoodVersion,
-  selectM1L1PushbackOne,
   type ConvertedLessonConfig,
 } from "@/lib/convertedLesson";
 import { m1L1ProviderTurn } from "@/lib/m1L1DynamicResponse";
@@ -227,18 +225,15 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
     try {
       const approved = preserveScenarioAttempt(value, "opener", draft, Date.now());
       await persist(approved);
-      const fallback = selectM1L1PushbackOne(draft, approved.run.id);
       const generated = await generateM1L1DynamicReply({
         scenario: convertedLesson.scenario,
         kind: "pushback_one",
         approvedTranscript: approved.run.attempt?.transcript ?? draft.trim(),
         openingTranscript: approved.run.attempt?.transcript ?? draft.trim(),
-        authoredFallback: fallback.text,
+        authoredCorpus: [...convertedLesson.pushbackOneBank, convertedLesson.authoredEvidenceTrap],
         runId: approved.run.id,
       });
-      const selected = generated.source === "provider"
-        ? m1L1ProviderTurn(approved.run.id, "pushback_one", generated.reply)
-        : fallback;
+      const selected = m1L1ProviderTurn(approved.run.id, "pushback_one", generated.reply);
       const isAudioPrepared = await preparePilotAudio(lineFor(selected));
       const withPressure = attachM1L1PushbackOne(approved, selected, Date.now());
       const ready = transitionScenarioPracticeRun(withPressure, "ready_for_response", Date.now());
@@ -254,7 +249,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       approvalInFlightRef.current = false;
       setBusy(false);
     }
-  }, [convertedLesson.scenario, draft, persist, replaceActiveScenarioRunStrict, value]);
+  }, [convertedLesson.authoredEvidenceTrap, convertedLesson.pushbackOneBank, convertedLesson.scenario, draft, persist, replaceActiveScenarioRunStrict, value]);
 
   const confirmFirstResponse = useCallback(async (): Promise<void> => {
     if (!value || draft.trim().length < 2 || approvalInFlightRef.current) return;
@@ -265,7 +260,6 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       const approved = preserveScenarioAttempt(value, "response", draft, Date.now());
       await persist(approved);
       const afterResponse = advanceM1L1FirstResponse(approved, Date.now());
-      const fallback = m1L1EvidenceTrap(approved.run.id);
       const generated = await generateM1L1DynamicReply({
         scenario: convertedLesson.scenario,
         kind: "evidence_trap",
@@ -273,12 +267,10 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
         openingTranscript: approved.run.attempt?.transcript ?? "",
         firstPushback: approved.run.m1L1?.pushbackOne?.text,
         firstResponse: approved.run.responseAttempt?.transcript ?? draft.trim(),
-        authoredFallback: fallback.text,
+        authoredCorpus: [...convertedLesson.pushbackOneBank, convertedLesson.authoredEvidenceTrap],
         runId: approved.run.id,
       });
-      const trap = generated.source === "provider"
-        ? m1L1ProviderTurn(approved.run.id, "evidence_trap", generated.reply)
-        : fallback;
+      const trap = m1L1ProviderTurn(approved.run.id, "evidence_trap", generated.reply);
       const isAudioPrepared = await preparePilotAudio(lineFor(trap));
       const withTrap = attachM1L1PushbackTwo(afterResponse, trap, Date.now());
       const note = withTrap.run.attempt && withTrap.run.responseAttempt
@@ -306,7 +298,7 @@ export function M1L1PaidPractice({ requestedRunId, convertedLesson, onReturnToDe
       approvalInFlightRef.current = false;
       setBusy(false);
     }
-  }, [convertedLesson.scenario, draft, persist, replaceActiveScenarioRunStrict, value]);
+  }, [convertedLesson.authoredEvidenceTrap, convertedLesson.pushbackOneBank, convertedLesson.scenario, draft, persist, replaceActiveScenarioRunStrict, value]);
 
   const confirmRetry = useCallback(async (): Promise<void> => {
     if (!value || !lesson?.selectedDimension || draft.trim().length < 2 || approvalInFlightRef.current) return;

@@ -1,6 +1,7 @@
 import type { Scenario } from "@/types/convo";
 import { approvedRehearsalConfig, type ApprovedRehearsalLessonId } from "@/lib/approvedRehearsals";
 import { isValidM1L1ProviderTurn, m1L1DynamicReplyPassesQuality } from "@/lib/m1L1DynamicResponse";
+import { canonicalCounterpartLine } from "@/lib/counterpartLineCanonicalization";
 import type { SharedSignalKey } from "@/types/sharedProduct";
 import type {
   M1L1BehaviorFlag,
@@ -154,6 +155,12 @@ function cleanTranscript(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function isAuthoredM1L1PressureText(value: string): boolean {
+  const comparable = canonicalCounterpartLine(value);
+  return [...M1_L1_CONVERSION.pushbackOneBank, M1_L1_CONVERSION.authoredEvidenceTrap]
+    .some((line) => canonicalCounterpartLine(line) === comparable);
+}
+
 function exactSentenceSpan(value: string, pattern: RegExp): string | null {
   const match = pattern.exec(value);
   if (!match || match.index === undefined) return null;
@@ -241,39 +248,42 @@ export function m1L1EvidenceTrap(runId: string): ScenarioCounterpartTurn {
 }
 
 export function isCanonicalM1L1PressureTurn(turn: ScenarioCounterpartTurn | undefined, kind: "pushback_one" | "evidence_trap"): boolean {
-  if (!turn || turn.semanticVoiceKey !== M1_L1_CONVERSION.semanticVoiceKey) return false;
-  if (turn.source === "provider") {
-    const ordinal = kind === "pushback_one" ? "1" : "2";
-    return new RegExp(`^.+-pushback-${ordinal}-provider$`).test(turn.id)
-      && turn.reactionId === `m1-l1-dynamic-pushback-${ordinal}`
-      && turn.resolvedAudioId === `${turn.id.slice(0, -`pushback-${ordinal}-provider`.length)}m1-l1-dynamic-pushback-${ordinal}`
-      && m1L1DynamicReplyPassesQuality(turn.text, kind, "", `${M1_L1_CONVERSION.scenario.title} ${M1_L1_CONVERSION.scenario.situation}`);
-  }
-  const definitions = kind === "pushback_one" ? M1L1_PUSHBACK_ONE_DEFINITIONS : [M1L1_EVIDENCE_TRAP_DEFINITION];
-  return definitions.some((definition) => turn.text === definition.text
-    && turn.reactionId === definition.reactionId
-    && turn.resolvedAudioId === definition.resolvedAudioId);
+  if (!turn || turn.source !== "provider" || turn.semanticVoiceKey !== M1_L1_CONVERSION.semanticVoiceKey || isAuthoredM1L1PressureText(turn.text)) return false;
+  const ordinal = kind === "pushback_one" ? "1" : "2";
+  return new RegExp(`^.+-pushback-${ordinal}-provider$`).test(turn.id)
+    && turn.reactionId === `m1-l1-dynamic-pushback-${ordinal}`
+    && turn.resolvedAudioId === `${turn.id.slice(0, -`pushback-${ordinal}-provider`.length)}m1-l1-dynamic-pushback-${ordinal}`
+    && m1L1DynamicReplyPassesQuality(turn.text, kind, "", `${M1_L1_CONVERSION.scenario.title} ${M1_L1_CONVERSION.scenario.situation}`);
+}
+
+function hasCanonicalM1L1Identity(run: PilotDayRun): boolean {
+  const context = run.scenarioContext;
+  return run.convertedModuleId === MODULE_ID
+    && run.practiceId === PRACTICE_ID
+    && run.contentVersion === CONTENT_VERSION
+    && run.counterpartIdentity === COUNTERPART_ID
+    && context?.scenarioId === SCENARIO_ID
+    && context.category === M1_L1_CONVERSION.context
+    && context.title === M1_L1_CONVERSION.scenario.title
+    && context.situation === M1_L1_CONVERSION.scenario.situation
+    && context.objective === M1_L1_CONVERSION.scenario.goal
+    && context.counterpartLabel === M1_L1_CONVERSION.scenario.counterpart
+    && context.counterpartId === COUNTERPART_ID;
 }
 
 export function hasCanonicalM1L1PressureSequence(run: PilotDayRun): boolean {
   const first = run.m1L1?.pushbackOne;
   const second = run.m1L1?.pushbackTwo;
+  if (!hasCanonicalM1L1Identity(run)) return false;
   if (!first && !second) return true;
   const context = `${M1_L1_CONVERSION.scenario.title} ${M1_L1_CONVERSION.scenario.situation} ${M1_L1_CONVERSION.scenario.persona}`;
   if (first) {
-    if (first.source === "provider") {
-      if (!run.attempt || !isValidM1L1ProviderTurn(first, run.id, "pushback_one", run.attempt.transcript, context)) return false;
-    } else {
-      const index = M1L1_PUSHBACK_ONE_DEFINITIONS.findIndex((definition) => definition.reactionId === first.reactionId);
-      if (index < 0 || first.id !== `${run.id}-pushback-1-${index + 1}` || !isCanonicalM1L1PressureTurn(first, "pushback_one")) return false;
-    }
+    if (first.source !== "provider" || isAuthoredM1L1PressureText(first.text) || !run.attempt || !isValidM1L1ProviderTurn(first, run.id, "pushback_one", run.attempt.transcript, context)) return false;
     if (run.counterpartTurn?.id !== first.id || run.counterpartReactionId !== first.reactionId || run.resolvedAudioId !== first.resolvedAudioId) return false;
   }
   if (second) {
-    if (second.source === "provider") {
-      const conversation = `${context} ${run.attempt?.transcript ?? ""} ${first?.text ?? ""} ${run.responseAttempt?.transcript ?? ""}`;
-      if (!run.responseAttempt || !isValidM1L1ProviderTurn(second, run.id, "evidence_trap", run.responseAttempt.transcript, conversation)) return false;
-    } else if (second.id !== `${run.id}-pushback-2-evidence-trap` || !isCanonicalM1L1PressureTurn(second, "evidence_trap")) return false;
+    const conversation = `${context} ${run.attempt?.transcript ?? ""} ${first?.text ?? ""} ${run.responseAttempt?.transcript ?? ""}`;
+    if (second.source !== "provider" || isAuthoredM1L1PressureText(second.text) || !run.responseAttempt || !isValidM1L1ProviderTurn(second, run.id, "evidence_trap", run.responseAttempt.transcript, conversation)) return false;
   }
   return true;
 }
@@ -594,7 +604,14 @@ export function validateM1L1Completion(run: PilotDayRun | null | undefined, requ
   if (!run || !requestedRunId || run.id !== requestedRunId) return { isValid: false, reason: "run_id" };
   if (run.convertedModuleId !== MODULE_ID || run.practiceId !== PRACTICE_ID || run.contentVersion !== CONTENT_VERSION) return { isValid: false, reason: "manifest_identity" };
   const context = run.scenarioContext;
-  if (context?.scenarioId !== SCENARIO_ID || context.category !== "work" || context.counterpartId !== COUNTERPART_ID) return { isValid: false, reason: "scenario_identity" };
+  if (context?.scenarioId !== SCENARIO_ID
+    || context.category !== M1_L1_CONVERSION.context
+    || context.title !== M1_L1_CONVERSION.scenario.title
+    || context.situation !== M1_L1_CONVERSION.scenario.situation
+    || context.objective !== M1_L1_CONVERSION.scenario.goal
+    || context.counterpartLabel !== M1_L1_CONVERSION.scenario.counterpart
+    || context.counterpartId !== COUNTERPART_ID
+    || run.counterpartIdentity !== COUNTERPART_ID) return { isValid: false, reason: "scenario_identity" };
   const rehearsal = run.m1L1;
   if (!run.attempt || !run.responseAttempt || !rehearsal?.pushbackOne || !rehearsal.pushbackTwo) return { isValid: false, reason: "turn_plan" };
   if (!hasCanonicalM1L1PressureSequence(run)) return { isValid: false, reason: "pressure_authenticity" };

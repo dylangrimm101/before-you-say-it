@@ -2,6 +2,7 @@ import type { ApprovedLessonId } from "@/constants/approvedLessons";
 import type { Scenario } from "@/types/convo";
 import type { PilotDayRun } from "@/types/pilotCurriculum";
 import type { SharedSignalKey } from "@/types/sharedProduct";
+import { approvedRehearsalPressurePassesQuality, areDistinctApprovedRehearsalLines, isExcludedApprovedRehearsalLine } from "@/lib/approvedRehearsalPressure";
 
 export type ApprovedRehearsalLessonId = Extract<
   ApprovedLessonId,
@@ -53,6 +54,10 @@ export interface ApprovedRehearsalConfig {
   counterpartId: string;
   authoredPressureText: string;
   authoredPressureTwoText: string;
+  /** Raw deck copy retained only as a fail-closed compatibility match anchor. */
+  handoffSourceScene: string;
+  /** Optional canned Card 20 copy replaced with neutral launch copy. */
+  handoffRepeatedSetup?: string;
   coachedBehaviorId: string;
   namedMoveId: string;
   namedMove: string;
@@ -89,6 +94,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     counterpartId: "ravi",
     authoredPressureText: "Okay, but that's still one example. What else are you basing this on?",
     authoredPressureTwoText: "So are you saying there are more examples I need to hear before we decide?",
+    handoffSourceScene: "Wednesday, end of day. You've told Ravi the approval step needs a clear owner and used yesterday's late file. He isn't brushing you off. He just isn't accepting that example.",
     coachedBehaviorId: "one_anchor",
     namedMoveId: "one-anchor-folder",
     namedMove: "One anchor. The rest stays in the folder.",
@@ -120,6 +126,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     counterpartId: "renee",
     authoredPressureText: "You never even call him.",
     authoredPressureTwoText: "When exactly are we coming back to the calls, then?",
+    handoffSourceScene: "Sunday evening, on the phone with your sister. You want March's appointments split before you hang up.",
     coachedBehaviorId: "park_and_return",
     namedMoveId: "both-on-table-one-at-time",
     namedMove: "Both on the table. One at a time.",
@@ -151,6 +158,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     counterpartId: "theo",
     authoredPressureText: "So you're saying I don't think about your schedule.",
     authoredPressureTwoText: "Are you talking about those two changes, or everything lately?",
+    handoffSourceScene: "Thursday night, the house is finally quiet. The plan changed twice this month after you had already rearranged work. By now it has become a month of things in your head.",
     coachedBehaviorId: "bounded_repeatable_point",
     namedMoveId: "catch-it-say-it-back",
     namedMove: "Catch it. Say it back.",
@@ -182,6 +190,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     counterpartId: "adam-m1-l5",
     authoredPressureText: "Is this you asking, or is this you working up to the signups?",
     authoredPressureTwoText: "Which one do you actually want us to decide tonight?",
+    handoffSourceScene: "Friday night, kitchen table. The kid went down at seven for once. Neither of you is running on four hours.",
     coachedBehaviorId: "one_conversation_purpose",
     namedMoveId: "pick-one-keep-rest",
     namedMove: "Pick one. Keep the rest.",
@@ -213,6 +222,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     counterpartId: "maya",
     authoredPressureText: "I can't do Thursday.",
     authoredPressureTwoText: "What exactly are you asking me to commit to now?",
+    handoffSourceScene: "Thursday morning, before standup. The handoff brief has landed late three weeks running and the review is at 4. You've mentioned it twice without asking for anything.",
     coachedBehaviorId: "clear_answerable_ask",
     namedMoveId: "one-action-one-owner-room-to-answer",
     namedMove: "One action. One owner. Room to answer.",
@@ -244,6 +254,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     counterpartId: "renee-m2-l2",
     authoredPressureText: "Why me?",
     authoredPressureTwoText: "The order is under Jen's name and card, so who needs to do the next step?",
+    handoffSourceScene: "Thursday afternoon, outside the school. You asked the group, there was the pause, and nobody has answered yet. Renee, Cory and Angela are still standing there. The bakery needs the cupcake order confirmed by five.",
     coachedBehaviorId: "named_ask_owner",
     namedMoveId: "say-who-youre-asking",
     namedMove: "Say who you're asking.",
@@ -275,6 +286,8 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     counterpartId: "marcus",
     authoredPressureText: "I can't do a whole Saturday. Theo's got a game and I'm not free till two.",
     authoredPressureTwoText: "All right, what part are you still asking me to take?",
+    handoffSourceScene: "Thursday night, on the phone with your brother Marcus about Saturday. Ellie gets the keys in the morning and the van goes back Sunday night.",
+    handoffRepeatedSetup: "The test is the second thing he says, when the first change you offered doesn\\u2019t quite fit.",
     coachedBehaviorId: "hear_trade_state",
     namedMoveId: "hear-it-trade-one-say-where-it-stands",
     namedMove: "Hear it. Trade one thing. Say where it stands.",
@@ -305,6 +318,8 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     counterpartId: "sam-m2-l4",
     authoredPressureText: "No, I can't do pickup tomorrow.",
     authoredPressureTwoText: "I need to know whether no is actually okay here.",
+    handoffSourceScene: "Wednesday night at home, talking to Sam about tomorrow. The client dinner is Thursday and it won't move. Pickup is at 5:30.",
+    handoffRepeatedSetup: "One exchange. Sam answers honestly, and sometimes the answer is no. The test is what you do next.",
     coachedBehaviorId: "honor_available_no",
     namedMoveId: "say-whether-no-is-available",
     namedMove: "Say whether no is available.",
@@ -335,10 +350,12 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     counterpartId: "sam-m2-l5",
     authoredPressureText: "What counts as at risk?",
     authoredPressureTwoText: "So if none of that happens, do you want me to handle the steps without checking each one?",
+    handoffSourceScene: "A weeknight at the kitchen table with Sam. Camp signup opens next month, early-bird closes six weeks after that, and you have run it the last three summers.",
+    handoffRepeatedSetup: "One exchange. You make the handoff, Sam asks what counts as at risk. Answer it, and stop there.",
     coachedBehaviorId: "loop_not_last_step",
     namedMoveId: "ask-for-loop-not-last-step",
     namedMove: "Ask for the loop, not the last step.",
-    retryDirection: "Answer the same question with only the condition that should bring Sam back to you. Leave the steps in between with him.",
+    retryDirection: "Answer the same question with only the condition that should bring Sam back to you. Leave the steps in between with them.",
     rehearsalHandoffCard: 20,
     returnCard: 21,
     completionCard: 22,
@@ -351,8 +368,70 @@ export function approvedRehearsalConfig(lessonId: string | null | undefined): Ap
   return lessonId && lessonId in REHEARSALS ? REHEARSALS[lessonId as ApprovedRehearsalLessonId] : undefined;
 }
 
+export function approvedRehearsalConfigs(): readonly ApprovedRehearsalConfig[] {
+  return Object.values(REHEARSALS);
+}
+
+/** Private compatibility corpus; these lines must never be used as live turns. */
+export function approvedRehearsalAuthoredCorpus(config: ApprovedRehearsalConfig): readonly string[] {
+  return [config.authoredPressureText, config.authoredPressureTwoText];
+}
+
 export function approvedRehearsalRuntimeEnabled(lessonId: string | null | undefined): lessonId is ApprovedRehearsalLessonId {
   return __DEV__ && Boolean(approvedRehearsalConfig(lessonId));
+}
+
+/** Validates every durable pressure invariant for one shared approved lesson. */
+export function hasCanonicalApprovedRehearsalPressureSequence(config: ApprovedRehearsalConfig, run: PilotDayRun): boolean {
+  const first = run.approvedRehearsal?.pushbackOne;
+  const second = run.approvedRehearsal?.pushbackTwo;
+  if (run.convertedModuleId !== config.moduleId
+    || run.practiceId !== config.practiceId
+    || run.contentVersion !== config.contentVersion
+    || run.counterpartIdentity !== config.counterpartId
+    || run.scenarioContext?.scenarioId !== config.scenario.id
+    || run.scenarioContext.category !== config.scenario.category
+    || run.scenarioContext.situation !== config.scenario.situation
+    || run.scenarioContext.title !== config.scenario.title
+    || run.scenarioContext.objective !== config.scenario.goal
+    || run.scenarioContext.counterpartLabel !== config.scenario.counterpart
+    || run.scenarioContext.counterpartId !== config.counterpartId) return false;
+  if (!first && !second) return true;
+  const corpus = approvedRehearsalAuthoredCorpus(config);
+  const firstGroundingContext = [
+    config.scenario.title,
+    config.scenario.situation,
+    config.scenario.persona,
+    config.scenario.goal,
+    run.attempt?.transcript ?? "",
+  ].filter(Boolean).join(" ");
+  if (!first || !run.attempt
+    || run.counterpartTurn?.id !== first.id
+    || first.id !== `${run.id}-counterpart-turn-1`
+    || first.reactionId !== `${config.lessonId}-dynamic-pressure-1`
+    || first.semanticVoiceKey !== "contextual_counterpart"
+    || first.resolvedAudioId !== `${run.curriculumVersion}-${run.id}-counterpart-turn-1`
+    || first.source !== "provider"
+    || isExcludedApprovedRehearsalLine(first.text, corpus)
+    || !approvedRehearsalPressurePassesQuality(first.text, firstGroundingContext)
+    || (first.authoredAt ?? 0) <= run.attempt.confirmedAt) return false;
+  if (!second) return true;
+  const secondGroundingContext = [
+    firstGroundingContext,
+    first.text,
+    run.responseAttempt?.transcript ?? "",
+  ].filter(Boolean).join(" ");
+  return Boolean(run.responseAttempt
+    && second.id === `${run.id}-counterpart-turn-2`
+    && second.reactionId === `${config.lessonId}-dynamic-pressure-2`
+    && second.semanticVoiceKey === "contextual_counterpart"
+    && second.resolvedAudioId === `${run.curriculumVersion}-${run.id}-counterpart-turn-2`
+    && second.source === "provider"
+    && !isExcludedApprovedRehearsalLine(second.text, corpus)
+    && approvedRehearsalPressurePassesQuality(second.text, secondGroundingContext)
+    && areDistinctApprovedRehearsalLines(first.text, second.text)
+    && (first.authoredAt ?? 0) < run.responseAttempt.confirmedAt
+    && run.responseAttempt.confirmedAt < (second.authoredAt ?? 0));
 }
 
 export function validateApprovedRehearsalCompletion(
@@ -385,14 +464,14 @@ export function validateApprovedRehearsalCompletion(
     && pressureOne.semanticVoiceKey === "contextual_counterpart"
     && pressureOne.resolvedAudioId === `${run.curriculumVersion}-${run.id}-counterpart-turn-1`
     && pressureOne.text.trim().length >= 3
-    && (pressureOne.source === "provider" || (pressureOne.source === "authored" && pressureOne.text === config.authoredPressureText)));
+    && pressureOne.source === "provider");
   const hasValidPressureTwo = Boolean(pressureTwo
     && pressureTwo.id === `${run.id}-counterpart-turn-2`
     && pressureTwo.reactionId === `${config.lessonId}-dynamic-pressure-2`
     && pressureTwo.semanticVoiceKey === "contextual_counterpart"
     && pressureTwo.resolvedAudioId === `${run.curriculumVersion}-${run.id}-counterpart-turn-2`
     && pressureTwo.text.trim().length >= 3
-    && (pressureTwo.source === "provider" || (pressureTwo.source === "authored" && pressureTwo.text === config.authoredPressureTwoText)));
+    && pressureTwo.source === "provider");
   const expectedReplayAudioId = observation?.coachedBeat === 1
     ? `top-of-scene:${run.id}`
     : pressureOne?.resolvedAudioId;
@@ -406,6 +485,7 @@ export function validateApprovedRehearsalCompletion(
     && run.counterpartIdentity === config.counterpartId
     && context?.scenarioId === config.scenario.id
     && context.counterpartId === config.counterpartId
+    && hasCanonicalApprovedRehearsalPressureSequence(config, run)
     && hasValidPressureOne
     && hasValidPressureTwo
     && hasValidObservation

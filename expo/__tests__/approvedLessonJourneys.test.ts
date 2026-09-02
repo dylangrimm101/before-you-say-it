@@ -65,14 +65,14 @@ function completedJourney(input: (typeof JOURNEYS)[number]) {
   };
   const opened = preserveScenarioAttempt(identified, "opener", input.opener, 101);
   const pressured = attachApprovedRehearsalPushbackOne(opened, {
-    id: `${runId}-counterpart-turn-1`, text: `Dynamic pressure for ${input.lessonId}`, source: "provider",
+    id: `${runId}-counterpart-turn-1`, text: `I still need a clearer answer about ${config.scenario.title}.`, source: "provider",
     reactionId: `${input.lessonId}-dynamic-pressure-1`, semanticVoiceKey: "contextual_counterpart",
     resolvedAudioId: `${opened.run.curriculumVersion}-${runId}-counterpart-turn-1`,
   }, 102);
   const responded = preserveScenarioAttempt(pressured, "response", input.firstResponse, 103);
   const advanced = advanceApprovedRehearsalFirstResponse(responded, 104);
   const pressuredAgain = attachApprovedRehearsalPushbackTwo(advanced, {
-    id: `${runId}-counterpart-turn-2`, text: `Dynamic second pressure for ${input.lessonId}`, source: "provider",
+    id: `${runId}-counterpart-turn-2`, text: `Why does ${config.scenario.goal.toLowerCase()} follow from that?`, source: "provider",
     reactionId: `${input.lessonId}-dynamic-pressure-2`, semanticVoiceKey: "contextual_counterpart",
     resolvedAudioId: `${opened.run.curriculumVersion}-${runId}-counterpart-turn-2`,
   }, 105);

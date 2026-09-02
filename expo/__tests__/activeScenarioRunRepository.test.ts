@@ -11,7 +11,8 @@ import {
   resetActiveRunQueueForTests,
   type ActiveRunStorage,
 } from "@/lib/activeScenarioRunRepository";
-import { createScenarioPracticeRun } from "@/lib/scenarioPractice";
+import { createScenarioPracticeRun, initializeApprovedRehearsalRun } from "@/lib/scenarioPractice";
+import { approvedRehearsalConfig } from "@/lib/approvedRehearsals";
 import type { Scenario } from "@/types/convo";
 
 class MemoryActiveStorage implements ActiveRunStorage {
@@ -75,6 +76,46 @@ describe("active scenario compare-and-swap repository", () => {
   test("malformed JSON is quarantined rather than treated as an empty writable slot", async () => {
     const storage = new MemoryActiveStorage();
     storage.values.set(ACTIVE_SCENARIO_RUN_KEY, "{bad json");
+    await expect(readActiveScenarioRunStrict(storage)).rejects.toThrow("quarantined");
+    expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(false);
+    expect(storage.values.has(QUARANTINED_SCENARIO_RUN_KEY)).toBe(true);
+  });
+
+  test("quarantines provider-labelled canned pressure in an active shared-lesson run", async () => {
+    const storage = new MemoryActiveStorage();
+    const config = approvedRehearsalConfig("m2-l5")!;
+    const id = "canned-active";
+    const created = initializeApprovedRehearsalRun(createScenarioPracticeRun(config.scenario, "steady", "defensive", id, 1), 1);
+    const canned = { id: `${id}-counterpart-turn-1`, text: `W\u200Bhat counts as at risk?`, source: "provider" as const, reactionId: "m2-l5-dynamic-pressure-1", semanticVoiceKey: "contextual_counterpart" as const, resolvedAudioId: `${created.run.curriculumVersion}-${id}-counterpart-turn-1`, authoredAt: 3 };
+    storage.values.set(ACTIVE_SCENARIO_RUN_KEY, JSON.stringify({ ...created, run: {
+      ...created.run, convertedModuleId: config.moduleId, practiceId: config.practiceId, contentVersion: config.contentVersion,
+      counterpartIdentity: config.counterpartId, scenarioContext: { ...created.run.scenarioContext!, counterpartId: config.counterpartId },
+      attempt: { id: `${id}-opener`, kind: "opener", transcript: "Can you own the signup?", representation: "confirmed_transcript", confirmedAt: 2 },
+      counterpartTurn: canned, approvedRehearsal: { beat: 2, retryCount: 0, pushbackOne: canned }, updatedAt: 3,
+    } }));
+    await expect(readActiveScenarioRunStrict(storage)).rejects.toThrow("quarantined");
+    expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(false);
+    expect(storage.values.has(QUARANTINED_SCENARIO_RUN_KEY)).toBe(true);
+  });
+
+  test("quarantines approved-lesson state with an unknown scenario identity before pressure", async () => {
+    const storage = new MemoryActiveStorage();
+    const config = approvedRehearsalConfig("m2-l1")!;
+    const id = "unknown-scenario-active";
+    const created = initializeApprovedRehearsalRun(createScenarioPracticeRun(config.scenario, "steady", "defensive", id, 1), 1);
+    storage.values.set(ACTIVE_SCENARIO_RUN_KEY, JSON.stringify({ ...created, run: {
+      ...created.run,
+      convertedModuleId: config.moduleId,
+      practiceId: config.practiceId,
+      contentVersion: config.contentVersion,
+      counterpartIdentity: config.counterpartId,
+      scenarioContext: {
+        ...created.run.scenarioContext!,
+        scenarioId: "mars-scene",
+        situation: "The spaceship leaves Mars tomorrow.",
+        counterpartId: config.counterpartId,
+      },
+    } }));
     await expect(readActiveScenarioRunStrict(storage)).rejects.toThrow("quarantined");
     expect(storage.values.has(ACTIVE_SCENARIO_RUN_KEY)).toBe(false);
     expect(storage.values.has(QUARANTINED_SCENARIO_RUN_KEY)).toBe(true);

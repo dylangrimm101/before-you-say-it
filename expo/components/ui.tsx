@@ -365,24 +365,27 @@ export function GhostButton({
   label,
   onPress,
   destructive = false,
+  disabled = false,
   style,
   containerStyle,
 }: {
   label: string;
   onPress: () => void;
   destructive?: boolean;
+  disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   containerStyle?: StyleProp<ViewStyle>;
 }) {
   return (
     <PressCard
       onPress={onPress}
+      disabled={disabled}
       style={style}
       containerStyle={containerStyle}
       accessibilityLabel={label}
     >
-      <View style={[styles.ghost, destructive ? { borderColor: `${C.clay}66` } : null]}>
-        <Text style={[styles.ghostLabel, destructive ? { color: C.clay } : null]}>
+      <View style={[styles.ghost, disabled ? { opacity: 0.5 } : null, destructive ? { borderColor: `${C.clay}66` } : null]}>
+        <Text style={[styles.ghostLabel, disabled ? { color: C.textDim } : null, destructive ? { color: C.clay } : null]}>
           {label}
         </Text>
       </View>

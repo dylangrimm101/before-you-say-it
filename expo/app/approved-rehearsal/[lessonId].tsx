@@ -7,7 +7,7 @@ import { ScenarioPaidPractice } from "@/components/ScenarioPaidPractice";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { Backdrop } from "@/components/ui";
 import { C, GUTTER, T } from "@/constants/theme";
-import { approvedRehearsalConfig, approvedRehearsalRuntimeEnabled } from "@/lib/approvedRehearsals";
+import { approvedRehearsalConfig, approvedRehearsalRuntimeEnabled, hasCanonicalApprovedRehearsalPressureSequence } from "@/lib/approvedRehearsals";
 import { conversionRuntimeEnabled, isAcceptedM1L1ResumeRun, M1_L1_CONVERSION } from "@/lib/convertedLesson";
 import { createScenarioPracticeRun, initializeApprovedRehearsalRun, initializeM1L1Run } from "@/lib/scenarioPractice";
 import { useStore } from "@/providers/store";
@@ -35,6 +35,7 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
       && run.scenarioContext?.scenarioId === config.scenario.id
       && run.scenarioContext.counterpartId === config.counterpartId
       && run.counterpartIdentity === config.counterpartId
+      && hasCanonicalApprovedRehearsalPressureSequence(approvedConfig!, run)
       && Boolean(run.approvedRehearsal));
   const resumable = isAvailable && isAcceptedIdentity && run?.state !== "complete";
   const hasConflict = isAvailable && Boolean(activeScenarioRun) && !resumable;

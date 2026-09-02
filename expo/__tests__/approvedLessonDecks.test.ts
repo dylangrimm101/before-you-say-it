@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { alignApprovedRehearsalScene, authorizedDeckHtml, installTapTutorialDismissal, materializeApprovedDeckHtml, removeM1L1OutcomePreview, removeRehearsalContinuationCopy } from "../lib/approvedDeckLoader";
+import { authorizedDeckHtml, installTapTutorialDismissal, materializeApprovedDeckHtml, removeM1L1OutcomePreview, removeRehearsalContinuationCopy, transformApprovedRehearsalHandoff } from "../lib/approvedDeckLoader";
+import { approvedRehearsalConfig } from "../lib/approvedRehearsals";
 
 const DECK_LIMITS = {
   "M1-L1-Buried-Point.html": 20,
@@ -183,6 +184,13 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(m1L2Page).toContain("go(d) {\n    if (this.state.hint && this.state.i === 0)");
   });
 
+  test("keeps full-card tap zones off M1 L1 cards that contain their own controls", async () => {
+    const page = materializeApprovedDeckHtml(await source("assets/lesson-decks/M1-L1-Buried-Point.html"));
+    expect(page).toContain(
+      "showTapZones:!c.handoff && !c.transfer && !q && !c.dquiz && !(c.chips && c.chips.length) && !(c.rooms && c.rooms.length)",
+    );
+  });
+
   test("removes the redundant voice-engine continuation paragraph from every handoff that contains it", async () => {
     const paragraphStart = "The rehearsal runs in the voice engine.";
     let affectedDeckCount = 0;
@@ -210,61 +218,92 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(cleaned).toContain("Start rehearsal");
   });
 
-  test("installs the approved detailed M1 L2 through M2 L5 scenes in production handoffs", async () => {
+  test("installs one canonical scene and removes canned handoff previews for all nine shared lessons", async () => {
     const cases = [
       {
+        lessonId: "m1-l2",
         fileName: "M1-L2-Cut-the-Case.html",
+        handoffCard: 20,
         oldScene: "Wednesday, end of day. You've told Ravi the approval step needs a clear owner and used yesterday's late file. He isn't brushing you off. He just isn't accepting that example.",
-        approvedScene: "Wednesday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi points out that the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file was also late, another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.",
       },
       {
+        lessonId: "m1-l3",
         fileName: "M1-L3-Park-and-Return.html",
+        handoffCard: 20,
         oldScene: "Sunday evening, on the phone with your sister. You want March's appointments split before you hang up.",
-        approvedScene: "Sunday evening, you’re on the phone with your sister, Renee. Dad’s March appointments still need to be divided, and you handled the last four. You want to agree on who will take each March appointment before you hang up. Renee has been handling more of Dad’s regular check-in calls and may raise that you haven’t been calling as often.",
       },
       {
+        lessonId: "m1-l4",
         fileName: "M1-L4-Make-It-Repeatable.html",
+        handoffCard: 17,
         oldScene: "Thursday night, the house is finally quiet. The plan changed twice this month after you had already rearranged work. By now it has become a month of things in your head.",
-        approvedScene: "Thursday night, you’re talking with Theo, your partner, after the house is quiet. Twice this month, Theo agreed to handle school pickup, so you rearranged work around that plan. Both times, he changed the plan after your schedule was already set, leaving you to move meetings again. You want future changes discussed before either of you commits—not to suggest that Theo never considers your schedule.",
       },
       {
+        lessonId: "m1-l5",
         fileName: "M1-L5-Fit-in-One.html",
+        handoffCard: 18,
         oldScene: "Friday night, kitchen table. The kid went down at seven for once. Neither of you is running on four hours.",
-        approvedScene: "Friday night, you’re at the kitchen table with Adam, who shares responsibility for your child’s calendar, after the kid has gone to bed. This month, most of the calendar has fallen to you—including camp signups, the dentist, and both birthday RSVPs. You want several things addressed, but raising all of them at once could leave none of them clear. Choose one purpose for tonight and keep the others for later. Adam has his own read of the month and may question which issue you actually want him to address.",
       },
       {
+        lessonId: "m2-l1",
         fileName: "M2-L1-Clear-Ask.html",
+        handoffCard: 20,
         oldScene: "Thursday morning, before standup. The handoff brief has landed late three weeks running and the review is at 4. You've mentioned it twice without asking for anything.",
-        approvedScene: "Thursday morning, before standup, you’re speaking with Maya, your teammate who prepares the revised two-page handoff brief for a 4 PM review. The brief has arrived late three weeks in a row, and you’ve mentioned the pattern twice without making a specific request. You need to leave the conversation knowing what Maya can deliver in time for today’s review and by when. Maya may say she cannot finish the whole brief today, so make one clear, answerable ask while leaving room for a real constraint.",
       },
       {
+        lessonId: "m2-l2",
         fileName: "M2-L2-Say-Who.html",
+        handoffCard: 20,
         oldScene: "Thursday afternoon, outside the school. You asked the group, there was the pause, and nobody has answered yet. Renee, Cory and Angela are still standing there. The bakery needs the cupcake order confirmed by five.",
-        approvedScene: "Thursday afternoon, outside the school after pickup, you’re standing with Renee, Cory, Angela, and Jen. The group’s cupcake order must be confirmed with the bakery by 5 PM. You already asked whether someone could handle it, but after a pause no one answered. Renee has collected everyone’s cash, while the order is under Jen’s name and card. You need to leave knowing who will take the next answerable action. Address one person directly rather than sending the request back to the group; Renee may ask why the request belongs to her.",
       },
       {
+        lessonId: "m2-l3",
         fileName: "M2-L3-When-They-Say-They-Cant.html",
+        handoffCard: 20,
         oldScene: "Thursday night, on the phone with your brother Marcus about Saturday. Ellie gets the keys in the morning and the van goes back Sunday night.",
-        approvedScene: "Thursday night, you’re on the phone with your brother, Marcus, arranging who will handle the van on Saturday. Ellie will have the keys that morning, and the van must be returned Sunday night, so Saturday’s plan needs to be settled before the weekend. You want to leave with a clear agreement about which part of Saturday Marcus can take. Marcus may say he cannot do the whole day because Theo has a game and he is not free until 2 PM. Hear the constraint, trade one part of the original ask, and clearly restate what you are still asking him to do.",
+        repeatedSetup: "Reading a good response is easy. The test is the second thing he says",
       },
       {
+        lessonId: "m2-l4",
         fileName: "M2-L4-Say-Whether-No.html",
+        handoffCard: 20,
         oldScene: "Wednesday night at home, talking to Sam about tomorrow. The client dinner is Thursday and it won't move. Pickup is at 5:30.",
-        approvedScene: "Wednesday night at home, you’re talking with Sam, your partner, about school pickup tomorrow. You have a client dinner on Thursday that cannot move, and pickup is at 5:30. You need to know whether Sam can handle pickup, but you can make another arrangement if the answer is no. Ask directly while making clear that no is genuinely available. Sam may say they cannot do pickup and then check whether no is actually okay. If you offered room to say no, honor the answer without asking again or adding a penalty.",
+        repeatedSetup: "One exchange. Sam answers honestly, and sometimes the answer is no. The test is what you do next.",
       },
       {
+        lessonId: "m2-l5",
         fileName: "M2-L5-Ask-for-the-Loop.html",
+        handoffCard: 20,
         oldScene: "A weeknight at the kitchen table with Sam. Camp signup opens next month, early-bird closes six weeks after that, and you have run it the last three summers.",
-        approvedScene: "A weeknight at the kitchen table, you’re talking with Sam, your partner, about handling the camp signup. Registration opens next month, and early-bird pricing ends six weeks later. You have managed the signup for the last three summers, but this year you want Sam to own it. You need Sam to return to you only if a change in timing or cost puts the signup at risk—not for approval at every step. Define a clear condition for checking back while leaving the steps in between with Sam. Sam may ask what counts as “at risk” and whether they should proceed without checking each step.",
+        repeatedSetup: "One exchange. You make the handoff, Sam asks what counts as at risk. Answer it, and stop there.",
       },
     ] as const;
 
     for (const rehearsal of cases) {
-      const sourceTemplate = approvedTemplate(await source(`assets/lesson-decks/${rehearsal.fileName}`));
-      const productionTemplate = alignApprovedRehearsalScene(sourceTemplate);
-      expect(productionTemplate).toContain(rehearsal.approvedScene);
+      const config = approvedRehearsalConfig(rehearsal.lessonId)!;
+      const productionTemplate = transformApprovedRehearsalHandoff(
+        approvedTemplate(await source(`assets/lesson-decks/${rehearsal.fileName}`)), config,
+      );
+      expect(productionTemplate, rehearsal.lessonId).toContain(config.scenario.situation);
       expect(productionTemplate).not.toContain(rehearsal.oldScene);
+      expect(productionTemplate).not.toMatch(/<span\b[^>]*>\s*What happens\s*<\/span>/i);
+      expect(productionTemplate).not.toContain(config.authoredPressureText);
+      if ("repeatedSetup" in rehearsal) {
+        expect(productionTemplate).not.toContain(rehearsal.repeatedSetup);
+        expect(productionTemplate).toContain("Practice one live exchange, then return for coaching.");
+      }
+      expect(productionTemplate).toContain("Start rehearsal");
     }
+  });
+
+  test("fails closed when a shared handoff scene or preview marker is missing or duplicated", async () => {
+    const config = approvedRehearsalConfig("m2-l3")!;
+    const template = approvedTemplate(await source("assets/lesson-decks/M2-L3-When-They-Say-They-Cant.html"));
+    const stale = "Thursday night, on the phone with your brother Marcus about Saturday. Ellie gets the keys in the morning and the van goes back Sunday night.";
+    expect(() => transformApprovedRehearsalHandoff(template.replace(stale, "changed upstream"), config)).toThrow("scene");
+    expect(() => transformApprovedRehearsalHandoff(`${template}${stale}`, config)).toThrow("scene");
+    expect(() => transformApprovedRehearsalHandoff(template.replace("What happens", "What follows"), config)).toThrow("preview");
+    expect(() => transformApprovedRehearsalHandoff(`${template}${template.match(/<div[^>]*>\s*<span[^>]*>\s*What happens[\s\S]*?<\/div>/i)?.[0] ?? ""}`, config)).toThrow("preview");
   });
 
   test("re-verifies every fetched deck against its authorized boundary before display", async () => {

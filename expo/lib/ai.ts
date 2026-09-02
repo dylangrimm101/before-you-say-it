@@ -4,6 +4,8 @@ import { errorShape, safeLog } from "@/lib/redact";
 import type { Debrief, Difficulty, OnboardingForm, PersonaVoice, ReactionPattern, Scenario, Turn } from "@/types/convo";
 import { neutralPilotCoachResponse, selectDay8Pushback, validatePilotCoachResponse } from "@/lib/pilotCurriculum";
 import { m1L1DynamicReplyPassesQuality, type M1L1PressureKind } from "@/lib/m1L1DynamicResponse";
+import { canonicalCounterpartLine } from "@/lib/counterpartLineCanonicalization";
+import { approvedRehearsalPressurePassesQuality, isExcludedApprovedRehearsalLine } from "@/lib/approvedRehearsalPressure";
 import type {
   PilotCoachResponse,
   PilotCounterpartResponse,
@@ -225,13 +227,12 @@ export interface M1L1DynamicReplyInput {
   openingTranscript: string;
   firstPushback?: string;
   firstResponse?: string;
-  authoredFallback: string;
+  authoredCorpus: readonly string[];
   runId: string;
 }
 
 export interface M1L1DynamicReplyResult {
   reply: string;
-  source: "provider" | "authored";
 }
 
 export interface ApprovedRehearsalDynamicReplyInput {
@@ -246,25 +247,16 @@ export interface ApprovedRehearsalDynamicReplyInput {
   openingTranscript: string;
   firstPressure?: string;
   firstResponse?: string;
-  authoredFallback: string;
+  authoredCorpus: readonly string[];
   runId: string;
 }
 
-const SHARED_REHEARSAL_COACHING_LEAKAGE = /\b(?:learner|lesson|practice|rehearsal|coach|coaching|rubric|transcript|named move|try saying|you should say|good job|well done)\b/i;
-
-/** Rejects unsafe or instructional shared-lesson replies before they reach the learner. */
-export function approvedRehearsalDynamicReplyPassesQuality(reply: string): boolean {
-  const clean = reply.trim();
-  const words = clean.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? [];
-  return clean.length >= 3
-    && clean.length <= 320
-    && words.length >= 2
-    && words.length <= 55
-    && !SHARED_REHEARSAL_COACHING_LEAKAGE.test(clean)
-    && counterpartLinePassesQuality(clean, "pushback");
+/** Rejects unsafe, ungrounded, or instructional shared-lesson replies before they reach the learner. */
+export function approvedRehearsalDynamicReplyPassesQuality(reply: string, groundingContext: string): boolean {
+  return approvedRehearsalPressurePassesQuality(reply, groundingContext);
 }
 
-/** Generates a scenario-aware pressure for an approved lesson, with its authored line as a fail-safe only. */
+/** Generates a provider-only scenario-aware pressure for an approved lesson. */
 export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehearsalDynamicReplyInput): Promise<M1L1DynamicReplyResult> {
   const pressureObjective = [
     input.kind === "pushback_one"
@@ -274,6 +266,16 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
     `Keep every fact consistent with the scenario and persona, keep the issue unresolved, and do not explain or name the teaching move “${input.namedMove}”.`,
     `The later retry guidance will be: ${input.retryDirection}`,
   ].join(" ");
+  const groundingContext = [
+    input.scenario.title,
+    input.scenario.situation,
+    input.scenario.persona,
+    input.scenario.goal,
+    input.openingTranscript,
+    input.firstPressure ?? "",
+    input.firstResponse ?? "",
+    input.approvedTranscript,
+  ].filter(Boolean).join(" ");
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -290,7 +292,7 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
           user_turn_2: input.firstResponse ?? "",
           counterpart_close: "",
         } satisfies BysiTranscript,
-        avoid_repeating: [input.firstPressure ?? "", input.authoredFallback].filter(Boolean),
+        avoid_repeating: [...input.authoredCorpus, input.firstPressure ?? ""].filter(Boolean),
         lesson_constraints: {
           lesson_id: input.lessonId,
           counterpart_id: input.counterpartId,
@@ -312,14 +314,18 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
         variation_seed: `${input.runId}-${input.lessonId}-${input.kind}-${attempt}`,
       });
       const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
-      if (reply && approvedRehearsalDynamicReplyPassesQuality(reply)) return { reply, source: "provider" };
+      const canonicalReply = canonicalCounterpartLine(reply);
+      const repeatsCorpus = isExcludedApprovedRehearsalLine(reply, input.authoredCorpus);
+      const repeatsFirstPressure = Boolean(input.firstPressure)
+        && canonicalReply === canonicalCounterpartLine(input.firstPressure!);
+      if (reply && !repeatsCorpus && !repeatsFirstPressure && approvedRehearsalDynamicReplyPassesQuality(reply, groundingContext)) return { reply };
       safeLog("[ai] approved rehearsal quality gate rejected line", { attempt, lessonId: input.lessonId });
     } catch (error) {
       safeLog("[ai] approved rehearsal counterpart request failed", { attempt, lessonId: input.lessonId, ...errorShape(error) });
     }
   }
 
-  return { reply: input.authoredFallback, source: "authored" };
+  throw new Error("AI counterpart response is unavailable");
 }
 
 function m1L1ConversationContext(input: M1L1DynamicReplyInput): string {
@@ -333,7 +339,7 @@ function m1L1ConversationContext(input: M1L1DynamicReplyInput): string {
   ].filter((value) => value.trim().length > 0).join(" ");
 }
 
-/** Generates one constrained M1 L1 pressure turn, retries one rejected result, then returns the authored fallback. */
+/** Generates one constrained M1 L1 pressure turn and fails closed when provider evidence is unavailable. */
 export async function generateM1L1DynamicReply(input: M1L1DynamicReplyInput): Promise<M1L1DynamicReplyResult> {
   const context = m1L1ConversationContext(input);
   const turn = input.kind === "pushback_one" ? "pushback" : "close";
@@ -357,7 +363,7 @@ export async function generateM1L1DynamicReply(input: M1L1DynamicReplyInput): Pr
           pressure_condition: `${input.scenario.persona} ${pressureObjective}`,
         },
         transcript,
-        avoid_repeating: [input.firstPushback ?? "", input.authoredFallback].filter(Boolean),
+        avoid_repeating: [...input.authoredCorpus, input.firstPushback ?? ""].filter(Boolean),
         lesson_constraints: {
           lesson_id: "m1-l1",
           counterpart: "Adam, the learner's colleague",
@@ -370,8 +376,15 @@ export async function generateM1L1DynamicReply(input: M1L1DynamicReplyInput): Pr
         variation_seed: `${input.runId}-${input.kind}-${attempt}`,
       });
       const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
-      if (reply && m1L1DynamicReplyPassesQuality(reply, input.kind, input.approvedTranscript, context)) {
-        return { reply, source: "provider" };
+      const normalizedReply = canonicalCounterpartLine(reply);
+      const repeatsAuthoredLine = input.authoredCorpus.some((line) => normalizedReply === canonicalCounterpartLine(line));
+      const repeatsFirstPressure = Boolean(input.firstPushback)
+        && normalizedReply === canonicalCounterpartLine(input.firstPushback!);
+      if (reply
+        && !repeatsAuthoredLine
+        && !repeatsFirstPressure
+        && m1L1DynamicReplyPassesQuality(reply, input.kind, input.approvedTranscript, context)) {
+        return { reply };
       }
       safeLog("[ai] M1 L1 semantic quality gate rejected line", { attempt, kind: input.kind });
     } catch (error) {
@@ -379,7 +392,7 @@ export async function generateM1L1DynamicReply(input: M1L1DynamicReplyInput): Pr
     }
   }
 
-  return { reply: input.authoredFallback, source: "authored" };
+  throw new Error("AI counterpart response is unavailable");
 }
 
 export async function nextCounterpartTurn(

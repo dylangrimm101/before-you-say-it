@@ -14,6 +14,7 @@ import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import type { ConvertedLessonConfig } from "@/lib/convertedLesson";
 import {
   approvedRehearsalCoachExchange,
+  approvedRehearsalAuthoredCorpus,
   approvedRehearsalComparison,
   type ApprovedRehearsalConfig,
 } from "@/lib/approvedRehearsals";
@@ -275,7 +276,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
           retryDirection: approvedRehearsal.retryDirection,
           approvedTranscript: openingTranscript,
           openingTranscript,
-          authoredFallback: approvedRehearsal.authoredPressureText,
+          authoredCorpus: approvedRehearsalAuthoredCorpus(approvedRehearsal),
           runId: approved.run.id,
         })
         : await nextCounterpartTurn(
@@ -290,7 +291,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
       const pressureTurn = {
         id: `${approved.run.id}-counterpart-turn-1`,
         text: pressureText,
-        source: ("source" in result ? result.source : "provider") as "provider" | "authored",
+        source: "provider" as const,
         reactionId: approvedRehearsal ? `${approvedRehearsal.lessonId}-dynamic-pressure-1` : `${approved.run.id}-provider-pressure`,
         semanticVoiceKey: "contextual_counterpart" as const,
         resolvedAudioId: `${approved.run.curriculumVersion}-${approved.run.id}-counterpart-turn-1`,
@@ -308,7 +309,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
       approvalInFlightRef.current = false;
       setBusy(false);
     }
-  }, [approvedRehearsal, context, convertedLesson, draft, persist, scenario, value]);
+  }, [approvedRehearsal, context, draft, persist, scenario, value]);
 
   const confirmResponse = useCallback(async (): Promise<void> => {
     if (!value || !context || !pressureOne || draft.trim().length < 2 || approvalInFlightRef.current) return;
@@ -334,7 +335,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
           openingTranscript,
           firstPressure: pressureOne.text,
           firstResponse: response,
-          authoredFallback: approvedRehearsal.authoredPressureTwoText,
+          authoredCorpus: approvedRehearsalAuthoredCorpus(approvedRehearsal),
           runId: approved.run.id,
         });
         const pressureText = result.reply.trim();
@@ -342,7 +343,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
         const withSecondPressure = attachApprovedRehearsalPushbackTwo(advanced, {
           id: `${approved.run.id}-counterpart-turn-2`,
           text: pressureText,
-          source: result.source,
+          source: "provider",
           reactionId: `${approvedRehearsal.lessonId}-dynamic-pressure-2`,
           semanticVoiceKey: "contextual_counterpart",
           resolvedAudioId: `${approved.run.curriculumVersion}-${approved.run.id}-counterpart-turn-2`,

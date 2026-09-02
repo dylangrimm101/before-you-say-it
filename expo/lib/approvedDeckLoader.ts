@@ -1,6 +1,7 @@
 import { gunzipSync, strFromU8, unzipSync } from "fflate";
 
 import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
+import { approvedRehearsalConfigs, type ApprovedRehearsalConfig } from "@/lib/approvedRehearsals";
 
 const APPROVED_HANDOFF_ARCHIVE_URL = "https://r2-pub.rork.com/attachments/xo73vo5tbrhku6f68brbr.zip";
 const TEMPLATE_PATTERN = /<script type="__bundler\/template">\s*(.*?)\s*<\/script>/s;
@@ -14,24 +15,6 @@ const M1_L1_CONTENT_VERSION = "m1-l1-v2.1-2026-08-24";
 const M1_L1_APPROVED_SHA256 = "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e";
 const STALE_M1_L1_SCENE = "Sunday evening, kitchen. Dishes done, kid finally asleep. You've wanted to say this for two weeks. Your partner is on the couch, half looking at their phone. Not hostile. Tired.";
 const STALE_M1_L1_SCENE_BEATS = "You open. Adam pushes back twice. The second one is <em>“You're acting like this happens all the time.”</em> Then Hope names one change and hands the same moment back to you.";
-const STALE_M1_L2_SCENE = "Wednesday, end of day. You've told Ravi the approval step needs a clear owner and used yesterday's late file. He isn't brushing you off. He just isn't accepting that example.";
-const APPROVED_M1_L2_SCENE = "Wednesday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi points out that the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file was also late, another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.";
-const STALE_M1_L3_SCENE = "Sunday evening, on the phone with your sister. You want March's appointments split before you hang up.";
-const APPROVED_M1_L3_SCENE = "Sunday evening, you’re on the phone with your sister, Renee. Dad’s March appointments still need to be divided, and you handled the last four. You want to agree on who will take each March appointment before you hang up. Renee has been handling more of Dad’s regular check-in calls and may raise that you haven’t been calling as often.";
-const STALE_M1_L4_SCENE = "Thursday night, the house is finally quiet. The plan changed twice this month after you had already rearranged work. By now it has become a month of things in your head.";
-const APPROVED_M1_L4_SCENE = "Thursday night, you’re talking with Theo, your partner, after the house is quiet. Twice this month, Theo agreed to handle school pickup, so you rearranged work around that plan. Both times, he changed the plan after your schedule was already set, leaving you to move meetings again. You want future changes discussed before either of you commits—not to suggest that Theo never considers your schedule.";
-const STALE_M1_L5_SCENE = "Friday night, kitchen table. The kid went down at seven for once. Neither of you is running on four hours.";
-const APPROVED_M1_L5_SCENE = "Friday night, you’re at the kitchen table with Adam, who shares responsibility for your child’s calendar, after the kid has gone to bed. This month, most of the calendar has fallen to you—including camp signups, the dentist, and both birthday RSVPs. You want several things addressed, but raising all of them at once could leave none of them clear. Choose one purpose for tonight and keep the others for later. Adam has his own read of the month and may question which issue you actually want him to address.";
-const STALE_M2_L1_SCENE = "Thursday morning, before standup. The handoff brief has landed late three weeks running and the review is at 4. You've mentioned it twice without asking for anything.";
-const APPROVED_M2_L1_SCENE = "Thursday morning, before standup, you’re speaking with Maya, your teammate who prepares the revised two-page handoff brief for a 4 PM review. The brief has arrived late three weeks in a row, and you’ve mentioned the pattern twice without making a specific request. You need to leave the conversation knowing what Maya can deliver in time for today’s review and by when. Maya may say she cannot finish the whole brief today, so make one clear, answerable ask while leaving room for a real constraint.";
-const STALE_M2_L2_SCENE = "Thursday afternoon, outside the school. You asked the group, there was the pause, and nobody has answered yet. Renee, Cory and Angela are still standing there. The bakery needs the cupcake order confirmed by five.";
-const APPROVED_M2_L2_SCENE = "Thursday afternoon, outside the school after pickup, you’re standing with Renee, Cory, Angela, and Jen. The group’s cupcake order must be confirmed with the bakery by 5 PM. You already asked whether someone could handle it, but after a pause no one answered. Renee has collected everyone’s cash, while the order is under Jen’s name and card. You need to leave knowing who will take the next answerable action. Address one person directly rather than sending the request back to the group; Renee may ask why the request belongs to her.";
-const STALE_M2_L3_SCENE = "Thursday night, on the phone with your brother Marcus about Saturday. Ellie gets the keys in the morning and the van goes back Sunday night.";
-const APPROVED_M2_L3_SCENE = "Thursday night, you’re on the phone with your brother, Marcus, arranging who will handle the van on Saturday. Ellie will have the keys that morning, and the van must be returned Sunday night, so Saturday’s plan needs to be settled before the weekend. You want to leave with a clear agreement about which part of Saturday Marcus can take. Marcus may say he cannot do the whole day because Theo has a game and he is not free until 2 PM. Hear the constraint, trade one part of the original ask, and clearly restate what you are still asking him to do.";
-const STALE_M2_L4_SCENE = "Wednesday night at home, talking to Sam about tomorrow. The client dinner is Thursday and it won't move. Pickup is at 5:30.";
-const APPROVED_M2_L4_SCENE = "Wednesday night at home, you’re talking with Sam, your partner, about school pickup tomorrow. You have a client dinner on Thursday that cannot move, and pickup is at 5:30. You need to know whether Sam can handle pickup, but you can make another arrangement if the answer is no. Ask directly while making clear that no is genuinely available. Sam may say they cannot do pickup and then check whether no is actually okay. If you offered room to say no, honor the answer without asking again or adding a penalty.";
-const STALE_M2_L5_SCENE = "A weeknight at the kitchen table with Sam. Camp signup opens next month, early-bird closes six weeks after that, and you have run it the last three summers.";
-const APPROVED_M2_L5_SCENE = "A weeknight at the kitchen table, you’re talking with Sam, your partner, about handling the camp signup. Registration opens next month, and early-bird pricing ends six weeks later. You have managed the signup for the last three summers, but this year you want Sam to own it. You need Sam to return to you only if a change in timing or cost puts the signup at risk—not for approval at every step. Define a clear condition for checking back while leaving the steps in between with Sam. Sam may ask what counts as “at risk” and whether they should proceed without checking each step.";
 const M1_L1_OUTCOME_CARD = /<div\b[^>]*>\s*<span\b[^>]*>\s*What happens\s*<\/span>[\s\S]*?<\/div>/gi;
 const M1_L1_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*You open\.\s*Adam pushes back twice\..*?same moment back to you\.\s*<\/div>\s*<\/div>/is;
 const M1_L1_EMPTY_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*<\/div>\s*<\/div>/gis;
@@ -192,6 +175,8 @@ function isolateNativeDeck(template: string): string {
 const REHEARSAL_CONTINUATION_PARAGRAPH = /<p\b[^>]*>\s*The rehearsal runs in the voice engine\..*?<\/p>/gs;
 const TAP_TUTORIAL_MARKER = "showHint:st.hint && i === 0,";
 const DECK_GO_MARKER = "go(d) {\n";
+const FULL_CARD_TAP_ZONE_MARKER = "showTapZones:!c.handoff && !c.transfer && !q && !c.dquiz,";
+const INTERACTIVE_SAFE_TAP_ZONE = "showTapZones:!c.handoff && !c.transfer && !q && !c.dquiz && !(c.chips && c.chips.length) && !(c.rooms && c.rooms.length),";
 
 /** Makes the first tutorial tap dismiss its overlay without advancing Card 1. */
 export function installTapTutorialDismissal(template: string): string {
@@ -201,6 +186,12 @@ export function installTapTutorialDismissal(template: string): string {
     DECK_GO_MARKER,
     `${DECK_GO_MARKER}    if (this.state.hint && this.state.i === 0) {\n      this.setState({ hint:false });\n      return;\n    }\n`,
   );
+}
+
+/** Keeps full-card navigation layers from covering chips or room-switcher tabs. */
+export function protectInteractiveDeckControls(template: string): string {
+  if (!template.includes(FULL_CARD_TAP_ZONE_MARKER)) return template;
+  return template.replace(FULL_CARD_TAP_ZONE_MARKER, INTERACTIVE_SAFE_TAP_ZONE);
 }
 
 /** Removes the redundant continuation paragraph from rehearsal handoff cards. */
@@ -215,8 +206,10 @@ export function materializeApprovedDeckHtml(bundleHtml: string): string {
   const externalEncoded = bundleHtml.match(EXTERNAL_RESOURCES_PATTERN)?.[1];
   if (!templateEncoded || !manifestEncoded || !externalEncoded) throw new Error("Approved lesson bundle metadata is missing");
 
-  let template = installTapTutorialDismissal(
-    removeRehearsalContinuationCopy(JSON.parse(templateEncoded) as string),
+  let template = protectInteractiveDeckControls(
+    installTapTutorialDismissal(
+      removeRehearsalContinuationCopy(JSON.parse(templateEncoded) as string),
+    ),
   );
   const manifest = JSON.parse(manifestEncoded) as Record<string, BundleEntry>;
   const externalResources = orderedExternalResources(JSON.parse(externalEncoded) as ExternalResource[]);
@@ -269,26 +262,39 @@ export function removeM1L1OutcomePreview(template: string): string {
     .replace(M1_L1_EMPTY_OUTCOME_PREVIEW, "");
 }
 
-/** Applies approved scene-copy revisions at runtime without modifying bundled lesson sources. */
-export function alignApprovedRehearsalScene(template: string): string {
-  return template
-    .replace(STALE_M1_L2_SCENE, APPROVED_M1_L2_SCENE)
-    .replace(STALE_M1_L3_SCENE, APPROVED_M1_L3_SCENE)
-    .replace(STALE_M1_L4_SCENE, APPROVED_M1_L4_SCENE)
-    .replace(STALE_M1_L5_SCENE, APPROVED_M1_L5_SCENE)
-    .replace(STALE_M2_L1_SCENE, APPROVED_M2_L1_SCENE)
-    .replace(STALE_M2_L2_SCENE, APPROVED_M2_L2_SCENE)
-    .replace(STALE_M2_L3_SCENE, APPROVED_M2_L3_SCENE)
-    .replace(STALE_M2_L4_SCENE, APPROVED_M2_L4_SCENE)
-    .replace(STALE_M2_L5_SCENE, APPROVED_M2_L5_SCENE);
+const SHARED_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<span\b[^>]*>\s*What happens\s*<\/span>\s*<span\b[^>]*>[\s\S]*?<\/span>\s*<\/div>/gi;
+const NEUTRAL_HANDOFF_SETUP = "Practice one live exchange, then return for coaching.";
+
+function occurrenceCount(value: string, marker: string): number {
+  return marker ? value.split(marker).length - 1 : 0;
+}
+
+/** Aligns one known shared handoff and rejects mutable source drift. */
+export function transformApprovedRehearsalHandoff(template: string, config: ApprovedRehearsalConfig): string {
+  if (occurrenceCount(template, config.handoffSourceScene) !== 1) throw new Error("Converted lesson scene marker must occur exactly once");
+  const previews = template.match(SHARED_OUTCOME_PREVIEW) ?? [];
+  if (previews.length !== 1) throw new Error("Converted lesson preview marker must occur exactly once");
+  let result = template.replace(config.handoffSourceScene, config.scenario.situation).replace(SHARED_OUTCOME_PREVIEW, "");
+  if (config.handoffRepeatedSetup) {
+    if (occurrenceCount(result, config.handoffRepeatedSetup) !== 1) throw new Error("Converted lesson repeated setup marker must occur exactly once");
+    result = result.replace(config.handoffRepeatedSetup, NEUTRAL_HANDOFF_SETUP);
+  }
+  if (result.includes(config.handoffSourceScene) || SHARED_OUTCOME_PREVIEW.test(result)) throw new Error("Converted lesson handoff could not be sanitized");
+  SHARED_OUTCOME_PREVIEW.lastIndex = 0;
+  return result;
 }
 
 /** Converts an approved lesson handoff action into the fail-closed native QA runtime launch. */
 export function convertedHandoffDeckHtml(rawHtml: string, handoffCard: number): string {
   return replaceEncodedTemplate(rawHtml, (source) => {
     const sliced = sliceCards(source, handoffCard);
-    const withAcceptedScene = alignApprovedRehearsalScene(removeM1L1OutcomePreview(sliced))
-      .replace(STALE_M1_L1_SCENE, M1_L1_CONVERSION.scenario.situation);
+    const sharedMatches = approvedRehearsalConfigs().filter((config) => sliced.includes(config.handoffSourceScene));
+    const withAcceptedScene = sharedMatches.length === 1
+      ? transformApprovedRehearsalHandoff(sliced, sharedMatches[0]!)
+      : removeM1L1OutcomePreview(sliced).replace(STALE_M1_L1_SCENE, M1_L1_CONVERSION.scenario.situation);
+    if (!sliced.includes(STALE_M1_L1_SCENE) && sharedMatches.length !== 1) {
+      throw new Error("Converted lesson scene could not be identified");
+    }
     if (sliced.includes(STALE_M1_L1_SCENE) && withAcceptedScene.includes(STALE_M1_L1_SCENE)) {
       throw new Error("Converted lesson scene could not be aligned");
     }

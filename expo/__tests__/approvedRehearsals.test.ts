@@ -7,10 +7,11 @@ import {
   approvedRehearsalCriterion,
   approvedRehearsalIndexImpact,
   approvedRehearsalStrongVersion,
+  hasCanonicalApprovedRehearsalPressureSequence,
   validateApprovedRehearsalCompletion,
 } from "@/lib/approvedRehearsals";
 import { normalizeConvertedLessonProgress } from "@/lib/convertedLesson";
-import { createScenarioPracticeRun } from "@/lib/scenarioPractice";
+import { createScenarioPracticeRun, initializeApprovedRehearsalRun, normalizeScenarioPracticeRun } from "@/lib/scenarioPractice";
 import type { PilotDayRun } from "@/types/pilotCurriculum";
 
 describe("approved M1 L2-L5 rehearsals", () => {
@@ -312,5 +313,120 @@ describe("approved lesson native completion evidence", () => {
     expect(increased).toMatchObject({ signalValue: 78, beforeIndex: 60, afterIndex: 78, delta: 18 });
     expect(held).toMatchObject({ signalValue: 60, beforeIndex: 60, afterIndex: 60, delta: 0 });
     expect(decreased).toMatchObject({ signalValue: 48, beforeIndex: 60, afterIndex: 48, delta: -12 });
+  });
+});
+
+describe("shared provider-only saved-run contract", () => {
+  const lessonIds = ["m1-l2", "m1-l3", "m1-l4", "m1-l5", "m2-l1", "m2-l2", "m2-l3", "m2-l4", "m2-l5"] as const;
+
+  function pressureRun(lessonId: (typeof lessonIds)[number]): PilotDayRun {
+    const config = approvedRehearsalConfig(lessonId)!;
+    const id = `saved-${lessonId}`;
+    const created = initializeApprovedRehearsalRun(createScenarioPracticeRun(config.scenario, "steady", "defensive", id, 1), 1);
+    const first = {
+      id: `${id}-counterpart-turn-1`, text: `I still need a clearer answer about ${config.scenario.title}.`, source: "provider" as const,
+      reactionId: `${lessonId}-dynamic-pressure-1`, semanticVoiceKey: "contextual_counterpart" as const,
+      resolvedAudioId: `${created.run.curriculumVersion}-${id}-counterpart-turn-1`, authoredAt: 3,
+    };
+    const second = {
+      id: `${id}-counterpart-turn-2`, text: `Why does ${config.scenario.goal.toLowerCase()} follow from that?`, source: "provider" as const,
+      reactionId: `${lessonId}-dynamic-pressure-2`, semanticVoiceKey: "contextual_counterpart" as const,
+      resolvedAudioId: `${created.run.curriculumVersion}-${id}-counterpart-turn-2`, authoredAt: 5,
+    };
+    return {
+      ...created.run,
+      convertedModuleId: config.moduleId, practiceId: config.practiceId, contentVersion: config.contentVersion,
+      counterpartIdentity: config.counterpartId,
+      scenarioContext: { ...created.run.scenarioContext!, counterpartId: config.counterpartId },
+      attempt: { id: `${id}-opener`, kind: "opener", transcript: "Here is my opening request.", representation: "confirmed_transcript", confirmedAt: 2 },
+      counterpartTurn: first,
+      responseAttempt: { id: `${id}-response`, kind: "response", transcript: "Here is my first response.", representation: "confirmed_transcript", confirmedAt: 4 },
+      approvedRehearsal: { beat: 4, retryCount: 0, pushbackOne: first, pushbackTwo: second },
+      state: "ready_for_second_response", updatedAt: 5,
+    };
+  }
+
+  test("rejects a pre-pressure run whose saved scenario identity was altered", () => {
+    const config = approvedRehearsalConfig("m2-l1")!;
+    const id = "corrupt-pre-pressure";
+    const created = initializeApprovedRehearsalRun(createScenarioPracticeRun(config.scenario, "steady", "defensive", id, 1), 1);
+    const run: PilotDayRun = {
+      ...created.run,
+      convertedModuleId: config.moduleId,
+      practiceId: config.practiceId,
+      contentVersion: config.contentVersion,
+      counterpartIdentity: config.counterpartId,
+      scenarioContext: {
+        ...created.run.scenarioContext!,
+        counterpartId: config.counterpartId,
+        situation: "The spaceship leaves Mars tomorrow.",
+      },
+    };
+    expect(hasCanonicalApprovedRehearsalPressureSequence(config, run)).toBe(false);
+    expect(normalizeScenarioPracticeRun({ version: 1, run })).toBeNull();
+  });
+
+  test("rejects a pre-pressure run whose saved category was altered", () => {
+    const config = approvedRehearsalConfig("m2-l1")!;
+    const id = "corrupt-pre-pressure-category";
+    const created = initializeApprovedRehearsalRun(createScenarioPracticeRun(config.scenario, "steady", "defensive", id, 1), 1);
+    const run: PilotDayRun = {
+      ...created.run,
+      convertedModuleId: config.moduleId,
+      practiceId: config.practiceId,
+      contentVersion: config.contentVersion,
+      counterpartIdentity: config.counterpartId,
+      scenarioContext: {
+        ...created.run.scenarioContext!,
+        counterpartId: config.counterpartId,
+        category: "family",
+      },
+    };
+    expect(hasCanonicalApprovedRehearsalPressureSequence(config, run)).toBe(false);
+    expect(normalizeScenarioPracticeRun({ version: 1, run })).toBeNull();
+  });
+
+  test("accepts only distinct provider pressures with canonical identity and chronology", () => {
+    for (const lessonId of lessonIds) {
+      const config = approvedRehearsalConfig(lessonId)!;
+      const run = pressureRun(lessonId);
+      expect(hasCanonicalApprovedRehearsalPressureSequence(config, run), lessonId).toBe(true);
+      expect(normalizeScenarioPracticeRun({ version: 1, run })?.run.id, lessonId).toBe(run.id);
+      const duplicate = { ...run.approvedRehearsal!.pushbackTwo!, text: run.approvedRehearsal!.pushbackOne!.text };
+      expect(hasCanonicalApprovedRehearsalPressureSequence(config, { ...run, approvedRehearsal: { ...run.approvedRehearsal!, pushbackTwo: duplicate } }), lessonId).toBe(false);
+    }
+  });
+
+  test("rejects off-topic provider pressure from persistence and resume validation", () => {
+    const lessonId = "m2-l1";
+    const config = approvedRehearsalConfig(lessonId)!;
+    const unrelated = [
+      "The spaceship leaves Mars tomorrow. Why should I agree?",
+      "My rent doubled yesterday. Why is this my problem?",
+      "I disagree. Why?",
+      "The spaceship leaves Mars, but the handoff brief is late.",
+      "Aliens landed on Mars; anyway, Thursday review.",
+    ];
+    for (const text of unrelated) {
+      const base = pressureRun(lessonId);
+      const badFirst = { ...base.approvedRehearsal!.pushbackOne!, text };
+      const run = { ...base, counterpartTurn: badFirst, approvedRehearsal: { ...base.approvedRehearsal!, pushbackOne: badFirst } };
+      expect(hasCanonicalApprovedRehearsalPressureSequence(config, run), text).toBe(false);
+      expect(normalizeScenarioPracticeRun({ version: 1, run }), text).toBeNull();
+    }
+  });
+
+  test("invalidates authored and provider-labelled canned saved runs, including zero-width variants", () => {
+    for (const lessonId of lessonIds) {
+      const config = approvedRehearsalConfig(lessonId)!;
+      for (const source of ["authored", "provider"] as const) {
+        const base = pressureRun(lessonId);
+        const canned = `${config.authoredPressureText.slice(0, 1)}\u200B${config.authoredPressureText.slice(1)}`;
+        const badFirst = { ...base.approvedRehearsal!.pushbackOne!, source, text: canned };
+        const run = { ...base, counterpartTurn: badFirst, approvedRehearsal: { ...base.approvedRehearsal!, pushbackOne: badFirst } };
+        expect(hasCanonicalApprovedRehearsalPressureSequence(config, run), `${lessonId}-${source}`).toBe(false);
+        expect(normalizeScenarioPracticeRun({ version: 1, run }), `${lessonId}-${source}`).toBeNull();
+      }
+    }
   });
 });
