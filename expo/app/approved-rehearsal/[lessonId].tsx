@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 
 import { ScenarioPaidPractice } from "@/components/ScenarioPaidPractice";
+import { approvedLessonDeck } from "@/constants/approvedLessons";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { Backdrop, PrimaryButton } from "@/components/ui";
 import { canAccessLaunchDeck, isLaunchLessonId, nextLaunchDeck } from "@/lib/launchCurriculum";
@@ -29,6 +30,7 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
   const isPro = useIsPro();
   const isEntitled = isPro || (__DEV__ && devProEnabled);
   const launchLessonId = isLaunchLessonId(params.lessonId) ? params.lessonId : null;
+  const lesson = approvedLessonDeck(launchLessonId);
   const hasLaunchAccess = Boolean(launchLessonId && canAccessLaunchDeck(launchLessonId, isEntitled, convertedLessonProgress, moduleCloseProgress));
   const nextDeck = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
   const isM1L1 = conversionRuntimeEnabled(params.lessonId);
@@ -141,6 +143,8 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
     return <ScenarioPaidPractice
       key={runtimeKey}
       scenario={config!.scenario}
+      {...(lesson?.shortName ? { lessonTitle: lesson.shortName } : {})}
+      {...(lesson?.namedMove ? { lessonMove: lesson.namedMove } : {})}
       requestedRunId={activeScenarioRun.run.id}
       {...(isM1L1 ? { convertedLesson: M1_L1_CONVERSION } : { approvedRehearsal: approvedConfig! })}
       onReturnToDeck={(runId) => router.replace({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: config!.lessonId, returnFromRehearsal: "1", runId } })}

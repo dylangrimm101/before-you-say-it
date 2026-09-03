@@ -49,6 +49,8 @@ import { SESSION_SCHEMA_VERSION, type SessionRecord } from "@/types/privacy";
 
 interface ScenarioPaidPracticeProps {
   scenario: Scenario;
+  lessonTitle?: string;
+  lessonMove?: string | null;
   requestedRunId?: string;
   convertedLesson?: ConvertedLessonConfig;
   approvedRehearsal?: ApprovedRehearsalConfig;
@@ -69,7 +71,7 @@ export function ScenarioPaidPractice(props: ScenarioPaidPracticeProps): React.JS
 }
 
 /** Shared non-converted scenario surface; it never defaults to Adam. */
-function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson, approvedRehearsal, onReturnToDeck, onDiscard }: ScenarioPaidPracticeProps) {
+function SharedScenarioPaidPractice({ scenario, lessonTitle, lessonMove, requestedRunId, convertedLesson, approvedRehearsal, onReturnToDeck, onDiscard }: ScenarioPaidPracticeProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeScenarioRun, replaceActiveScenarioRunStrict, clearActiveScenarioRunStrict, upsertSession } = useStore();
@@ -533,10 +535,11 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
   return <View style={styles.root}><Backdrop />
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
       <Pressable onPress={handleClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Leave rehearsal"><X size={21} color={C.textSoft} /></Pressable>
-      <View style={styles.headerCopy}><Text style={styles.headerTitle}>{context.counterpartName}</Text><Text style={styles.headerMeta}>{approvedRehearsal ? `Step ${Math.min(lessonState?.beat ?? 1, 7)} of 7` : `${context.counterpartRole} · ${difficultyLabel}`}</Text></View><View style={styles.close} />
+      <View style={styles.headerCopy}><Text style={styles.headerTitle}>{approvedRehearsal && lessonTitle ? lessonTitle : context.counterpartName}</Text><Text style={styles.headerMeta}>{approvedRehearsal ? `Lesson rehearsal · Step ${Math.min(lessonState?.beat ?? 1, 7)} of 7` : `${context.counterpartRole} · ${difficultyLabel}`}</Text></View><View style={styles.close} />
     </View>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 150 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {approvedRehearsal ? <ProductCard accent style={styles.lessonIdentity}><SectionLabel tone={C.purple}>Lesson rehearsal</SectionLabel><Text style={styles.lessonIdentityTitle}>{lessonTitle}</Text>{lessonMove ? <Text style={styles.lessonIdentityMove}>{lessonMove}</Text> : null}</ProductCard> : null}
         <StatusPill label={context.category.toUpperCase()} tone="purple" /><Text style={styles.scenarioTitle}>{context.title}</Text><Text style={styles.context}>{context.situation}</Text>
         <ProductCard style={styles.identityCard}><View><SectionLabel>Counterpart</SectionLabel><Text style={styles.identityValue}>{context.counterpartLabel}</Text></View><View><SectionLabel>Objective</SectionLabel><Text style={styles.identityValue}>{context.objective}</Text></View><View><SectionLabel>Pressure level</SectionLabel><Text style={styles.identityValue}>{difficultyLabel} · {DIFFICULTY[context.difficulty].note}</Text></View></ProductCard>
 
@@ -593,6 +596,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 }, center: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
   header: { minHeight: 70, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerCopy: { flex: 1, alignItems: "center" }, headerTitle: { fontFamily: font.bold, fontSize: 17, color: C.text }, headerMeta: { ...T.caption, color: C.purple, marginTop: 2 },
   scroll: { paddingHorizontal: GUTTER, paddingTop: 12 }, scenarioTitle: { ...T.title, marginTop: 10 }, context: { ...T.support, marginTop: 7 }, identityCard: { marginTop: 16, gap: 14 }, identityValue: { ...T.support, color: C.text, marginTop: 4 },
+  lessonIdentity: { marginBottom: 18, gap: 5 }, lessonIdentityTitle: { ...T.title, fontSize: 22, lineHeight: 28 }, lessonIdentityMove: { ...T.support, color: C.purple },
   title: { ...T.title, marginTop: 22 }, body: { ...T.support, marginTop: 8 }, action: { marginTop: 18 }, capture: { alignItems: "center", marginTop: 22 }, or: { ...T.caption, marginVertical: 16 }, input: { ...T.body, minHeight: 108, width: "100%", backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.glassEdge, borderRadius: radius.md, padding: 16, textAlignVertical: "top" },
   listening: { alignItems: "center", gap: 20, paddingTop: 36 }, thinkingWrap: { alignSelf: "flex-start", alignItems: "flex-start", marginTop: 16 }, thinkingBubble: { minWidth: 156, flexDirection: "row", alignItems: "center", gap: 10 }, thinkingText: { ...T.caption, color: C.textSoft }, busy: { marginTop: 14 }, speaking: { ...T.caption, color: C.purple, marginTop: 10 }, thread: { marginTop: 16, gap: 12 }, messageWrap: { maxWidth: "84%" }, messageMine: { alignSelf: "flex-end", alignItems: "flex-end" }, messageTheirs: { alignSelf: "flex-start", alignItems: "flex-start" }, messageLabel: { ...T.caption, fontFamily: font.semi, marginBottom: 4 }, messageBubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 11 }, bubbleMine: { backgroundColor: C.purple }, bubbleTheirs: { backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.line }, messageText: { ...T.support, color: C.text }, messageTextMine: { color: C.onAccent }, processing: { minHeight: 56, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 }, permissionCard: { marginTop: 16 }, permissionSecondary: { minHeight: 44, alignItems: "center", justifyContent: "center" }, permissionSecondaryText: { ...T.caption, color: C.purple, fontFamily: font.semi }, counterpartCard: { marginTop: 18 }, counterpartText: { ...T.body, marginTop: 10 }, continuityLabel: { ...T.caption, marginTop: 12 }, coachCard: { marginTop: 14, gap: 8 }, comparison: { marginTop: 10 },
 });

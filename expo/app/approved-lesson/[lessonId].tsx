@@ -55,6 +55,9 @@ export default function ApprovedLessonDeckScreen() {
   const approvedConfig = approvedRehearsalConfig(params.lessonId);
   const rehearsalConfig = isM1L1 ? M1_L1_CONVERSION : approvedConfig;
   const feedbackLessonId = lesson && isFeedbackLessonId(lesson.id) ? lesson.id : null;
+  const customerLessonHeader = lesson
+    ? lesson.isCloseDeck ? `MODULE ${lesson.module} REVIEW` : `MODULE ${lesson.module} · LESSON ${lesson.lesson}`
+    : "LESSON";
   const isConverted = Boolean(rehearsalConfig);
   const isReturning = isConverted && params.returnFromRehearsal === "1" && !lessonWasReset;
   const returningRun = activeScenarioRun?.run;
@@ -478,22 +481,22 @@ export default function ApprovedLessonDeckScreen() {
             safeLog("[approved-lessons] webview failed", { code: event.nativeEvent.code, description: event.nativeEvent.description });
             setLoadError(true);
           }}
-          accessibilityLabel={`${lesson.title} approved source deck`}
+          accessibilityLabel={`${lesson.title} lesson`}
         />
       ) : loadError ? (
         <Unavailable
-          title="The approved deck couldn't open."
+          title="This lesson couldn't open."
           body="The lesson is still available. Try loading it again."
           onRetry={() => setLoadAttempt((current) => current + 1)}
         />
       ) : (
-        <View style={styles.loading}><ActivityIndicator color={C.purple} /><Text style={styles.loadingText}>Opening approved deck…</Text></View>
+        <View style={styles.loading}><ActivityIndicator color={C.purple} /><Text style={styles.loadingText}>Opening lesson…</Text></View>
       )}
       <Pressable
         onPress={() => router.back()}
         style={[styles.backButton, { top: insets.top + 6 }]}
         accessibilityRole="button"
-        accessibilityLabel="Back to approved lesson catalog"
+        accessibilityLabel="Back to Practice"
       >
         <ArrowLeft size={20} color={C.text} />
       </Pressable>
@@ -515,9 +518,10 @@ export default function ApprovedLessonDeckScreen() {
       </View> : null}
       {completionCommitted && isConverted && !lessonWasReset ? <View style={[styles.completionReset, { bottom: insets.bottom + 18 }]}><Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.completionResetButton} accessibilityRole="button"><RotateCcw size={18} color={C.purple} /><Text style={styles.completionResetText}>{isResetting ? "Resetting…" : "Do this lesson again"}</Text></Pressable></View> : null}
       {resetNotice ? <View style={[styles.resetNotice, { bottom: insets.bottom + 18 }]}><Text style={styles.resetNoticeText}>{resetNotice.message}</Text>{resetNotice.canUndo ? <Pressable onPress={() => void handleUndoReset()} style={styles.undoButton} accessibilityRole="button"><Text style={styles.undoText}>Undo</Text></Pressable> : null}</View> : null}
-      {__DEV__ ? <View pointerEvents="none" style={[styles.qaBadge, { top: insets.top + 9 }]}>
-        <Text style={styles.qaBadgeText}>{completionCommitted ? "COMPLETE" : isReturning ? "REHEARSAL COMPLETE" : "INTERNAL QA"}</Text>
-      </View> : null}
+      <View pointerEvents="none" style={[styles.customerLessonHeader, { top: insets.top + 7 }]}>
+        <Text style={styles.customerLessonEyebrow}>{completionCommitted ? "LESSON COMPLETE" : isReturning ? "BACK FROM REHEARSAL" : customerLessonHeader}</Text>
+        <Text numberOfLines={1} style={styles.customerLessonTitle}>{lesson.shortName}</Text>
+      </View>
     </View>
   );
 }
@@ -654,8 +658,9 @@ const styles = StyleSheet.create({
   loadingText: { ...T.caption },
   backButton: { position: "absolute", left: 12, zIndex: 4, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
   menuButton: { position: "absolute", right: 12, zIndex: 5, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
-  qaBadge: { position: "absolute", alignSelf: "center", zIndex: 3, minHeight: 32, borderRadius: 16, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line },
-  qaBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.1, color: C.purple },
+  customerLessonHeader: { position: "absolute", left: 64, right: 64, zIndex: 3, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  customerLessonEyebrow: { fontFamily: font.bold, fontSize: 8, lineHeight: 10, letterSpacing: 1.2, color: C.purple },
+  customerLessonTitle: { fontFamily: font.semi, fontSize: 13, lineHeight: 17, color: C.text, marginTop: 2, maxWidth: "100%" },
   completionScroll: { paddingHorizontal: GUTTER, paddingTop: 76 }, celebrationIcon: { width: 52, height: 52, borderRadius: 18, backgroundColor: C.purple, alignItems: "center", justifyContent: "center", marginBottom: 18, ...shadow.hero }, completionTitle: { fontFamily: font.bold, fontSize: 34, lineHeight: 40, letterSpacing: -0.8, color: C.text, marginTop: 10, maxWidth: 340 }, completionLede: { ...T.support, marginTop: 10, maxWidth: 340 },
   indexImpactCard: { marginTop: 24, gap: 10 }, impactTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }, impactResult: { fontFamily: font.bold, fontSize: 18, lineHeight: 23, color: C.text, marginTop: 7 }, indexTransition: { gap: 9 }, indexNumbers: { flexDirection: "row", alignItems: "baseline", gap: 8 }, indexBefore: { fontFamily: font.semi, fontSize: 31, color: C.dim, textDecorationLine: "line-through" }, indexArrow: { fontFamily: font.regular, fontSize: 23, color: C.dim }, indexAfter: { fontFamily: font.bold, fontSize: 54, lineHeight: 60, color: C.purple, letterSpacing: -1.5 }, indexOutOf: { fontFamily: font.regular, fontSize: 14, color: C.dim }, indexTrack: { height: 8, overflow: "hidden", borderRadius: 4, backgroundColor: "rgba(81,40,136,0.11)" }, indexFill: { height: "100%", borderRadius: 4, backgroundColor: C.purple }, impactExplanation: { ...T.support, color: C.text }, signalNote: { ...T.caption, marginTop: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
   comparisonCard: { marginTop: 14, gap: 12 }, responseBlock: { gap: 5 }, responseLabel: { fontFamily: font.bold, fontSize: 11, letterSpacing: 0.7, textTransform: "uppercase", color: C.dim }, responseText: { fontFamily: font.medium, fontSize: 16, lineHeight: 23, color: C.text }, responseDivider: { height: StyleSheet.hairlineWidth, backgroundColor: C.line }, comparisonText: { ...T.support, color: C.purple, paddingTop: 4 },

@@ -5,10 +5,12 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-nativ
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, useReducedMotion } from "@/components/ui";
-import { curriculumModule, type CurriculumModule } from "@/constants/modules";
 import { approvedLessonDeck } from "@/constants/approvedLessons";
 import { C, GUTTER, eyebrow, font, radius, shadow, T } from "@/constants/theme";
 import { nextLaunchDeck } from "@/lib/launchCurriculum";
+import { approvedRehearsalConfig } from "@/lib/approvedRehearsals";
+import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
+import { customerLessonActivityCopy } from "@/lib/customerLessonExperience";
 import {
   TODAY_ACTIVITY_KEYS,
   TODAY_CARD_GAP,
@@ -26,15 +28,12 @@ import {
   type TodayIndexPresentation,
 } from "@/lib/today";
 import { useStore } from "@/providers/store";
-import type { PilotModule } from "@/types/pilotCurriculum";
+
 
 const SIGNALS = ["Clarity", "Specificity", "Listening", "Steadiness", "Boundaries", "Repair"] as const;
 const SIGNAL_COLORS = ["#512888", "#6B4E9E", "#8571B0", "#9E8CC2", "#B3A4D0", "#C7BCDE"] as const;
 const CARD_TINTS = ["#FFFFFF", "#FDFCFE", "#FBFAFD", "#F9F7FC"] as const;
-interface ActivityCopy {
-  title: string;
-  body: string;
-}
+interface ActivityCopy { title: string; body: string; }
 
 interface DeckLayerProps {
   children: React.ReactNode;
@@ -62,12 +61,6 @@ function DeckLayer({ children, entrance, order }: DeckLayerProps) {
   );
 }
 
-function activityCopy(key: TodayActivityKey, module: CurriculumModule, moduleDay: PilotModule | undefined): ActivityCopy {
-  if (key === "lesson") return { title: module.name, body: moduleDay?.copy.body ?? "Learn the move behind your first focus." };
-  if (key === "practice") return { title: "Practice the distinction", body: moduleDay?.copy.quiz?.prompt ?? "Choose the response that keeps the communication move visible." };
-  if (key === "rehearsal") return { title: moduleDay?.copy.scenario?.heading ?? "Use it under pressure", body: moduleDay?.copy.scenario?.user_job ?? "Try the move against realistic pushback, then repeat the moment once." };
-  return { title: "See what changed", body: moduleDay?.copy.transfer ?? "Compare your responses and carry one adjustment forward." };
-}
 
 function IndexCard({ index, chartProgress, hasLessonUpdate, onDetails }: { index: TodayIndexPresentation; chartProgress: Animated.Value; hasLessonUpdate: boolean; onDetails: () => void }) {
   const chartSlots = Array.from({ length: 7 }, (_, slot) => {
@@ -123,18 +116,26 @@ export default function TodayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isReduced = useReducedMotion();
-  const { access, activityDays, activePracticeSession, convertedLessonProgress, moduleCloseProgress, scoredPracticeHistory } = useStore();
+  const { access, activityDays, activePracticeSession, activeScenarioRun, convertedLessonProgress, moduleCloseProgress, scoredPracticeHistory } = useStore();
   const nextDeckId = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
   const nextDeck = approvedLessonDeck(nextDeckId);
   const moduleId = nextDeck?.module === 2 ? "make_a_clear_ask" : "get_to_the_point";
-  const recommended = curriculumModule(moduleId);
-  const moduleDay: PilotModule | undefined = undefined;
+  const rehearsalConfig = nextDeckId === "m1-l1" ? M1_L1_CONVERSION : approvedRehearsalConfig(nextDeckId);
+  const run = activeScenarioRun?.run;
+  const activeLessonRun = run
+    && rehearsalConfig
+    && run.practiceId === rehearsalConfig.practiceId
+    && run.contentVersion === rehearsalConfig.contentVersion
+    && run.scenarioContext?.scenarioId === rehearsalConfig.scenario.id
+    ? run
+    : undefined;
+  const lessonCopy = nextDeck ? customerLessonActivityCopy(nextDeck, rehearsalConfig) : undefined;
   const index = useMemo<TodayIndexPresentation>(
     () => todayIndexPresentation(activePracticeSession?.sharedResult, scoredPracticeHistory),
     [activePracticeSession?.sharedResult, scoredPracticeHistory],
   );
   const recentDays = useMemo(() => todayRecentPractice(activityDays, new Date()), [activityDays]);
-  const activities = useMemo(() => todayActivityPresentation(undefined, false), []);
+  const activities = useMemo(() => todayActivityPresentation(activeLessonRun?.state, Boolean(activeLessonRun)), [activeLessonRun]);
   const entrances = useRef<Animated.Value[]>(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
   const chartProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
 
@@ -153,11 +154,15 @@ export default function TodayScreen() {
     return () => { cards.stop(); chart.stop(); };
   }, [chartProgress, entrances, isReduced]);
 
-  const openCurrentActivity = useCallback((): void => {
+  const openCurrentActivity = useCallback((activity: TodayActivityKey): void => {
     if (!nextDeckId) { router.push("/path"); return; }
     if (access.entitlement !== "pro") { router.push({ pathname: "/paywall", params: { gate: "program", moduleId } }); return; }
+    if ((activity === "rehearsal" || activity === "review") && rehearsalConfig) {
+      router.push({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: nextDeckId } });
+      return;
+    }
     router.push({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: nextDeckId } });
-  }, [access.entitlement, moduleId, nextDeckId, router]);
+  }, [access.entitlement, moduleId, nextDeckId, rehearsalConfig, router]);
 
   const openPath = useCallback((): void => { router.push("/path"); }, [router]);
   const openProgress = useCallback((): void => { router.push("/(tabs)/progress"); }, [router]);
@@ -181,10 +186,8 @@ export default function TodayScreen() {
           const activity = activities[activityIndex];
           const order = activityIndex + 1;
           if (!activity) return null;
-          const copy = key === "lesson" && nextDeck
-            ? { title: nextDeck.shortName, body: nextDeck.isCloseDeck ? "Bring the five moves together and complete the module." : `Module ${nextDeck.module} · Lesson ${nextDeck.lesson}` }
-            : recommended ? activityCopy(key, recommended, moduleDay) : { title: key === "review" ? "See what changed" : `${key[0]?.toUpperCase() ?? ""}${key.slice(1)}`, body: "Complete the current approved lesson to continue." };
-          return <DeckLayer key={key} entrance={entrances[order]} order={order}><ActivityCard activity={activity} copy={copy} tint={CARD_TINTS[activityIndex]} onPress={openCurrentActivity} /></DeckLayer>;
+          const copy: ActivityCopy = lessonCopy?.[key] ?? { title: key === "review" ? "See what changed" : `${key[0]?.toUpperCase() ?? ""}${key.slice(1)}`, body: "Complete the current lesson to continue." };
+          return <DeckLayer key={key} entrance={entrances[order]} order={order}><ActivityCard activity={activity} copy={copy} tint={CARD_TINTS[activityIndex]} onPress={() => openCurrentActivity(key)} /></DeckLayer>;
         })}
         <Pressable onPress={openPath} accessibilityRole="button" accessibilityLabel="View your practice path" style={styles.pathLink}><Text style={styles.pathText}>View your path</Text><ChevronRight size={15} color={C.purple} /></Pressable>
       </Animated.ScrollView>
