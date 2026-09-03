@@ -146,6 +146,13 @@ export default function ScenarioBrief() {
         </Reveal>
 
         <Reveal index={3}>
+          <ProductCard style={styles.sceneStartCard}>
+            <SectionLabel>How the scene starts</SectionLabel>
+            <Text style={styles.sceneStartText}>{scenario.opensWith === "counterpart" ? `“${scenario.openingLine}”` : "You’ll open this conversation in your own words."}</Text>
+          </ProductCard>
+        </Reveal>
+
+        <Reveal index={4}>
           <View style={styles.difficultyHeading}>
             <SectionLabel>Practice difficulty</SectionLabel>
             <Text style={styles.difficultySupport}>
@@ -159,7 +166,7 @@ export default function ScenarioBrief() {
             const selected = item === level;
             const detail = DIFFICULTY[item];
             return (
-              <Reveal key={item} index={4 + index}>
+              <Reveal key={item} index={5 + index}>
                 <PressCard
                   onPress={() => setLevel(item)}
                   containerStyle={styles.levelHit}
@@ -201,7 +208,7 @@ export default function ScenarioBrief() {
           })}
         </View>
 
-        <Reveal index={7}>
+        <Reveal index={8}>
           <Text style={styles.disclaimer}>
             A rehearsal is private practice designed to help you prepare before a real conversation.
           </Text>
@@ -236,6 +243,15 @@ const styles = StyleSheet.create({
   detailCard: {
     marginBottom: 12,
     padding: 20,
+  },
+  sceneStartCard: {
+    marginBottom: 12,
+    padding: 20,
+  },
+  sceneStartText: {
+    ...T.support,
+    color: C.text,
+    marginTop: 10,
   },
   cardHeading: {
     alignItems: "center",

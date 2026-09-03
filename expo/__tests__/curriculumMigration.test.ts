@@ -135,7 +135,7 @@ describe("normalized equivalence with the pre-migration curriculum", () => {
   });
 
   it("no scenario was dropped from the library", () => {
-    expect(SCENARIOS).toHaveLength(12);
+    expect(SCENARIOS).toHaveLength(34);
     const ids = SCENARIOS.map((s) => s.id).sort();
     expect(ids).toEqual([...new Set(ids)].sort());
   });

@@ -2,14 +2,14 @@ import type { ModuleId } from "@/constants/modules";
 import type { CategoryId, Scenario } from "@/types/convo";
 
 const AUTHORED_FOCUS_SCENARIOS: Record<ModuleId, readonly string[]> = {
-  get_to_the_point: ["chores", "burnout", "friend-drift"],
-  make_a_clear_ask: ["chores", "sibling-caregiving", "raise", "friend-money"],
-  start_the_conversation: ["intimacy", "wedding-money", "parent-comingclean", "quit", "friend-drift"],
-  listen_and_respond: ["intimacy", "mother-boundary", "feedback", "friend-drift"],
-  stay_clear_under_pushback: ["chores", "mother-boundary", "raise", "friend-money"],
-  pause_say_no_boundary: ["mother-boundary", "parent-comingclean", "burnout", "quit"],
-  repair_what_went_wrong: ["intimacy", "feedback", "friend-drift"],
-  use_it_in_real_life: ["chores", "sibling-caregiving", "raise", "friend-money"],
+  get_to_the_point: ["chores", "whole-task-ownership", "manager-skepticism", "burnout", "private-news-boundary", "friend-drift"],
+  make_a_clear_ask: ["chores", "whole-task-ownership", "sibling-caregiving", "raise", "request-time-off", "scope-creep", "friend-money"],
+  start_the_conversation: ["intimacy", "phone-attention", "wedding-money", "parent-comingclean", "quit", "reconnect-after-silence", "friend-drift"],
+  listen_and_respond: ["intimacy", "parenting-disagreement", "mother-boundary", "parenting-criticism", "feedback", "unhappy-client", "friend-drift"],
+  stay_clear_under_pushback: ["chores", "last-minute-plan-change", "mother-boundary", "manager-skepticism", "price-pushback", "raise", "decline-friend-invitation", "friend-money"],
+  pause_say_no_boundary: ["mother-boundary", "decline-family-invitation", "family-money-request", "parent-comingclean", "burnout", "quit", "decline-friend-invitation"],
+  repair_what_went_wrong: ["repair-after-snapping", "intimacy", "feedback", "reconnect-after-silence", "friend-drift"],
+  use_it_in_real_life: ["whole-task-ownership", "work-priority-conflict", "sibling-caregiving", "request-time-off", "meeting-interruption", "raise", "reconnect-after-silence", "friend-money"],
 };
 
 export type ScenarioRecommendationMatch = "focus-and-category" | "focus-only" | "category-only" | "none";
@@ -58,7 +58,7 @@ export function recommendScenario(
     return {
       scenario: categoryOnly,
       match: "category-only",
-      reason: "No authored scenario matches the current focus here. This is a relationship-context fallback, not a personalized match.",
+      reason: "A useful place to practice in this part of your life.",
       isLocked,
     };
   }

@@ -65,7 +65,9 @@ describe("all approved lesson dynamic counterparts", () => {
         type: "rehearsal_turn",
         turn: "pushback",
         contract: {
-          scenario: `${config.scenario.title}. ${config.scenario.situation}`,
+          scenario: expect.stringContaining(config.scenario.situation),
+          counterpart: config.scenario.counterpart,
+          counterpart_persona: config.scenario.persona,
           success_target: config.scenario.goal,
         },
         transcript: { user_turn_1: `My approved opening for ${lessonId}.` },

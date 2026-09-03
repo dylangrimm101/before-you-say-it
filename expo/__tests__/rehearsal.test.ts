@@ -122,14 +122,21 @@ describe("every shipped scenario declares its turn order", () => {
 
   it("keeps the conversations the user must initiate user-first", () => {
     const userFirst = SCENARIOS.filter((s) => opensWith(s) === "user");
-    expect(userFirst.length).toBe(SCENARIOS.length - 1);
+    expect(userFirst.length).toBe(SCENARIOS.length - 6);
     expect(userFirst.some((s) => s.id === "chores")).toBe(true);
     expect(userFirst.some((s) => s.id === "wedding-money")).toBe(true);
   });
 
   it("keeps at least one genuine response scenario partner-first", () => {
     const partnerFirst = SCENARIOS.filter((s) => opensWith(s) === "counterpart");
-    expect(partnerFirst.map((s) => s.id)).toEqual(["mother-boundary"]);
+    expect(partnerFirst.map((s) => s.id)).toEqual([
+      "mother-boundary",
+      "parenting-criticism",
+      "meeting-interruption",
+      "unhappy-client",
+      "join-group-conversation",
+      "forgotten-name",
+    ]);
   });
 });
 

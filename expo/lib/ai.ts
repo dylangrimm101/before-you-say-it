@@ -1,4 +1,5 @@
 import { personaFor } from "@/constants/personas";
+import { DIFFICULTY } from "@/constants/scenarios";
 import { renderCounterpartMessage } from "@/lib/rehearsal";
 import { errorShape, safeLog } from "@/lib/redact";
 import type { Debrief, Difficulty, OnboardingForm, PersonaVoice, ReactionPattern, Scenario, Turn } from "@/types/convo";
@@ -32,6 +33,13 @@ interface BysiContract {
   entry_route: BysiEntryRoute;
   context: string;
   scenario: string;
+  counterpart?: string;
+  counterpart_persona?: string;
+  difficulty?: Difficulty | null;
+  difficulty_behavior?: string | null;
+  reaction_pattern?: ReactionPattern | null;
+  opens_with?: "user" | "counterpart";
+  opening_line?: string;
   success_target: string;
   pressure_condition: string;
 }
@@ -147,13 +155,30 @@ function bysiContract(
   reaction?: ReactionPattern,
   outcome?: string,
   entryRoute: BysiEntryRoute = "real_conversation",
+  difficulty?: Difficulty,
 ): BysiContract {
+  const difficultyBehavior = difficulty ? DIFFICULTY[difficulty].behaviour : null;
+  const reactionBehavior = reaction ? REACTION_BEHAVIOUR[reaction] : null;
+  const opensWith = scenario.opensWith ?? "user";
   return {
     entry_route: entryRoute,
     context: scenario.category,
-    scenario: `${scenario.title}. ${scenario.situation}`.trim(),
+    scenario: `${scenario.title}. Counterpart: ${scenario.counterpart}. Situation: ${scenario.situation} Opening: ${opensWith === "counterpart" ? scenario.openingLine : "The learner opens in their own words."}`.trim(),
+    counterpart: scenario.counterpart,
+    counterpart_persona: scenario.persona,
+    difficulty: difficulty ?? null,
+    difficulty_behavior: difficultyBehavior,
+    reaction_pattern: reaction ?? null,
+    opens_with: opensWith,
+    opening_line: scenario.openingLine,
     success_target: outcome?.trim() || scenario.goal,
-    pressure_condition: reaction ? REACTION_BEHAVIOUR[reaction] : scenario.persona,
+    pressure_condition: [
+      `Stay in character as ${scenario.counterpart}.`,
+      "Scenario facts and persona are authoritative; never replace them with a generic reaction style.",
+      scenario.persona,
+      difficultyBehavior ? `Use difficulty only to scale resistance without changing the scenario: ${difficultyBehavior}` : "",
+      reactionBehavior ? `Use the reaction tendency only when it does not contradict the scenario: ${reactionBehavior}` : "",
+    ].filter(Boolean).join(" "),
   };
 }
 
@@ -162,11 +187,12 @@ function bysiTranscript(turns: Turn[], scenario: Scenario): BysiTranscript {
   const counterpartTurns = turns
     .filter((turn) => turn.role === "them")
     .map((turn) => renderCounterpartMessage(turn.text, scenario.counterpart).body);
+  const authoredOpening = scenario.opensWith === "counterpart" ? scenario.openingLine : "";
   return {
     user_turn_1: userTurns[0] ?? "",
-    counterpart_pushback: counterpartTurns[0] ?? scenario.openingLine,
+    counterpart_pushback: counterpartTurns[0] ?? authoredOpening,
     user_turn_2: userTurns[1] ?? "",
-    counterpart_close: counterpartTurns[1] ?? scenario.openingLine,
+    counterpart_close: counterpartTurns[1] ?? "",
   };
 }
 
@@ -197,12 +223,25 @@ export interface CounterpartTurn {
   nudge: string;
 }
 
-const CHANNEL_LEAKAGE = /\b(?:text(?:ed|ing)?|message(?:d|s|ing)?|dm(?:s|ed|ing)?|chat(?:ted|ting)?|phone call|call(?:ed|ing)?|facetime|zoom|email(?:ed|ing)?|video call)\b/i;
+const CHANNEL_FAMILIES = [
+  /\btext(?:ed|ing)?\b/i,
+  /\bmessage(?:d|s|ing)?\b/i,
+  /\bdm(?:s|ed|ing)?\b/i,
+  /\bchat(?:ted|ting)?\b/i,
+  /\b(?:phone call|call(?:ed|ing)?)\b/i,
+  /\bfacetime\b/i,
+  /\bzoom\b/i,
+  /\bvideo call\b/i,
+  /\bemail(?:ed|ing)?\b/i,
+] as const;
 const EASY_CLOSE = /\b(?:you(?:'|’)re right|i agree|i(?:'|’)m sorry|i apologize|i(?:'|’)ll do that|i will do that|consider it done|we have a deal|that sounds fair)\b/i;
+const COACHING_LEAKAGE = /\b(?:as your coach|good job|try saying|you should say|the learner should|coaching feedback)\b/i;
+const ROLE_LEAKAGE = /\b(?:as an ai|language model|role-?play(?:ing)?|this scenario|system prompt)\b/i;
 
 /** Rejects unsupported channel changes and unrealistically easy final agreement. */
-export function counterpartLinePassesQuality(line: string, turn: AcquisitionCounterpartTurn): boolean {
-  if (CHANNEL_LEAKAGE.test(line)) return false;
+export function counterpartLinePassesQuality(line: string, turn: AcquisitionCounterpartTurn, groundingContext: string = ""): boolean {
+  if (CHANNEL_FAMILIES.some((family) => family.test(line) && !family.test(groundingContext))) return false;
+  if (COACHING_LEAKAGE.test(line) || ROLE_LEAKAGE.test(line)) return false;
   if (turn === "pushback" && /^(?:i hear you|you(?:'|’)re right|that(?:'|’)s fair|okay|i get that)\b/i.test(line.trim())) return false;
   return turn !== "close" || !EASY_CLOSE.test(line);
 }
@@ -421,7 +460,7 @@ export async function nextCounterpartTurn(
   const avoidRepeating = turns
     .filter((item) => item.role === "them")
     .map((item) => renderCounterpartMessage(item.text, scenario.counterpart).body);
-  void difficulty;
+  const groundingContext = `${scenario.title} ${scenario.situation} ${scenario.persona} ${scenario.openingLine}`;
   void persona;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -429,13 +468,13 @@ export async function nextCounterpartTurn(
       const result = await postBysi<BysiTurnResponse>({
         type: "rehearsal_turn",
         turn,
-        contract: bysiContract(scenario, reaction, outcome, entryRoute),
+        contract: bysiContract(scenario, reaction, outcome, entryRoute, difficulty),
         transcript: bysiTranscript(turns, scenario),
         avoid_repeating: avoidRepeating,
         variation_seed: `${scenario.id}-${turn}-${Date.now().toString(36)}-${attempt}`,
       });
       const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
-      if (reply && counterpartLinePassesQuality(reply, turn)) return { reply, tension: 50, nudge: "" };
+      if (reply && counterpartLinePassesQuality(reply, turn, groundingContext)) return { reply, tension: 50, nudge: "" };
       safeLog("[ai] BYSI counterpart quality gate rejected line", { attempt, turn });
     } catch (error) {
       safeLog("[ai] BYSI counterpart request failed", { attempt, ...errorShape(error) });
