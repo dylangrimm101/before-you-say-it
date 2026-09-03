@@ -44,6 +44,7 @@ export default function Library() {
 
   useEffect(() => {
     if (params.view === "scenarios") setView("scenarios");
+    if (params.view === "lessons") setView("lessons");
   }, [params.view]);
 
   const openCustom = (): void => { if (isLocked) router.push({ pathname: "/paywall", params: { gate: "another-rehearsal" } }); else router.push("/custom"); };
@@ -58,7 +59,7 @@ export default function Library() {
   return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 22, paddingBottom: insets.bottom + 112 }]} showsVerticalScrollIndicator={false}>
     <Reveal><Text style={styles.title}>Practice</Text><Text style={styles.intro}>Learn the moves in order, or rehearse a conversation you need to have.</Text></Reveal>
     <Reveal index={1} style={styles.viewSwitcher}>
-      {(["lessons", "scenarios"] as const).map((option) => <PressCard key={option} onPress={() => setView(option)} accessibilityRole="tab" accessibilityState={{ selected: view === option }} accessibilityLabel={`Show ${option}`}><View style={[styles.viewOption, view === option && styles.viewOptionActive]}><Text style={[styles.viewOptionText, view === option && styles.viewOptionTextActive]}>{option === "lessons" ? "Lessons" : "Scenarios"}</Text></View></PressCard>)}
+      {(["lessons", "scenarios"] as const).map((option) => <PressCard key={option} onPress={() => { setView(option); router.setParams({ view: option }); }} accessibilityRole="tab" accessibilityState={{ selected: view === option }} accessibilityLabel={`Show ${option}`}><View style={[styles.viewOption, view === option && styles.viewOptionActive]}><Text style={[styles.viewOptionText, view === option && styles.viewOptionTextActive]}>{option === "lessons" ? "Lessons" : "Scenarios"}</Text></View></PressCard>)}
     </Reveal>
     {view === "lessons" ? <>
       <Reveal index={2}><Text style={styles.lessonTitle}>Two modules. Ten lessons.</Text><Text style={styles.lessonIntro}>Start with the current lesson, then keep going at your own pace. Today updates immediately when you finish.</Text></Reveal>

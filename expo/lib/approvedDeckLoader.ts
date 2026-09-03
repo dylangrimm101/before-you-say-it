@@ -195,6 +195,22 @@ const TAP_TUTORIAL_MARKER = "showHint:st.hint && i === 0,";
 const DECK_GO_MARKER = "go(d) {\n";
 const FULL_CARD_TAP_ZONE_PATTERN = /showTapZones:([^,\n]+),/;
 const INTERACTIVE_TAP_ZONE_GUARD = " && !(c.chips && c.chips.length) && !(c.rooms && c.rooms.length)";
+const DECK_TOP_LEFT_CONTROL = /<(button|span)\b([^>]*?)sc-camel-on-click="\{\{ restart \}\}"([^>]*)>\s*×\s*<\/\1>/;
+
+/** Makes the deck-owned top-left X exit to the customer Home route. */
+export function installCustomerLessonExit(template: string): string {
+  if (!DECK_TOP_LEFT_CONTROL.test(template)) return template;
+  const restartProperty = /restart:\(\)\s*=>/;
+  if (!restartProperty.test(template)) throw new Error("Approved lesson exit contract is missing");
+  return template
+    .replace(DECK_TOP_LEFT_CONTROL, (_control, _tag: string, before: string, after: string) => {
+      const attributes = `${before}${after}`
+        .replace(/\s(?:type|aria-label|role|tabindex)="[^"]*"/gi, "")
+        .trim();
+      return `<button type="button" aria-label="Exit lesson" ${attributes} sc-camel-on-click="{{ exitLesson }}">×</button>`;
+    })
+    .replace(restartProperty, "exitLesson:() => { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({type:'exit-lesson'})); else window.history.back(); },\n      restart:() =>");
+}
 
 /** Makes the first tutorial tap dismiss its overlay without advancing Card 1. */
 export function installTapTutorialDismissal(template: string): string {
@@ -238,8 +254,10 @@ export function materializeApprovedDeckHtml(bundleHtml: string): string {
 
   let template = protectKnownNarrowCards(
     protectInteractiveDeckControls(
-      installTapTutorialDismissal(
-        removeRehearsalContinuationCopy(JSON.parse(templateEncoded) as string),
+      installCustomerLessonExit(
+        installTapTutorialDismissal(
+          removeRehearsalContinuationCopy(JSON.parse(templateEncoded) as string),
+        ),
       ),
     ),
   );

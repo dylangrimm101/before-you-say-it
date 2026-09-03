@@ -95,11 +95,11 @@ describe("selection semantics and responsive Today cards", () => {
     }
   });
 
-  test("Today cards use a minimum height rather than a clipping fixed height", () => {
+  test("Today cards use the original fixed-height floating deck with bounded copy", () => {
     const today = source("app/(tabs)/index.tsx");
-    expect(today).toContain("minHeight: TODAY_CARD_HEIGHT");
-    expect(today).not.toContain("card: { height: TODAY_CARD_HEIGHT");
+    expect(today).toContain("card: { height: TODAY_CARD_HEIGHT");
     expect(today).toContain("pinnedTranslation(order, scrollOffset)");
-    expect(today).not.toContain("numberOfLines={3}");
+    expect(today).toContain("numberOfLines={2}");
+    expect(today).toContain("numberOfLines={3}");
   });
 });

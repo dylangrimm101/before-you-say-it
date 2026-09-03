@@ -163,6 +163,16 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(page).not.toContain("blob:");
   });
 
+  test("binds every deck-owned top-left X to the customer Home exit without removing restart support", async () => {
+    for (const fileName of Object.keys(DECK_LIMITS)) {
+      const page = materializeApprovedDeckHtml(await source(`assets/lesson-decks/${fileName}`));
+      expect(page, fileName).toContain('sc-camel-on-click="{{ exitLesson }}"');
+      expect(page, fileName).toContain('<button type="button" aria-label="Exit lesson"');
+      expect(page, fileName).toContain("type:'exit-lesson'");
+      expect(page, fileName).toContain('sc-camel-on-click="{{ restart }}"');
+    }
+  });
+
   test("uses the first tutorial tap only to dismiss the hint and keeps Card 1 visible", async () => {
     let tutorialDeckCount = 0;
     for (const fileName of Object.keys(DECK_LIMITS)) {
