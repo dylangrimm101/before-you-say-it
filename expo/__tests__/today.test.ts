@@ -86,6 +86,8 @@ describe("locked Today card system", () => {
     expect(source).toContain("pinnedTranslation(order, scrollOffset)");
     expect(source).toContain("onScroll={onDeckScroll}");
     expect(source).toContain("scrollOffset={scrollOffset}");
+    expect(source).toContain("scrollOffset.setValue(event.nativeEvent.contentOffset.y)");
+    expect(source).not.toContain("Animated.event(");
     expect(source).not.toContain("card: { height: TODAY_CARD_HEIGHT");
     expect(source).not.toContain("stickyHeaderIndices");
   });

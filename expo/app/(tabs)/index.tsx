@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { Check, ChevronRight } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, useReducedMotion } from "@/components/ui";
@@ -157,10 +157,9 @@ export default function TodayScreen() {
   const entrances = useRef<Animated.Value[]>(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
   const chartProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
   const scrollOffset = useRef<Animated.Value>(new Animated.Value(0)).current;
-  const onDeckScroll = useMemo(
-    () => Animated.event([{ nativeEvent: { contentOffset: { y: scrollOffset } } }], { useNativeDriver: true }),
-    [scrollOffset],
-  );
+  const onDeckScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>): void => {
+    scrollOffset.setValue(event.nativeEvent.contentOffset.y);
+  }, [scrollOffset]);
 
 
   useEffect(() => {

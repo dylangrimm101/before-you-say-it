@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import type { ApprovedLessonDeck } from "@/constants/approvedLessons";
-import { approvedRehearsalConfig } from "@/lib/approvedRehearsals";
+import { approvedRehearsalConfig, approvedRehearsalConfigs } from "@/lib/approvedRehearsals";
+import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
 import { CUSTOMER_LESSON_CARD_COPY, customerLessonActivityCopy } from "@/lib/customerLessonExperience";
 import { installTapTutorialDismissal } from "@/lib/approvedDeckLoader";
 
@@ -30,8 +31,12 @@ describe("customer lesson journey", () => {
     expect(route).not.toContain("lessonMenu");
     expect(route).not.toContain("MoreHorizontal");
     expect(route).toContain("hasCompletedLesson");
-    expect(route).toContain("completionCommitted || hasCompletedLesson");
+    expect(route).toContain("<CompletedLessonReplayScreen");
     expect(route).toContain("Do this lesson again");
+    expect(route).toContain("setLessonWasReset(false)");
+    expect(route).toContain("<ScrollView contentContainerStyle={[styles.completedReplay");
+    expect(route).toContain("paddingTop: topInset + 24");
+    expect(route).toContain("paddingBottom: bottomInset + 24");
   });
 
   test("restores the scroll-driven floating Today card stack", async () => {
@@ -41,6 +46,8 @@ describe("customer lesson journey", () => {
     expect(today).toContain("onScroll={onDeckScroll}");
     expect(today).toContain("scrollEventThrottle={16}");
     expect(today).toContain("scrollOffset={scrollOffset}");
+    expect(today).toContain("scrollOffset.setValue(event.nativeEvent.contentOffset.y)");
+    expect(today).not.toContain("Animated.event(");
   });
 
   test("maps every lesson's Today cards to that lesson's move and rehearsal", () => {
@@ -95,5 +102,29 @@ describe("customer lesson journey", () => {
     expect(runtime).toContain("lessonTitle?: string");
     expect(runtime).toContain("lessonMove?: string");
     expect(runtime).toContain("Lesson rehearsal");
+  });
+
+  test("M1 L1 dedicated rehearsal receives and shows the same lesson identity contract", async () => {
+    const router = await source("components/ScenarioPaidPractice.tsx");
+    const runtime = await source("components/M1L1PaidPractice.tsx");
+    expect(router).toContain("lessonTitle={props.lessonTitle}");
+    expect(router).toContain("lessonMove={props.lessonMove}");
+    expect(runtime).toContain("lessonTitle?: string");
+    expect(runtime).toContain("lessonMove?: string | null");
+    expect(runtime).toContain("Lesson rehearsal");
+    expect(runtime).toContain("convertedLesson.scenario.goal");
+  });
+
+  test("all ten interactive lessons provide a complete rehearsal identity", () => {
+    const rehearsals = [M1_L1_CONVERSION, ...approvedRehearsalConfigs()];
+    expect(rehearsals).toHaveLength(10);
+    for (const rehearsal of rehearsals) {
+      expect(rehearsal.lessonId.length, rehearsal.lessonId).toBeGreaterThan(0);
+      expect(rehearsal.namedMove.trim().length, rehearsal.lessonId).toBeGreaterThan(0);
+      expect(rehearsal.scenario.title.trim().length, rehearsal.lessonId).toBeGreaterThan(0);
+      expect(rehearsal.scenario.counterpart.trim().length, rehearsal.lessonId).toBeGreaterThan(0);
+      expect(rehearsal.scenario.goal.trim().length, rehearsal.lessonId).toBeGreaterThan(0);
+      expect(rehearsal.scenario.situation.trim().length, rehearsal.lessonId).toBeGreaterThan(80);
+    }
   });
 });
