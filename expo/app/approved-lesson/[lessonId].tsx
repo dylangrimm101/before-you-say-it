@@ -273,6 +273,10 @@ export default function ApprovedLessonDeckScreen() {
       setLoadError(true);
       return;
     }
+    if (message.type === "exit-lesson") {
+      router.replace("/(tabs)");
+      return;
+    }
     if (message.type === "deck-ready") return;
     if (message.type === "module-close-complete" && lesson?.isCloseDeck && !completionCommitted) {
       try {

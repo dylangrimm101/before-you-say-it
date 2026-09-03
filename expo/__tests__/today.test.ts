@@ -78,17 +78,18 @@ describe("locked Today card system", () => {
     expect(reduced).toMatchObject({ entranceDurationMs: 0, entranceStaggerMs: 0, chartDurationMs: 0, shouldAnimate: false, cardHeight: 288, pinStep: 12 });
   });
 
-  test("uses the scroll-driven floating card stack while retaining responsive card height", async () => {
+  test("uses the original fixed-height scroll-driven floating card stack", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text();
     expect(source).toContain("<Animated.ScrollView");
-    expect(source).toContain("minHeight: TODAY_CARD_HEIGHT");
+    expect(source).toContain("card: { height: TODAY_CARD_HEIGHT");
     expect(source).toContain("useNativeDriver: true");
     expect(source).toContain("pinnedTranslation(order, scrollOffset)");
     expect(source).toContain("onScroll={onDeckScroll}");
     expect(source).toContain("scrollOffset={scrollOffset}");
     expect(source).toContain("scrollOffset.setValue(event.nativeEvent.contentOffset.y)");
     expect(source).not.toContain("Animated.event(");
-    expect(source).not.toContain("card: { height: TODAY_CARD_HEIGHT");
+    expect(source).toContain("numberOfLines={2}");
+    expect(source).toContain("numberOfLines={3}");
     expect(source).not.toContain("stickyHeaderIndices");
   });
 

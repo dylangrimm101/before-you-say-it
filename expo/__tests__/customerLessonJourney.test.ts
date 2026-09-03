@@ -4,7 +4,7 @@ import type { ApprovedLessonDeck } from "@/constants/approvedLessons";
 import { approvedRehearsalConfig, approvedRehearsalConfigs } from "@/lib/approvedRehearsals";
 import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
 import { CUSTOMER_LESSON_CARD_COPY, customerLessonActivityCopy } from "@/lib/customerLessonExperience";
-import { installTapTutorialDismissal } from "@/lib/approvedDeckLoader";
+import { installCustomerLessonExit, installTapTutorialDismissal } from "@/lib/approvedDeckLoader";
 
 async function source(path: string): Promise<string> {
   return Bun.file(`${import.meta.dir}/../${path}`).text();
@@ -17,6 +17,20 @@ describe("customer lesson journey", () => {
     expect(result).toContain("showHint:st.hint && i === 0");
     expect(result).toContain("if (this.state.hint && this.state.i === 0)");
     expect(result).toContain("this.setState({ hint:false });");
+  });
+
+  test("turns the deck-owned top-left X into a safe return to Home", async () => {
+    const template = `<span sc-camel-on-click="{{ restart }}">×</span><span sc-camel-on-click="{{ restart }}">Restart</span> restart:() => this.setState({ i:0 })`;
+    const result = installCustomerLessonExit(template);
+    expect(result).toContain('<button type="button" aria-label="Exit lesson"');
+    expect(result).toContain('sc-camel-on-click="{{ exitLesson }}"');
+    expect(result).toContain('aria-label="Exit lesson"');
+    expect(result).toContain('>×</button>');
+    expect(result).toContain('sc-camel-on-click="{{ restart }}">Restart');
+    expect(result).toContain("type:'exit-lesson'");
+    const route = await source("app/approved-lesson/[lessonId].tsx");
+    expect(route).toContain('message.type === "exit-lesson"');
+    expect(route).toContain('router.replace("/(tabs)")');
   });
 
   test("customer lesson leaves the deck chrome unobstructed and contains no internal QA controls", async () => {
@@ -48,6 +62,19 @@ describe("customer lesson journey", () => {
     expect(today).toContain("scrollOffset={scrollOffset}");
     expect(today).toContain("scrollOffset.setValue(event.nativeEvent.contentOffset.y)");
     expect(today).not.toContain("Animated.event(");
+    expect(today).toContain("card: { height: TODAY_CARD_HEIGHT");
+    expect(today).toContain("numberOfLines={2}");
+    expect(today).toContain("numberOfLines={3}");
+  });
+
+  test("View your path opens the Practice tab in Lessons view", async () => {
+    const today = await source("app/(tabs)/index.tsx");
+    const practice = await source("app/(tabs)/library.tsx");
+    expect(today).toContain('pathname: "/(tabs)/library"');
+    expect(today).toContain('view: "lessons"');
+    expect(today).toContain('const openPath = useCallback((): void => { router.push({ pathname: "/(tabs)/library", params: { view: "lessons" } }); }');
+    expect(practice).toContain('if (params.view === "lessons") setView("lessons")');
+    expect(practice).toContain("router.setParams({ view: option })");
   });
 
   test("maps every lesson's Today cards to that lesson's move and rehearsal", () => {

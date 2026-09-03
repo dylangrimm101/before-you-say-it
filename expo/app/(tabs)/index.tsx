@@ -123,8 +123,8 @@ function ActivityCard({ activity, copy, tint, onPress }: { activity: TodayActivi
         <View style={styles.activityMeta}><Text style={[styles.activityKind, isCurrent && styles.activityKindCurrent]}>{activity.key}</Text></View>
         {isCompleted ? <View style={styles.check}><Check size={12} color={C.onAccent} strokeWidth={3} /></View> : null}
       </View>
-      <Text style={[styles.activityTitle, !isCurrent && styles.activityTitleQuiet]}>{copy.title}</Text>
-      <Text style={[styles.activityBody, !isCurrent && styles.activityBodyQuiet]}>{copy.body}</Text>
+      <Text numberOfLines={2} style={[styles.activityTitle, !isCurrent && styles.activityTitleQuiet]}>{copy.title}</Text>
+      <Text numberOfLines={3} style={[styles.activityBody, !isCurrent && styles.activityBodyQuiet]}>{copy.body}</Text>
       {isCurrent && activity.ctaLabel ? <Pressable onPress={onPress} style={({ pressed }) => [styles.primaryAction, pressed && styles.primaryActionPressed]} accessibilityRole="button" accessibilityLabel={activity.ctaLabel}><Text style={styles.primaryActionText}>{activity.ctaLabel}</Text></Pressable> : <View style={styles.quietState}><Text style={styles.quietStateText}>{isCompleted ? "Complete · Review" : "Up next"}</Text></View>}
     </View>
   );
@@ -186,7 +186,7 @@ export default function TodayScreen() {
     router.push({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: nextDeckId } });
   }, [access.entitlement, moduleId, nextDeckId, rehearsalConfig, router]);
 
-  const openPath = useCallback((): void => { router.push("/path"); }, [router]);
+  const openPath = useCallback((): void => { router.push({ pathname: "/(tabs)/library", params: { view: "lessons" } }); }, [router]);
   const openProgress = useCallback((): void => { router.push("/(tabs)/progress"); }, [router]);
 
   return (
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   dayLabel: { fontFamily: font.semi, fontSize: 10, lineHeight: 12, letterSpacing: 0.6, textTransform: "uppercase", color: C.dim }, dayLabelToday: { color: C.purple },
   deck: { flex: 1 }, deckContent: { paddingHorizontal: 20, isolation: "isolate" },
   cardLayer: { paddingBottom: TODAY_CARD_GAP },
-  card: { minHeight: TODAY_CARD_HEIGHT, borderRadius: TODAY_CARD_RADIUS, padding: TODAY_CARD_PADDING, backgroundColor: C.onAccent, borderWidth: 1, borderColor: C.line, ...shadow.layer },
+  card: { height: TODAY_CARD_HEIGHT, borderRadius: TODAY_CARD_RADIUS, padding: TODAY_CARD_PADDING, backgroundColor: C.onAccent, borderWidth: 1, borderColor: C.line, ...shadow.layer },
   indexCard: { backgroundColor: "#FCFAFF", borderColor: "rgba(81,40,136,0.2)", shadowColor: C.purple, shadowOffset: { width: 0, height: 13 }, shadowOpacity: 0.12, shadowRadius: 28, elevation: 7 },
   cardCurrent: { borderColor: "rgba(81,40,136,0.22)", shadowColor: C.purple, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.14, shadowRadius: 26, elevation: 8 },
   cardTopRow: { minHeight: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
