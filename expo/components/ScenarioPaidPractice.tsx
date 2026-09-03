@@ -65,7 +65,7 @@ function turn(id: string, role: Turn["role"], text: string): Turn {
 /** Routes only accepted M1 L1 into its isolated authored runtime. */
 export function ScenarioPaidPractice(props: ScenarioPaidPracticeProps): React.JSX.Element {
   if (props.convertedLesson && props.requestedRunId && props.onReturnToDeck && props.onDiscard) {
-    return <M1L1PaidPractice requestedRunId={props.requestedRunId} convertedLesson={props.convertedLesson} onReturnToDeck={props.onReturnToDeck} onDiscard={props.onDiscard} />;
+    return <M1L1PaidPractice requestedRunId={props.requestedRunId} lessonTitle={props.lessonTitle} lessonMove={props.lessonMove} convertedLesson={props.convertedLesson} onReturnToDeck={props.onReturnToDeck} onDiscard={props.onDiscard} />;
   }
   return <SharedScenarioPaidPractice {...props} />;
 }

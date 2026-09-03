@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Bookmark, Check, RotateCcw, ShieldCheck, Sparkles, Star, TrendingUp } from "lucide-react-native";
+import { Bookmark, Check, ShieldCheck, Sparkles, Star, TrendingUp } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, ActivityIndicator, Alert, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -251,6 +251,7 @@ export default function ApprovedLessonDeckScreen() {
     if (!rehearsalConfig || !resetNotice?.canUndo) return;
     try {
       await undoConvertedLessonReset(rehearsalConfig.lessonId, resetNotice.snapshot);
+      setLessonWasReset(false);
       setResetNotice({ message: "Completion restored. Private rehearsal content stays deleted.", snapshot: [], canUndo: false });
     } catch (error: unknown) {
       safeLog("[converted-lesson] lesson reset undo failed", errorShape(error));
@@ -436,6 +437,17 @@ export default function ApprovedLessonDeckScreen() {
       onDone={() => router.replace("/(tabs)")}
     />;
   }
+  if (hasCompletedLesson && isConverted && !lessonWasReset && !isReturning) {
+    return <CompletedLessonReplayScreen
+      lessonTitle={lesson.title}
+      namedMove={lesson.namedMove}
+      topInset={insets.top}
+      bottomInset={insets.bottom}
+      isResetting={isResetting}
+      onReplay={() => void handleResetLesson()}
+      onBack={() => router.replace("/(tabs)/library")}
+    />;
+  }
   if (isReturning && !hasValidReturn) {
     return <Unavailable
       title="We couldn’t verify that rehearsal result."
@@ -491,11 +503,14 @@ export default function ApprovedLessonDeckScreen() {
         <View style={styles.loading}><ActivityIndicator color={C.purple} /><Text style={styles.loadingText}>Opening lesson…</Text></View>
       )}
 
-      {(completionCommitted || hasCompletedLesson) && isConverted && !lessonWasReset && !isReturning ? <View style={[styles.completionReset, { bottom: insets.bottom + 18 }]}><Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.completionResetButton} accessibilityRole="button"><RotateCcw size={18} color={C.purple} /><Text style={styles.completionResetText}>{isResetting ? "Resetting…" : "Do this lesson again"}</Text></Pressable></View> : null}
       {resetNotice ? <View style={[styles.resetNotice, { bottom: insets.bottom + 18 }]}><Text style={styles.resetNoticeText}>{resetNotice.message}</Text>{resetNotice.canUndo ? <Pressable onPress={() => void handleUndoReset()} style={styles.undoButton} accessibilityRole="button"><Text style={styles.undoText}>Undo</Text></Pressable> : null}</View> : null}
 
     </View>
   );
+}
+
+function CompletedLessonReplayScreen({ lessonTitle, namedMove, topInset, bottomInset, isResetting, onReplay, onBack }: { lessonTitle: string; namedMove: string | null; topInset: number; bottomInset: number; isResetting: boolean; onReplay: () => void; onBack: () => void }): React.JSX.Element {
+  return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={[styles.completedReplay, { paddingTop: topInset + 24, paddingBottom: bottomInset + 24 }]} showsVerticalScrollIndicator={false}><ProductCard accent style={styles.completedReplayCard}><View style={styles.completedReplayIcon}><Check size={24} color={C.onAccent} strokeWidth={3} /></View><SectionLabel tone={C.purple}>Lesson complete</SectionLabel><Text style={styles.completedReplayTitle}>{lessonTitle}</Text>{namedMove ? <Text style={styles.completedReplayMove}>{namedMove}</Text> : null}<Text style={styles.completedReplayBody}>Your completed lesson is saved. Replay it whenever you want another run through the cards and rehearsal.</Text><PrimaryButton label={isResetting ? "Resetting lesson…" : "Do this lesson again"} disabled={isResetting} onPress={onReplay} containerStyle={styles.completedReplayAction} /><GhostButton label="Back to Practice" disabled={isResetting} onPress={onBack} containerStyle={styles.completedReplayBack} /></ProductCard></ScrollView></View>;
 }
 
 function LessonCompletionScreen({ impact, originalResponse, retryResponse, comparison, strongVersion, isSaved, isCompleting, bottomInset, onToggleSave, onFinish }: { impact: M1L1IndexImpact | ApprovedRehearsalIndexImpact; originalResponse: string; retryResponse: string; comparison: string; strongVersion: string; isSaved: boolean; isCompleting: boolean; bottomInset: number; onToggleSave: () => void; onFinish: () => void }): React.JSX.Element {
@@ -652,7 +667,7 @@ const styles = StyleSheet.create({
   feedbackSkip: { marginTop: 8 },
   feedbackPrivacy: { ...T.caption, marginTop: 12, paddingHorizontal: 12, textAlign: "center" },
 
-  completionReset: { position: "absolute", left: 18, right: 18, zIndex: 6, alignItems: "center" }, completionResetButton: { minHeight: 48, borderRadius: 24, paddingHorizontal: 18, flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.96)", borderWidth: 1, borderColor: C.line, ...shadow.layer }, completionResetText: { fontFamily: font.bold, fontSize: 13, color: C.purple },
+  completedReplay: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER }, completedReplayCard: { width: "100%", gap: 10 }, completedReplayIcon: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: C.purple, marginBottom: 6 }, completedReplayTitle: { ...T.title, fontSize: 28, lineHeight: 34 }, completedReplayMove: { ...T.support, color: C.purple }, completedReplayBody: { ...T.support, marginTop: 4 }, completedReplayAction: { marginTop: 12 }, completedReplayBack: { marginTop: 4 },
   resetNotice: { position: "absolute", left: 14, right: 14, zIndex: 10, minHeight: 56, borderRadius: 18, paddingLeft: 16, paddingRight: 8, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.text, ...shadow.layer }, resetNoticeText: { flex: 1, fontFamily: font.medium, fontSize: 13, lineHeight: 18, color: C.onAccent }, undoButton: { minWidth: 58, minHeight: 44, alignItems: "center", justifyContent: "center" }, undoText: { fontFamily: font.bold, fontSize: 13, color: "#DCC8F6" },
   unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
   unavailableTitle: { ...T.title, textAlign: "center", marginTop: 16 },
