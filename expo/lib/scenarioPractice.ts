@@ -1,4 +1,5 @@
 import { hasCanonicalM1L1PressureSequence, isCanonicalM1L1PressureTurn } from "@/lib/convertedLesson";
+import { approvedRehearsalConfigs, hasCanonicalApprovedRehearsalPressureSequence } from "@/lib/approvedRehearsals";
 import { comparePilotAttempts } from "@/lib/pilotCurriculum";
 import { preservePilotAttempt, transitionPilotRun } from "@/lib/practiceSession";
 import type { Difficulty, PersonaVoice, ReactionPattern, Scenario } from "@/types/convo";
@@ -239,6 +240,8 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
     if ((lesson.replayProof || lesson.replayCompletedAt) && !hasReplayCompletion) return null;
     if (run.state === "replay_pending" && (!hasReplayRequest || hasReplayCompletion)) return null;
     canonicalRun.approvedRehearsal = lesson;
+    const approvedConfig = approvedRehearsalConfigs().find((config) => config.scenario.id === canonicalRun.scenarioContext?.scenarioId);
+    if (!approvedConfig || !hasCanonicalApprovedRehearsalPressureSequence(approvedConfig, canonicalRun)) return null;
   }
   if (run.m1L1 !== undefined) {
     if (!run.m1L1 || typeof run.m1L1 !== "object") return null;

@@ -117,7 +117,8 @@ describe("the selected Hope or Adam role reaches speech", () => {
   it("maps the selected persona to the BYSI TTS role", async () => {
     const source = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
     expect(source).toContain('persona === "man-adam" ? "adam" : "hope"');
-    expect(source).toContain('"https://beforeyousayit.app/api/tts"');
+    expect(source).toContain("EXPO_PUBLIC_TTS_ENDPOINT");
+    expect(source).not.toContain('|| "https://beforeyousayit.app/api/tts"');
   });
 
   it("passes work, partner, family, and friends personas at the real shared playback boundary", async () => {
@@ -209,7 +210,8 @@ describe("the selected Hope or Adam role reaches speech", () => {
 
   it("uses the BYSI TTS endpoint for both Hope and Adam", async () => {
     const source = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
-    expect(source).toContain('"https://beforeyousayit.app/api/tts"');
+    expect(source).toContain("EXPO_PUBLIC_TTS_ENDPOINT");
+    expect(source).not.toContain('|| "https://beforeyousayit.app/api/tts"');
     expect(source).toContain("const role = roleForPersona(persona)");
     expect(source).toContain("JSON.stringify({ role, text })");
     expect(source).toContain("text");

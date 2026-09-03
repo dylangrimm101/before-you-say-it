@@ -135,6 +135,7 @@ export default function DrillScreen() {
       <View style={[styles.root, styles.center]}>
         <Backdrop />
         <Text style={{ color: C.dim }}>That drill is gone.</Text>
+        <PrimaryButton label="Back to Library" onPress={() => router.replace("/(tabs)/library")} style={{ marginTop: 24, alignSelf: "stretch" }} />
       </View>
     );
   }

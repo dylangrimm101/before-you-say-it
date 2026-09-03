@@ -14,6 +14,7 @@ import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import type { ConvertedLessonConfig } from "@/lib/convertedLesson";
 import {
   approvedRehearsalCoachExchange,
+  approvedRehearsalAuthoredCorpus,
   approvedRehearsalComparison,
   type ApprovedRehearsalConfig,
 } from "@/lib/approvedRehearsals";
@@ -48,6 +49,8 @@ import { SESSION_SCHEMA_VERSION, type SessionRecord } from "@/types/privacy";
 
 interface ScenarioPaidPracticeProps {
   scenario: Scenario;
+  lessonTitle?: string;
+  lessonMove?: string | null;
   requestedRunId?: string;
   convertedLesson?: ConvertedLessonConfig;
   approvedRehearsal?: ApprovedRehearsalConfig;
@@ -68,10 +71,10 @@ export function ScenarioPaidPractice(props: ScenarioPaidPracticeProps): React.JS
 }
 
 /** Shared non-converted scenario surface; it never defaults to Adam. */
-function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson, approvedRehearsal, onReturnToDeck, onDiscard }: ScenarioPaidPracticeProps) {
+function SharedScenarioPaidPractice({ scenario, lessonTitle, lessonMove, requestedRunId, convertedLesson, approvedRehearsal, onReturnToDeck, onDiscard }: ScenarioPaidPracticeProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { activeScenarioRun, replaceActiveScenarioRunStrict, upsertSession } = useStore();
+  const { activeScenarioRun, replaceActiveScenarioRunStrict, clearActiveScenarioRunStrict, upsertSession } = useStore();
   const restored = scenarioRunForRoute(activeScenarioRun, scenario.id);
   const [value, setValue] = useState<PersistedScenarioPracticeRun | null>(
     restored && (!requestedRunId || restored.run.id === requestedRunId) ? restored : null,
@@ -144,9 +147,33 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
       discardInFlightRef.current = false;
     }
   }, [dictation, onDiscard]);
+  const abandonNormalRun = useCallback(async (): Promise<void> => {
+    if (discardInFlightRef.current) return;
+    const expected = activeRunRevision(valueRef.current);
+    if (!expected) return;
+    discardInFlightRef.current = true;
+    try {
+      await dictation.cancel();
+      await clearActiveScenarioRunStrict(expected);
+      router.replace("/(tabs)/library");
+    } catch (caught: unknown) {
+      safeLog("[scenario] abandon failed", errorShape(caught));
+      setError("We couldn’t abandon this rehearsal safely. It remains saved; try again.");
+    } finally {
+      discardInFlightRef.current = false;
+    }
+  }, [clearActiveScenarioRunStrict, dictation, router]);
   const handleClose = useCallback((): void => {
     if (!isLessonPractice) {
-      void leaveAfterCleanup();
+      Alert.alert(
+        "Leave this rehearsal?",
+        "Save it to resume this exact scenario later, or abandon it to start fresh.",
+        [
+          { text: "Keep practicing", style: "cancel" },
+          { text: "Save and leave", onPress: () => { void leaveAfterCleanup(); } },
+          { text: "Abandon rehearsal", style: "destructive", onPress: () => { void abandonNormalRun(); } },
+        ],
+      );
       return;
     }
     Alert.alert(
@@ -158,7 +185,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
         { text: "Discard this rehearsal", style: "destructive", onPress: () => { void discardAfterCleanup(); } },
       ],
     );
-  }, [discardAfterCleanup, isLessonPractice, leaveAfterCleanup]);
+  }, [abandonNormalRun, discardAfterCleanup, isLessonPractice, leaveAfterCleanup]);
   const difficultyLabel = context ? DIFFICULTY[context.difficulty].label : "";
 
   const startRecording = useCallback(async (kind: "opener" | "response" | "retry"): Promise<void> => {
@@ -275,7 +302,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
           retryDirection: approvedRehearsal.retryDirection,
           approvedTranscript: openingTranscript,
           openingTranscript,
-          authoredFallback: approvedRehearsal.authoredPressureText,
+          authoredCorpus: approvedRehearsalAuthoredCorpus(approvedRehearsal),
           runId: approved.run.id,
         })
         : await nextCounterpartTurn(
@@ -290,7 +317,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
       const pressureTurn = {
         id: `${approved.run.id}-counterpart-turn-1`,
         text: pressureText,
-        source: ("source" in result ? result.source : "provider") as "provider" | "authored",
+        source: "provider" as const,
         reactionId: approvedRehearsal ? `${approvedRehearsal.lessonId}-dynamic-pressure-1` : `${approved.run.id}-provider-pressure`,
         semanticVoiceKey: "contextual_counterpart" as const,
         resolvedAudioId: `${approved.run.curriculumVersion}-${approved.run.id}-counterpart-turn-1`,
@@ -308,7 +335,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
       approvalInFlightRef.current = false;
       setBusy(false);
     }
-  }, [approvedRehearsal, context, convertedLesson, draft, persist, scenario, value]);
+  }, [approvedRehearsal, context, draft, persist, scenario, value]);
 
   const confirmResponse = useCallback(async (): Promise<void> => {
     if (!value || !context || !pressureOne || draft.trim().length < 2 || approvalInFlightRef.current) return;
@@ -334,7 +361,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
           openingTranscript,
           firstPressure: pressureOne.text,
           firstResponse: response,
-          authoredFallback: approvedRehearsal.authoredPressureTwoText,
+          authoredCorpus: approvedRehearsalAuthoredCorpus(approvedRehearsal),
           runId: approved.run.id,
         });
         const pressureText = result.reply.trim();
@@ -342,7 +369,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
         const withSecondPressure = attachApprovedRehearsalPushbackTwo(advanced, {
           id: `${approved.run.id}-counterpart-turn-2`,
           text: pressureText,
-          source: result.source,
+          source: "provider",
           reactionId: `${approvedRehearsal.lessonId}-dynamic-pressure-2`,
           semanticVoiceKey: "contextual_counterpart",
           resolvedAudioId: `${approved.run.curriculumVersion}-${approved.run.id}-counterpart-turn-2`,
@@ -446,9 +473,10 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
 
   const finish = useCallback(async (): Promise<void> => {
     if (!value || !context || !run?.retryAttempt || !pressure) return;
-    const completed = transitionScenarioPracticeRun(value, "complete", Date.now());
-    await persist(completed);
-    const record: SessionRecord = {
+    try {
+      const completed = transitionScenarioPracticeRun(value, "complete", Date.now());
+      await persist(completed);
+      const record: SessionRecord = {
       schemaVersion: SESSION_SCHEMA_VERSION,
       id: run.id,
       scenarioId: context.scenarioId,
@@ -465,9 +493,31 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
       startedAt: run.createdAt,
       endedAt: Date.now(),
       contentRetained: false,
-    };
-    await upsertSession(record);
-  }, [context, persist, pressure, run, upsertSession, value]);
+      };
+      await upsertSession(record);
+      const expected = activeRunRevision(completed);
+      if (!expected) throw new Error("Completed scenario revision is unavailable");
+      await clearActiveScenarioRunStrict(expected);
+      router.replace("/(tabs)/library");
+    } catch (caught: unknown) {
+      safeLog("[scenario] completion cleanup failed", errorShape(caught));
+      setError("We couldn’t finish this scenario safely. Your completed rehearsal is saved; use Back to Scenarios to retry cleanup.");
+    }
+  }, [clearActiveScenarioRunStrict, context, persist, pressure, router, run, upsertSession, value]);
+  const leaveCompleted = useCallback(async (): Promise<void> => {
+    const expected = activeRunRevision(valueRef.current);
+    if (!expected) {
+      router.replace("/(tabs)/library");
+      return;
+    }
+    try {
+      await clearActiveScenarioRunStrict(expected);
+      router.replace("/(tabs)/library");
+    } catch (caught: unknown) {
+      safeLog("[scenario] completed run cleanup failed", errorShape(caught));
+      setError("We couldn’t clear the completed rehearsal yet. Try returning to Scenarios again.");
+    }
+  }, [clearActiveScenarioRunStrict, router]);
 
   if (!value || !context || !run || !presentation.isAvailable) {
     const unavailableTitle = presentation.isAvailable ? "This scenario run is unavailable." : presentation.title;
@@ -485,10 +535,11 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
   return <View style={styles.root}><Backdrop />
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
       <Pressable onPress={handleClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Leave rehearsal"><X size={21} color={C.textSoft} /></Pressable>
-      <View style={styles.headerCopy}><Text style={styles.headerTitle}>{context.counterpartName}</Text><Text style={styles.headerMeta}>{approvedRehearsal ? `Step ${Math.min(lessonState?.beat ?? 1, 7)} of 7` : `${context.counterpartRole} · ${difficultyLabel}`}</Text></View><View style={styles.close} />
+      <View style={styles.headerCopy}><Text style={styles.headerTitle}>{approvedRehearsal && lessonTitle ? lessonTitle : context.counterpartName}</Text><Text style={styles.headerMeta}>{approvedRehearsal ? `Lesson rehearsal · Step ${Math.min(lessonState?.beat ?? 1, 7)} of 7` : `${context.counterpartRole} · ${difficultyLabel}`}</Text></View><View style={styles.close} />
     </View>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 150 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {approvedRehearsal ? <ProductCard accent style={styles.lessonIdentity}><SectionLabel tone={C.purple}>Lesson rehearsal</SectionLabel><Text style={styles.lessonIdentityTitle}>{lessonTitle}</Text>{lessonMove ? <Text style={styles.lessonIdentityMove}>{lessonMove}</Text> : null}</ProductCard> : null}
         <StatusPill label={context.category.toUpperCase()} tone="purple" /><Text style={styles.scenarioTitle}>{context.title}</Text><Text style={styles.context}>{context.situation}</Text>
         <ProductCard style={styles.identityCard}><View><SectionLabel>Counterpart</SectionLabel><Text style={styles.identityValue}>{context.counterpartLabel}</Text></View><View><SectionLabel>Objective</SectionLabel><Text style={styles.identityValue}>{context.objective}</Text></View><View><SectionLabel>Pressure level</SectionLabel><Text style={styles.identityValue}>{difficultyLabel} · {DIFFICULTY[context.difficulty].note}</Text></View></ProductCard>
 
@@ -504,7 +555,7 @@ function SharedScenarioPaidPractice({ scenario, requestedRunId, convertedLesson,
         {state === "ready_for_retry" && (pressure || lessonState?.replayTarget === "top_of_scene") ? <Reveal><StatusPill label="Same-moment retry" tone="purple" /><CounterpartCard presentation={counterpartPresentation} /><Text style={styles.title}>Answer the exact same turn again.</Text><Text style={styles.body}>{run.retryInstruction}</Text><CaptureActions value={draft} onChange={setDraft} onRecord={() => void beginCapture("retry")} onType={() => void openTypedReview("confirm_retry_transcript")} /></Reveal> : null}
         {state === "attempt_comparison" && run.retryAttempt && run.comparison && coachedOriginal ? <Reveal><StatusPill label="Review · same moment" tone="purple" /><Text style={styles.title}>Compare your two responses.</Text><CounterpartCard presentation={counterpartPresentation} /><Comparison label="Original approved response" text={coachedOriginal} /><Comparison label="Retry approved response" text={run.retryAttempt.transcript} /><Text style={styles.body}>{run.comparison.text}</Text><PrimaryButton label={isLessonPractice ? "See my results" : "Continue"} onPress={() => { if (isLessonPractice && onReturnToDeck) onReturnToDeck(run.id); else void persist(transitionScenarioPracticeRun(value, "transfer_cue", Date.now())); }} containerStyle={styles.action} /></Reveal> : null}
         {state === "transfer_cue" ? <Reveal><StatusPill label="Hope · wrap-up" tone="purple" /><Text style={styles.title}>Take the clearer wording into the real conversation.</Text><Text style={styles.body}>This completion belongs to {context.title}, with {context.counterpartName} as {context.counterpartRole}. No unrelated practice fixture was used.</Text><PrimaryButton label="Complete scenario" onPress={() => void finish()} containerStyle={styles.action} /></Reveal> : null}
-        {state === "complete" ? <Reveal><StatusPill label="Scenario complete" tone="green" /><Text style={styles.title}>{context.title} is complete.</Text><Text style={styles.body}>You practiced one {context.counterpartName} pressure moment twice at {difficultyLabel.toLowerCase()} difficulty.</Text><PrimaryButton label="Back to Scenarios" onPress={() => router.replace("/(tabs)/library")} containerStyle={styles.action} /></Reveal> : null}
+        {state === "complete" ? <Reveal><StatusPill label="Scenario complete" tone="green" /><Text style={styles.title}>{context.title} is complete.</Text><Text style={styles.body}>You practiced one {context.counterpartName} pressure moment twice at {difficultyLabel.toLowerCase()} difficulty.</Text>{error ? <Text style={styles.body}>{error}</Text> : null}<PrimaryButton label="Back to Scenarios" onPress={() => void leaveCompleted()} containerStyle={styles.action} /></Reveal> : null}
         {state === "network_error" || state === "model_error" ? <Reveal><StatusPill label="Saved checkpoint" tone="amber" /><Text style={styles.title}>{error}</Text><PrimaryButton label="Return to this scenario" onPress={() => void persist(transitionScenarioPracticeRun(value, state === "network_error" ? (run.responseAttempt ? "confirm_response_transcript" : "confirm_attempt_transcript") : "confirm_response_transcript", Date.now()))} containerStyle={styles.action} /></Reveal> : null}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -545,6 +596,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, flex: { flex: 1 }, center: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
   header: { minHeight: 70, paddingHorizontal: GUTTER, paddingBottom: 8, flexDirection: "row", alignItems: "center" }, close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, headerCopy: { flex: 1, alignItems: "center" }, headerTitle: { fontFamily: font.bold, fontSize: 17, color: C.text }, headerMeta: { ...T.caption, color: C.purple, marginTop: 2 },
   scroll: { paddingHorizontal: GUTTER, paddingTop: 12 }, scenarioTitle: { ...T.title, marginTop: 10 }, context: { ...T.support, marginTop: 7 }, identityCard: { marginTop: 16, gap: 14 }, identityValue: { ...T.support, color: C.text, marginTop: 4 },
+  lessonIdentity: { marginBottom: 18, gap: 5 }, lessonIdentityTitle: { ...T.title, fontSize: 22, lineHeight: 28 }, lessonIdentityMove: { ...T.support, color: C.purple },
   title: { ...T.title, marginTop: 22 }, body: { ...T.support, marginTop: 8 }, action: { marginTop: 18 }, capture: { alignItems: "center", marginTop: 22 }, or: { ...T.caption, marginVertical: 16 }, input: { ...T.body, minHeight: 108, width: "100%", backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.glassEdge, borderRadius: radius.md, padding: 16, textAlignVertical: "top" },
   listening: { alignItems: "center", gap: 20, paddingTop: 36 }, thinkingWrap: { alignSelf: "flex-start", alignItems: "flex-start", marginTop: 16 }, thinkingBubble: { minWidth: 156, flexDirection: "row", alignItems: "center", gap: 10 }, thinkingText: { ...T.caption, color: C.textSoft }, busy: { marginTop: 14 }, speaking: { ...T.caption, color: C.purple, marginTop: 10 }, thread: { marginTop: 16, gap: 12 }, messageWrap: { maxWidth: "84%" }, messageMine: { alignSelf: "flex-end", alignItems: "flex-end" }, messageTheirs: { alignSelf: "flex-start", alignItems: "flex-start" }, messageLabel: { ...T.caption, fontFamily: font.semi, marginBottom: 4 }, messageBubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 11 }, bubbleMine: { backgroundColor: C.purple }, bubbleTheirs: { backgroundColor: C.surfaceHigh, borderWidth: 1, borderColor: C.line }, messageText: { ...T.support, color: C.text }, messageTextMine: { color: C.onAccent }, processing: { minHeight: 56, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 }, permissionCard: { marginTop: 16 }, permissionSecondary: { minHeight: 44, alignItems: "center", justifyContent: "center" }, permissionSecondaryText: { ...T.caption, color: C.purple, fontFamily: font.semi }, counterpartCard: { marginTop: 18 }, counterpartText: { ...T.body, marginTop: 10 }, continuityLabel: { ...T.caption, marginTop: 12 }, coachCard: { marginTop: 14, gap: 8 }, comparison: { marginTop: 10 },
 });

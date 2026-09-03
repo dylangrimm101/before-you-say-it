@@ -5,9 +5,12 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-nativ
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, useReducedMotion } from "@/components/ui";
-import { curriculumModule, type CurriculumModule } from "@/constants/modules";
+import { approvedLessonDeck } from "@/constants/approvedLessons";
 import { C, GUTTER, eyebrow, font, radius, shadow, T } from "@/constants/theme";
-import { nextReviewPractice, reviewPracticeRuntime } from "@/lib/modularCurriculum";
+import { nextLaunchDeck } from "@/lib/launchCurriculum";
+import { approvedRehearsalConfig } from "@/lib/approvedRehearsals";
+import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
+import { customerLessonActivityCopy } from "@/lib/customerLessonExperience";
 import {
   TODAY_ACTIVITY_KEYS,
   TODAY_CARD_GAP,
@@ -17,54 +20,28 @@ import {
   TODAY_CHART_DURATION_MS,
   TODAY_ENTRANCE_DURATION_MS,
   TODAY_ENTRANCE_STAGGER_MS,
-  TODAY_PIN_STEP,
   todayActivityPresentation,
   todayIndexPresentation,
   todayRecentPractice,
-  todayRecommendedModuleId,
   type TodayActivityKey,
   type TodayActivityPresentation,
   type TodayIndexPresentation,
 } from "@/lib/today";
 import { useStore } from "@/providers/store";
-import type { PilotModule } from "@/types/pilotCurriculum";
+
 
 const SIGNALS = ["Clarity", "Specificity", "Listening", "Steadiness", "Boundaries", "Repair"] as const;
 const SIGNAL_COLORS = ["#512888", "#6B4E9E", "#8571B0", "#9E8CC2", "#B3A4D0", "#C7BCDE"] as const;
 const CARD_TINTS = ["#FFFFFF", "#FDFCFE", "#FBFAFD", "#F9F7FC"] as const;
-interface ActivityCopy {
-  title: string;
-  body: string;
-}
+interface ActivityCopy { title: string; body: string; }
 
 interface DeckLayerProps {
   children: React.ReactNode;
   entrance: Animated.Value;
   order: number;
-  scrollOffset: Animated.Value;
 }
 
-function pinnedTranslation(order: number, scrollOffset: Animated.Value): Animated.AnimatedInterpolation<number> {
-  const naturalTop = order * (TODAY_CARD_HEIGHT + TODAY_CARD_GAP);
-  const pinnedTop = order * TODAY_PIN_STEP;
-  const pinThreshold = naturalTop - pinnedTop;
-  if (pinThreshold === 0) {
-    return scrollOffset.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 1],
-      extrapolateLeft: "clamp",
-      extrapolateRight: "extend",
-    });
-  }
-  return scrollOffset.interpolate({
-    inputRange: [0, pinThreshold, pinThreshold + 1],
-    outputRange: [0, 0, 1],
-    extrapolateLeft: "clamp",
-    extrapolateRight: "extend",
-  });
-}
-
-function DeckLayer({ children, entrance, order, scrollOffset }: DeckLayerProps) {
+function DeckLayer({ children, entrance, order }: DeckLayerProps) {
   return (
     <Animated.View
       style={[
@@ -73,7 +50,6 @@ function DeckLayer({ children, entrance, order, scrollOffset }: DeckLayerProps) 
           zIndex: 10 + order * 10,
           opacity: entrance,
           transform: [
-            { translateY: pinnedTranslation(order, scrollOffset) },
             { translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
             { scale: entrance.interpolate({ inputRange: [0, 1], outputRange: [0.978, 1] }) },
           ],
@@ -85,12 +61,6 @@ function DeckLayer({ children, entrance, order, scrollOffset }: DeckLayerProps) 
   );
 }
 
-function activityCopy(key: TodayActivityKey, module: CurriculumModule, moduleDay: PilotModule | undefined): ActivityCopy {
-  if (key === "lesson") return { title: module.name, body: moduleDay?.copy.body ?? "Learn the move behind your first focus." };
-  if (key === "practice") return { title: "Practice the distinction", body: moduleDay?.copy.quiz?.prompt ?? "Choose the response that keeps the communication move visible." };
-  if (key === "rehearsal") return { title: moduleDay?.copy.scenario?.heading ?? "Use it under pressure", body: moduleDay?.copy.scenario?.user_job ?? "Try the move against realistic pushback, then repeat the moment once." };
-  return { title: "See what changed", body: moduleDay?.copy.transfer ?? "Compare your responses and carry one adjustment forward." };
-}
 
 function IndexCard({ index, chartProgress, hasLessonUpdate, onDetails }: { index: TodayIndexPresentation; chartProgress: Animated.Value; hasLessonUpdate: boolean; onDetails: () => void }) {
   const chartSlots = Array.from({ length: 7 }, (_, slot) => {
@@ -135,8 +105,8 @@ function ActivityCard({ activity, copy, tint, onPress }: { activity: TodayActivi
         <View style={styles.activityMeta}><Text style={[styles.activityKind, isCurrent && styles.activityKindCurrent]}>{activity.key}</Text></View>
         {isCompleted ? <View style={styles.check}><Check size={12} color={C.onAccent} strokeWidth={3} /></View> : null}
       </View>
-      <Text numberOfLines={2} style={[styles.activityTitle, !isCurrent && styles.activityTitleQuiet]}>{copy.title}</Text>
-      <Text numberOfLines={3} style={[styles.activityBody, !isCurrent && styles.activityBodyQuiet]}>{copy.body}</Text>
+      <Text style={[styles.activityTitle, !isCurrent && styles.activityTitleQuiet]}>{copy.title}</Text>
+      <Text style={[styles.activityBody, !isCurrent && styles.activityBodyQuiet]}>{copy.body}</Text>
       {isCurrent && activity.ctaLabel ? <Pressable onPress={onPress} style={({ pressed }) => [styles.primaryAction, pressed && styles.primaryActionPressed]} accessibilityRole="button" accessibilityLabel={activity.ctaLabel}><Text style={styles.primaryActionText}>{activity.ctaLabel}</Text></Pressable> : <View style={styles.quietState}><Text style={styles.quietStateText}>{isCompleted ? "Complete · Review" : "Up next"}</Text></View>}
     </View>
   );
@@ -146,28 +116,29 @@ export default function TodayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isReduced = useReducedMotion();
-  const { access, activityDays, activePracticeSession, completedPracticeIds, scoredPracticeHistory } = useStore();
-  const moduleId = todayRecommendedModuleId(activePracticeSession);
-  const recommended = curriculumModule(moduleId);
-  const activeRun = moduleId ? Object.values(activePracticeSession?.pilotRuns ?? {}).find((run) => run.moduleId === moduleId && run.state !== "complete") : undefined;
-  const nextPractice = moduleId ? nextReviewPractice(moduleId, completedPracticeIds) : undefined;
-  const moduleDay = reviewPracticeRuntime(activeRun?.practiceId ?? nextPractice?.practiceId ?? "")?.module;
+  const { access, activityDays, activePracticeSession, activeScenarioRun, convertedLessonProgress, moduleCloseProgress, scoredPracticeHistory } = useStore();
+  const nextDeckId = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
+  const nextDeck = approvedLessonDeck(nextDeckId);
+  const moduleId = nextDeck?.module === 2 ? "make_a_clear_ask" : "get_to_the_point";
+  const rehearsalConfig = nextDeckId === "m1-l1" ? M1_L1_CONVERSION : approvedRehearsalConfig(nextDeckId);
+  const run = activeScenarioRun?.run;
+  const activeLessonRun = run
+    && rehearsalConfig
+    && run.practiceId === rehearsalConfig.practiceId
+    && run.contentVersion === rehearsalConfig.contentVersion
+    && run.scenarioContext?.scenarioId === rehearsalConfig.scenario.id
+    ? run
+    : undefined;
+  const lessonCopy = nextDeck ? customerLessonActivityCopy(nextDeck, rehearsalConfig) : undefined;
   const index = useMemo<TodayIndexPresentation>(
     () => todayIndexPresentation(activePracticeSession?.sharedResult, scoredPracticeHistory),
     [activePracticeSession?.sharedResult, scoredPracticeHistory],
   );
   const recentDays = useMemo(() => todayRecentPractice(activityDays, new Date()), [activityDays]);
-  const activities = useMemo(() => todayActivityPresentation(activeRun?.state, Boolean(activeRun)), [activeRun]);
+  const activities = useMemo(() => todayActivityPresentation(activeLessonRun?.state, Boolean(activeLessonRun)), [activeLessonRun]);
   const entrances = useRef<Animated.Value[]>(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
   const chartProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
-  const scrollOffset = useRef<Animated.Value>(new Animated.Value(0)).current;
-  const onDeckScroll = useMemo(
-    () => Animated.event(
-      [{ nativeEvent: { contentOffset: { y: scrollOffset } } }],
-      { useNativeDriver: true },
-    ),
-    [scrollOffset],
-  );
+
 
   useEffect(() => {
     if (isReduced) {
@@ -183,23 +154,17 @@ export default function TodayScreen() {
     return () => { cards.stop(); chart.stop(); };
   }, [chartProgress, entrances, isReduced]);
 
-  const openCurrentActivity = useCallback((): void => {
-    if (!moduleId) { router.push("/(tabs)/progress"); return; }
+  const openCurrentActivity = useCallback((activity: TodayActivityKey): void => {
+    if (!nextDeckId) { router.push("/path"); return; }
     if (access.entitlement !== "pro") { router.push({ pathname: "/paywall", params: { gate: "program", moduleId } }); return; }
-    const current = activities.find((activity) => activity.state === "current");
-    if (current?.isInterrupted) {
-      router.push({ pathname: "/interrupted/[moduleId]", params: { moduleId } });
+    if ((activity === "rehearsal" || activity === "review") && rehearsalConfig) {
+      router.push({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: nextDeckId } });
       return;
     }
-    router.push({ pathname: "/module/[day]", params: { day: moduleId } });
-  }, [access.entitlement, activities, moduleId, router]);
+    router.push({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: nextDeckId } });
+  }, [access.entitlement, moduleId, nextDeckId, rehearsalConfig, router]);
 
-  const openPath = useCallback((): void => {
-    router.push({
-      pathname: "/(tabs)/library",
-      params: { section: "lessons", pathRequest: String(Date.now()) },
-    });
-  }, [router]);
+  const openPath = useCallback((): void => { router.push("/path"); }, [router]);
   const openProgress = useCallback((): void => { router.push("/(tabs)/progress"); }, [router]);
 
   return (
@@ -212,19 +177,17 @@ export default function TodayScreen() {
       <Animated.ScrollView
         style={styles.deck}
         contentContainerStyle={[styles.deckContent, { paddingBottom: insets.bottom + 116 }]}
-        onScroll={onDeckScroll}
-        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       >
-        <DeckLayer entrance={entrances[0]} order={0} scrollOffset={scrollOffset}>
+        <DeckLayer entrance={entrances[0]} order={0}>
           <IndexCard index={index} chartProgress={chartProgress} hasLessonUpdate={scoredPracticeHistory.length > 0} onDetails={openProgress} />
         </DeckLayer>
         {TODAY_ACTIVITY_KEYS.map((key, activityIndex) => {
           const activity = activities[activityIndex];
           const order = activityIndex + 1;
           if (!activity) return null;
-          const copy = recommended ? activityCopy(key, recommended, moduleDay) : { title: key === "lesson" ? "Your first lesson isn’t ready yet" : key === "review" ? "See what changed" : `${key[0]?.toUpperCase() ?? ""}${key.slice(1)}`, body: "This activity appears after an evidence-backed first focus is available." };
-          return <DeckLayer key={key} entrance={entrances[order]} order={order} scrollOffset={scrollOffset}><ActivityCard activity={activity} copy={copy} tint={CARD_TINTS[activityIndex]} onPress={openCurrentActivity} /></DeckLayer>;
+          const copy: ActivityCopy = lessonCopy?.[key] ?? { title: key === "review" ? "See what changed" : `${key[0]?.toUpperCase() ?? ""}${key.slice(1)}`, body: "Complete the current lesson to continue." };
+          return <DeckLayer key={key} entrance={entrances[order]} order={order}><ActivityCard activity={activity} copy={copy} tint={CARD_TINTS[activityIndex]} onPress={() => openCurrentActivity(key)} /></DeckLayer>;
         })}
         <Pressable onPress={openPath} accessibilityRole="button" accessibilityLabel="View your practice path" style={styles.pathLink}><Text style={styles.pathText}>View your path</Text><ChevronRight size={15} color={C.purple} /></Pressable>
       </Animated.ScrollView>
@@ -244,7 +207,7 @@ const styles = StyleSheet.create({
   dayLabel: { fontFamily: font.semi, fontSize: 10, lineHeight: 12, letterSpacing: 0.6, textTransform: "uppercase", color: C.dim }, dayLabelToday: { color: C.purple },
   deck: { flex: 1 }, deckContent: { paddingHorizontal: 20, isolation: "isolate" },
   cardLayer: { paddingBottom: TODAY_CARD_GAP },
-  card: { height: TODAY_CARD_HEIGHT, borderRadius: TODAY_CARD_RADIUS, padding: TODAY_CARD_PADDING, backgroundColor: C.onAccent, borderWidth: 1, borderColor: C.line, ...shadow.layer },
+  card: { minHeight: TODAY_CARD_HEIGHT, borderRadius: TODAY_CARD_RADIUS, padding: TODAY_CARD_PADDING, backgroundColor: C.onAccent, borderWidth: 1, borderColor: C.line, ...shadow.layer },
   indexCard: { backgroundColor: "#FCFAFF", borderColor: "rgba(81,40,136,0.2)", shadowColor: C.purple, shadowOffset: { width: 0, height: 13 }, shadowOpacity: 0.12, shadowRadius: 28, elevation: 7 },
   cardCurrent: { borderColor: "rgba(81,40,136,0.22)", shadowColor: C.purple, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.14, shadowRadius: 26, elevation: 8 },
   cardTopRow: { minHeight: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

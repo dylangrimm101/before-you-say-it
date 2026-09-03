@@ -453,7 +453,10 @@ describe("data URIs are never handed to native playback", () => {
   it("speaks only counterpart text through the user-owned BYSI TTS endpoint", async () => {
     const voice = await Bun.file(`${import.meta.dir}/../lib/voice.ts`).text();
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
-    expect(voice).toContain('"https://beforeyousayit.app/api/tts"');
+    expect(voice).toContain("EXPO_PUBLIC_TTS_ENDPOINT");
+    expect(voice).not.toContain('|| "https://beforeyousayit.app/api/tts"');
+    expect(voice).toContain("BYSI voice endpoint is not configured");
+    expect(voice).toContain('parsed.pathname.endsWith("/api/tts")');
     expect(voice).toContain("JSON.stringify({ role, text })");
     expect(voice).toContain('contentType !== "audio/mpeg"');
     expect(voice).toContain("blob.size");

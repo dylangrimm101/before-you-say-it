@@ -23,7 +23,8 @@ describe("focus-led scenario recommendations", () => {
     const result = recommendScenario(SCENARIOS, null, null, "friends", false);
     expect(result.match).toBe("category-only");
     expect(result.scenario?.category).toBe("friends");
-    expect(result.reason).toContain("not a personalized match");
+    expect(result.reason).toBe("A useful place to practice in this part of your life.");
+    expect(result.reason).not.toContain("fallback");
   });
 
   test("no match returns no recommendation", () => {

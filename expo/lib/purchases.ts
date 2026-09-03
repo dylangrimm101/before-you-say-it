@@ -20,6 +20,8 @@ type PurchasesModule = {
   purchasePackage: (pkg: PurchasesPackage) => Promise<{ customerInfo: CustomerInfo }>;
   restorePurchases: () => Promise<CustomerInfo>;
   logIn: (appUserID: string) => Promise<{ customerInfo: CustomerInfo; created: boolean }>;
+  logOut: () => Promise<CustomerInfo>;
+  isAnonymous: () => Promise<boolean>;
 };
 
 /**
@@ -111,6 +113,13 @@ export async function identifyPurchasesUser(userId: string): Promise<CustomerInf
     safeLog("[purchases] account association failed", errorShape(error));
     return null;
   }
+}
+
+/** Clears any authenticated RevenueCat app-user identity during data reset. */
+export async function clearPurchasesIdentity(): Promise<void> {
+  if (!sdk || !configured) return;
+  if (await sdk.isAnonymous()) return;
+  await sdk.logOut();
 }
 
 export function useCustomerInfo() {

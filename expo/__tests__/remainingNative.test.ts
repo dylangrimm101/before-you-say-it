@@ -23,7 +23,8 @@ describe("remaining native acquisition and paid experience", () => {
   test("rehearsal replies use the user-owned BYSI Claude endpoint with honest recovery copy", async () => {
     const ai = await source("lib/ai.ts");
     const rehearsal = await source("app/rehearse/[id].tsx");
-    expect(ai).toContain('"https://beforeyousayit.app/api/generate"');
+    expect(ai).toContain("EXPO_PUBLIC_GENERATE_ENDPOINT");
+    expect(ai).not.toContain('|| "https://beforeyousayit.app/api/generate"');
     expect(ai).toContain('type: "rehearsal_turn"');
     expect(ai).toContain('type: "free_rehearsal_result"');
     expect(ai).not.toContain("EXPO_PUBLIC_TOOLKIT_URL");
@@ -85,8 +86,12 @@ describe("remaining native acquisition and paid experience", () => {
     expect(paywall).toContain("See where you’ll start");
     expect(paywall).toContain("isPlanOpen ? (");
     expect(paywall).toContain("curriculumModule(moduleId)");
-    expect(paywall).toContain("$11.99/month or $89.99/year");
-    expect(paywall).toContain("We’ll email you 3 days before your free trial ends.");
+    expect(paywall).toContain("monthlyTerms?.priceString");
+    expect(paywall).toContain("annualTerms?.priceString");
+    expect(paywall).not.toContain("$11.99");
+    expect(paywall).not.toContain("$89.99");
+    expect(paywall).not.toContain("We’ll email you");
+    expect(paywall).toContain("Manage or cancel subscription");
     expect(paywall).toContain("In-app purchase configuration required");
     expect(paywall).not.toContain("Price Unavailable");
     expect(paywall).not.toContain("No confirmed trial");
@@ -115,7 +120,7 @@ describe("remaining native acquisition and paid experience", () => {
     expect(store).toContain("__DEV__ && devForceUnpaid");
     expect(store).toContain("purchasedPro || (__DEV__ && devPro)");
     expect(today).toContain('access.entitlement !== "pro"');
-    expect(today).toContain('pathname: "/module/[day]"');
+    expect(today).toContain('pathname: "/approved-lesson/[lessonId]"');
   });
 
   test("the earned offer is three stages and rejects an incomplete free result", async () => {
@@ -166,13 +171,11 @@ describe("remaining native acquisition and paid experience", () => {
     expect(purchased).not.toContain("streak");
   });
 
-  test("first practice and Today derive from first focus and real checkpoints", async () => {
+  test("first practice and Today derive from durable approved-deck checkpoints", async () => {
     const today = await source("app/(tabs)/index.tsx");
-    const todayLogic = await source("lib/today.ts");
     const purchased = await source("app/purchase-success.tsx");
-    expect(todayLogic).toContain("session?.sharedResult?.first_focus?.recommended_module_id ?? null");
-    expect(today).toContain("run.moduleId === moduleId");
-    expect(today).toContain("todayActivityPresentation(activeRun?.state");
+    expect(today).toContain("nextLaunchDeck(convertedLessonProgress, moduleCloseProgress)");
+    expect(today).toContain('pathname: "/approved-lesson/[lessonId]"');
     expect(purchased).toContain("Start my first practice");
   });
 

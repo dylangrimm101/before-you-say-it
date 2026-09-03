@@ -12,17 +12,19 @@ import { ProductCard, SectionLabel } from "@/components/PaidProductUI";
 import { Backdrop, GhostButton, PrimaryButton, Reveal, useReducedMotion } from "@/components/ui";
 import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { C, GUTTER, T, font, radius, shadow } from "@/constants/theme";
-import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadReturnedDeckHtml } from "@/lib/approvedDeckLoader";
+import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadModuleCloseDeckHtml } from "@/lib/approvedDeckLoader";
 import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
 import { approvedRehearsalConfig, approvedRehearsalIndexImpact, approvedRehearsalStrongVersion, validateApprovedRehearsalCompletion, type ApprovedRehearsalIndexImpact } from "@/lib/approvedRehearsals";
 import { conversionRuntimeEnabled, m1L1GoodVersion, m1L1IndexImpact, M1_L1_CONVERSION, validateM1L1Completion, type ConvertedLessonProgress, type M1L1IndexImpact, type TransferChoice } from "@/lib/convertedLesson";
 import { progressHistoryPresentation, SCORED_PRACTICE_HISTORY_VERSION, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
+import { canAccessLaunchDeck, nextLaunchDeck } from "@/lib/launchCurriculum";
+import { useIsPro } from "@/lib/purchases";
 import { isFeedbackLessonId, LESSON_FEEDBACK_MAX_LENGTH, type FeedbackLessonId } from "@/lib/lessonFeedback";
 import { submitLessonFeedback } from "@/lib/lessonFeedbackService";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useStore } from "@/providers/store";
 
-/** Renders an approved source deck behind a strict internal-review boundary. */
+/** Renders the canonical approved deck used by the two-module launch curriculum. */
 export default function ApprovedLessonDeckScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -30,21 +32,32 @@ export default function ApprovedLessonDeckScreen() {
   const lesson = approvedLessonDeck(params.lessonId);
   const {
     activeScenarioRun,
+    convertedLessonProgress,
+    moduleCloseProgress,
+    devProEnabled,
     clearActiveScenarioRunStrict,
     markPendingConvertedLessonPrivateContentDeleted,
     promotePendingConvertedLessonCompletion,
     resetConvertedLesson,
     saveScoredPracticeRecord,
+    saveModuleCloseCompletion,
     scoredPracticeHistory,
     activePracticeSession,
     undoConvertedLessonReset,
     writePendingConvertedLessonCompletion,
   } = useStore();
+  const isPro = useIsPro();
+  const isEntitled = isPro || (__DEV__ && devProEnabled);
+  const hasLaunchAccess = Boolean(lesson && canAccessLaunchDeck(lesson.id, isEntitled, convertedLessonProgress, moduleCloseProgress));
+  const nextDeck = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
   const [lessonWasReset, setLessonWasReset] = useState<boolean>(false);
   const isM1L1 = conversionRuntimeEnabled(params.lessonId);
   const approvedConfig = approvedRehearsalConfig(params.lessonId);
   const rehearsalConfig = isM1L1 ? M1_L1_CONVERSION : approvedConfig;
   const feedbackLessonId = lesson && isFeedbackLessonId(lesson.id) ? lesson.id : null;
+  const customerLessonHeader = lesson
+    ? lesson.isCloseDeck ? `MODULE ${lesson.module} REVIEW` : `MODULE ${lesson.module} · LESSON ${lesson.lesson}`
+    : "LESSON";
   const isConverted = Boolean(rehearsalConfig);
   const isReturning = isConverted && params.returnFromRehearsal === "1" && !lessonWasReset;
   const returningRun = activeScenarioRun?.run;
@@ -73,10 +86,10 @@ export default function ApprovedLessonDeckScreen() {
     let isActive = true;
     setDeckHtml(null);
     setLoadError(false);
-    if (!__DEV__ || !lesson) return () => { isActive = false; };
+    if (!lesson || !hasLaunchAccess || isReturning) return () => { isActive = false; };
 
-    const loader = isReturning && rehearsalConfig
-      ? loadReturnedDeckHtml(lesson.archivePath, rehearsalConfig.returnCard, rehearsalConfig.completionCard, isApprovedMoveSaved)
+    const loader = lesson.isCloseDeck
+      ? loadModuleCloseDeckHtml(lesson.archivePath)
       : rehearsalConfig
         ? loadConvertedHandoffDeckHtml(lesson.archivePath, rehearsalConfig.rehearsalHandoffCard)
         : loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard);
@@ -86,20 +99,19 @@ export default function ApprovedLessonDeckScreen() {
         if (isActive) setLoadError(true);
       });
     return () => { isActive = false; };
-  }, [isApprovedMoveSaved, isReturning, lesson, loadAttempt, rehearsalConfig]);
+  }, [hasLaunchAccess, isReturning, lesson, loadAttempt, rehearsalConfig]);
 
   const reviewGuard = useMemo(() => {
     if (!lesson) return "true;";
     const boundary = lesson.reviewThroughCard;
     const total = lesson.cardCount;
-    const shouldStopDeckNavigation = lesson.isCloseDeck;
     return `
       (function () {
         var boundary = ${boundary};
         var total = ${total};
-        var stopDeckNavigation = ${shouldStopDeckNavigation ? "true" : "false"};
-        var blockedLabels = ${isConverted ? "[]" : '["start rehearsal", "start voice rehearsal", "continue lesson preview"]'};
+        var blockedLabels = ${isConverted || lesson.isCloseDeck ? "[]" : '["start rehearsal", "start voice rehearsal", "continue lesson preview"]'};
         var expectedRunId = ${JSON.stringify(params.runId ?? "")};
+        var closeCompletionPosted = false;
         function textOf(node) {
           return String(node && (node.innerText || node.textContent) || "").trim().toLowerCase();
         }
@@ -181,14 +193,6 @@ export default function ApprovedLessonDeckScreen() {
             event.stopImmediatePropagation();
             return false;
           }
-          if (stopDeckNavigation && currentCounter()) {
-            var isBack = label === "back" || label === "×" || label.indexOf("restart") >= 0;
-            if (!isBack) {
-              event.preventDefault();
-              event.stopImmediatePropagation();
-              return false;
-            }
-          }
           if (${isReturning ? "true" : "false"}) {
             window.setTimeout(function () {
               var message = null;
@@ -198,12 +202,18 @@ export default function ApprovedLessonDeckScreen() {
           }
           return true;
         }, true);
+        function postCloseCompletion() {
+          if (!${lesson.isCloseDeck ? "true" : "false"} || closeCompletionPosted || currentCounter() !== "9 / 9") return;
+          closeCompletionPosted = true;
+          if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type:"module-close-complete" }));
+        }
         function enforce() {
           suppressArtifactHostDiagnostic();
           fitApprovedFrame();
           disableDeferredActions();
           enableApprovedMoveCompletion();
           protectScrollableCardContent();
+          postCloseCompletion();
         }
         new MutationObserver(enforce).observe(document, { childList: true, subtree: true });
         window.addEventListener("resize", enforce);
@@ -265,6 +275,21 @@ export default function ApprovedLessonDeckScreen() {
       return;
     }
     if (message.type === "deck-ready") return;
+    if (message.type === "module-close-complete" && lesson?.isCloseDeck && !completionCommitted) {
+      try {
+        await saveModuleCloseCompletion({
+          lessonId: lesson.id as "m1-close" | "m2-close",
+          module: lesson.module,
+          completedAt: Date.now(),
+          sourceLineage: "approved-r2-close-deck",
+        });
+        setCompletionCommitted(true);
+      } catch (error: unknown) {
+        safeLog("[approved-lessons] module close save failed", errorShape(error));
+        Alert.alert("We couldn’t save module completion", "Stay on this screen and try the completion choice again.");
+      }
+      return;
+    }
     if (message.type === "start-rehearsal" && rehearsalConfig && !isReturning) {
       router.push({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: rehearsalConfig.lessonId } });
       return;
@@ -309,7 +334,7 @@ export default function ApprovedLessonDeckScreen() {
       safeLog("[converted-lesson] progress commit failed", errorShape(error));
       Alert.alert("We couldn’t finish securely", "Progress or rehearsal deletion did not complete. Stay on this screen and try again.");
     }
-  }, [activeScenarioRun, approvedConfig, clearActiveScenarioRunStrict, completionCommitted, isM1L1, isReturning, lesson?.id, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, rehearsalConfig, router, writePendingConvertedLessonCompletion]);
+  }, [activeScenarioRun, approvedConfig, clearActiveScenarioRunStrict, completionCommitted, isM1L1, isReturning, lesson, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, rehearsalConfig, router, saveModuleCloseCompletion, writePendingConvertedLessonCompletion]);
 
   const indexEvidence = useMemo(
     () => progressHistoryPresentation(scoredPracticeHistory, activePracticeSession?.sharedResult),
@@ -398,10 +423,14 @@ export default function ApprovedLessonDeckScreen() {
     }
   }, [activeScenarioRun, clearActiveScenarioRunStrict, feedbackLessonId, indexImpact, isCompleting, isStrongVersionSaved, lesson, markPendingConvertedLessonPrivateContentDeleted, promotePendingConvertedLessonCompletion, rehearsalConfig, returningRun, saveScoredPracticeRecord, strongVersion, writePendingConvertedLessonCompletion]);
 
-  if (!__DEV__) {
-    return <Unavailable title="Lesson review is unavailable." body="Approved source decks are available only in internal development builds." />;
-  }
-  if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to the internal lesson catalog and choose another deck." />;
+  if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to your path and choose another lesson." />;
+  if (!hasLaunchAccess) return <Unavailable
+    title={isEntitled ? "Finish the current lesson first." : "A subscription is required for this lesson."}
+    body={isEntitled ? "Your next available lesson stays in order on your path." : "Start or restore your subscription to open the paid curriculum."}
+    onRetry={() => isEntitled && nextDeck
+      ? router.replace({ pathname: "/approved-lesson/[lessonId]", params: { lessonId: nextDeck } })
+      : router.replace("/paywall")}
+  />;
   if (feedbackContext) {
     return <LessonFeedbackScreen
       feedback={feedbackContext}
@@ -452,22 +481,22 @@ export default function ApprovedLessonDeckScreen() {
             safeLog("[approved-lessons] webview failed", { code: event.nativeEvent.code, description: event.nativeEvent.description });
             setLoadError(true);
           }}
-          accessibilityLabel={`${lesson.title} approved source deck`}
+          accessibilityLabel={`${lesson.title} lesson`}
         />
       ) : loadError ? (
         <Unavailable
-          title="The approved deck couldn't open."
+          title="This lesson couldn't open."
           body="The lesson is still available. Try loading it again."
           onRetry={() => setLoadAttempt((current) => current + 1)}
         />
       ) : (
-        <View style={styles.loading}><ActivityIndicator color={C.purple} /><Text style={styles.loadingText}>Opening approved deck…</Text></View>
+        <View style={styles.loading}><ActivityIndicator color={C.purple} /><Text style={styles.loadingText}>Opening lesson…</Text></View>
       )}
       <Pressable
         onPress={() => router.back()}
         style={[styles.backButton, { top: insets.top + 6 }]}
         accessibilityRole="button"
-        accessibilityLabel="Back to approved lesson catalog"
+        accessibilityLabel="Back to Practice"
       >
         <ArrowLeft size={20} color={C.text} />
       </Pressable>
@@ -487,10 +516,11 @@ export default function ApprovedLessonDeckScreen() {
           <View style={styles.lessonMenuCopy}><Text style={styles.lessonMenuTitle}>Reset this lesson</Text><Text style={styles.lessonMenuBody}>Clear its completion and rehearsal, then return to Card 1.</Text></View>
         </Pressable>
       </View> : null}
-      {completionCommitted && !lessonWasReset ? <View style={[styles.completionReset, { bottom: insets.bottom + 18 }]}><Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.completionResetButton} accessibilityRole="button"><RotateCcw size={18} color={C.purple} /><Text style={styles.completionResetText}>{isResetting ? "Resetting…" : "Do this lesson again"}</Text></Pressable></View> : null}
+      {completionCommitted && isConverted && !lessonWasReset ? <View style={[styles.completionReset, { bottom: insets.bottom + 18 }]}><Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.completionResetButton} accessibilityRole="button"><RotateCcw size={18} color={C.purple} /><Text style={styles.completionResetText}>{isResetting ? "Resetting…" : "Do this lesson again"}</Text></Pressable></View> : null}
       {resetNotice ? <View style={[styles.resetNotice, { bottom: insets.bottom + 18 }]}><Text style={styles.resetNoticeText}>{resetNotice.message}</Text>{resetNotice.canUndo ? <Pressable onPress={() => void handleUndoReset()} style={styles.undoButton} accessibilityRole="button"><Text style={styles.undoText}>Undo</Text></Pressable> : null}</View> : null}
-      <View pointerEvents="none" style={[styles.qaBadge, { top: insets.top + 9 }]}>
-        <Text style={styles.qaBadgeText}>{completionCommitted ? "COMPLETE · TRANSCRIPT DELETED" : isReturning ? "REHEARSAL COMPLETE" : "INTERNAL QA"}</Text>
+      <View pointerEvents="none" style={[styles.customerLessonHeader, { top: insets.top + 7 }]}>
+        <Text style={styles.customerLessonEyebrow}>{completionCommitted ? "LESSON COMPLETE" : isReturning ? "BACK FROM REHEARSAL" : customerLessonHeader}</Text>
+        <Text numberOfLines={1} style={styles.customerLessonTitle}>{lesson.shortName}</Text>
       </View>
     </View>
   );
@@ -628,8 +658,9 @@ const styles = StyleSheet.create({
   loadingText: { ...T.caption },
   backButton: { position: "absolute", left: 12, zIndex: 4, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
   menuButton: { position: "absolute", right: 12, zIndex: 5, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
-  qaBadge: { position: "absolute", alignSelf: "center", zIndex: 3, minHeight: 32, borderRadius: 16, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line },
-  qaBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.1, color: C.purple },
+  customerLessonHeader: { position: "absolute", left: 64, right: 64, zIndex: 3, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  customerLessonEyebrow: { fontFamily: font.bold, fontSize: 8, lineHeight: 10, letterSpacing: 1.2, color: C.purple },
+  customerLessonTitle: { fontFamily: font.semi, fontSize: 13, lineHeight: 17, color: C.text, marginTop: 2, maxWidth: "100%" },
   completionScroll: { paddingHorizontal: GUTTER, paddingTop: 76 }, celebrationIcon: { width: 52, height: 52, borderRadius: 18, backgroundColor: C.purple, alignItems: "center", justifyContent: "center", marginBottom: 18, ...shadow.hero }, completionTitle: { fontFamily: font.bold, fontSize: 34, lineHeight: 40, letterSpacing: -0.8, color: C.text, marginTop: 10, maxWidth: 340 }, completionLede: { ...T.support, marginTop: 10, maxWidth: 340 },
   indexImpactCard: { marginTop: 24, gap: 10 }, impactTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }, impactResult: { fontFamily: font.bold, fontSize: 18, lineHeight: 23, color: C.text, marginTop: 7 }, indexTransition: { gap: 9 }, indexNumbers: { flexDirection: "row", alignItems: "baseline", gap: 8 }, indexBefore: { fontFamily: font.semi, fontSize: 31, color: C.dim, textDecorationLine: "line-through" }, indexArrow: { fontFamily: font.regular, fontSize: 23, color: C.dim }, indexAfter: { fontFamily: font.bold, fontSize: 54, lineHeight: 60, color: C.purple, letterSpacing: -1.5 }, indexOutOf: { fontFamily: font.regular, fontSize: 14, color: C.dim }, indexTrack: { height: 8, overflow: "hidden", borderRadius: 4, backgroundColor: "rgba(81,40,136,0.11)" }, indexFill: { height: "100%", borderRadius: 4, backgroundColor: C.purple }, impactExplanation: { ...T.support, color: C.text }, signalNote: { ...T.caption, marginTop: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
   comparisonCard: { marginTop: 14, gap: 12 }, responseBlock: { gap: 5 }, responseLabel: { fontFamily: font.bold, fontSize: 11, letterSpacing: 0.7, textTransform: "uppercase", color: C.dim }, responseText: { fontFamily: font.medium, fontSize: 16, lineHeight: 23, color: C.text }, responseDivider: { height: StyleSheet.hairlineWidth, backgroundColor: C.line }, comparisonText: { ...T.support, color: C.purple, paddingTop: 4 },

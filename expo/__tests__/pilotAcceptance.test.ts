@@ -172,9 +172,10 @@ describe("required exercised curriculum paths", () => {
     expect(rehearsal).toContain('"Transcription unavailable"');
     const ai = await Bun.file(`${import.meta.dir}/../lib/ai.ts`).text();
     const transcription = await Bun.file(`${import.meta.dir}/../lib/transcription.ts`).text();
+    const transcriptionConfig = await Bun.file(`${import.meta.dir}/../lib/transcriptionConfig.ts`).text();
     const backend = await Bun.file(`${import.meta.dir}/../../backend/functions/transcribe/index.ts`).text();
     expect(ai).not.toContain("transcription-model");
-    expect(transcription).toContain("/functions/v1/transcribe");
+    expect(transcriptionConfig).toContain("/functions/v1/transcribe");
     expect(transcription).toContain('body.append("audio"');
     expect(transcription).toContain('body.append("turn", turn)');
     expect(transcription).not.toContain("EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY");

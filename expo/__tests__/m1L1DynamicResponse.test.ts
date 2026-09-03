@@ -7,6 +7,7 @@ import { m1L1DynamicReplyPassesQuality, m1L1ProviderTurn } from "@/lib/m1L1Dynam
 const originalFetch = globalThis.fetch;
 const opening = "The file arrived at 4:20 yesterday, which left too little review time. Can we move the handoff to noon?";
 const context = `${M1_L1_CONVERSION.scenario.title} ${M1_L1_CONVERSION.scenario.situation} ${M1_L1_CONVERSION.scenario.persona}`;
+const authoredCorpus = [...M1_L1_CONVERSION.pushbackOneBank, M1_L1_CONVERSION.authoredEvidenceTrap];
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
@@ -44,11 +45,10 @@ describe("M1 L1 constrained dynamic counterpart", () => {
       kind: "pushback_one",
       approvedTranscript: opening,
       openingTranscript: opening,
-      authoredFallback: M1_L1_CONVERSION.pushbackOneBank[0],
+      authoredCorpus,
       runId: "dynamic-run",
     });
 
-    expect(result.source).toBe("provider");
     expect(result.reply).toContain("quarter close");
     expect(payloads).toHaveLength(2);
     expect(payloads[0]).toMatchObject({
@@ -61,25 +61,102 @@ describe("M1 L1 constrained dynamic counterpart", () => {
     });
   });
 
-  test("falls back to the exact authored line after two failed quality checks", async () => {
+  test("fails closed instead of showing a canned line after two failed quality checks", async () => {
     let requestCount = 0;
     globalThis.fetch = (async (): Promise<Response> => {
       requestCount += 1;
       return new Response(JSON.stringify({ mode: "turn", text: "Sure, you're right. I'll do that." }), { status: 200 });
     }) as typeof fetch;
-    const fallback = M1_L1_CONVERSION.pushbackOneBank[0];
-
-    const result = await generateM1L1DynamicReply({
+    const request = generateM1L1DynamicReply({
       scenario: M1_L1_CONVERSION.scenario,
       kind: "pushback_one",
       approvedTranscript: opening,
       openingTranscript: opening,
-      authoredFallback: fallback,
+      authoredCorpus,
       runId: "fallback-run",
     });
 
+    await expect(request).rejects.toThrow("AI counterpart response is unavailable");
     expect(requestCount).toBe(2);
-    expect(result).toEqual({ reply: fallback, source: "authored" });
+  });
+
+  test("rejects an authored fallback returned verbatim by the provider", async () => {
+    const fallback = M1_L1_CONVERSION.pushbackOneBank[0];
+    globalThis.fetch = (async (): Promise<Response> =>
+      new Response(JSON.stringify({ mode: "turn", text: fallback }), { status: 200 })) as typeof fetch;
+
+    await expect(generateM1L1DynamicReply({
+      scenario: M1_L1_CONVERSION.scenario,
+      kind: "pushback_one",
+      approvedTranscript: opening,
+      openingTranscript: opening,
+      authoredCorpus,
+      runId: "verbatim-fallback-run",
+    })).rejects.toThrow("AI counterpart response is unavailable");
+  });
+
+  test("rejects every authored M1 L1 line even when a different fallback was selected", async () => {
+    const differentCannedLine = M1_L1_CONVERSION.pushbackOneBank[0];
+    globalThis.fetch = (async (): Promise<Response> =>
+      new Response(JSON.stringify({ mode: "turn", text: differentCannedLine }), { status: 200 })) as typeof fetch;
+
+    await expect(generateM1L1DynamicReply({
+      scenario: M1_L1_CONVERSION.scenario,
+      kind: "pushback_one",
+      approvedTranscript: opening,
+      openingTranscript: opening,
+      authoredCorpus,
+      runId: "different-canned-line-run",
+    })).rejects.toThrow("AI counterpart response is unavailable");
+  });
+
+  test("rejects authored fallback wording with punctuation-only changes", async () => {
+    const fallback = M1_L1_CONVERSION.pushbackOneBank[0];
+    const punctuationVariant = fallback.replace(/\.$/, "!");
+    globalThis.fetch = (async (): Promise<Response> =>
+      new Response(JSON.stringify({ mode: "turn", text: punctuationVariant }), { status: 200 })) as typeof fetch;
+
+    await expect(generateM1L1DynamicReply({
+      scenario: M1_L1_CONVERSION.scenario,
+      kind: "pushback_one",
+      approvedTranscript: opening,
+      openingTranscript: opening,
+      authoredCorpus,
+      runId: "punctuation-fallback-run",
+    })).rejects.toThrow("AI counterpart response is unavailable");
+  });
+
+  test("rejects an authored line containing an invisible Unicode format character", async () => {
+    const fallback = M1_L1_CONVERSION.pushbackOneBank[0];
+    const invisibleVariant = fallback.replace("fair", "fa\u200Bir");
+    globalThis.fetch = (async (): Promise<Response> =>
+      new Response(JSON.stringify({ mode: "turn", text: invisibleVariant }), { status: 200 })) as typeof fetch;
+
+    await expect(generateM1L1DynamicReply({
+      scenario: M1_L1_CONVERSION.scenario,
+      kind: "pushback_one",
+      approvedTranscript: opening,
+      openingTranscript: opening,
+      authoredCorpus,
+      runId: "invisible-canned-line-run",
+    })).rejects.toThrow("AI counterpart response is unavailable");
+  });
+
+  test("rejects a second provider reply that repeats the first pressure", async () => {
+    const repeated = "I don't think one late handoff makes this a pattern.";
+    globalThis.fetch = (async (): Promise<Response> =>
+      new Response(JSON.stringify({ mode: "turn", text: repeated }), { status: 200 })) as typeof fetch;
+
+    await expect(generateM1L1DynamicReply({
+      scenario: M1_L1_CONVERSION.scenario,
+      kind: "evidence_trap",
+      approvedTranscript: "Yesterday's late file is one example. Can we decide who owns approval?",
+      openingTranscript: opening,
+      firstPushback: repeated,
+      firstResponse: "Yesterday's late file is one example. Can we decide who owns approval?",
+      authoredCorpus,
+      runId: "duplicate-pressure-run",
+    })).rejects.toThrow("AI counterpart response is unavailable");
   });
 
   test("aborts a stalled provider request within the configured boundary", async () => {

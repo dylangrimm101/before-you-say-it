@@ -15,7 +15,18 @@ import {
 import type { PersonaVoice } from "@/types/convo";
 import type { PilotAudioLine } from "@/types/pilotCurriculum";
 
-const TTS_ENDPOINT = process.env.EXPO_PUBLIC_TTS_ENDPOINT?.trim() || "https://beforeyousayit.app/api/tts";
+const TTS_ENDPOINT = process.env.EXPO_PUBLIC_TTS_ENDPOINT?.trim() ?? "";
+
+function configuredTtsEndpoint(): string {
+  if (!TTS_ENDPOINT) throw new Error("BYSI voice endpoint is not configured");
+  try {
+    const parsed = new URL(TTS_ENDPOINT);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash || !parsed.pathname.endsWith("/api/tts")) throw new Error();
+    return parsed.toString();
+  } catch {
+    throw new Error("BYSI voice endpoint configuration is invalid");
+  }
+}
 
 type BysiVoiceRole = "hope" | "adam";
 
@@ -128,13 +139,14 @@ export async function unlockAudioPlayback(): Promise<boolean> {
 }
 
 async function fetchSpeechDataUri(text: string, persona: PersonaVoice): Promise<string> {
+  const endpoint = configuredTtsEndpoint();
   const role = roleForPersona(persona);
   safeLog("[evidence] BYSI TTS request", {
-    endpoint: evidenceEndpoint(TTS_ENDPOINT),
+    endpoint: evidenceEndpoint(endpoint),
     provider: "user-owned-bysi-tts",
     role,
   });
-  const response = await fetch(TTS_ENDPOINT, {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role, text }),
@@ -142,7 +154,7 @@ async function fetchSpeechDataUri(text: string, persona: PersonaVoice): Promise<
   const contentType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown";
   if (!response.ok) {
     safeLog("[evidence] BYSI TTS response", {
-      endpoint: evidenceEndpoint(TTS_ENDPOINT),
+      endpoint: evidenceEndpoint(endpoint),
       ok: false,
       role,
       status: response.status,
@@ -155,7 +167,7 @@ async function fetchSpeechDataUri(text: string, persona: PersonaVoice): Promise<
   const blob = await response.blob();
   safeLog("[evidence] BYSI TTS response", {
     count: blob.size,
-    endpoint: evidenceEndpoint(TTS_ENDPOINT),
+    endpoint: evidenceEndpoint(endpoint),
     ok: true,
     role,
     status: response.status,
@@ -285,6 +297,21 @@ export async function resetSpeech(): Promise<void> {
   lastUtterance = null;
   await stopSpeech();
   publish({ phase: "idle", canReplay: false });
+}
+
+/** Deletes generated speech bytes on every supported platform and verifies native removal. */
+export async function deleteGeneratedVoiceCacheStrict(): Promise<void> {
+  await resetSpeech();
+  webStaticCache.clear();
+  if (Platform.OS === "web") return;
+  // Loaded only on native so web reset never touches unsupported file APIs.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const FS = require("expo-file-system/legacy") as typeof import("expo-file-system/legacy");
+  if (!FS.cacheDirectory) throw new Error("Generated voice cache location is unavailable");
+  const dir = `${FS.cacheDirectory}rehearsal-voice/`;
+  const before = await FS.getInfoAsync(dir);
+  if (before.exists) await FS.deleteAsync(dir, { idempotent: true });
+  if ((await FS.getInfoAsync(dir)).exists) throw new Error("Generated voice cache deletion was not confirmed");
 }
 
 async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {

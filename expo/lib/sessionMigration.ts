@@ -96,7 +96,7 @@ function readScript(raw: unknown): string[] | undefined {
  * Reduce one stored entry to a minimized record. Returns null when the entry
  * is too malformed to be worth keeping.
  */
-function toRecord(raw: unknown): SessionRecord | null {
+function toRecord(raw: unknown, preserveCustomScenarioText: boolean): SessionRecord | null {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
   const o = raw as Record<string, unknown>;
 
@@ -104,14 +104,16 @@ function toRecord(raw: unknown): SessionRecord | null {
   if (!id) return null;
   const scenarioId = str(o.scenarioId) ?? "unknown";
 
-  // Already minimized — pass it through unchanged so migration is idempotent.
+  // Already minimized — canonicalize it again so old v2 custom labels cannot
+  // bypass the current consent-safe shape during migration/recovery.
   if (o.schemaVersion === SESSION_SCHEMA_VERSION && !carriesContent(o)) {
+    const userAuthored = isUserAuthored(scenarioId) && !preserveCustomScenarioText;
     return {
       schemaVersion: SESSION_SCHEMA_VERSION,
       id,
       scenarioId,
-      title: str(o.title),
-      counterpart: str(o.counterpart),
+      title: userAuthored ? undefined : str(o.title),
+      counterpart: userAuthored ? undefined : str(o.counterpart),
       category: (str(o.category) as CategoryId | undefined) ?? "partner",
       difficulty: (str(o.difficulty) as Difficulty | undefined) ?? "steady",
       persona: str(o.persona) as PersonaVoice | undefined,
@@ -144,7 +146,7 @@ function toRecord(raw: unknown): SessionRecord | null {
   // Lift the script out of a legacy debrief body so upgrading users keep the
   // scripts they were already shown, rather than silently losing them.
   const script = readScript(o.script) ?? (debrief ? readScript(debrief.script) : undefined);
-  const userAuthored = isUserAuthored(scenarioId);
+  const userAuthored = isUserAuthored(scenarioId) && !preserveCustomScenarioText;
 
   return {
     schemaVersion: SESSION_SCHEMA_VERSION,
@@ -185,7 +187,7 @@ function toRecord(raw: unknown): SessionRecord | null {
  *
  * Fails safe: unparseable input yields an empty list rather than throwing.
  */
-export function migrateSessions(raw: unknown): MigrationResult {
+export function migrateSessions(raw: unknown, options: { preserveCustomScenarioText?: boolean } = {}): MigrationResult {
   let value: unknown = raw;
   if (typeof value === "string") {
     try {
@@ -199,7 +201,7 @@ export function migrateSessions(raw: unknown): MigrationResult {
   let removedContentFrom = 0;
   const records: SessionRecord[] = [];
   value.forEach((entry) => {
-    const record = toRecord(entry);
+    const record = toRecord(entry, options.preserveCustomScenarioText === true);
     if (!record) return;
     if (entry !== null && typeof entry === "object" && carriesContent(entry as Record<string, unknown>)) {
       removedContentFrom += 1;

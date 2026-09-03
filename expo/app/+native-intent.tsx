@@ -1,3 +1,5 @@
-export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {
-  return "/";
+import { validatedNativeIntentPath } from "@/lib/nativeIntent";
+
+export function redirectSystemPath({ path }: { path: string; initial: boolean }): string {
+  return validatedNativeIntentPath(path);
 }

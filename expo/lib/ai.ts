@@ -1,17 +1,31 @@
 import { personaFor } from "@/constants/personas";
+import { DIFFICULTY } from "@/constants/scenarios";
 import { renderCounterpartMessage } from "@/lib/rehearsal";
 import { errorShape, safeLog } from "@/lib/redact";
 import type { Debrief, Difficulty, OnboardingForm, PersonaVoice, ReactionPattern, Scenario, Turn } from "@/types/convo";
 import { neutralPilotCoachResponse, selectDay8Pushback, validatePilotCoachResponse } from "@/lib/pilotCurriculum";
 import { m1L1DynamicReplyPassesQuality, type M1L1PressureKind } from "@/lib/m1L1DynamicResponse";
+import { canonicalCounterpartLine } from "@/lib/counterpartLineCanonicalization";
+import { approvedRehearsalPressurePassesQuality, isExcludedApprovedRehearsalLine } from "@/lib/approvedRehearsalPressure";
 import type {
   PilotCoachResponse,
   PilotCounterpartResponse,
   PilotModule,
 } from "@/types/pilotCurriculum";
 
-const GENERATE_ENDPOINT = process.env.EXPO_PUBLIC_GENERATE_ENDPOINT?.trim() || "https://beforeyousayit.app/api/generate";
+const GENERATE_ENDPOINT = process.env.EXPO_PUBLIC_GENERATE_ENDPOINT?.trim() ?? "";
 const BYSI_GENERATION_TIMEOUT_MS = 15_000;
+
+function configuredGenerateEndpoint(): string {
+  if (!GENERATE_ENDPOINT) throw new Error("BYSI generation endpoint is not configured");
+  try {
+    const parsed = new URL(GENERATE_ENDPOINT);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash || !parsed.pathname.endsWith("/api/generate")) throw new Error();
+    return parsed.toString();
+  } catch {
+    throw new Error("BYSI generation endpoint configuration is invalid");
+  }
+}
 
 type BysiEntryRoute = "real_conversation" | "recurring_problem" | "desired_skill";
 
@@ -19,6 +33,13 @@ interface BysiContract {
   entry_route: BysiEntryRoute;
   context: string;
   scenario: string;
+  counterpart?: string;
+  counterpart_persona?: string;
+  difficulty?: Difficulty | null;
+  difficulty_behavior?: string | null;
+  reaction_pattern?: ReactionPattern | null;
+  opens_with?: "user" | "counterpart";
+  opening_line?: string;
   success_target: string;
   pressure_condition: string;
 }
@@ -90,10 +111,11 @@ function evidenceEndpoint(url: string): string {
 
 /** Performs one bounded BYSI request so a provider stall cannot trap the rehearsal UI. */
 export async function requestBysiGeneration(payload: Record<string, unknown>, timeoutMs: number = BYSI_GENERATION_TIMEOUT_MS): Promise<Response> {
+  const endpoint = configuredGenerateEndpoint();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(GENERATE_ENDPOINT, {
+    return await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -105,18 +127,19 @@ export async function requestBysiGeneration(payload: Record<string, unknown>, ti
 }
 
 async function postBysi<T>(payload: Record<string, unknown>): Promise<T> {
+  const endpoint = configuredGenerateEndpoint();
   const type = typeof payload.type === "string" ? payload.type : "unknown";
   const contract = payload.contract as { entry_route?: unknown } | undefined;
   const entryRoute = typeof contract?.entry_route === "string" ? contract.entry_route : "unknown";
   safeLog("[evidence] BYSI generation request", {
-    endpoint: evidenceEndpoint(GENERATE_ENDPOINT),
+    endpoint: evidenceEndpoint(endpoint),
     entryRoute,
     provider: "user-owned-claude-backend",
     type,
   });
   const response = await requestBysiGeneration(payload);
   safeLog("[evidence] BYSI generation response", {
-    endpoint: evidenceEndpoint(GENERATE_ENDPOINT),
+    endpoint: evidenceEndpoint(endpoint),
     entryRoute,
     ok: response.ok,
     status: response.status,
@@ -132,13 +155,30 @@ function bysiContract(
   reaction?: ReactionPattern,
   outcome?: string,
   entryRoute: BysiEntryRoute = "real_conversation",
+  difficulty?: Difficulty,
 ): BysiContract {
+  const difficultyBehavior = difficulty ? DIFFICULTY[difficulty].behaviour : null;
+  const reactionBehavior = reaction ? REACTION_BEHAVIOUR[reaction] : null;
+  const opensWith = scenario.opensWith ?? "user";
   return {
     entry_route: entryRoute,
     context: scenario.category,
-    scenario: `${scenario.title}. ${scenario.situation}`.trim(),
+    scenario: `${scenario.title}. Counterpart: ${scenario.counterpart}. Situation: ${scenario.situation} Opening: ${opensWith === "counterpart" ? scenario.openingLine : "The learner opens in their own words."}`.trim(),
+    counterpart: scenario.counterpart,
+    counterpart_persona: scenario.persona,
+    difficulty: difficulty ?? null,
+    difficulty_behavior: difficultyBehavior,
+    reaction_pattern: reaction ?? null,
+    opens_with: opensWith,
+    opening_line: scenario.openingLine,
     success_target: outcome?.trim() || scenario.goal,
-    pressure_condition: reaction ? REACTION_BEHAVIOUR[reaction] : scenario.persona,
+    pressure_condition: [
+      `Stay in character as ${scenario.counterpart}.`,
+      "Scenario facts and persona are authoritative; never replace them with a generic reaction style.",
+      scenario.persona,
+      difficultyBehavior ? `Use difficulty only to scale resistance without changing the scenario: ${difficultyBehavior}` : "",
+      reactionBehavior ? `Use the reaction tendency only when it does not contradict the scenario: ${reactionBehavior}` : "",
+    ].filter(Boolean).join(" "),
   };
 }
 
@@ -147,11 +187,12 @@ function bysiTranscript(turns: Turn[], scenario: Scenario): BysiTranscript {
   const counterpartTurns = turns
     .filter((turn) => turn.role === "them")
     .map((turn) => renderCounterpartMessage(turn.text, scenario.counterpart).body);
+  const authoredOpening = scenario.opensWith === "counterpart" ? scenario.openingLine : "";
   return {
     user_turn_1: userTurns[0] ?? "",
-    counterpart_pushback: counterpartTurns[0] ?? scenario.openingLine,
+    counterpart_pushback: counterpartTurns[0] ?? authoredOpening,
     user_turn_2: userTurns[1] ?? "",
-    counterpart_close: counterpartTurns[1] ?? scenario.openingLine,
+    counterpart_close: counterpartTurns[1] ?? "",
   };
 }
 
@@ -182,12 +223,25 @@ export interface CounterpartTurn {
   nudge: string;
 }
 
-const CHANNEL_LEAKAGE = /\b(?:text(?:ed|ing)?|message(?:d|s|ing)?|dm(?:s|ed|ing)?|chat(?:ted|ting)?|phone call|call(?:ed|ing)?|facetime|zoom|email(?:ed|ing)?|video call)\b/i;
+const CHANNEL_FAMILIES = [
+  /\btext(?:ed|ing)?\b/i,
+  /\bmessage(?:d|s|ing)?\b/i,
+  /\bdm(?:s|ed|ing)?\b/i,
+  /\bchat(?:ted|ting)?\b/i,
+  /\b(?:phone call|call(?:ed|ing)?)\b/i,
+  /\bfacetime\b/i,
+  /\bzoom\b/i,
+  /\bvideo call\b/i,
+  /\bemail(?:ed|ing)?\b/i,
+] as const;
 const EASY_CLOSE = /\b(?:you(?:'|’)re right|i agree|i(?:'|’)m sorry|i apologize|i(?:'|’)ll do that|i will do that|consider it done|we have a deal|that sounds fair)\b/i;
+const COACHING_LEAKAGE = /\b(?:as your coach|good job|try saying|you should say|the learner should|coaching feedback)\b/i;
+const ROLE_LEAKAGE = /\b(?:as an ai|language model|role-?play(?:ing)?|this scenario|system prompt)\b/i;
 
 /** Rejects unsupported channel changes and unrealistically easy final agreement. */
-export function counterpartLinePassesQuality(line: string, turn: AcquisitionCounterpartTurn): boolean {
-  if (CHANNEL_LEAKAGE.test(line)) return false;
+export function counterpartLinePassesQuality(line: string, turn: AcquisitionCounterpartTurn, groundingContext: string = ""): boolean {
+  if (CHANNEL_FAMILIES.some((family) => family.test(line) && !family.test(groundingContext))) return false;
+  if (COACHING_LEAKAGE.test(line) || ROLE_LEAKAGE.test(line)) return false;
   if (turn === "pushback" && /^(?:i hear you|you(?:'|’)re right|that(?:'|’)s fair|okay|i get that)\b/i.test(line.trim())) return false;
   return turn !== "close" || !EASY_CLOSE.test(line);
 }
@@ -225,13 +279,12 @@ export interface M1L1DynamicReplyInput {
   openingTranscript: string;
   firstPushback?: string;
   firstResponse?: string;
-  authoredFallback: string;
+  authoredCorpus: readonly string[];
   runId: string;
 }
 
 export interface M1L1DynamicReplyResult {
   reply: string;
-  source: "provider" | "authored";
 }
 
 export interface ApprovedRehearsalDynamicReplyInput {
@@ -246,25 +299,16 @@ export interface ApprovedRehearsalDynamicReplyInput {
   openingTranscript: string;
   firstPressure?: string;
   firstResponse?: string;
-  authoredFallback: string;
+  authoredCorpus: readonly string[];
   runId: string;
 }
 
-const SHARED_REHEARSAL_COACHING_LEAKAGE = /\b(?:learner|lesson|practice|rehearsal|coach|coaching|rubric|transcript|named move|try saying|you should say|good job|well done)\b/i;
-
-/** Rejects unsafe or instructional shared-lesson replies before they reach the learner. */
-export function approvedRehearsalDynamicReplyPassesQuality(reply: string): boolean {
-  const clean = reply.trim();
-  const words = clean.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? [];
-  return clean.length >= 3
-    && clean.length <= 320
-    && words.length >= 2
-    && words.length <= 55
-    && !SHARED_REHEARSAL_COACHING_LEAKAGE.test(clean)
-    && counterpartLinePassesQuality(clean, "pushback");
+/** Rejects unsafe, ungrounded, or instructional shared-lesson replies before they reach the learner. */
+export function approvedRehearsalDynamicReplyPassesQuality(reply: string, groundingContext: string): boolean {
+  return approvedRehearsalPressurePassesQuality(reply, groundingContext);
 }
 
-/** Generates a scenario-aware pressure for an approved lesson, with its authored line as a fail-safe only. */
+/** Generates a provider-only scenario-aware pressure for an approved lesson. */
 export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehearsalDynamicReplyInput): Promise<M1L1DynamicReplyResult> {
   const pressureObjective = [
     input.kind === "pushback_one"
@@ -274,6 +318,16 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
     `Keep every fact consistent with the scenario and persona, keep the issue unresolved, and do not explain or name the teaching move “${input.namedMove}”.`,
     `The later retry guidance will be: ${input.retryDirection}`,
   ].join(" ");
+  const groundingContext = [
+    input.scenario.title,
+    input.scenario.situation,
+    input.scenario.persona,
+    input.scenario.goal,
+    input.openingTranscript,
+    input.firstPressure ?? "",
+    input.firstResponse ?? "",
+    input.approvedTranscript,
+  ].filter(Boolean).join(" ");
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -290,7 +344,7 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
           user_turn_2: input.firstResponse ?? "",
           counterpart_close: "",
         } satisfies BysiTranscript,
-        avoid_repeating: [input.firstPressure ?? "", input.authoredFallback].filter(Boolean),
+        avoid_repeating: [...input.authoredCorpus, input.firstPressure ?? ""].filter(Boolean),
         lesson_constraints: {
           lesson_id: input.lessonId,
           counterpart_id: input.counterpartId,
@@ -312,14 +366,18 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
         variation_seed: `${input.runId}-${input.lessonId}-${input.kind}-${attempt}`,
       });
       const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
-      if (reply && approvedRehearsalDynamicReplyPassesQuality(reply)) return { reply, source: "provider" };
+      const canonicalReply = canonicalCounterpartLine(reply);
+      const repeatsCorpus = isExcludedApprovedRehearsalLine(reply, input.authoredCorpus);
+      const repeatsFirstPressure = Boolean(input.firstPressure)
+        && canonicalReply === canonicalCounterpartLine(input.firstPressure!);
+      if (reply && !repeatsCorpus && !repeatsFirstPressure && approvedRehearsalDynamicReplyPassesQuality(reply, groundingContext)) return { reply };
       safeLog("[ai] approved rehearsal quality gate rejected line", { attempt, lessonId: input.lessonId });
     } catch (error) {
       safeLog("[ai] approved rehearsal counterpart request failed", { attempt, lessonId: input.lessonId, ...errorShape(error) });
     }
   }
 
-  return { reply: input.authoredFallback, source: "authored" };
+  throw new Error("AI counterpart response is unavailable");
 }
 
 function m1L1ConversationContext(input: M1L1DynamicReplyInput): string {
@@ -333,7 +391,7 @@ function m1L1ConversationContext(input: M1L1DynamicReplyInput): string {
   ].filter((value) => value.trim().length > 0).join(" ");
 }
 
-/** Generates one constrained M1 L1 pressure turn, retries one rejected result, then returns the authored fallback. */
+/** Generates one constrained M1 L1 pressure turn and fails closed when provider evidence is unavailable. */
 export async function generateM1L1DynamicReply(input: M1L1DynamicReplyInput): Promise<M1L1DynamicReplyResult> {
   const context = m1L1ConversationContext(input);
   const turn = input.kind === "pushback_one" ? "pushback" : "close";
@@ -357,7 +415,7 @@ export async function generateM1L1DynamicReply(input: M1L1DynamicReplyInput): Pr
           pressure_condition: `${input.scenario.persona} ${pressureObjective}`,
         },
         transcript,
-        avoid_repeating: [input.firstPushback ?? "", input.authoredFallback].filter(Boolean),
+        avoid_repeating: [...input.authoredCorpus, input.firstPushback ?? ""].filter(Boolean),
         lesson_constraints: {
           lesson_id: "m1-l1",
           counterpart: "Adam, the learner's colleague",
@@ -370,8 +428,15 @@ export async function generateM1L1DynamicReply(input: M1L1DynamicReplyInput): Pr
         variation_seed: `${input.runId}-${input.kind}-${attempt}`,
       });
       const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
-      if (reply && m1L1DynamicReplyPassesQuality(reply, input.kind, input.approvedTranscript, context)) {
-        return { reply, source: "provider" };
+      const normalizedReply = canonicalCounterpartLine(reply);
+      const repeatsAuthoredLine = input.authoredCorpus.some((line) => normalizedReply === canonicalCounterpartLine(line));
+      const repeatsFirstPressure = Boolean(input.firstPushback)
+        && normalizedReply === canonicalCounterpartLine(input.firstPushback!);
+      if (reply
+        && !repeatsAuthoredLine
+        && !repeatsFirstPressure
+        && m1L1DynamicReplyPassesQuality(reply, input.kind, input.approvedTranscript, context)) {
+        return { reply };
       }
       safeLog("[ai] M1 L1 semantic quality gate rejected line", { attempt, kind: input.kind });
     } catch (error) {
@@ -379,7 +444,7 @@ export async function generateM1L1DynamicReply(input: M1L1DynamicReplyInput): Pr
     }
   }
 
-  return { reply: input.authoredFallback, source: "authored" };
+  throw new Error("AI counterpart response is unavailable");
 }
 
 export async function nextCounterpartTurn(
@@ -395,7 +460,7 @@ export async function nextCounterpartTurn(
   const avoidRepeating = turns
     .filter((item) => item.role === "them")
     .map((item) => renderCounterpartMessage(item.text, scenario.counterpart).body);
-  void difficulty;
+  const groundingContext = `${scenario.title} ${scenario.situation} ${scenario.persona} ${scenario.openingLine}`;
   void persona;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -403,13 +468,13 @@ export async function nextCounterpartTurn(
       const result = await postBysi<BysiTurnResponse>({
         type: "rehearsal_turn",
         turn,
-        contract: bysiContract(scenario, reaction, outcome, entryRoute),
+        contract: bysiContract(scenario, reaction, outcome, entryRoute, difficulty),
         transcript: bysiTranscript(turns, scenario),
         avoid_repeating: avoidRepeating,
         variation_seed: `${scenario.id}-${turn}-${Date.now().toString(36)}-${attempt}`,
       });
       const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
-      if (reply && counterpartLinePassesQuality(reply, turn)) return { reply, tension: 50, nudge: "" };
+      if (reply && counterpartLinePassesQuality(reply, turn, groundingContext)) return { reply, tension: 50, nudge: "" };
       safeLog("[ai] BYSI counterpart quality gate rejected line", { attempt, turn });
     } catch (error) {
       safeLog("[ai] BYSI counterpart request failed", { attempt, ...errorShape(error) });

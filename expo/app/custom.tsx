@@ -264,7 +264,7 @@ export default function CustomScenario() {
               {DIFFICULTIES.map((item) => {
                 const isSelected = item.id === difficulty;
                 return (
-                  <PressCard key={item.id} onPress={() => setDifficulty(item.id)}>
+                  <PressCard key={item.id} onPress={() => setDifficulty(item.id)} accessibilityRole="radio" accessibilityState={{ selected: isSelected }} accessibilityLabel={`${item.label}: ${item.note}`}>
                     <View style={[styles.difficulty, isSelected && styles.optionSelected]}>
                       <View style={styles.difficultyCopy}>
                         <Text style={[styles.difficultyTitle, isSelected && styles.optionTextSelected]}>

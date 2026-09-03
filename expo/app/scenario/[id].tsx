@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, Target, UserRound } from "lucide-react-native";
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PaidHeader, ProductCard, SectionLabel, StatusPill } from "@/components/PaidProductUI";
@@ -17,6 +17,8 @@ import { voiceForScenario } from "@/constants/personas";
 import { CATEGORIES, DIFFICULTY } from "@/constants/scenarios";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { canStartRehearsal } from "@/lib/access";
+import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
+import { scenarioStartDisposition } from "@/lib/scenarioLifecycle";
 import { createScenarioPracticeRun } from "@/lib/scenarioPractice";
 import { useStore } from "@/providers/store";
 import type { Difficulty, ReactionPattern } from "@/types/convo";
@@ -32,7 +34,7 @@ export default function ScenarioBrief() {
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { findScenario, profile, access, createActiveScenarioRunStrict } = useStore();
+  const { findScenario, profile, access, activeScenarioRun, createActiveScenarioRunStrict, archiveActiveScenarioRunStrict } = useStore();
   const [level, setLevel] = useState<Difficulty>(
     (params.level as Difficulty) ?? "steady",
   );
@@ -65,25 +67,43 @@ export default function ScenarioBrief() {
       return;
     }
 
-    const runId = `scenario-${scenario.id}-${Date.now().toString(36)}`;
-    await createActiveScenarioRunStrict(createScenarioPracticeRun(
-      scenario,
-      level,
-      params.reaction ?? profile?.reaction ?? "not-sure",
-      runId,
-      Date.now(),
-      voiceForScenario(scenario, profile?.persona ?? "woman-hope"),
-    ));
-    router.push({
-      pathname: "/rehearse/[id]",
-      params: {
-        id: scenario.id,
-        difficulty: level,
-        reaction: params.reaction ?? profile?.reaction ?? "not-sure",
-        scenarioRunId: runId,
-        ...(params.challengeDay ? { challengeDay: params.challengeDay } : {}),
-      },
-    });
+    const disposition = scenarioStartDisposition(activeScenarioRun, scenario.id);
+    if (disposition.kind === "protected_conflict") {
+      Alert.alert("A lesson rehearsal is still active", "Return to that lesson to finish or discard it before starting a standalone scenario.");
+      return;
+    }
+    if (disposition.kind === "resume") {
+      router.push({ pathname: "/rehearse/[id]", params: { id: scenario.id, scenarioRunId: disposition.runId } });
+      return;
+    }
+    try {
+      if (disposition.kind === "retire_then_create") {
+        const expected = activeRunRevision(activeScenarioRun);
+        if (!expected || expected.runId !== disposition.runId) throw new Error("Active scenario identity changed");
+        await archiveActiveScenarioRunStrict(expected);
+      }
+      const runId = `scenario-${scenario.id}-${Date.now().toString(36)}`;
+      await createActiveScenarioRunStrict(createScenarioPracticeRun(
+        scenario,
+        level,
+        params.reaction ?? profile?.reaction ?? "not-sure",
+        runId,
+        Date.now(),
+        voiceForScenario(scenario, profile?.persona ?? "woman-hope"),
+      ));
+      router.push({
+        pathname: "/rehearse/[id]",
+        params: {
+          id: scenario.id,
+          difficulty: level,
+          reaction: params.reaction ?? profile?.reaction ?? "not-sure",
+          scenarioRunId: runId,
+          ...(params.challengeDay ? { challengeDay: params.challengeDay } : {}),
+        },
+      });
+    } catch {
+      Alert.alert("Couldn’t start the rehearsal", "Your existing rehearsal is still safe. Try again.");
+    }
   };
 
   return (
@@ -126,6 +146,13 @@ export default function ScenarioBrief() {
         </Reveal>
 
         <Reveal index={3}>
+          <ProductCard style={styles.sceneStartCard}>
+            <SectionLabel>How the scene starts</SectionLabel>
+            <Text style={styles.sceneStartText}>{scenario.opensWith === "counterpart" ? `“${scenario.openingLine}”` : "You’ll open this conversation in your own words."}</Text>
+          </ProductCard>
+        </Reveal>
+
+        <Reveal index={4}>
           <View style={styles.difficultyHeading}>
             <SectionLabel>Practice difficulty</SectionLabel>
             <Text style={styles.difficultySupport}>
@@ -139,11 +166,13 @@ export default function ScenarioBrief() {
             const selected = item === level;
             const detail = DIFFICULTY[item];
             return (
-              <Reveal key={item} index={4 + index}>
+              <Reveal key={item} index={5 + index}>
                 <PressCard
                   onPress={() => setLevel(item)}
                   containerStyle={styles.levelHit}
                   accessibilityLabel={`${detail.label}: ${detail.note}`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
                 >
                   <View style={[styles.level, selected && styles.levelSelected]}>
                     <SelectionWipe selected={selected} />
@@ -179,7 +208,7 @@ export default function ScenarioBrief() {
           })}
         </View>
 
-        <Reveal index={7}>
+        <Reveal index={8}>
           <Text style={styles.disclaimer}>
             A rehearsal is private practice designed to help you prepare before a real conversation.
           </Text>
@@ -214,6 +243,15 @@ const styles = StyleSheet.create({
   detailCard: {
     marginBottom: 12,
     padding: 20,
+  },
+  sceneStartCard: {
+    marginBottom: 12,
+    padding: 20,
+  },
+  sceneStartText: {
+    ...T.support,
+    color: C.text,
+    marginTop: 10,
   },
   cardHeading: {
     alignItems: "center",

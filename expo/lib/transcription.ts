@@ -1,6 +1,8 @@
 import { Platform } from "react-native";
 
 import { safeLog } from "@/lib/redact";
+import { supabase } from "@/lib/supabase";
+import { validatedTranscribeEndpoint } from "@/lib/transcriptionConfig";
 
 export type TranscriptionTurn = "opener" | "reply";
 
@@ -10,9 +12,7 @@ const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const TRANSCRIPTION_TIMEOUT_MS = 45_000;
 
 /** Public endpoint URL only; transcription provider credentials remain server-side. */
-export const TRANSCRIBE_ENDPOINT = CONFIGURED_ENDPOINT || (
-  SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/transcribe` : ""
-);
+export const TRANSCRIBE_ENDPOINT = validatedTranscribeEndpoint(CONFIGURED_ENDPOINT, SUPABASE_URL);
 
 export class TranscriptionUnavailableError extends Error {
   readonly status: number;
@@ -34,11 +34,14 @@ function evidenceEndpoint(url: string): string {
   return url.replace(/^https?:\/\//, "").slice(0, 64);
 }
 
-function requestHeaders(): Record<string, string> {
-  if (!TRANSCRIBE_ENDPOINT.includes(".supabase.co/functions/v1/") || !SUPABASE_ANON_KEY) return {};
+async function requestHeaders(): Promise<Record<string, string>> {
+  if (!supabase || !SUPABASE_ANON_KEY) throw new TranscriptionUnavailableError(401);
+  const { data, error } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token?.trim();
+  if (error || !accessToken) throw new TranscriptionUnavailableError(401);
   return {
     apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    Authorization: `Bearer ${accessToken}`,
   };
 }
 
@@ -77,9 +80,10 @@ export async function transcribeRecording(
   const timeout = setTimeout(() => controller.abort(), TRANSCRIPTION_TIMEOUT_MS);
   let response: Response;
   try {
+    const headers = await requestHeaders();
     response = await fetch(TRANSCRIBE_ENDPOINT, {
       method: "POST",
-      headers: requestHeaders(),
+      headers,
       body,
       signal: controller.signal,
     });

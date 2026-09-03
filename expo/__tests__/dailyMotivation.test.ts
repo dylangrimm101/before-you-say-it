@@ -18,20 +18,12 @@ describe("daily dashboard motivation", () => {
     expect(dailyMotivation(today)).not.toBe(dailyMotivation(tomorrow));
   });
 
-  test("Today leads with the evidence-backed module and locked activity hierarchy", async () => {
+  test("Today leads with the next approved launch deck and locked activity hierarchy", async () => {
     const today = await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text();
-    expect(today).toContain("todayRecommendedModuleId");
+    expect(today).toContain("nextLaunchDeck");
     expect(today).toContain("Communication Index");
     expect(today).toContain("TODAY_ACTIVITY_KEYS");
     expect(today).toContain("View your path");
-    expect(today).toContain('pathname: "/(tabs)/library"');
-    expect(today).toContain('section: "lessons"');
-  });
-
-  test("Practice honors a View your path request by selecting Lessons", async () => {
-    const practice = await Bun.file(`${import.meta.dir}/../app/(tabs)/library.tsx`).text();
-    expect(practice).toContain('section === "lessons"');
-    expect(practice).toContain('setView("lessons")');
   });
 
   test("does not use missed-day pressure, a giant recommendation card, or fixture history", async () => {
