@@ -255,6 +255,53 @@ export const SCENARIOS: Scenario[] = [
   },
 ];
 
+function expandedScenario(
+  id: string,
+  category: CategoryId,
+  title: string,
+  counterpart: string,
+  situation: string,
+): Scenario {
+  return {
+    id,
+    category,
+    power: "peer",
+    title,
+    counterpart,
+    situation,
+    persona: `${counterpart} has a reasonable concern and will engage when the conversation stays specific, calm, and focused on a workable next step.`,
+    goal: `Address the situation directly and agree on one clear next step.`,
+    opensWith: "user",
+    openingLine: "You said you wanted to talk. What’s on your mind?",
+    minutes: 7,
+  };
+}
+
+SCENARIOS.push(
+  expandedScenario("parenting-disagreement", "partner", "Disagree about a parenting decision", "Taylor — your partner", "Taylor handled a difficult moment with your child differently than you would have. You want to agree on what to do next without attacking either person’s parenting."),
+  expandedScenario("last-minute-plan-change", "partner", "Push back on a last-minute plan change", "Casey — your partner", "Casey changed a shared weekend plan after you rearranged work and childcare. You want to address the impact and improve future handoffs."),
+  expandedScenario("whole-task-ownership", "partner", "Ask them to own the whole task", "Morgan — your partner", "Morgan helps when asked, but you still notice, plan, remind, and check. You want to hand over one complete recurring responsibility."),
+  expandedScenario("phone-attention", "partner", "Talk about phone attention", "Riley — your partner", "Separate screens have left you feeling alone together. You want one repeatable phone-free ritual without keeping score."),
+  expandedScenario("work-priority-conflict", "partner", "Decide whose work commitment bends", "Avery — your partner", "You both have important work commitments at the same time and need to choose who covers pickup without ranking whose career matters more."),
+  expandedScenario("repair-after-snapping", "partner", "Repair after you snapped", "Jordan — your partner", "You spoke sharply during a rushed handoff. You need to apologize for the wording and still resolve the missed handoff underneath it."),
+  expandedScenario("decline-family-invitation", "family", "Decline a family invitation without over-explaining", "Lena — your aunt", "Your household cannot attend a large gathering. You want to decline warmly without turning every explanation into a negotiation."),
+  expandedScenario("parenting-criticism", "family", "Respond to criticism of your parenting", "Your father-in-law", "Your father-in-law questioned a parenting decision in front of your child. You want future concerns raised privately."),
+  expandedScenario("private-news-boundary", "family", "Ask family not to share your private news", "Jamie — your cousin", "Jamie passed along personal news you asked them to keep private. You want a clear permission rule for the future."),
+  expandedScenario("change-holiday-tradition", "family", "Change a family holiday tradition", "Your mom", "Your household can no longer spend the entire holiday at your mother’s home. You want to state the new plan and preserve connection."),
+  expandedScenario("family-money-request", "family", "Say no to a family money request", "Marcus — your brother", "Marcus needs a loan, but lending it would strain your household and past loans have damaged trust."),
+  expandedScenario("request-time-off", "work", "Ask for time off when the team is stretched", "Dana — your manager", "You need several days off while the team is short-staffed. You want a clear decision rather than taking ownership of the staffing problem."),
+  expandedScenario("manager-skepticism", "work", "Defend your recommendation to a skeptical manager", "Morgan — your manager", "You recommend a bolder approach while Morgan favors the familiar option. You need to present one rationale, one risk, and a testable next step."),
+  expandedScenario("meeting-interruption", "work", "Get your point back after being interrupted", "Chris — your teammate", "Chris interrupted while you were explaining a risk and the meeting is moving on. You want to reclaim the floor calmly."),
+  expandedScenario("scope-creep", "work", "Push back on expanding scope", "Avery — your client", "Several new requests have been added while the deadline and budget remain fixed. You need a decision about what moves."),
+  expandedScenario("price-pushback", "work", "Handle price pushback without discounting", "Jordan — a prospective client", "Jordan likes your proposal but has a lower competing quote. You want to understand the objection before changing price or scope."),
+  expandedScenario("unhappy-client", "work", "Respond to an unhappy client", "Riley — your client", "A delivery missed an expectation Riley believed was agreed. You need to acknowledge the impact and identify the gap before promising a fix."),
+  expandedScenario("decline-friend-invitation", "friends", "Decline an invitation without inventing an excuse", "Alex — your friend", "You value the friendship but do not want to attend the weekend event. You want to say no honestly and warmly."),
+  expandedScenario("reconnect-after-silence", "friends", "Reconnect after months of silence", "Taylor — an old friend", "You left Taylor’s messages unanswered for months. You want to own the silence and offer one realistic next step."),
+  expandedScenario("join-group-conversation", "friends", "Join a group conversation naturally", "Casey — a person in the group", "You are standing at the edge of a conversation and want to join with one relevant observation or question."),
+  expandedScenario("leave-conversation-gracefully", "friends", "Leave a conversation gracefully", "Morgan — a person you just met", "The conversation has run its course. You want to close warmly and move on without inventing an emergency."),
+  expandedScenario("forgotten-name", "friends", "Recover after forgetting someone’s name", "Jamie — a person you have met before", "Jamie remembers you, but you cannot recall their name. You want to ask directly and continue without making it a performance."),
+);
+
 export function scenariosFor(category: CategoryId): Scenario[] {
   return SCENARIOS.filter((s) => s.category === category);
 }
