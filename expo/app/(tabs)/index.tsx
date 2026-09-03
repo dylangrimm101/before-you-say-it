@@ -194,7 +194,12 @@ export default function TodayScreen() {
     router.push({ pathname: "/module/[day]", params: { day: moduleId } });
   }, [access.entitlement, activities, moduleId, router]);
 
-  const openPath = useCallback((): void => { router.push("/path"); }, [router]);
+  const openPath = useCallback((): void => {
+    router.push({
+      pathname: "/(tabs)/library",
+      params: { section: "lessons", pathRequest: String(Date.now()) },
+    });
+  }, [router]);
   const openProgress = useCallback((): void => { router.push("/(tabs)/progress"); }, [router]);
 
   return (

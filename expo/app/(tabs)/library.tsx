@@ -1,6 +1,6 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, ChevronRight, LockKeyhole, PenLine, Sparkles } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -19,8 +19,13 @@ type PracticeView = "lessons" | "scenarios";
 export default function Library() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { section, pathRequest } = useLocalSearchParams<{ section?: string; pathRequest?: string }>();
   const { profile, customScenarios, completed, access, activePracticeSession } = useStore();
   const [view, setView] = useState<PracticeView>("lessons");
+
+  useEffect(() => {
+    if (section === "lessons" && pathRequest) setView("lessons");
+  }, [pathRequest, section]);
   const [active, setActive] = useState<CategoryId>(profile?.focus ?? "partner");
   const category = CATEGORIES.find((item) => item.id === active);
   const list = useMemo<Scenario[]>(() => [...customScenarios.filter((scenario) => scenario.category === active), ...SCENARIOS.filter((scenario) => scenario.category === active)], [active, customScenarios]);

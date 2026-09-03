@@ -24,6 +24,14 @@ describe("daily dashboard motivation", () => {
     expect(today).toContain("Communication Index");
     expect(today).toContain("TODAY_ACTIVITY_KEYS");
     expect(today).toContain("View your path");
+    expect(today).toContain('pathname: "/(tabs)/library"');
+    expect(today).toContain('section: "lessons"');
+  });
+
+  test("Practice honors a View your path request by selecting Lessons", async () => {
+    const practice = await Bun.file(`${import.meta.dir}/../app/(tabs)/library.tsx`).text();
+    expect(practice).toContain('section === "lessons"');
+    expect(practice).toContain('setView("lessons")');
   });
 
   test("does not use missed-day pressure, a giant recommendation card, or fixture history", async () => {
