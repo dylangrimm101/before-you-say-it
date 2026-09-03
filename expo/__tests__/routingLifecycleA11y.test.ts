@@ -99,7 +99,7 @@ describe("selection semantics and responsive Today cards", () => {
     const today = source("app/(tabs)/index.tsx");
     expect(today).toContain("minHeight: TODAY_CARD_HEIGHT");
     expect(today).not.toContain("card: { height: TODAY_CARD_HEIGHT");
-    expect(today).not.toContain("pinnedTranslation(");
+    expect(today).toContain("pinnedTranslation(order, scrollOffset)");
     expect(today).not.toContain("numberOfLines={3}");
   });
 });

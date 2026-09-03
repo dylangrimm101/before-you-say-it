@@ -18,14 +18,29 @@ describe("customer lesson journey", () => {
     expect(result).toContain("this.setState({ hint:false });");
   });
 
-  test("customer lesson route has a real lesson identity and no internal QA language", async () => {
+  test("customer lesson leaves the deck chrome unobstructed and contains no internal QA controls", async () => {
     const route = await source("app/approved-lesson/[lessonId].tsx");
     expect(route).not.toContain("INTERNAL QA");
     expect(route).not.toContain("qaBadge");
     expect(route).not.toContain("approved source deck");
     expect(route).not.toContain("Opening approved deck");
-    expect(route).toContain("customerLessonHeader");
-    expect(route).toContain("Back to Practice");
+    expect(route).not.toContain("customerLessonHeader");
+    expect(route).not.toContain("backButton");
+    expect(route).not.toContain("menuButton");
+    expect(route).not.toContain("lessonMenu");
+    expect(route).not.toContain("MoreHorizontal");
+    expect(route).toContain("hasCompletedLesson");
+    expect(route).toContain("completionCommitted || hasCompletedLesson");
+    expect(route).toContain("Do this lesson again");
+  });
+
+  test("restores the scroll-driven floating Today card stack", async () => {
+    const today = await source("app/(tabs)/index.tsx");
+    expect(today).toContain("pinnedTranslation(order, scrollOffset)");
+    expect(today).toContain("const scrollOffset = useRef<Animated.Value>");
+    expect(today).toContain("onScroll={onDeckScroll}");
+    expect(today).toContain("scrollEventThrottle={16}");
+    expect(today).toContain("scrollOffset={scrollOffset}");
   });
 
   test("maps every lesson's Today cards to that lesson's move and rehearsal", () => {

@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Bookmark, Check, MoreHorizontal, RotateCcw, ShieldCheck, Sparkles, Star, TrendingUp } from "lucide-react-native";
+import { Bookmark, Check, RotateCcw, ShieldCheck, Sparkles, Star, TrendingUp } from "lucide-react-native";
 import { useMutation } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, ActivityIndicator, Alert, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -55,10 +55,9 @@ export default function ApprovedLessonDeckScreen() {
   const approvedConfig = approvedRehearsalConfig(params.lessonId);
   const rehearsalConfig = isM1L1 ? M1_L1_CONVERSION : approvedConfig;
   const feedbackLessonId = lesson && isFeedbackLessonId(lesson.id) ? lesson.id : null;
-  const customerLessonHeader = lesson
-    ? lesson.isCloseDeck ? `MODULE ${lesson.module} REVIEW` : `MODULE ${lesson.module} · LESSON ${lesson.lesson}`
-    : "LESSON";
+
   const isConverted = Boolean(rehearsalConfig);
+  const hasCompletedLesson = Boolean(rehearsalConfig && convertedLessonProgress.some((entry) => entry.lessonId === rehearsalConfig.lessonId));
   const isReturning = isConverted && params.returnFromRehearsal === "1" && !lessonWasReset;
   const returningRun = activeScenarioRun?.run;
   const hasValidReturn = isM1L1
@@ -71,7 +70,7 @@ export default function ApprovedLessonDeckScreen() {
   const [deckHtml, setDeckHtml] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<boolean>(false);
   const [loadAttempt, setLoadAttempt] = useState<number>(0);
-  const [isLessonMenuOpen, setIsLessonMenuOpen] = useState<boolean>(false);
+
   const [feedbackContext, setFeedbackContext] = useState<{ id: string; lessonId: FeedbackLessonId; contentVersion: string; lessonTitle: string } | null>(null);
   const [isResetting, setIsResetting] = useState<boolean>(false);
   const [resetNotice, setResetNotice] = useState<{ message: string; snapshot: ConvertedLessonProgress[]; canUndo: boolean } | null>(null);
@@ -225,7 +224,6 @@ export default function ApprovedLessonDeckScreen() {
 
   const handleResetLesson = useCallback(async (): Promise<void> => {
     if (!rehearsalConfig || isResetting) return;
-    setIsLessonMenuOpen(false);
     setIsResetting(true);
     try {
       const snapshot = await resetConvertedLesson({
@@ -492,36 +490,10 @@ export default function ApprovedLessonDeckScreen() {
       ) : (
         <View style={styles.loading}><ActivityIndicator color={C.purple} /><Text style={styles.loadingText}>Opening lesson…</Text></View>
       )}
-      <Pressable
-        onPress={() => router.back()}
-        style={[styles.backButton, { top: insets.top + 6 }]}
-        accessibilityRole="button"
-        accessibilityLabel="Back to Practice"
-      >
-        <ArrowLeft size={20} color={C.text} />
-      </Pressable>
-      {isConverted ? <Pressable
-        onPress={() => setIsLessonMenuOpen((current) => !current)}
-        style={[styles.menuButton, { top: insets.top + 6 }]}
-        accessibilityRole="button"
-        accessibilityLabel="Lesson options"
-        accessibilityState={{ expanded: isLessonMenuOpen }}
-      >
-        <MoreHorizontal size={21} color={C.text} />
-      </Pressable> : null}
-      {isLessonMenuOpen && rehearsalConfig ? <View style={[styles.lessonMenu, { top: insets.top + 56 }]}>
-        <Text style={styles.lessonMenuLabel}>LESSON OPTIONS</Text>
-        <Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.lessonMenuAction} accessibilityRole="button">
-          {isResetting ? <ActivityIndicator size="small" color={C.clay} /> : <RotateCcw size={18} color={C.clay} />}
-          <View style={styles.lessonMenuCopy}><Text style={styles.lessonMenuTitle}>Reset this lesson</Text><Text style={styles.lessonMenuBody}>Clear its completion and rehearsal, then return to Card 1.</Text></View>
-        </Pressable>
-      </View> : null}
-      {completionCommitted && isConverted && !lessonWasReset ? <View style={[styles.completionReset, { bottom: insets.bottom + 18 }]}><Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.completionResetButton} accessibilityRole="button"><RotateCcw size={18} color={C.purple} /><Text style={styles.completionResetText}>{isResetting ? "Resetting…" : "Do this lesson again"}</Text></Pressable></View> : null}
+
+      {(completionCommitted || hasCompletedLesson) && isConverted && !lessonWasReset && !isReturning ? <View style={[styles.completionReset, { bottom: insets.bottom + 18 }]}><Pressable onPress={() => void handleResetLesson()} disabled={isResetting} style={styles.completionResetButton} accessibilityRole="button"><RotateCcw size={18} color={C.purple} /><Text style={styles.completionResetText}>{isResetting ? "Resetting…" : "Do this lesson again"}</Text></Pressable></View> : null}
       {resetNotice ? <View style={[styles.resetNotice, { bottom: insets.bottom + 18 }]}><Text style={styles.resetNoticeText}>{resetNotice.message}</Text>{resetNotice.canUndo ? <Pressable onPress={() => void handleUndoReset()} style={styles.undoButton} accessibilityRole="button"><Text style={styles.undoText}>Undo</Text></Pressable> : null}</View> : null}
-      <View pointerEvents="none" style={[styles.customerLessonHeader, { top: insets.top + 7 }]}>
-        <Text style={styles.customerLessonEyebrow}>{completionCommitted ? "LESSON COMPLETE" : isReturning ? "BACK FROM REHEARSAL" : customerLessonHeader}</Text>
-        <Text numberOfLines={1} style={styles.customerLessonTitle}>{lesson.shortName}</Text>
-      </View>
+
     </View>
   );
 }
@@ -656,11 +628,7 @@ const styles = StyleSheet.create({
   webView: { flex: 1, backgroundColor: "#F2EDE4" },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   loadingText: { ...T.caption },
-  backButton: { position: "absolute", left: 12, zIndex: 4, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
-  menuButton: { position: "absolute", right: 12, zIndex: 5, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
-  customerLessonHeader: { position: "absolute", left: 64, right: 64, zIndex: 3, minHeight: 44, alignItems: "center", justifyContent: "center" },
-  customerLessonEyebrow: { fontFamily: font.bold, fontSize: 8, lineHeight: 10, letterSpacing: 1.2, color: C.purple },
-  customerLessonTitle: { fontFamily: font.semi, fontSize: 13, lineHeight: 17, color: C.text, marginTop: 2, maxWidth: "100%" },
+
   completionScroll: { paddingHorizontal: GUTTER, paddingTop: 76 }, celebrationIcon: { width: 52, height: 52, borderRadius: 18, backgroundColor: C.purple, alignItems: "center", justifyContent: "center", marginBottom: 18, ...shadow.hero }, completionTitle: { fontFamily: font.bold, fontSize: 34, lineHeight: 40, letterSpacing: -0.8, color: C.text, marginTop: 10, maxWidth: 340 }, completionLede: { ...T.support, marginTop: 10, maxWidth: 340 },
   indexImpactCard: { marginTop: 24, gap: 10 }, impactTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }, impactResult: { fontFamily: font.bold, fontSize: 18, lineHeight: 23, color: C.text, marginTop: 7 }, indexTransition: { gap: 9 }, indexNumbers: { flexDirection: "row", alignItems: "baseline", gap: 8 }, indexBefore: { fontFamily: font.semi, fontSize: 31, color: C.dim, textDecorationLine: "line-through" }, indexArrow: { fontFamily: font.regular, fontSize: 23, color: C.dim }, indexAfter: { fontFamily: font.bold, fontSize: 54, lineHeight: 60, color: C.purple, letterSpacing: -1.5 }, indexOutOf: { fontFamily: font.regular, fontSize: 14, color: C.dim }, indexTrack: { height: 8, overflow: "hidden", borderRadius: 4, backgroundColor: "rgba(81,40,136,0.11)" }, indexFill: { height: "100%", borderRadius: 4, backgroundColor: C.purple }, impactExplanation: { ...T.support, color: C.text }, signalNote: { ...T.caption, marginTop: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
   comparisonCard: { marginTop: 14, gap: 12 }, responseBlock: { gap: 5 }, responseLabel: { fontFamily: font.bold, fontSize: 11, letterSpacing: 0.7, textTransform: "uppercase", color: C.dim }, responseText: { fontFamily: font.medium, fontSize: 16, lineHeight: 23, color: C.text }, responseDivider: { height: StyleSheet.hairlineWidth, backgroundColor: C.line }, comparisonText: { ...T.support, color: C.purple, paddingTop: 4 },
@@ -683,10 +651,7 @@ const styles = StyleSheet.create({
   feedbackSubmit: { marginTop: 20 },
   feedbackSkip: { marginTop: 8 },
   feedbackPrivacy: { ...T.caption, marginTop: 12, paddingHorizontal: 12, textAlign: "center" },
-  lessonMenu: { position: "absolute", right: 12, zIndex: 8, width: 278, borderRadius: 18, padding: 12, backgroundColor: "rgba(255,255,255,0.98)", borderWidth: 1, borderColor: C.line, ...shadow.layer },
-  lessonMenuLabel: { fontFamily: font.bold, fontSize: 9, letterSpacing: 1.2, color: C.dim, paddingHorizontal: 6, paddingBottom: 7 },
-  lessonMenuAction: { minHeight: 70, borderRadius: 14, padding: 10, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.claySoft },
-  lessonMenuCopy: { flex: 1 }, lessonMenuTitle: { fontFamily: font.bold, fontSize: 14, color: C.clay }, lessonMenuBody: { ...T.caption, marginTop: 2 },
+
   completionReset: { position: "absolute", left: 18, right: 18, zIndex: 6, alignItems: "center" }, completionResetButton: { minHeight: 48, borderRadius: 24, paddingHorizontal: 18, flexDirection: "row", gap: 8, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.96)", borderWidth: 1, borderColor: C.line, ...shadow.layer }, completionResetText: { fontFamily: font.bold, fontSize: 13, color: C.purple },
   resetNotice: { position: "absolute", left: 14, right: 14, zIndex: 10, minHeight: 56, borderRadius: 18, paddingLeft: 16, paddingRight: 8, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.text, ...shadow.layer }, resetNoticeText: { flex: 1, fontFamily: font.medium, fontSize: 13, lineHeight: 18, color: C.onAccent }, undoButton: { minWidth: 58, minHeight: 44, alignItems: "center", justifyContent: "center" }, undoText: { fontFamily: font.bold, fontSize: 13, color: "#DCC8F6" },
   unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER },
