@@ -1,4 +1,3 @@
-import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
@@ -28,16 +27,8 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: C.purple,
         tabBarInactiveTintColor: C.dim,
-        // The dock is one of the few surfaces where content continuously moves
-        // underneath, so real blur is justified here.
-        tabBarBackground:
-          Platform.OS === "web"
-            ? undefined
-            : () => (
-                <BlurView intensity={28} tint="light" style={StyleSheet.absoluteFill} />
-              ),
         tabBarStyle: {
-          backgroundColor: Platform.OS === "web" ? C.barSolid : C.bar,
+          backgroundColor: C.barSolid,
           borderTopColor: C.barEdge,
           borderTopWidth: StyleSheet.hairlineWidth,
           height: Platform.OS === "ios" ? 88 : 66,

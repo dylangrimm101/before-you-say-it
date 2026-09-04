@@ -53,15 +53,16 @@ describe("customer lesson journey", () => {
     expect(route).toContain("paddingBottom: bottomInset + 24");
   });
 
-  test("restores the scroll-driven floating Today card stack", async () => {
+  test("keeps web fallback and native-thread scrolling for the floating Today stack", async () => {
     const today = await source("app/(tabs)/index.tsx");
     expect(today).toContain("pinnedTranslation(order, scrollOffset)");
     expect(today).toContain("const scrollOffset = useRef<Animated.Value>");
-    expect(today).toContain("onScroll={onDeckScroll}");
+    expect(today).toContain('Platform.OS === "web" ? onDeckScroll : nativeDeckScroll');
+    expect(today).toContain("const nativeDeckScroll = useMemo(() => Animated.event(");
     expect(today).toContain("scrollEventThrottle={16}");
     expect(today).toContain("scrollOffset={scrollOffset}");
     expect(today).toContain("scrollOffset.setValue(event.nativeEvent.contentOffset.y)");
-    expect(today).not.toContain("Animated.event(");
+    expect(today).not.toContain("rotate:");
     expect(today).toContain("card: { height: TODAY_CARD_HEIGHT");
     expect(today).toContain("numberOfLines={2}");
     expect(today).toContain("numberOfLines={3}");

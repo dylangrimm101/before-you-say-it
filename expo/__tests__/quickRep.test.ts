@@ -63,7 +63,7 @@ describe("lesson-matched Quick Rep", () => {
     expect(quickRepCompletedToday([{ ...log[0]!, date: "2026-09-02" }], "m1-l1", now)).toBe(false);
   });
 
-  test("keeps Quick Rep optional on Today and preserves the four-card floating stack", async () => {
+  test("places optional Quick Rep as a full-size deck card below the Index", async () => {
     const today = await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text();
     expect(today).toContain("<QuickRepHomeCard");
     expect(today).toContain('pathname: "/quick-rep/[lessonId]"');
@@ -71,6 +71,12 @@ describe("lesson-matched Quick Rep", () => {
     expect(today).toContain("quickRepCompletedToday(drillLog");
     expect(today).toContain("TODAY_ACTIVITY_KEYS.map");
     expect(today).not.toContain('TODAY_ACTIVITY_KEYS = ["quick-rep"');
+    expect(today).toContain("Array.from({ length: 6 }");
+    expect(today).toContain("<DeckLayer entrance={entrances[1]} order={1}");
+    expect(today).toContain("const order = activityIndex + (quickRep ? 2 : 1)");
+    expect(today).toContain("<View style={[styles.card, styles.quickRepCard]}");
+    expect(today).not.toContain("quickRepCard: { minHeight: 88");
+    expect(today).not.toContain("marginHorizontal: 20, marginBottom: 14");
   });
 
   test("uses voice-first capture, one cue, and the same prompt retry without showing a global score", async () => {
