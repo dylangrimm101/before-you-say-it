@@ -310,7 +310,7 @@ describe("the primary button reads as a real button", () => {
     expect(source).toContain('Platform.OS === "web" ? C.barSolid : C.bar');
 
     const theme = await Bun.file(`${import.meta.dir}/../constants/theme.ts`).text();
-    expect(theme).toContain('barSolid: "rgba(247,247,250,0.97)"');
+    expect(theme).toContain('barSolid: "#F7F7FA"');
   });
 });
 

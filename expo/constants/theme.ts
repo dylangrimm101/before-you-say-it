@@ -28,12 +28,8 @@ export const C = {
   surfaceHigh: "rgba(255,255,255,0.62)",
   /** The docked footer bar — the one place a second real blur is allowed. */
   bar: "rgba(255,255,255,0.42)",
-  /**
-   * Fallback for the docked bar where no blur is available (web). Nearly
-   * opaque, so content scrolling underneath cannot muddy the action sitting
-   * on top of it.
-   */
-  barSolid: "rgba(247,247,250,0.97)",
+  /** Solid dock fill. Content must never show through navigation. */
+  barSolid: "#F7F7FA",
   /** Top-light hairline that gives a layer its edge. */
   glassEdge: "rgba(255,255,255,0.62)",
   barEdge: "rgba(255,255,255,0.50)",

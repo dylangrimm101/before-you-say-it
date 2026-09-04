@@ -78,19 +78,29 @@ describe("locked Today card system", () => {
     expect(reduced).toMatchObject({ entranceDurationMs: 0, entranceStaggerMs: 0, chartDurationMs: 0, shouldAnimate: false, cardHeight: 288, pinStep: 12 });
   });
 
-  test("uses the original fixed-height scroll-driven floating card stack", async () => {
+  test("keeps the chart stationary while activity cards layer smoothly above it", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text();
     expect(source).toContain("<Animated.ScrollView");
     expect(source).toContain("card: { height: TODAY_CARD_HEIGHT");
     expect(source).toContain("useNativeDriver: true");
     expect(source).toContain("pinnedTranslation(order, scrollOffset)");
-    expect(source).toContain("onScroll={onDeckScroll}");
+    expect(source).toContain('Platform.OS === "web" ? onDeckScroll : nativeDeckScroll');
+    expect(source).toContain("const nativeDeckScroll = useMemo(() => Animated.event(");
     expect(source).toContain("scrollOffset={scrollOffset}");
     expect(source).toContain("scrollOffset.setValue(event.nativeEvent.contentOffset.y)");
-    expect(source).not.toContain("Animated.event(");
+    expect(source).not.toContain("rotate:");
     expect(source).toContain("numberOfLines={2}");
     expect(source).toContain("numberOfLines={3}");
     expect(source).not.toContain("stickyHeaderIndices");
+  });
+
+  test("uses an opaque tab dock so purple cards never show through navigation", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../app/(tabs)/_layout.tsx`).text();
+    expect(source).not.toContain("BlurView");
+    expect(source).not.toContain("tabBarBackground");
+    expect(source).toContain("backgroundColor: C.barSolid");
+    const theme = await Bun.file(`${import.meta.dir}/../constants/theme.ts`).text();
+    expect(theme).toContain('barSolid: "#F7F7FA"');
   });
 
   test("makes the current Communication Index the Home focal point and includes completed lesson evidence", async () => {

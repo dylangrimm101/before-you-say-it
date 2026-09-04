@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
-import { Check, ChevronRight, Mic } from "lucide-react-native";
+import { Check, ChevronRight } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { Animated, Easing, Pressable, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, useReducedMotion } from "@/components/ui";
@@ -132,15 +132,15 @@ function ActivityCard({ activity, copy, tint, onPress }: { activity: TodayActivi
 }
 
 function QuickRepHomeCard({ config, completed, onPress }: { config: QuickRepConfig; completed: boolean; onPress: () => void }) {
-  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${completed ? "Practice again" : "Start"} Quick Rep for ${config.lessonTitle}`} style={({ pressed }) => [styles.quickRepCard, pressed && styles.quickRepPressed]}>
-    <View style={[styles.quickRepIcon, completed && styles.quickRepIconComplete]}>{completed ? <Check size={18} color={C.onAccent} strokeWidth={3} /> : <Mic size={20} color={C.purple} strokeWidth={1.9} />}</View>
-    <View style={styles.quickRepCopy}>
-      <Text style={styles.quickRepEyebrow}>{completed ? "QUICK REP · COMPLETE TODAY" : "QUICK REP · OPTIONAL"}</Text>
-      <Text numberOfLines={1} style={styles.quickRepTitle}>{config.lessonTitle}</Text>
-      <Text numberOfLines={1} style={styles.quickRepBody}>{completed ? "Use the move again whenever you want." : "One new moment. One cue. One retry."}</Text>
+  return <View style={[styles.card, styles.quickRepCard]} accessibilityLabel={`Quick Rep. Optional. ${config.lessonTitle}.${completed ? " Complete today." : ""}`}>
+    <View style={styles.cardTopRow}>
+      <View style={styles.activityMeta}><Text style={[styles.activityKind, styles.activityKindCurrent]}>Quick Rep</Text><View style={styles.optionalBadge}><Text style={styles.optionalBadgeText}>Optional</Text></View></View>
+      {completed ? <View style={styles.check}><Check size={12} color={C.onAccent} strokeWidth={3} /></View> : null}
     </View>
-    <ChevronRight size={18} color={C.purple} />
-  </Pressable>;
+    <Text numberOfLines={2} style={styles.activityTitle}>{config.lessonTitle}</Text>
+    <Text numberOfLines={3} style={styles.activityBody}>{completed ? `Today's rep is complete. Practice ${config.namedMove} again whenever you want.` : `${config.namedMove} Use it in one new moment, get one cue, then retry.`}</Text>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.quickRepAction, pressed && styles.quickRepPressed]} accessibilityRole="button" accessibilityLabel={`${completed ? "Practice again" : "Start"} Quick Rep for ${config.lessonTitle}`}><Text style={styles.quickRepActionText}>{completed ? "Practice again" : "Start Quick Rep"}</Text></Pressable>
+  </View>;
 }
 
 export default function TodayScreen() {
@@ -169,12 +169,16 @@ export default function TodayScreen() {
   );
   const recentDays = useMemo(() => todayRecentPractice(activityDays, new Date()), [activityDays]);
   const activities = useMemo(() => todayActivityPresentation(activeLessonRun?.state, Boolean(activeLessonRun)), [activeLessonRun]);
-  const entrances = useRef<Animated.Value[]>(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
+  const entrances = useRef<Animated.Value[]>(Array.from({ length: 6 }, () => new Animated.Value(0))).current;
   const chartProgress = useRef<Animated.Value>(new Animated.Value(0)).current;
   const scrollOffset = useRef<Animated.Value>(new Animated.Value(0)).current;
   const onDeckScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>): void => {
     scrollOffset.setValue(event.nativeEvent.contentOffset.y);
   }, [scrollOffset]);
+  const nativeDeckScroll = useMemo(() => Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollOffset } } }],
+    { useNativeDriver: true },
+  ), [scrollOffset]);
 
 
   useEffect(() => {
@@ -215,20 +219,20 @@ export default function TodayScreen() {
       <View style={styles.recentStrip} accessibilityLabel="Recent practice, seven days">
         {recentDays.map((day) => <View key={day.key} style={[styles.day, day.isToday && styles.dayToday]}><View style={[styles.dayDot, day.hasPractice && styles.dayDotDone, day.isToday && !day.hasPractice && styles.dayDotToday]}>{day.hasPractice ? <Check size={9} color={C.onAccent} strokeWidth={3} /> : null}</View><Text style={[styles.dayLabel, day.isToday && styles.dayLabelToday]}>{day.label}</Text></View>)}
       </View>
-      {quickRep ? <QuickRepHomeCard config={quickRep} completed={quickRepDone} onPress={openQuickRep} /> : null}
       <Animated.ScrollView
         style={styles.deck}
         contentContainerStyle={[styles.deckContent, { paddingBottom: insets.bottom + 116 }]}
-        onScroll={onDeckScroll}
+        onScroll={Platform.OS === "web" ? onDeckScroll : nativeDeckScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       >
         <DeckLayer entrance={entrances[0]} order={0} scrollOffset={scrollOffset}>
           <IndexCard index={index} chartProgress={chartProgress} hasLessonUpdate={scoredPracticeHistory.length > 0} onDetails={openProgress} />
         </DeckLayer>
+        {quickRep ? <DeckLayer entrance={entrances[1]} order={1} scrollOffset={scrollOffset}><QuickRepHomeCard config={quickRep} completed={quickRepDone} onPress={openQuickRep} /></DeckLayer> : null}
         {TODAY_ACTIVITY_KEYS.map((key, activityIndex) => {
           const activity = activities[activityIndex];
-          const order = activityIndex + 1;
+          const order = activityIndex + (quickRep ? 2 : 1);
           if (!activity) return null;
           const copy: ActivityCopy = lessonCopy?.[key] ?? { title: key === "review" ? "See what changed" : `${key[0]?.toUpperCase() ?? ""}${key.slice(1)}`, body: "Complete the current lesson to continue." };
           return <DeckLayer key={key} entrance={entrances[order]} order={order} scrollOffset={scrollOffset}><ActivityCard activity={activity} copy={copy} tint={CARD_TINTS[activityIndex]} onPress={() => openCurrentActivity(key)} /></DeckLayer>;
@@ -249,14 +253,12 @@ const styles = StyleSheet.create({
   dayDot: { width: 15, height: 15, borderRadius: 8, borderWidth: 1.5, borderColor: "rgba(23,26,31,0.18)", alignItems: "center", justifyContent: "center" },
   dayDotDone: { backgroundColor: C.purple, borderColor: C.purple }, dayDotToday: { borderColor: "rgba(81,40,136,0.5)" },
   dayLabel: { fontFamily: font.semi, fontSize: 10, lineHeight: 12, letterSpacing: 0.6, textTransform: "uppercase", color: C.dim }, dayLabelToday: { color: C.purple },
-  quickRepCard: { minHeight: 88, marginHorizontal: 20, marginBottom: 14, borderRadius: 22, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#F6F0FC", borderWidth: 1, borderColor: "rgba(81,40,136,0.2)", ...shadow.layer },
-  quickRepPressed: { transform: [{ scale: 0.99 }], backgroundColor: "#F0E7F9" },
-  quickRepIcon: { width: 42, height: 42, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: C.purpleSoft },
-  quickRepIconComplete: { backgroundColor: C.purple },
-  quickRepCopy: { flex: 1, minWidth: 0 },
-  quickRepEyebrow: { fontFamily: font.bold, fontSize: 9, lineHeight: 12, letterSpacing: 1.1, color: C.purple },
-  quickRepTitle: { fontFamily: font.bold, fontSize: 16, lineHeight: 21, color: C.text, marginTop: 2 },
-  quickRepBody: { fontFamily: font.regular, fontSize: 12, lineHeight: 16, color: C.textSoft, marginTop: 1 },
+  quickRepCard: { backgroundColor: "#FFFFFF" },
+  optionalBadge: { minHeight: 22, paddingHorizontal: 8, borderRadius: 11, justifyContent: "center", backgroundColor: C.purpleSoft },
+  optionalBadgeText: { fontFamily: font.bold, fontSize: 9, letterSpacing: 0.6, textTransform: "uppercase", color: C.purple },
+  quickRepAction: { height: 52, borderRadius: radius.pill, borderWidth: 1, borderColor: "rgba(81,40,136,0.24)", alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" },
+  quickRepPressed: { transform: [{ scale: 0.985 }], backgroundColor: C.purpleSoft },
+  quickRepActionText: { fontFamily: font.semi, fontSize: 15, color: C.purple },
   deck: { flex: 1 }, deckContent: { paddingHorizontal: 20, isolation: "isolate" },
   cardLayer: { paddingBottom: TODAY_CARD_GAP },
   card: { height: TODAY_CARD_HEIGHT, borderRadius: TODAY_CARD_RADIUS, padding: TODAY_CARD_PADDING, backgroundColor: C.onAccent, borderWidth: 1, borderColor: C.line, ...shadow.layer },
