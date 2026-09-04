@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Check, ChevronRight } from "lucide-react-native";
+import { Check, ChevronRight, Mic } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +11,7 @@ import { nextLaunchDeck } from "@/lib/launchCurriculum";
 import { approvedRehearsalConfig } from "@/lib/approvedRehearsals";
 import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
 import { customerLessonActivityCopy } from "@/lib/customerLessonExperience";
+import { latestCompletedQuickRep, quickRepCompletedToday, type QuickRepConfig } from "@/lib/quickRep";
 import {
   TODAY_ACTIVITY_KEYS,
   TODAY_CARD_GAP,
@@ -130,11 +131,23 @@ function ActivityCard({ activity, copy, tint, onPress }: { activity: TodayActivi
   );
 }
 
+function QuickRepHomeCard({ config, completed, onPress }: { config: QuickRepConfig; completed: boolean; onPress: () => void }) {
+  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${completed ? "Practice again" : "Start"} Quick Rep for ${config.lessonTitle}`} style={({ pressed }) => [styles.quickRepCard, pressed && styles.quickRepPressed]}>
+    <View style={[styles.quickRepIcon, completed && styles.quickRepIconComplete]}>{completed ? <Check size={18} color={C.onAccent} strokeWidth={3} /> : <Mic size={20} color={C.purple} strokeWidth={1.9} />}</View>
+    <View style={styles.quickRepCopy}>
+      <Text style={styles.quickRepEyebrow}>{completed ? "QUICK REP · COMPLETE TODAY" : "QUICK REP · OPTIONAL"}</Text>
+      <Text numberOfLines={1} style={styles.quickRepTitle}>{config.lessonTitle}</Text>
+      <Text numberOfLines={1} style={styles.quickRepBody}>{completed ? "Use the move again whenever you want." : "One new moment. One cue. One retry."}</Text>
+    </View>
+    <ChevronRight size={18} color={C.purple} />
+  </Pressable>;
+}
+
 export default function TodayScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isReduced = useReducedMotion();
-  const { access, activityDays, activePracticeSession, activeScenarioRun, convertedLessonProgress, moduleCloseProgress, scoredPracticeHistory } = useStore();
+  const { access, activityDays, activePracticeSession, activeScenarioRun, convertedLessonProgress, drillLog, moduleCloseProgress, scoredPracticeHistory } = useStore();
   const nextDeckId = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
   const nextDeck = approvedLessonDeck(nextDeckId);
   const moduleId = nextDeck?.module === 2 ? "make_a_clear_ask" : "get_to_the_point";
@@ -148,6 +161,8 @@ export default function TodayScreen() {
     ? run
     : undefined;
   const lessonCopy = nextDeck ? customerLessonActivityCopy(nextDeck, rehearsalConfig) : undefined;
+  const quickRep = useMemo(() => latestCompletedQuickRep(convertedLessonProgress), [convertedLessonProgress]);
+  const quickRepDone = quickRep ? quickRepCompletedToday(drillLog, quickRep.lessonId) : false;
   const index = useMemo<TodayIndexPresentation>(
     () => todayIndexPresentation(activePracticeSession?.sharedResult, scoredPracticeHistory),
     [activePracticeSession?.sharedResult, scoredPracticeHistory],
@@ -188,6 +203,10 @@ export default function TodayScreen() {
 
   const openPath = useCallback((): void => { router.push({ pathname: "/(tabs)/library", params: { view: "lessons" } }); }, [router]);
   const openProgress = useCallback((): void => { router.push("/(tabs)/progress"); }, [router]);
+  const openQuickRep = useCallback((): void => {
+    if (!quickRep) return;
+    router.push({ pathname: "/quick-rep/[lessonId]", params: { lessonId: quickRep.lessonId } });
+  }, [quickRep, router]);
 
   return (
     <View style={styles.root}>
@@ -196,6 +215,7 @@ export default function TodayScreen() {
       <View style={styles.recentStrip} accessibilityLabel="Recent practice, seven days">
         {recentDays.map((day) => <View key={day.key} style={[styles.day, day.isToday && styles.dayToday]}><View style={[styles.dayDot, day.hasPractice && styles.dayDotDone, day.isToday && !day.hasPractice && styles.dayDotToday]}>{day.hasPractice ? <Check size={9} color={C.onAccent} strokeWidth={3} /> : null}</View><Text style={[styles.dayLabel, day.isToday && styles.dayLabelToday]}>{day.label}</Text></View>)}
       </View>
+      {quickRep ? <QuickRepHomeCard config={quickRep} completed={quickRepDone} onPress={openQuickRep} /> : null}
       <Animated.ScrollView
         style={styles.deck}
         contentContainerStyle={[styles.deckContent, { paddingBottom: insets.bottom + 116 }]}
@@ -229,6 +249,14 @@ const styles = StyleSheet.create({
   dayDot: { width: 15, height: 15, borderRadius: 8, borderWidth: 1.5, borderColor: "rgba(23,26,31,0.18)", alignItems: "center", justifyContent: "center" },
   dayDotDone: { backgroundColor: C.purple, borderColor: C.purple }, dayDotToday: { borderColor: "rgba(81,40,136,0.5)" },
   dayLabel: { fontFamily: font.semi, fontSize: 10, lineHeight: 12, letterSpacing: 0.6, textTransform: "uppercase", color: C.dim }, dayLabelToday: { color: C.purple },
+  quickRepCard: { minHeight: 88, marginHorizontal: 20, marginBottom: 14, borderRadius: 22, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#F6F0FC", borderWidth: 1, borderColor: "rgba(81,40,136,0.2)", ...shadow.layer },
+  quickRepPressed: { transform: [{ scale: 0.99 }], backgroundColor: "#F0E7F9" },
+  quickRepIcon: { width: 42, height: 42, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: C.purpleSoft },
+  quickRepIconComplete: { backgroundColor: C.purple },
+  quickRepCopy: { flex: 1, minWidth: 0 },
+  quickRepEyebrow: { fontFamily: font.bold, fontSize: 9, lineHeight: 12, letterSpacing: 1.1, color: C.purple },
+  quickRepTitle: { fontFamily: font.bold, fontSize: 16, lineHeight: 21, color: C.text, marginTop: 2 },
+  quickRepBody: { fontFamily: font.regular, fontSize: 12, lineHeight: 16, color: C.textSoft, marginTop: 1 },
   deck: { flex: 1 }, deckContent: { paddingHorizontal: 20, isolation: "isolate" },
   cardLayer: { paddingBottom: TODAY_CARD_GAP },
   card: { height: TODAY_CARD_HEIGHT, borderRadius: TODAY_CARD_RADIUS, padding: TODAY_CARD_PADDING, backgroundColor: C.onAccent, borderWidth: 1, borderColor: C.line, ...shadow.layer },
