@@ -155,7 +155,7 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="How it is stored"
-            body="In this app's own storage on this device, under a stable anonymous device ID. This build does not provide an account or cross-device recovery. The data is not separately encrypted by this app; protection is whatever your phone applies to app data."
+            body="Practice progress stays in this app's storage on this device under a stable anonymous device ID and does not sync between devices. Signing in reconnects your eligible access through your existing web account. The data is not separately encrypted by this app; protection is whatever your phone applies to app data."
             tone={C.amber}
           />
         </Section>
@@ -175,7 +175,7 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="Purchases"
-            body="Handled by RevenueCat with an anonymous app ID. No conversation content is involved."
+            body="Handled by RevenueCat with an anonymous app ID or your signed-in account ID. No conversation content is involved."
           />
           <Bullet
             head="Reminders"

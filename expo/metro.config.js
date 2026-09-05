@@ -1,6 +1,5 @@
 const { getDefaultConfig } = require("expo/metro-config");
-const { withRorkMetro } = require("@rork-ai/toolkit-sdk/metro");
+const { runClientEnvPreflight } = require("./scripts/client-env-preflight.cjs");
 
-const config = getDefaultConfig(__dirname);
-
-module.exports = withRorkMetro(config);
+runClientEnvPreflight(__dirname);
+module.exports = getDefaultConfig(__dirname);

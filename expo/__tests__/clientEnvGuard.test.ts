@@ -15,12 +15,12 @@ describe("client environment repopulation guard", () => {
       "EXPO_PUBLIC_PROJECT_ID=project-fixture",
     ].join("\n");
     const sanitized = sanitizeClientEnv(fixture);
-    expect(sanitized.removedNames.sort()).toEqual(["EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY", "OPENAI_API_KEY", "SUPABASE_ACCESS_TOKEN"]);
+    expect(sanitized.removedNames.sort()).toEqual(["EXPO_PUBLIC_PROJECT_ID", "EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY", "OPENAI_API_KEY", "SUPABASE_ACCESS_TOKEN"]);
     expect(sanitized.content).toContain("EXPO_PUBLIC_SUPABASE_URL");
     expect(sanitized.content).toContain("EXPO_PUBLIC_GENERATE_ENDPOINT");
     expect(sanitized.content).toContain("EXPO_PUBLIC_TRANSCRIBE_ENDPOINT");
     expect(sanitized.content).toContain("EXPO_PUBLIC_TTS_ENDPOINT");
-    expect(sanitized.content).toContain("EXPO_PUBLIC_PROJECT_ID");
+    expect(sanitized.content).not.toContain("EXPO_PUBLIC_PROJECT_ID");
     expect(prohibitedClientEnvNames(sanitized.content)).toEqual([]);
     expect(sanitized.content).not.toContain("fixture-not-a-secret");
   });
@@ -33,9 +33,9 @@ describe("client environment repopulation guard", () => {
       EXPO_PUBLIC_UNREVIEWED_LABEL: "remove-me",
     };
     expect(guardClientProcessEnv(inherited).removedNames.sort()).toEqual([
-      "EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY", "EXPO_PUBLIC_UNREVIEWED_LABEL", "OPENAI_API_KEY",
+      "EXPO_PUBLIC_PROJECT_ID", "EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY", "EXPO_PUBLIC_UNREVIEWED_LABEL", "OPENAI_API_KEY",
     ]);
-    expect(inherited).toEqual({ EXPO_PUBLIC_PROJECT_ID: "project" });
+    expect(inherited).toEqual({});
     expect(() => guardClientProcessEnv({ EXPO_PUBLIC_NEW_SECRET_TOKEN: "secret" })).toThrow("Unknown secret-like client variables");
   });
 
@@ -47,13 +47,14 @@ describe("client environment repopulation guard", () => {
     const probe = Bun.spawn(["bun", "scripts/run-client-command.ts", "probe"], {
       cwd: `${import.meta.dir}/..`,
       env: { ...process.env, OPENAI_API_KEY: "fixture-private", SUPABASE_ACCESS_TOKEN: "fixture-token", EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY: "fixture-public" },
+      stdin: "ignore",
       stdout: "pipe", stderr: "pipe",
     });
     expect(await probe.exited).toBe(0);
     expect(await new Response(probe.stdout).text()).toContain("DOWNSTREAM_SECRET_ABSENT");
 
     const rejected = Bun.spawn(["bun", "scripts/run-client-command.ts", "probe"], {
-      cwd: `${import.meta.dir}/..`, env: { ...process.env, EXPO_PUBLIC_UNKNOWN_SECRET_TOKEN: "fixture" }, stdout: "pipe", stderr: "pipe",
+      cwd: `${import.meta.dir}/..`, env: { ...process.env, EXPO_PUBLIC_UNKNOWN_SECRET_TOKEN: "fixture" }, stdin: "ignore", stdout: "pipe", stderr: "pipe",
     });
     expect(await rejected.exited).not.toBe(0);
     expect(await new Response(rejected.stderr).text()).toContain("Unknown secret-like client variables");

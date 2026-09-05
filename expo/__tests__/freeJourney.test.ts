@@ -276,7 +276,7 @@ describe("Claude Design free journey contract", () => {
     expect(layout).toContain('firstSegment === "privacy"');
     expect(layout).toContain("canInterruptFreeJourney");
     expect(privacy).toContain("Privacy &amp; details");
-    expect(privacy).toContain("This build does not provide an account or cross-device recovery.");
+    expect(privacy).toContain("Signing in reconnects your eligible access through your existing web account.");
     expect(privacy).toContain("Each saved session keeps a minimized record of the scenario, date, completion details, and result summary when one is available. It does not keep the rehearsal transcript.");
     expect(privacy).toContain("Raw audio is not stored by this app.");
     expect(privacy).toContain("A recording is sent once for transcription");
