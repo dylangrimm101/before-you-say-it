@@ -155,7 +155,7 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="How it is stored"
-            body="Practice progress stays in this app's storage on this device under a stable anonymous device ID and does not sync between devices. Signing in reconnects your eligible access through your existing web account. The data is not separately encrypted by this app; protection is whatever your phone applies to app data."
+            body="Practice progress stays in this app's storage on this device under a stable anonymous device ID and does not sync between devices. On iPhone and Android, an existing web-account session is moved from legacy app storage into protected device credential storage; practice and conversation content never goes there. Signing in reconnects your eligible access through your existing web account. Other app data is not separately encrypted by BYSI; protection is whatever your phone applies to app data."
             tone={C.amber}
           />
         </Section>

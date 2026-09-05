@@ -13,6 +13,8 @@ describe("TestFlight foundation", () => {
     expect(pkg.dependencies?.["expo-location"]).toBeUndefined();
     expect(pkg.dependencies?.["expo-image-picker"]).toBeUndefined();
     expect(pkg.dependencies?.["expo-av"]).toBeUndefined();
+    const app = JSON.parse(await text("app.json")) as { expo?: { plugins?: unknown[] } };
+    expect(JSON.stringify(app.expo?.plugins)).toContain('"faceIDPermission":false');
   });
 
   test("completion never triggers an unsolicited notification permission prompt", async () => {
@@ -24,6 +26,7 @@ describe("TestFlight foundation", () => {
     const privacy = await text("app/privacy.tsx");
     const settings = await text("app/settings.tsx");
     expect(privacy).not.toContain("does not provide an account or cross-device recovery");
+    expect(privacy).toContain("protected device credential storage");
     expect(privacy).toContain("Signing in reconnects your eligible access");
     expect(privacy).toContain("anonymous app ID or your signed-in account ID");
     expect(settings).toContain("It does not delete your web account or cancel a subscription");
@@ -53,6 +56,19 @@ describe("TestFlight foundation", () => {
     expect(JSON.stringify(app.expo?.plugins)).toContain("https://beforeyousayit.app");
     const intent = await text("lib/nativeIntent.ts");
     expect(intent).toContain('"beforeyousayit:"');
+  });
+
+  test("OTA updates are separated by runtime and release channel", async () => {
+    const app = JSON.parse(await text("app.json")) as { expo?: { runtimeVersion?: { policy?: string } } };
+    const eas = JSON.parse(await text("eas.json")) as { build?: Record<string, { channel?: string }> };
+    const pkg = JSON.parse(await text("package.json")) as { dependencies?: Record<string, string> };
+    const runbook = await text("../docs/TESTFLIGHT-AND-OTA-OPERATIONS.md");
+    expect(app.expo?.runtimeVersion?.policy).toBe("appVersion");
+    expect(eas.build?.preview?.channel).toBe("preview");
+    expect(eas.build?.production?.channel).toBe("production");
+    expect(pkg.dependencies?.["expo-updates"]).toBeDefined();
+    expect(runbook).toContain("exact verified Git commit");
+    expect(runbook).toContain("rollback");
   });
 
   test("iOS release config declares export compliance and repeatable EAS profiles", async () => {

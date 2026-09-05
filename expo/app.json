@@ -3,6 +3,9 @@
     "name": "Before You Say It",
     "slug": "8fc4qwsqaurkxk0pimyvx",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "beforeyousayit",
@@ -61,7 +64,13 @@
           "microphonePermission": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
