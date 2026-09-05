@@ -52,7 +52,7 @@ import { sanitizeActivePracticeSessionForPersistence, sanitizeActiveScenarioRunF
 import { errorShape, safeLog } from "@/lib/redact";
 import { normalizeScenarioPracticeRun, type PersistedScenarioPracticeRun } from "@/lib/scenarioPractice";
 import { appendScoredPracticeRecord, normalizeScoredPracticeHistory, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
-import { cancelChallengeNudge, cancelDailyReminder, requestReminderPermission, syncChallengeNudge } from "@/lib/reminders";
+import { cancelChallengeNudge, cancelDailyReminder, syncChallengeNudge } from "@/lib/reminders";
 import { capRecords } from "@/lib/sessionMigration";
 import { migrateSessionStorage } from "@/lib/sessionStorageMigration";
 import { resetAllDataStrict } from "@/lib/resetAllData";
@@ -611,9 +611,6 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     } catch (e) {
       safeLog("[store] challenge save failed", errorShape(e));
     }
-    // They just finished a rep — the friendliest moment to ask for permission
-    // so tomorrow's 6 PM nudge can be delivered.
-    requestReminderPermission().catch(() => {});
   }, []);
 
   /** Persists one immutable scored result; duplicate rehearsal IDs are idempotent. */

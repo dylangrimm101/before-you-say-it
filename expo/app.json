@@ -3,9 +3,12 @@
     "name": "Before You Say It",
     "slug": "8fc4qwsqaurkxk0pimyvx",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "rork-app",
+    "scheme": "beforeyousayit",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -22,7 +25,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.rork.8fc4qwsqaurkxk0pimyvx",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal."
+        "NSMicrophoneUsageDescription": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -32,8 +36,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#512888"
-      },
-      "package": "app.rork.8fc4qwsqaurkxk0pimyvx"
+      }
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -42,7 +45,7 @@
       [
         "expo-router",
         {
-          "origin": "https://rork.com/"
+          "origin": "https://beforeyousayit.app"
         }
       ],
       "expo-font",
@@ -56,18 +59,18 @@
       ],
       "expo-web-browser",
       [
-        "expo-av",
-        {
-          "microphonePermission": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal."
-        }
-      ],
-      [
         "expo-audio",
         {
           "microphonePermission": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

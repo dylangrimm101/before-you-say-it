@@ -91,7 +91,7 @@ export default function SettingsScreen() {
         });
     };
     const title = "Delete data on this device?";
-    const body = "This removes your local profile, practice history, saved scenarios, account session, generated audio, and progress. It does not cancel a subscription.";
+    const body = "This removes your local profile, practice history, saved scenarios, account session, generated audio, and progress. It does not delete your web account or cancel a subscription.";
     if (Platform.OS === "web") {
       if (globalThis.confirm?.(`${title}\n\n${body}`)) perform();
       return;
