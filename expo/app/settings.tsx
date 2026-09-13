@@ -12,6 +12,7 @@ import { providerLabel, subscriptionSnapshot } from "@/lib/commerce";
 import { PRO_ENTITLEMENT, useCustomerInfo, useRestorePurchases } from "@/lib/purchases";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useAuth } from "@/providers/auth";
+import { AccountLogout } from "@/components/AccountLogout";
 import { useStore } from "@/providers/store";
 
 const STORE_TERMS = Platform.select({
@@ -91,7 +92,7 @@ export default function SettingsScreen() {
         });
     };
     const title = "Delete data on this device?";
-    const body = "This removes your local profile, practice history, saved scenarios, account session, generated audio, and progress. It does not cancel a subscription.";
+    const body = "This removes your local profile, practice history, saved scenarios, account session, generated audio, and progress. It does not delete your web account or cancel a subscription.";
     if (Platform.OS === "web") {
       if (globalThis.confirm?.(`${title}\n\n${body}`)) perform();
       return;
@@ -119,7 +120,9 @@ export default function SettingsScreen() {
       </Reveal>
 
       <Reveal index={1} style={styles.section}><SectionLabel>Account</SectionLabel><SettingsGroup>
-        <SettingsRow icon={<UserRound size={18} color={C.purple} />} title={accountTitle} detail={accountDetail} onPress={!user && isAuthConfigured && !isAuthLoading ? () => router.push("/continue-from-web") : undefined} last />
+        <SettingsRow icon={<UserRound size={18} color={C.purple} />} title={accountTitle} detail={accountDetail} onPress={!user && isAuthConfigured && !isAuthLoading ? () => router.push("/continue-from-web") : undefined} last={!user} />
+        <AccountLogout />
+        {user ? <SettingsRow icon={<Trash2 size={18} color={C.purple} />} title="Delete account" detail="Permanently delete your account and personal practice data" onPress={() => router.push("/delete-account")} last /> : null}
       </SettingsGroup></Reveal>
 
       <Reveal index={2} style={styles.section}><SectionLabel>Practice & permissions</SectionLabel><SettingsGroup>

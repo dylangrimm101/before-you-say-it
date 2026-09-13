@@ -47,11 +47,13 @@ export default function DrillScreen() {
   const [outcomes, setOutcomes] = useState<RoundOutcome[]>([]);
   const [error, setError] = useState<string>("");
   const [logged, setLogged] = useState<boolean>(false);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const { logDrill, markChallengeDayDone } = useStore();
   const challengeDay = params.challengeDay ? Number(params.challengeDay) : null;
 
-  const dictation = useDictation();
+  const dictation = useDictation({ paidPractice: true });
 
   const done = drill ? outcomes.length >= drill.rounds.length : false;
   const current = drill && !done ? drill.rounds[round] : null;
@@ -107,24 +109,32 @@ export default function DrillScreen() {
 
 
   const next = useCallback(async () => {
-    if (!drill) return;
+    if (!drill || savingRef.current) return;
     tap("medium");
     if (round + 1 >= drill.rounds.length) {
-      // finished — log once
-      if (!logged) {
-        setLogged(true);
-        await logDrill({
-          drillId: drill.id,
-          date: dayKey(Date.now()),
-          score: average,
-          completedAt: Date.now(),
-        });
-        if (challengeDay !== null) {
-          await markChallengeDayDone(challengeDay);
+      // Keep the final feedback retryable until durable writes succeed.
+      savingRef.current = true;
+      setSaving(true);
+      setError("");
+      try {
+        if (!logged) {
+          await logDrill({
+            drillId: drill.id,
+            date: dayKey(Date.now()),
+            score: average,
+            completedAt: Date.now(),
+          });
+          setLogged(true);
         }
+        if (challengeDay !== null) await markChallengeDayDone(challengeDay);
         tap("success");
+        setRound(round + 1);
+      } catch {
+        setError("Couldn’t save this drill. Your feedback is still here. Try again.");
+      } finally {
+        savingRef.current = false;
+        setSaving(false);
       }
-      setRound(round + 1);
       return;
     }
     setRound(round + 1);
@@ -229,6 +239,7 @@ export default function DrillScreen() {
                   ) : null}
                   <PrimaryButton
                     label={round + 1 >= drill.rounds.length ? "See your score" : "Next round"}
+                    disabled={saving}
                         onPress={next}
                     style={{ marginTop: 16 }}
                   />

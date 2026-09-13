@@ -8,6 +8,7 @@ import { Backdrop, useReducedMotion } from "@/components/ui";
 import { approvedLessonDeck } from "@/constants/approvedLessons";
 import { C, GUTTER, eyebrow, font, radius, shadow, T } from "@/constants/theme";
 import { nextLaunchDeck } from "@/lib/launchCurriculum";
+import { measuredPracticeHistory } from "@/lib/scoredPracticeHistory";
 import { approvedRehearsalConfig } from "@/lib/approvedRehearsals";
 import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
 import { customerLessonActivityCopy } from "@/lib/customerLessonExperience";
@@ -90,7 +91,7 @@ function IndexCard({ index, chartProgress, hasLessonUpdate, onDetails }: { index
   const statusLabel = index.kind === "overall" ? "Overall Index" : index.kind === "partial" ? "Partial Index" : "Insufficient evidence";
 
   return (
-    <View style={[styles.card, styles.indexCard]} accessibilityLabel={`Current Communication Index. ${statusLabel}. ${index.value ?? "No Index value"}. ${index.observedCount} of 6 signals observed.${hasLessonUpdate ? " Latest completed lesson included." : ""}`}>
+    <View style={[styles.card, styles.indexCard]} accessibilityLabel={`Current Communication Index. ${statusLabel}. ${index.value ?? "No Index value"}. ${index.observedCount} of 6 signals observed.${hasLessonUpdate ? " Scored practice included." : ""}`}>
       <View style={styles.cardTopRow}>
         <View style={styles.indexLabelRow}><Text style={styles.cardEyebrow}>Communication Index</Text><View style={styles.currentBadge}><View style={styles.currentDot} /><Text style={styles.currentBadgeText}>Current</Text></View></View>
         <Pressable onPress={onDetails} accessibilityRole="button" accessibilityLabel="Communication Index details" hitSlop={12}>
@@ -99,7 +100,7 @@ function IndexCard({ index, chartProgress, hasLessonUpdate, onDetails }: { index
       </View>
       <View style={styles.indexHeading}>
         <View><Text style={styles.currentIndexCaption}>Your current Index</Text><View style={styles.indexValueRow}><Text style={styles.indexValue}>{valueLabel}</Text>{index.value !== null ? <Text style={styles.outOf}>/ 100</Text> : null}</View></View>
-        <View style={styles.indexPills}><View style={styles.pill}><Text style={styles.pillText}>{statusLabel}</Text></View><View style={styles.pill}><Text style={styles.pillText}>{index.observedCount} of 6 signals</Text></View>{hasLessonUpdate ? <View style={styles.updatedPill}><Check size={10} color={C.purple} strokeWidth={3} /><Text style={styles.updatedPillText}>Latest lesson included</Text></View> : null}</View>
+        <View style={styles.indexPills}><View style={styles.pill}><Text style={styles.pillText}>{statusLabel}</Text></View><View style={styles.pill}><Text style={styles.pillText}>{index.observedCount} of 6 signals</Text></View>{hasLessonUpdate ? <View style={styles.updatedPill}><Check size={10} color={C.purple} strokeWidth={3} /><Text style={styles.updatedPillText}>Scored practice included</Text></View> : null}</View>
       </View>
       <View style={styles.chartArea}>
         <View style={styles.chart} accessibilityRole="image" accessibilityLabel={index.chartValues.length === 0 ? "No scored practice values yet" : `Scored practice history. ${index.chartValues.join(", ")} on a zero to one hundred scale.`}>
@@ -163,6 +164,7 @@ export default function TodayScreen() {
   const lessonCopy = nextDeck ? customerLessonActivityCopy(nextDeck, rehearsalConfig) : undefined;
   const quickRep = useMemo(() => latestCompletedQuickRep(convertedLessonProgress), [convertedLessonProgress]);
   const quickRepDone = quickRep ? quickRepCompletedToday(drillLog, quickRep.lessonId) : false;
+  const measuredHistory = useMemo(() => measuredPracticeHistory(scoredPracticeHistory), [scoredPracticeHistory]);
   const index = useMemo<TodayIndexPresentation>(
     () => todayIndexPresentation(activePracticeSession?.sharedResult, scoredPracticeHistory),
     [activePracticeSession?.sharedResult, scoredPracticeHistory],
@@ -227,7 +229,7 @@ export default function TodayScreen() {
         showsVerticalScrollIndicator={false}
       >
         <DeckLayer entrance={entrances[0]} order={0} scrollOffset={scrollOffset}>
-          <IndexCard index={index} chartProgress={chartProgress} hasLessonUpdate={scoredPracticeHistory.length > 0} onDetails={openProgress} />
+          <IndexCard index={index} chartProgress={chartProgress} hasLessonUpdate={measuredHistory.length > 0} onDetails={openProgress} />
         </DeckLayer>
         {quickRep ? <DeckLayer entrance={entrances[1]} order={1} scrollOffset={scrollOffset}><QuickRepHomeCard config={quickRep} completed={quickRepDone} onPress={openQuickRep} /></DeckLayer> : null}
         {TODAY_ACTIVITY_KEYS.map((key, activityIndex) => {

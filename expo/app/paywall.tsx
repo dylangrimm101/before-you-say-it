@@ -1,3 +1,5 @@
+import { NativeBillingGate } from '@/components/NativeBillingGate';
+import { normalBillingEnabled } from '@/lib/nativeBillingRuntime';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AlertCircle, Check, ChevronDown, Clock3, RefreshCw, ShieldCheck } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -24,6 +26,9 @@ import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useCustomerInfo, useIsPro, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
 import { useStore } from "@/providers/store";
+import { useAuth } from "@/providers/auth";
+import { useStagingWebBridgeState } from "@/lib/useStagingWebBridgeState";
+import { stagingPurchasePresentation } from "@/lib/stagingWebBridge";
 import type { SharedResultContractV1 } from "@/types/sharedProduct";
 
 const DEFAULT_FOCUS_LABEL = "Focus: Specificity";
@@ -33,6 +38,26 @@ const SUBSCRIPTION_MANAGEMENT_URL = Platform.select({
 });
 
 export default function Paywall() {
+  const { stagingWebBridge } = useAuth();
+  const webState = useStagingWebBridgeState(stagingWebBridge);
+  const router = useRouter();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!stagingWebBridge) return;
+    const timer = setInterval(() => tick(value => value + 1), 1000);
+    return () => clearInterval(timer);
+  }, [stagingWebBridge]);
+  if (__DEV__ && stagingWebBridge?.suppressPurchasePrompt()) {
+    return <Unavailable title="Your web subscription is already verified." body="Don’t purchase again. This staging preview can show your saved web result; paid native practice still requires its own server authorization." onBack={() => router.replace("/staging-web-result")} />;
+  }
+  if (__DEV__ && stagingWebBridge && (stagingWebBridge.hasKnownWebPurchase() || stagingPurchasePresentation(webState, false) === "verify-web")) {
+    return <Unavailable title="Check your web purchase first." body="Web subscription access is not currently verified. Recheck your saved result before purchasing again; this screen does not grant paid access." onBack={() => router.replace("/staging-web-result")} />;
+  }
+  if(normalBillingEnabled)return <NativeBillingGate onContinue={()=>router.replace("/(tabs)/library")} onLogin={()=>router.push("/continue-from-web")}><ApplePaywall /></NativeBillingGate>;
+  return <ApplePaywall />;
+}
+
+function ApplePaywall() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ gate?: string; source?: string; moduleId?: string }>();
@@ -44,25 +69,30 @@ export default function Paywall() {
   const purchase = usePurchasePackage();
   const restore = useRestorePurchases();
   const customer = useCustomerInfo();
-  const [offer, setOffer] = useState<OfferState<SharedResultContractV1 | undefined>>(() => openOffer(activePracticeSession?.sharedResult));
+  const [offer, setOffer] = useState<OfferState<SharedResultContractV1 | undefined>>(() => {
+    const opened = openOffer(activePracticeSession?.sharedResult);
+    const checkpoint = activePracticeSession?.postRehearsalState;
+    if (params.source === "debrief" && (checkpoint === "pay2" || checkpoint === "pay3")) {
+      opened.stage = checkpoint === "pay2" ? 2 : 3;
+    }
+    return opened;
+  });
   const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
   const [commerceState, setCommerceState] = useState<CommercePresentationState>("ready");
   const stage = offer.stage;
 
   const plans = useMemo((): { monthly: PurchasesPackage | null; annual: PurchasesPackage | null } => {
     const current = offerings?.current;
-    return { monthly: current?.monthly ?? null, annual: current?.annual ?? null };
+    return { monthly: current?.monthly?.product.identifier === "byis_pro_monthly_5" ? current.monthly : null, annual: null };
   }, [offerings]);
   const selectedPackage = billing === "annual" ? plans.annual ?? plans.monthly : plans.monthly ?? plans.annual;
   const terms = storeProductSnapshot(selectedPackage?.product);
   const monthlyTerms = storeProductSnapshot(plans.monthly?.product);
   const annualTerms = storeProductSnapshot(plans.annual?.product);
   const isApprovedStoreOffer = Boolean(
-    plans.monthly && plans.annual
-      && monthlyTerms?.trialDurationLabel === "7 days"
-      && annualTerms?.trialDurationLabel === "7 days",
+    plans.monthly && monthlyTerms?.periodLabel === "1 month" && monthlyTerms.priceString,
   );
-  const purchaseLabel = "Start my free trial";
+  const purchaseLabel = "Subscribe monthly";
   const actions = commerceActionPresentation(commerceState, isPro, purchaseLabel);
   const hasCompleteEarnedResult = Boolean(activePracticeSession?.sharedResult?.pressure_moment && activePracticeSession.sharedResult.practice_shift && activePracticeSession.sharedResult.starting_index && activePracticeSession.sharedResult.first_focus);
   const earnedOfferBlocked = params.source === "debrief" && !hasCompleteEarnedResult;
@@ -148,7 +178,7 @@ export default function Paywall() {
       router.replace({ pathname: "/purchase-success", params: purchaseSuccessParams });
       return;
     }
-    if (!selectedPackage || purchase.isPending) return;
+    if (!selectedPackage || !isApprovedStoreOffer || purchase.isPending || restore.isPending) return;
     setCommerceState(transitionPurchase("ready", { type: "begin" }).state);
     tap("light");
     try {
@@ -212,6 +242,8 @@ export default function Paywall() {
         <PressCard onPress={() => navigateOffer("dismiss")} style={[styles.topHit, styles.closeHit]} accessibilityLabel="Close offer. Keep my free debrief for now"><Text style={styles.topText}>Close</Text></PressCard>
       </View>
 
+      {normalBillingEnabled && (purchase.error || restore.error) ? <Text>{purchase.error?.message || restore.error?.message}</Text> : null}
+      <PrimaryButton label="Log in before purchasing" disabled={purchase.isPending || restore.isPending} onPress={() => router.push("/continue-from-web")} />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -264,7 +296,7 @@ export default function Paywall() {
   );
 }
 
-function StageOne({ moduleName, modulePreview, focus, monthlyPrice, annualPrice }: { moduleName: string; modulePreview: string; focus: string; monthlyPrice: string | null; annualPrice: string | null }) {
+function StageOne({ moduleName, modulePreview, focus, monthlyPrice }: { moduleName: string; modulePreview: string; focus: string; monthlyPrice: string | null; annualPrice: string | null }) {
   const [isPlanOpen, setIsPlanOpen] = useState<boolean>(false);
   const isReduced = useReducedMotion();
   const segmentProgress = useRef<Animated.Value[]>(
@@ -295,11 +327,11 @@ function StageOne({ moduleName, modulePreview, focus, monthlyPrice, annualPrice 
   return (
     <Reveal style={styles.stageOne}>
       <View style={styles.offerHero}>
-        <Text style={styles.trialEyebrow}>START YOUR FREE TRIAL</Text>
-        <Text style={styles.offerTitle}>7 days free</Text>
-        <Text style={styles.priceLine}>{monthlyPrice && annualPrice ? `Then ${monthlyPrice} monthly or ${annualPrice} annually. Cancel anytime.` : "Store pricing will be shown before checkout."}</Text>
+        <Text style={styles.trialEyebrow}>YOUR PRACTICE SUBSCRIPTION</Text>
+        <Text style={styles.offerTitle}>Build your practice</Text>
+        <Text style={styles.priceLine}>{monthlyPrice ? `${monthlyPrice} monthly. Renews until cancelled.` : "Store pricing will be shown before checkout."}</Text>
 
-        <View style={styles.sevenSegments} accessibilityLabel="Seven animated lines representing the seven-day free trial">
+        <View style={styles.sevenSegments} accessibilityLabel="Your practice path">
           {segmentProgress.map((progress, index) => (
             <Animated.View
               key={index}
@@ -316,7 +348,7 @@ function StageOne({ moduleName, modulePreview, focus, monthlyPrice, annualPrice 
             />
           ))}
         </View>
-        <Text style={styles.trialSupport}>Seven days to practice the conversations that matter.</Text>
+        <Text style={styles.trialSupport}>Ten lessons and two module closes, at your own pace.</Text>
       </View>
 
       <PressCard
@@ -351,16 +383,29 @@ function StageOne({ moduleName, modulePreview, focus, monthlyPrice, annualPrice 
 }
 
 function StageTwo() {
-  return <Reveal><Eyebrow color={C.dim}>No surprise charge</Eyebrow><Text style={styles.title}>You control whether your subscription renews.</Text><Text style={styles.lede}>The store shows the trial and renewal terms before you confirm. You can cancel in your App Store or Google Play subscription settings before the trial ends.</Text><View style={styles.timeline}><TimelineRow active label="Today" detail="Trial begins after store confirmation" /><TimelineRow label="Before the trial ends" detail="Cancel in your store subscription settings if you do not want to renew." /><TimelineRow label="Trial end" detail="The selected plan renews unless cancelled beforehand." last /></View></Reveal>;
+  return <Reveal><Eyebrow color={C.dim}>Your subscription</Eyebrow><Text style={styles.title}>You control whether your subscription renews.</Text><Text style={styles.lede}>Review the monthly price before confirming in the store. Any introductory offer and your eligibility are confirmed by the store, not promised here. Cancel in your store subscription settings before renewal.</Text><View style={styles.timeline}><TimelineRow active label="Today" detail="Access begins after store confirmation" /><TimelineRow label="Every month" detail="Your subscription renews unless cancelled." /><TimelineRow label="Your choice" detail="Manage or cancel in your store subscription settings." last /></View></Reveal>;
 }
 
 function StageThree({ plans, billing, onBilling, terms, isLoading, unavailable, commerceState, onPrivacy, onRestore, isRestoreDisabled, onManageSubscription }: { plans: { monthly: PurchasesPackage | null; annual: PurchasesPackage | null }; billing: "monthly" | "annual"; onBilling: (value: "monthly" | "annual") => void; terms: ReturnType<typeof storeProductSnapshot>; isLoading: boolean; unavailable: boolean; commerceState: CommercePresentationState; onPrivacy: () => void; onRestore: () => void; isRestoreDisabled: boolean; onManageSubscription?: () => void }) {
-  const selectedRenewal = terms?.priceString && terms.periodLabel ? `${terms.priceString} every ${terms.periodLabel}` : "the storefront price shown above";
-  return <Reveal><Eyebrow color={C.dim}>Start your free trial</Eyebrow><Text style={styles.title}>{terms ? `${terms.trialDurationLabel} free, then ${selectedRenewal}.` : "Review your store offer."}</Text><View style={styles.checkoutTimeline}><TimelineRow active label="Today" detail="Full access begins after store confirmation" /><TimelineRow label="Before the trial ends" detail="Cancel in your store subscription settings if you do not want to renew." /><TimelineRow label="Trial end" detail={`${selectedRenewal} renews unless cancelled beforehand.`} last /></View>{isLoading ? <ActivityIndicator color={C.purple} style={styles.loading} /> : unavailable ? <IapBlocker /> : <><View style={styles.planList}>{plans.monthly ? <PlanChoice label="Monthly option" price={plans.monthly.product.priceString} selected={billing === "monthly"} onPress={() => onBilling("monthly")} /> : null}{plans.annual ? <PlanChoice label="Annual option" price={plans.annual.product.priceString} selected={billing === "annual"} onPress={() => onBilling("annual")} /> : null}</View><GlassCard style={styles.termsCard}><View style={styles.termRow}><Text style={styles.termLabel}>Store price</Text><Text style={styles.termValue}>{terms?.priceString}</Text></View><View style={styles.termRow}><Text style={styles.termLabel}>Billing</Text><Text style={styles.termValue}>{terms?.periodLabel}</Text></View><View style={styles.termRow}><Text style={styles.termLabel}>Introductory trial</Text><Text style={styles.termValue}>{terms?.trialDurationLabel} free</Text></View></GlassCard></>}{commerceState !== "ready" ? <StatusCard state={commerceState} /> : null}<Text style={styles.renewalCopy}>Renews automatically after the trial at {selectedRenewal}. Cancel in your App Store or Google Play subscription settings.</Text><View style={styles.links}>{onManageSubscription ? <PressCard onPress={onManageSubscription} accessibilityLabel="Manage or cancel subscription"><Text style={styles.billingLink}>Manage or cancel subscription</Text></PressCard> : null}<PressCard onPress={() => void Linking.openURL("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")} accessibilityLabel="Terms"><Text style={styles.link}>Terms</Text></PressCard><PressCard onPress={onPrivacy} accessibilityLabel="Privacy"><Text style={styles.link}>Privacy</Text></PressCard><PressCard onPress={onRestore} disabled={isRestoreDisabled} accessibilityLabel="Restore purchases"><Text style={[styles.billingLink, isRestoreDisabled && styles.disabledText]}>Restore purchases</Text></PressCard></View></Reveal>;
+  const selectedRenewal = terms?.priceString && terms.periodLabel ? `${terms.priceString} every ${terms.periodLabel}` : "the price confirmed by the store";
+  return <Reveal><Eyebrow color={C.dim}>Monthly subscription</Eyebrow><Text style={styles.title}>{terms ? `${selectedRenewal}.` : "Review your store offer."}</Text>
+    {isLoading ? <ActivityIndicator color={C.purple} style={styles.loading} /> : unavailable ? <IapBlocker /> : <>
+      {plans.monthly ? <PlanChoice label="Monthly option" price={plans.monthly.product.priceString} selected={billing === "monthly"} onPress={() => onBilling("monthly")} /> : null}
+      <GlassCard style={styles.termsCard}><Text style={styles.lede}>Full access to all ten launch lessons and both module closes. Lessons unlock in order as you finish them.</Text></GlassCard>
+    </>}
+    {commerceState !== "ready" ? <StatusCard state={commerceState} /> : null}
+    <Text style={styles.renewalCopy}>Renews automatically at {selectedRenewal} unless cancelled. Any introductory offer is subject to store eligibility and confirmation.</Text>
+    <View style={styles.links}>
+      {onManageSubscription ? <PressCard onPress={onManageSubscription} accessibilityLabel="Manage or cancel subscription"><Text style={styles.billingLink}>Manage or cancel subscription</Text></PressCard> : null}
+      <PressCard onPress={onPrivacy} accessibilityLabel="Privacy"><Text style={styles.link}>Privacy</Text></PressCard>
+      <PressCard onPress={() => void Linking.openURL("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")} accessibilityLabel="Terms of use"><Text style={styles.link}>Terms of use</Text></PressCard>
+      <PressCard onPress={onRestore} disabled={isRestoreDisabled} accessibilityLabel="Restore purchases"><Text style={styles.link}>Restore purchases</Text></PressCard>
+    </View>
+  </Reveal>;
 }
 
 function IapBlocker() {
-  return <View style={styles.iapBlocker}><AlertCircle size={20} color={C.clay} /><View style={styles.iapBlockerCopy}><Text style={styles.iapBlockerTitle}>In-app purchase configuration required</Text><Text style={styles.iapBlockerBody}>The live store has not returned both approved plans with a 7-day trial. Trial checkout stays disabled until the App Store or Google Play offer is configured.</Text></View></View>;
+  return <View style={styles.iapBlocker}><AlertCircle size={20} color={C.clay} /><View style={styles.iapBlockerCopy}><Text style={styles.iapBlockerTitle}>In-app purchase configuration required</Text><Text style={styles.iapBlockerBody}>The store has not returned the approved monthly subscription. Checkout stays disabled until the store offer is available. You can still restore an existing purchase.</Text></View></View>;
 }
 
 function PlanChoice({ label, price, selected, onPress }: { label: string; price: string; selected: boolean; onPress: () => void }) {

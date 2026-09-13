@@ -79,7 +79,7 @@ function signalKeyForDimension(name: string): SharedSignalV1["signal_key"] | nul
 }
 
 function score(value: number): number {
-  return Math.round(Math.min(100, Math.max(0, value)));
+  return Math.min(100, Math.max(0, value));
 }
 
 export interface ClearerVersionContext {
@@ -250,7 +250,7 @@ export function buildFreeJourneyResult(
       ...calculatedIndex,
       index_value: typeof providerOverall === "number" && Number.isFinite(providerOverall)
         ? score(providerOverall)
-        : calculatedIndex.index_value,
+        : providerOverall === null ? null : calculatedIndex.index_value,
       ...(analysis.starting_index?.label?.trim() ? { label: analysis.starting_index.label.trim() } : {}),
       ...(analysis.starting_index?.coverage_note?.trim() ? { coverage_note: analysis.starting_index.coverage_note.trim() } : {}),
       ...(analysis.starting_index?.focus_dimension?.trim() ? { focus_dimension: analysis.starting_index.focus_dimension.trim() } : {}),

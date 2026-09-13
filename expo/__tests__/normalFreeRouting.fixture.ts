@@ -1,0 +1,11 @@
+import {mock} from 'bun:test';import assert from 'node:assert/strict';
+import {APPROVED_ONBOARDING_SCENARIOS,scenarioFromApproved} from '../constants/onboardingScenarios';
+delete process.env.EXPO_PUBLIC_BYSI_BUILD_MODE;process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN='https://beforeyousayit.app';delete process.env.EXPO_PUBLIC_GENERATE_ENDPOINT;
+let calls=0;const contracts:unknown[]=[];
+mock.module('../lib/normalFreeRuntime',()=>({requestNormalFree:async(_op:string,payload:Record<string,any>)=>{calls++;contracts.push(payload.contract);return Response.json({mode:'insufficient_evidence',insufficient_evidence:{headline:'Synthetic',note:'Synthetic',next_step:'Synthetic'}});}}));
+const {nextCounterpartTurn,generateDebrief}=await import('../lib/ai');
+const scenario=scenarioFromApproved(APPROVED_ONBOARDING_SCENARIOS[0]!,'woman-hope');
+await nextCounterpartTurn(scenario,'steady',[{id:'one',role:'user',text:'Can we choose one task?'}]).catch(()=>{});
+await generateDebrief(scenario,'steady',[{id:'one',role:'user',text:'Can we choose one task?'}]);
+assert.ok(calls>=2,'Release free generation must use registered session transport without public endpoint');assert.deepEqual(contracts[0],contracts.at(-1),'result must sign exact turn contract including difficulty');
+console.log('PASS normal release routing and signed scene equality (synthetic transport)');

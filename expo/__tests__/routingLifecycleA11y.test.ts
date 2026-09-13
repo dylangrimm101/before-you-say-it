@@ -48,6 +48,8 @@ describe("validated native intent routing", () => {
     ["beforeyousayit://scenario/feedback?level=gentle", "/scenario/feedback?level=gentle"],
     ["https://beforeyousayit.app/drill/clarity", "/drill/clarity"],
     ["/(tabs)/progress", "/(tabs)/progress"],
+    ["/forgot-password", "/forgot-password"],
+    ["https://beforeyousayit.app/reset-password", "/reset-password"],
   ])("preserves supported destination %s", (input, expected) => {
     expect(validatedNativeIntentPath(input)).toBe(expected);
   });

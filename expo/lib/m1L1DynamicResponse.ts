@@ -18,7 +18,10 @@ const UNSUPPORTED_CLIENT_BEHAVIOR = /\b(?:the\s+)?client\s+(?:keeps?|is|was|has|
 const UNSUPPORTED_TIMEFRAME = /\b(?:two|2)\s+weeks?\b/i;
 const PRESSURE_ONE = /\b(?:but|because|not realistic|can't|cannot|won't|slammed|quarter close|unfair|fair to say|failing|where is this coming from|what do you mean|why)\b/i;
 const PRESSURE_TWO = /\b(?:one (?:example|time|handoff)|all the time|basis|basing|pattern|often|always|twice|what else|how often|doesn(?:'|’)t make|don(?:'|’)t think|is that enough|why (?:is|are|do))\b/i;
-const FACT_PATTERN = /\b(?:\d{1,2}(?::\d{2})?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday|tomorrow|today)\b/gi;
+// Finite lexical permission, not factual entailment. Written cardinal numbers
+// must not bypass the existing numeric check. Keep original text unchanged;
+// do not equate a scene time with a workload or claim this verifies referents.
+const FACT_PATTERN = /\b(?:\d+(?::\d{2})?|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday|tomorrow|today)\b/gi;
 
 function words(value: string): string[] {
   return value.toLowerCase().match(/[a-z][a-z'-]{2,}/g) ?? [];
@@ -29,7 +32,16 @@ function meaningfulWords(value: string): Set<string> {
 }
 
 function facts(value: string): Set<string> {
-  return new Set((value.match(FACT_PATTERN) ?? []).map((fact) => fact.toLowerCase()));
+  // Compare ordinary spoken cardinals with digits without rewriting dialogue.
+  // "one" is also an indefinite pronoun ("naming one", "one example"); do not
+  // impose a grammatical restriction to pretend that ambiguity is resolved.
+  const cardinals = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+  const aliases: Record<string, string> = {once: "1", twice: "2", thirty: "30", forty: "40", fifty: "50", sixty: "60", seventy: "70", eighty: "80", ninety: "90", hundred: "100", thousand: "1000", million: "1000000", billion: "1000000000"};
+  const tokens = value.toLowerCase().replace(/\bonce\b/g, "1").replace(/\btwice\b/g, "2").match(FACT_PATTERN) ?? [];
+  return new Set(tokens.filter((fact) => fact !== "one").map((fact) => {
+    const index = cardinals.indexOf(fact);
+    return index >= 0 ? String(index) : aliases[fact] ?? fact;
+  }));
 }
 
 /** Locally enforces M1 L1 relevance, continuity, pressure, and safety constraints before display. */

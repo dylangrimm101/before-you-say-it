@@ -1,3 +1,5 @@
+import { noteRecoveryIntent } from "./passwordRecoveryIntent";
+
 const STATIC_DESTINATIONS = new Set([
   "/",
   "/(tabs)",
@@ -8,6 +10,8 @@ const STATIC_DESTINATIONS = new Set([
   "/path",
   "/privacy",
   "/continue-from-web",
+  "/forgot-password",
+  "/reset-password",
   "/entry",
   "/onboarding",
   "/paywall",
@@ -50,6 +54,7 @@ function pathFromInput(input: string): { pathname: string; search: string } | nu
 
 /** Allows only shipped user-facing destinations; malformed, foreign, and internal QA links fail closed. */
 export function validatedNativeIntentPath(input: string): string {
+  noteRecoveryIntent(input);
   const parsed = pathFromInput(input);
   if (!parsed) return "/";
   let pathname: string;

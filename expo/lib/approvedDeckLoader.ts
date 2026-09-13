@@ -1,9 +1,12 @@
-import { gunzipSync, strFromU8, unzipSync } from "fflate";
+import { gunzipSync, strFromU8 } from "fflate";
+
+import bundledDeckAssets from "@/assets/approved-decks";
+import bundledDeckManifest from "@/assets/approved-decks/manifest.json";
 
 import { M1_L1_CONVERSION } from "@/lib/convertedLesson";
+import { withRequestDeadline } from "@/lib/requestDeadline";
 import { approvedRehearsalConfigs, type ApprovedRehearsalConfig } from "@/lib/approvedRehearsals";
 
-const APPROVED_HANDOFF_ARCHIVE_URL = "https://r2-pub.rork.com/attachments/xo73vo5tbrhku6f68brbr.zip";
 const APPROVED_HANDOFF_ARCHIVE_SHA256 = "62348a014a52c062bbcd691f88b3b77b618a72bf41014b6719b1b0f1de42fd03";
 const TEMPLATE_PATTERN = /<script type="__bundler\/template">\s*(.*?)\s*<\/script>/s;
 const MANIFEST_PATTERN = /<script type="__bundler\/manifest">\s*(.*?)\s*<\/script>/s;
@@ -20,56 +23,13 @@ const M1_L1_OUTCOME_CARD = /<div\b[^>]*>\s*<span\b[^>]*>\s*What happens\s*<\/spa
 const M1_L1_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*You open\.\s*Adam pushes back twice\..*?same moment back to you\.\s*<\/div>\s*<\/div>/is;
 const M1_L1_EMPTY_OUTCOME_PREVIEW = /<div\b[^>]*>\s*<div\b[^>]*>\s*What happens\s*<\/div>\s*<div\b[^>]*>\s*<\/div>\s*<\/div>/gis;
 
-let archivePromise: Promise<Record<string, Uint8Array>> | null = null;
-const ARCHIVE_LOAD_ATTEMPTS = 3;
-const ARCHIVE_LOAD_TIMEOUT_MS = 12_000;
-
 export function isApprovedArchiveDigest(digest: string): boolean {
   return digest === APPROVED_HANDOFF_ARCHIVE_SHA256;
-}
-
-function hexDigest(value: ArrayBuffer): string {
-  return Array.from(new Uint8Array(value), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /** Binds executable M1 L1 deck bytes to its lesson path and content version. */
 export function isApprovedM1L1DeckDigest(archivePath: string, contentVersion: string, digest: string): boolean {
   return archivePath === M1_L1_ARCHIVE_PATH && contentVersion === M1_L1_CONTENT_VERSION && digest === M1_L1_APPROVED_SHA256;
-}
-
-async function fetchApprovedArchive(): Promise<Record<string, Uint8Array>> {
-  let lastError: unknown = new Error("Approved lesson archive is unavailable");
-  for (let attempt = 0; attempt < ARCHIVE_LOAD_ATTEMPTS; attempt += 1) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), ARCHIVE_LOAD_TIMEOUT_MS);
-    try {
-      const response = await fetch(APPROVED_HANDOFF_ARCHIVE_URL, { signal: controller.signal });
-      if (!response.ok) throw new Error("Approved lesson archive is unavailable");
-      const archiveBytes = new Uint8Array(await response.arrayBuffer());
-      // Keep the module import lazy so the loader remains testable in Bun while
-      // native builds use Expo's byte-safe digest implementation.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const Crypto = require("expo-crypto") as typeof import("expo-crypto");
-      const digest = hexDigest(await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, archiveBytes));
-      if (!isApprovedArchiveDigest(digest)) throw new Error("Approved lesson archive failed authenticity check");
-      return unzipSync(archiveBytes);
-    } catch (error: unknown) {
-      lastError = error;
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-  throw lastError;
-}
-
-function approvedArchive(): Promise<Record<string, Uint8Array>> {
-  if (!archivePromise) {
-    archivePromise = fetchApprovedArchive().catch((error: unknown) => {
-      archivePromise = null;
-      throw error;
-    });
-  }
-  return archivePromise;
 }
 
 /** Removes every card and runtime branch beyond the currently authorized QA boundary. */
@@ -436,22 +396,65 @@ export function returnedDeckHtml(rawHtml: string, returnCard: number, completion
 }
 
 async function approvedDeckSource(archivePath: string): Promise<string> {
-  const archive = await approvedArchive();
-  const bytes = archive[archivePath];
-  if (!bytes) throw new Error("Approved lesson file is missing from the handoff");
-  const source = strFromU8(bytes);
-  if (archivePath === M1_L1_ARCHIVE_PATH) {
-    // Keep this synchronous module boundary compatible with Hermes; a lazy dynamic
-    // import can surface as a SyntaxError before the approved digest is checked.
+  if (!Object.hasOwn(bundledDeckAssets, archivePath)) throw new Error("Approved lesson file is missing from the handoff");
+  const digests: Readonly<Record<string, string>> = bundledDeckManifest.decks;
+  if (!isApprovedArchiveDigest(bundledDeckManifest.archiveSha256)
+    || !Object.hasOwn(digests, archivePath)) throw new Error("Approved lesson manifest failed authenticity check");
+  // Resolve only this deck. Static Metro requires package all twelve assets with
+  // the native binary; expo-updates also exposes embedded/local asset URIs.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Asset } = require("expo-asset") as typeof import("expo-asset");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Platform } = require("react-native") as typeof import("react-native");
+  const asset = Asset.fromModule(bundledDeckAssets[archivePath]);
+  let source: string;
+  if (Platform.OS === "web") {
+    source = await withRequestDeadline(async (signal) => {
+      const response = await fetch(asset.uri, { signal });
+      if (!response.ok) throw new Error("Approved lesson asset could not be read");
+      return await response.text();
+    }, 12_000);
+  } else {
+    let uri = asset.localUri || asset.uri;
+    // expo-updates embeds HTML in res/raw; expo-asset can move localUri to uri.
+    // SDK 54 legacy sends file: to FileInputStream, but a scheme-less name to
+    // openResourceInputStream -> getIdentifier(name, "raw", packageName).
+    if (Platform.OS === "android") {
+      const rawResource = /^file:\/\/\/android_res\/raw\/([a-z0-9_]+)\.html$/.exec(uri);
+      if (rawResource) {
+        uri = rawResource[1]!;
+      } else {
+        // Do not normalize malformed resource URLs (including encoded traversal)
+        // into either a resource name or a filesystem path.
+        let decodedUri: string;
+        try { decodedUri = decodeURIComponent(uri); }
+        catch { throw new Error("Approved lesson asset is not packaged locally"); }
+        if (/android_res/i.test(decodedUri)) throw new Error("Approved lesson asset is not packaged locally");
+      }
+    }
+    // Never turn a missing embedded asset into an internet dependency. Android
+    // release resources may be scheme-less raw resource identifiers; iOS and
+    // updates use file URIs. Expo Go's remote assets intentionally fail closed.
+    const local = /^(file|asset):\/\//.test(uri)
+      || (Platform.OS === "android" && /^[a-z0-9_]+$/.test(uri));
+    if (!local) throw new Error("Approved lesson asset is not packaged locally");
+    // SDK 54's top-level readAsStringAsync is deprecated and throws; use legacy.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Crypto = require("expo-crypto") as typeof import("expo-crypto");
-    const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, source);
+    const FileSystem = require("expo-file-system/legacy") as typeof import("expo-file-system/legacy");
+    source = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.UTF8 });
+  }
+  // Verify exact UTF-8 bytes before any existing transformation.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Crypto = require("expo-crypto") as typeof import("expo-crypto");
+  const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, source);
+  if (digest !== digests[archivePath]) throw new Error("Approved lesson deck failed authenticity check");
+  if (archivePath === M1_L1_ARCHIVE_PATH) {
     if (!isApprovedM1L1DeckDigest(archivePath, M1_L1_CONTENT_VERSION, digest)) throw new Error(`Approved M1 L1 deck failed authenticity check for ${M1_L1_CONTENT_VERSION}`);
   }
   return source;
 }
 
-/** Downloads the approved handoff once and returns only the authorized lesson slice. */
+/** Reads the bundled approved handoff and returns only the authorized lesson slice. */
 export async function loadApprovedDeckHtml(archivePath: string, reviewThroughCard: number): Promise<string> {
   return materializeApprovedDeckHtml(authorizedDeckHtml(await approvedDeckSource(archivePath), reviewThroughCard));
 }

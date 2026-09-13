@@ -81,7 +81,7 @@ describe("lesson-matched Quick Rep", () => {
 
   test("uses voice-first capture, one cue, and the same prompt retry without showing a global score", async () => {
     const route = await Bun.file(`${import.meta.dir}/../app/quick-rep/[lessonId].tsx`).text();
-    expect(route).toContain("useDictation()");
+    expect(route).toContain("useDictation({ paidPractice: true })");
     expect(route).toContain("convertedLessonProgress.some");
     expect(route).toContain('access.entitlement !== "pro"');
     expect(route).toContain("drillRoundFeedback(");

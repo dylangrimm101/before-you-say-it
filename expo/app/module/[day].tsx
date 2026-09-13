@@ -33,7 +33,7 @@ import {
   type ActivePracticeSession,
 } from "@/lib/practiceSession";
 import { useDictation } from "@/lib/useDictation";
-import { replaySpeech, resetSpeech, speakPilotAudio, stopSpeech, useSpeech } from "@/lib/voice";
+import { replaySpeech, resetSpeech, speakPaidPilotAudio as speakPilotAudio, stopSpeech, useSpeech } from "@/lib/voice";
 import { useStore } from "@/providers/store";
 import type { PilotAttemptKind, PilotAudioLine, PilotCoachResponse, PilotDayRun, PilotModule, PilotModuleState } from "@/types/pilotCurriculum";
 
@@ -62,9 +62,9 @@ export default function PilotModuleScreen() {
     saveActivePracticeSession,
   } = useStore();
   const speech = useSpeech();
-  const attemptDictation = useDictation();
-  const responseDictation = useDictation();
-  const retryDictation = useDictation();
+  const attemptDictation = useDictation({ paidPractice: true });
+  const responseDictation = useDictation({ paidPractice: true });
+  const retryDictation = useDictation({ paidPractice: true });
   const [session, setSession] = useState<ActivePracticeSession | null>(activePracticeSession);
   const initialRun = useMemo(() => session && module ? createPilotDayRun(session, module.day, Date.now(), moduleId ?? undefined, module.practice_id, module.content_version) : null, [module, moduleId, session]);
   const [run, setRun] = useState<PilotDayRun | null>(initialRun);

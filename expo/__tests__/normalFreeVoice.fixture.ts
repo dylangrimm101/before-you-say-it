@@ -1,0 +1,10 @@
+import {mock} from 'bun:test';import assert from 'node:assert/strict';
+delete process.env.EXPO_PUBLIC_BYSI_BUILD_MODE;process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN='https://beforeyousayit.app';delete process.env.EXPO_PUBLIC_TTS_ENDPOINT;delete process.env.EXPO_PUBLIC_TRANSCRIBE_ENDPOINT;
+mock.module('react-native',()=>({Platform:{OS:'web'}}));mock.module('expo-audio',()=>({createAudioPlayer(){throw Error('No device fixture');},setAudioModeAsync:async()=>{}}));mock.module('../lib/supabase',()=>({supabase:null}));
+const operations:string[]=[];mock.module('../lib/normalFreeRuntime',()=>({requestNormalFree:async(op:string)=>{operations.push(op);return Response.json({code:'exhausted'},{status:429});}}));
+const {speak}=await import('../lib/voice');const {transcribeRecording}=await import('../lib/transcription');
+globalThis.fetch=(async()=>new Response(new Blob(['synthetic-upload'],{type:'audio/mpeg'}))) as typeof fetch;
+assert.equal(await speak('Exact approved counterpart.','man-adam'),'failed','must not invent successful audio when exhausted');
+await assert.rejects(()=>transcribeRecording('blob:synthetic','audio/mpeg','opener'),{name:'TranscriptionUnavailableError'});
+assert.deepEqual(operations,['tts','transcribe'],'normal free voice must use session service, never public/paid/Edge');
+console.log('PASS mounted voice/transcription adapters, normal free exhaustion typed fallback; no playback proof');

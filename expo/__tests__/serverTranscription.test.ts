@@ -26,7 +26,12 @@ describe("server-side recording transcription", () => {
     expect(client).not.toContain("EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY");
     expect(client).not.toContain("transcription-model");
     expect(client).toContain("TRANSCRIPTION_TIMEOUT_MS");
-    expect(client).toContain("signal: controller.signal");
+    expect(client).toContain("return await withRequestDeadline(async (signal) => {");
+    expect(client).toContain("options.timeoutMs ?? TRANSCRIPTION_TIMEOUT_MS, options.signal");
+    expect(client).toContain("fetch(uri, { signal })");
+    expect(client).toMatch(/fetch\(TRANSCRIBE_ENDPOINT,\s*\{[^}]*\bsignal,/s);
+    expect(client).toContain("await audioResponse.blob()");
+    expect(client).toContain("await response.json()");
     expect(client).toContain("new TranscriptionUnavailableError(408)");
     expect(client).toContain("supabase.auth.getSession()");
     expect(client).toContain("data.session?.access_token");

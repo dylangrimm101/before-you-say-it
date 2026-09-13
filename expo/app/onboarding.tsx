@@ -54,7 +54,7 @@ export default function Onboarding(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const isReduced = useReducedMotion();
-  const { saveProfile, addCustomScenario, anonymousUserId, saveActivePracticeSession } = useStore();
+  const { saveProfile, addCustomScenario, anonymousUserId, createCurrentOnboardingPractice } = useStore();
   const [step, setStep] = useState<number>(0);
   const [entryRoute, setEntryRoute] = useState<OnboardingEntryRoute | null>(null);
   const [moduleId, setModuleId] = useState<ModuleId | null>(null);
@@ -144,7 +144,7 @@ export default function Onboarding(): React.JSX.Element {
       }
       await addCustomScenario(scenario);
       const practiceSessionId = createPracticeSessionId();
-      await saveActivePracticeSession(createOnboardingPracticeSession(practiceSessionId, anonymousUserId, scenario, selectedOutcome, selectedReaction, Date.now(), {
+      await createCurrentOnboardingPractice(createOnboardingPracticeSession(practiceSessionId, anonymousUserId, scenario, selectedOutcome, selectedReaction, Date.now(), {
         entryRoute,
         ...(moduleId ? { provisionalModuleId: moduleId } : {}),
         ...(selectionLabel ? { selectionLabel } : {}),
@@ -162,7 +162,7 @@ export default function Onboarding(): React.JSX.Element {
       setBuilding(false);
       setError("We couldn't set up your rehearsal. Check your connection and try again.");
     }
-  }, [addCustomScenario, anonymousUserId, building, entryRoute, isReal, moduleId, outcome, router, saveActivePracticeSession, saveProfile, selectionLabel, situation]);
+  }, [addCustomScenario, anonymousUserId, building, entryRoute, isReal, moduleId, outcome, router, createCurrentOnboardingPractice, saveProfile, selectionLabel, situation]);
 
   const chooseDiagnosis = (nextModuleId: ModuleId, label: string): void => {
     tap("light");

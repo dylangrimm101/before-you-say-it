@@ -36,7 +36,7 @@ import {
 } from "@/lib/scenarioPractice";
 import { leaveAfterStrictDictationCleanup } from "@/lib/temporaryRecording";
 import { useDictation } from "@/lib/useDictation";
-import { playPreparedPilotAudio, preparePilotAudio, replaySpeech, resetSpeech, speakPilotAudioToCompletion, unlockAudioPlayback, useSpeech } from "@/lib/voice";
+import { playPreparedPilotAudio, preparePaidPilotAudio as preparePilotAudio, replaySpeech, resetSpeech, speakPaidPilotAudioToCompletion as speakPilotAudioToCompletion, unlockAudioPlayback, useSpeech } from "@/lib/voice";
 import { useStore } from "@/providers/store";
 
 interface M1L1PaidPracticeProps {
@@ -100,7 +100,7 @@ export function M1L1PaidPractice({ requestedRunId, lessonTitle, lessonMove, conv
   const approvalInFlightRef = useRef<boolean>(false);
   const captureTransitionInFlightRef = useRef<boolean>(false);
   const replayTransitionInFlightRef = useRef<boolean>(false);
-  const dictation = useDictation();
+  const dictation = useDictation({ paidPractice: true });
   const speech = useSpeech();
   const cancelDictation = dictation.cancel;
 

@@ -14,11 +14,13 @@ import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { C, GUTTER, T, font, radius, shadow } from "@/constants/theme";
 import { loadApprovedDeckHtml, loadConvertedHandoffDeckHtml, loadModuleCloseDeckHtml } from "@/lib/approvedDeckLoader";
 import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
-import { approvedRehearsalConfig, approvedRehearsalIndexImpact, approvedRehearsalStrongVersion, validateApprovedRehearsalCompletion, type ApprovedRehearsalIndexImpact } from "@/lib/approvedRehearsals";
+import { approvedRehearsalComparison, approvedRehearsalConfig, approvedRehearsalIndexImpact, approvedRehearsalStrongVersion, validateApprovedRehearsalCompletion, type ApprovedRehearsalIndexImpact } from "@/lib/approvedRehearsals";
 import { conversionRuntimeEnabled, m1L1GoodVersion, m1L1IndexImpact, M1_L1_CONVERSION, validateM1L1Completion, type ConvertedLessonProgress, type M1L1IndexImpact, type TransferChoice } from "@/lib/convertedLesson";
 import { progressHistoryPresentation, SCORED_PRACTICE_HISTORY_VERSION, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
 import { canAccessLaunchDeck, nextLaunchDeck } from "@/lib/launchCurriculum";
 import { useIsPro } from "@/lib/purchases";
+import { useStagingPracticeAdmission } from "@/lib/useStagingPracticeAdmission";
+import { StagingPracticeGate } from "@/components/StagingPracticeGate";
 import { isFeedbackLessonId, LESSON_FEEDBACK_MAX_LENGTH, type FeedbackLessonId } from "@/lib/lessonFeedback";
 import { submitLessonFeedback } from "@/lib/lessonFeedbackService";
 import { errorShape, safeLog } from "@/lib/redact";
@@ -47,7 +49,8 @@ export default function ApprovedLessonDeckScreen() {
     writePendingConvertedLessonCompletion,
   } = useStore();
   const isPro = useIsPro();
-  const isEntitled = isPro || (__DEV__ && devProEnabled);
+  const admission = useStagingPracticeAdmission();
+  const isEntitled = normalBillingEnabled ? isPro : isPro || (__DEV__ && devProEnabled) || admission.allowed;
   const hasLaunchAccess = Boolean(lesson && canAccessLaunchDeck(lesson.id, isEntitled, convertedLessonProgress, moduleCloseProgress));
   const nextDeck = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
   const [lessonWasReset, setLessonWasReset] = useState<boolean>(false);
@@ -66,6 +69,8 @@ export default function ApprovedLessonDeckScreen() {
   const isApprovedMoveSaved = !isReturning || hasValidReturn;
   const [isStrongVersionSaved, setIsStrongVersionSaved] = useState<boolean>(false);
   const [completionCommitted, setCompletionCommitted] = useState<boolean>(false);
+  const [closeSaveFailed, setCloseSaveFailed] = useState<boolean>(false);
+  const closeSaveInFlight = useRef(false);
   const [isCompleting, setIsCompleting] = useState<boolean>(false);
   const [deckHtml, setDeckHtml] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<boolean>(false);
@@ -157,7 +162,7 @@ export default function ApprovedLessonDeckScreen() {
         function enableApprovedMoveCompletion() {
           if (!${isReturning && isApprovedMoveSaved ? "true" : "false"}) return;
           var counters = Array.prototype.slice.call(document.querySelectorAll("[data-tnum]"));
-          var isCard21 = counters.some(function (node) { return /^1 \/ 2$/.test(textOf(node)); });
+          var isCard21 = counters.some(function (node) { return textOf(node) === "1 / 2"; });
           if (!isCard21) return;
           Array.prototype.slice.call(document.querySelectorAll("button, [role=button]")).forEach(function (control) {
             var label = textOf(control);
@@ -279,6 +284,9 @@ export default function ApprovedLessonDeckScreen() {
     }
     if (message.type === "deck-ready") return;
     if (message.type === "module-close-complete" && lesson?.isCloseDeck && !completionCommitted) {
+      if (closeSaveInFlight.current) return;
+      closeSaveInFlight.current = true;
+      setCloseSaveFailed(false);
       try {
         await saveModuleCloseCompletion({
           lessonId: lesson.id as "m1-close" | "m2-close",
@@ -289,7 +297,10 @@ export default function ApprovedLessonDeckScreen() {
         setCompletionCommitted(true);
       } catch (error: unknown) {
         safeLog("[approved-lessons] module close save failed", errorShape(error));
-        Alert.alert("We couldn’t save module completion", "Stay on this screen and try the completion choice again.");
+        setCloseSaveFailed(true);
+        Alert.alert("We couldn’t save module completion", "Your progress was not marked complete. Use Retry saving module completion on this screen.");
+      } finally {
+        closeSaveInFlight.current = false;
       }
       return;
     }
@@ -367,10 +378,15 @@ export default function ApprovedLessonDeckScreen() {
 
   const finishLesson = useCallback(async (): Promise<void> => {
     const retryAttempt = returningRun?.retryAttempt;
-    if (!activeScenarioRun || !returningRun || !retryAttempt || !indexImpact || !rehearsalConfig || !feedbackLessonId || !lesson || isCompleting) return;
+    if (!activeScenarioRun || !returningRun || !retryAttempt || (isM1L1 && !indexImpact) || !rehearsalConfig || !feedbackLessonId || !lesson || isCompleting || completionCommitted || !isReturning) return;
+    // Completion is proof of actual practice, independent of a measured Index impact.
+    const completionIsValid = isM1L1
+      ? validateM1L1Completion(returningRun, params.runId).isValid
+      : Boolean(approvedConfig && validateApprovedRehearsalCompletion(approvedConfig, returningRun, params.runId));
+    if (!completionIsValid) return;
     setIsCompleting(true);
     const completedAt = Date.now();
-    const record: ScoredPracticeRecord = {
+    const record: ScoredPracticeRecord | null = indexImpact ? {
       schemaVersion: SCORED_PRACTICE_HISTORY_VERSION,
       id: returningRun.id,
       rehearsalId: returningRun.id,
@@ -382,7 +398,7 @@ export default function ApprovedLessonDeckScreen() {
       overallIndex: indexImpact.signalValue,
       evidence: [{ turnId: retryAttempt.id }],
       currentFocus: `Keep ${indexImpact.signalLabel.toLowerCase()} visible under pushback`,
-    };
+    } : null;
     try {
       await finalizeConvertedLesson({
         lessonId: rehearsalConfig.lessonId,
@@ -411,7 +427,7 @@ export default function ApprovedLessonDeckScreen() {
         },
         promotePending: promotePendingConvertedLessonCompletion,
       });
-      await saveScoredPracticeRecord(record);
+      if (record) await saveScoredPracticeRecord(record);
       setCompletionCommitted(true);
       setFeedbackContext({
         id: Crypto.randomUUID(),
@@ -424,9 +440,10 @@ export default function ApprovedLessonDeckScreen() {
       Alert.alert("We couldn’t finish securely", "Your rehearsal is still available. Please try again.");
       setIsCompleting(false);
     }
-  }, [activeScenarioRun, clearActiveScenarioRunStrict, feedbackLessonId, indexImpact, isCompleting, isStrongVersionSaved, lesson, markPendingConvertedLessonPrivateContentDeleted, promotePendingConvertedLessonCompletion, rehearsalConfig, returningRun, saveScoredPracticeRecord, strongVersion, writePendingConvertedLessonCompletion]);
+  }, [activeScenarioRun, approvedConfig, clearActiveScenarioRunStrict, completionCommitted, feedbackLessonId, indexImpact, isCompleting, isM1L1, isReturning, isStrongVersionSaved, lesson, markPendingConvertedLessonPrivateContentDeleted, params.runId, promotePendingConvertedLessonCompletion, rehearsalConfig, returningRun, saveScoredPracticeRecord, strongVersion, writePendingConvertedLessonCompletion]);
 
   if (!lesson) return <Unavailable title="That approved deck isn't available." body="Return to your path and choose another lesson." />;
+  if (admission.enabled && !isEntitled) return <StagingPracticeGate admission={admission} />;
   if (!hasLaunchAccess) return <Unavailable
     title={isEntitled ? "Finish the current lesson first." : "A subscription is required for this lesson."}
     body={isEntitled ? "Your next available lesson stays in order on your path." : "Start or restore your subscription to open the paid curriculum."}
@@ -459,12 +476,14 @@ export default function ApprovedLessonDeckScreen() {
       onRetry={() => rehearsalConfig && router.replace({ pathname: "/approved-rehearsal/[lessonId]", params: { lessonId: rehearsalConfig.lessonId } })}
     />;
   }
-  if (isReturning && hasValidReturn && indexImpact && strongVersion && coachedOriginalResponse && returningRun?.retryAttempt && returningRun.comparison) {
+  if (isReturning && hasValidReturn && (!isM1L1 || indexImpact) && strongVersion && coachedOriginalResponse && returningRun?.retryAttempt && returningRun.comparison) {
     return <LessonCompletionScreen
       impact={indexImpact}
       originalResponse={coachedOriginalResponse}
       retryResponse={returningRun.retryAttempt.transcript}
-      comparison={returningRun.comparison.text}
+      comparison={approvedConfig && !isM1L1
+        ? approvedRehearsalComparison(approvedConfig, coachedOriginalResponse, returningRun.retryAttempt.transcript).text
+        : returningRun.comparison.text}
       strongVersion={strongVersion}
       isSaved={isStrongVersionSaved}
       isCompleting={isCompleting}
@@ -476,6 +495,7 @@ export default function ApprovedLessonDeckScreen() {
 
   return (
     <View style={styles.root}>
+      {closeSaveFailed && lesson.isCloseDeck ? <PrimaryButton label="Retry saving module completion" onPress={() => void handleDeckMessage(JSON.stringify({ type: "module-close-complete" }))} /> : null}
       {deckHtml && !loadError && isApprovedMoveSaved ? (
         <WebView
           key={`${lesson.id}-${loadAttempt}`}
@@ -517,7 +537,17 @@ function CompletedLessonReplayScreen({ lessonTitle, namedMove, topInset, bottomI
   return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={[styles.completedReplay, { paddingTop: topInset + 24, paddingBottom: bottomInset + 24 }]} showsVerticalScrollIndicator={false}><ProductCard accent style={styles.completedReplayCard}><View style={styles.completedReplayIcon}><Check size={24} color={C.onAccent} strokeWidth={3} /></View><SectionLabel tone={C.purple}>Lesson complete</SectionLabel><Text style={styles.completedReplayTitle}>{lessonTitle}</Text>{namedMove ? <Text style={styles.completedReplayMove}>{namedMove}</Text> : null}<Text style={styles.completedReplayBody}>Your completed lesson is saved. Replay it whenever you want another run through the cards and rehearsal.</Text><PrimaryButton label={isResetting ? "Resetting lesson…" : "Do this lesson again"} disabled={isResetting} onPress={onReplay} containerStyle={styles.completedReplayAction} /><GhostButton label="Back to Practice" disabled={isResetting} onPress={onBack} containerStyle={styles.completedReplayBack} /></ProductCard></ScrollView></View>;
 }
 
-function LessonCompletionScreen({ impact, originalResponse, retryResponse, comparison, strongVersion, isSaved, isCompleting, bottomInset, onToggleSave, onFinish }: { impact: M1L1IndexImpact | ApprovedRehearsalIndexImpact; originalResponse: string; retryResponse: string; comparison: string; strongVersion: string; isSaved: boolean; isCompleting: boolean; bottomInset: number; onToggleSave: () => void; onFinish: () => void }): React.JSX.Element {
+function LessonCompletionScreen({ impact, originalResponse, retryResponse, comparison, strongVersion, isSaved, isCompleting, bottomInset, onToggleSave, onFinish }: { impact?: M1L1IndexImpact | ApprovedRehearsalIndexImpact | null; originalResponse: string; retryResponse: string; comparison: string; strongVersion: string; isSaved: boolean; isCompleting: boolean; bottomInset: number; onToggleSave: () => void; onFinish: () => void }): React.JSX.Element {
+  return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={[styles.completionScroll, { paddingBottom: bottomInset + 34 }]} showsVerticalScrollIndicator={false}>
+    <Reveal><View style={styles.celebrationIcon}><Sparkles size={26} color={C.onAccent} /></View><SectionLabel tone={C.purple}>Lesson complete</SectionLabel><Text style={styles.completionTitle}>You practiced it under pressure.</Text><Text style={styles.completionLede}>{impact ? "Hope compared the same behavior before and after your retry." : "Review your first response and retry from the same moment. This practice was not assessed."}</Text></Reveal>
+    <Reveal index={1}>{impact ? <LessonIndexImpactCard impact={impact} /> : <ProductCard accent style={styles.indexImpactCard}><SectionLabel tone={C.purple}>Practice complete · not assessed</SectionLabel><Text style={styles.impactResult}>No score for this practice</Text><Text style={styles.impactExplanation}>A validated assessment is unavailable. Your Communication Index has not changed.</Text><Text style={styles.signalNote}>Completion records your rehearsal and retry, not measured skill improvement.</Text></ProductCard>}</Reveal>
+    <Reveal index={2}><ProductCard style={styles.comparisonCard}><SectionLabel tone={C.purple}>Same moment · before and after</SectionLabel><View style={styles.responseBlock}><Text style={styles.responseLabel}>First response</Text><Text style={styles.responseText}>“{originalResponse}”</Text></View><View style={styles.responseDivider} /><View style={styles.responseBlock}><Text style={styles.responseLabel}>Retry</Text><Text style={styles.responseText}>“{retryResponse}”</Text></View><Text style={styles.comparisonText}>{comparison}</Text></ProductCard></Reveal>
+    <Reveal index={3}><ProductCard style={styles.strongCard}><SectionLabel tone={C.purple}>A strong version</SectionLabel><Text style={styles.strongText}>“{strongVersion}”</Text><Pressable onPress={onToggleSave} style={[styles.saveStrongButton, isSaved && styles.saveStrongButtonSaved]} accessibilityRole="button" accessibilityState={{ selected: isSaved }}><View style={styles.saveIcon}>{isSaved ? <Check size={17} color={C.onAccent} strokeWidth={3} /> : <Bookmark size={17} color={C.purple} />}</View><Text style={[styles.saveStrongText, isSaved && styles.saveStrongTextSaved]}>{isSaved ? "Saved for later" : "Save this version for later"}</Text></Pressable></ProductCard></Reveal>
+    <Reveal index={4}><PrimaryButton label={isCompleting ? impact ? "Updating your Index…" : "Saving practice…" : "Done — back to Home"} disabled={isCompleting} onPress={onFinish} containerStyle={styles.finishButton} /><Text style={styles.privacyNote}>{isSaved ? "The strong version will be saved. Your rehearsal transcript will be deleted." : "Your rehearsal transcript will be deleted when you finish."}</Text></Reveal>
+  </ScrollView></View>;
+}
+
+function LessonIndexImpactCard({ impact }: { impact: M1L1IndexImpact | ApprovedRehearsalIndexImpact }): React.JSX.Element {
   const isReduced = useReducedMotion();
   const startingValue = impact.beforeIndex ?? impact.afterIndex;
   const [displayedIndex, setDisplayedIndex] = useState<number>(startingValue);
@@ -554,13 +584,7 @@ function LessonCompletionScreen({ impact, originalResponse, retryResponse, compa
     };
   }, [impact.afterIndex, indexProgress, isReduced, resultLabel, startingValue]);
 
-  return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={[styles.completionScroll, { paddingBottom: bottomInset + 34 }]} showsVerticalScrollIndicator={false}>
-    <Reveal><View style={styles.celebrationIcon}><Sparkles size={26} color={C.onAccent} /></View><SectionLabel tone={C.purple}>Lesson complete</SectionLabel><Text style={styles.completionTitle}>You practiced it under pressure.</Text><Text style={styles.completionLede}>Hope compared the same behavior before and after your retry.</Text></Reveal>
-    <Reveal index={1}><ProductCard accent style={styles.indexImpactCard}><View style={styles.impactTop}><View><SectionLabel tone={C.purple}>Communication Index</SectionLabel><Text style={styles.impactResult}>{resultLabel}</Text></View><TrendingUp size={24} color={C.purple} /></View><View style={styles.indexTransition} accessibilityLabel={`Communication Index moved from ${impact.beforeIndex ?? "no previous value"} to ${impact.afterIndex} out of 100`}><View style={styles.indexNumbers}>{impact.beforeIndex !== null ? <><Text style={styles.indexBefore}>{impact.beforeIndex}</Text><Text style={styles.indexArrow}>→</Text></> : null}<Animated.Text style={[styles.indexAfter, { transform: [{ scale: animatedScale }] }]}>{displayedIndex}</Animated.Text><Text style={styles.indexOutOf}>/ 100</Text></View><View style={styles.indexTrack}><Animated.View style={[styles.indexFill, { width: animatedFill }]} /></View></View><Animated.View style={{ opacity: explanationOpacity }}><Text style={styles.impactExplanation}>{impact.explanation}</Text><Text style={styles.signalNote}>Observed signal · {impact.signalLabel}</Text></Animated.View></ProductCard></Reveal>
-    <Reveal index={2}><ProductCard style={styles.comparisonCard}><SectionLabel tone={C.purple}>Same moment · before and after</SectionLabel><View style={styles.responseBlock}><Text style={styles.responseLabel}>First response</Text><Text style={styles.responseText}>“{originalResponse}”</Text></View><View style={styles.responseDivider} /><View style={styles.responseBlock}><Text style={styles.responseLabel}>Retry</Text><Text style={styles.responseText}>“{retryResponse}”</Text></View><Text style={styles.comparisonText}>{comparison}</Text></ProductCard></Reveal>
-    <Reveal index={3}><ProductCard style={styles.strongCard}><SectionLabel tone={C.purple}>A strong version</SectionLabel><Text style={styles.strongText}>“{strongVersion}”</Text><Pressable onPress={onToggleSave} style={[styles.saveStrongButton, isSaved && styles.saveStrongButtonSaved]} accessibilityRole="button" accessibilityState={{ selected: isSaved }}><View style={styles.saveIcon}>{isSaved ? <Check size={17} color={C.onAccent} strokeWidth={3} /> : <Bookmark size={17} color={C.purple} />}</View><Text style={[styles.saveStrongText, isSaved && styles.saveStrongTextSaved]}>{isSaved ? "Saved for later" : "Save this version for later"}</Text></Pressable></ProductCard></Reveal>
-    <Reveal index={4}><PrimaryButton label={isCompleting ? "Updating your Index…" : "Done — back to Home"} disabled={isCompleting} onPress={onFinish} containerStyle={styles.finishButton} /><Text style={styles.privacyNote}>{isSaved ? "The strong version will be saved. Your rehearsal transcript will be deleted." : "Your rehearsal transcript will be deleted when you finish."}</Text></Reveal>
-  </ScrollView></View>;
+  return <ProductCard accent style={styles.indexImpactCard}><View style={styles.impactTop}><View><SectionLabel tone={C.purple}>Communication Index</SectionLabel><Text style={styles.impactResult}>{resultLabel}</Text></View><TrendingUp size={24} color={C.purple} /></View><View style={styles.indexTransition} accessibilityLabel={`Communication Index moved from ${impact.beforeIndex ?? "no previous value"} to ${impact.afterIndex} out of 100`}><View style={styles.indexNumbers}>{impact.beforeIndex !== null ? <><Text style={styles.indexBefore}>{impact.beforeIndex}</Text><Text style={styles.indexArrow}>→</Text></> : null}<Animated.Text style={[styles.indexAfter, { transform: [{ scale: animatedScale }] }]}>{displayedIndex}</Animated.Text><Text style={styles.indexOutOf}>/ 100</Text></View><View style={styles.indexTrack}><Animated.View style={[styles.indexFill, { width: animatedFill }]} /></View></View><Animated.View style={{ opacity: explanationOpacity }}><Text style={styles.impactExplanation}>{impact.explanation}</Text><Text style={styles.signalNote}>Observed signal · {impact.signalLabel}</Text></Animated.View></ProductCard>;
 }
 
 function LessonFeedbackScreen({ feedback, bottomInset, onDone }: { feedback: { id: string; lessonId: FeedbackLessonId; contentVersion: string; lessonTitle: string }; bottomInset: number; onDone: () => void }): React.JSX.Element {
@@ -678,3 +702,4 @@ const styles = StyleSheet.create({
   unavailableBody: { ...T.support, textAlign: "center", marginTop: 8 },
   retryButton: { marginTop: 20, minWidth: 160 },
 });
+import {normalBillingEnabled} from '@/lib/nativeBillingRuntime';

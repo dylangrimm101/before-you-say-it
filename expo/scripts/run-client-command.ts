@@ -8,9 +8,9 @@ import { guardClientProcessEnv, sanitizeClientEnv } from "../lib/clientEnvGuard"
 type LifecycleName = "start" | "start-web" | "start-web-dev" | "test" | "lint" | "check" | "export" | "probe";
 
 const commands: Record<LifecycleName, readonly string[]> = {
-  start: ["bunx", "rork", "start", "-p", "8fc4qwsqaurkxk0pimyvx"],
-  "start-web": ["bunx", "rork", "start", "-p", "8fc4qwsqaurkxk0pimyvx", "--web"],
-  "start-web-dev": ["bunx", "rork", "start", "-p", "8fc4qwsqaurkxk0pimyvx", "--web"],
+  start: ["bunx", "expo", "start"],
+  "start-web": ["bunx", "expo", "start", "--web"],
+  "start-web-dev": ["bunx", "expo", "start", "--web"],
   test: ["bun", "test"],
   lint: ["bunx", "expo", "lint"],
   check: ["bun", "scripts/run-client-checks.ts"],

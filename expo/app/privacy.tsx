@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { ChevronLeft, Trash2 } from "lucide-react-native";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -24,6 +24,7 @@ import { useStore } from "@/providers/store";
 export default function PrivacyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [error, setError] = useState("");
   const {
     sessions,
     customScenarios,
@@ -57,7 +58,8 @@ export default function PrivacyScreen() {
       "Delete all practice history?",
       "Every saved session record and any legacy retained recording will be removed from this device. Your active Day 1 handoff, streak days, and program progress stay.",
       () => {
-        void deleteAllSessions();
+        setError("");
+        void deleteAllSessions().catch(() => setError("Couldn’t delete practice history. Try again."));
       },
     );
   }, [confirm, deleteAllSessions]);
@@ -67,7 +69,8 @@ export default function PrivacyScreen() {
       "Delete your saved scenarios?",
       "The scenarios you wrote will be removed from this device.",
       () => {
-        deleteAllCustomScenarios();
+        setError("");
+        void deleteAllCustomScenarios().catch(() => setError("Couldn’t delete your scenarios. Try again."));
       },
     );
   }, [confirm, deleteAllCustomScenarios]);
@@ -75,11 +78,12 @@ export default function PrivacyScreen() {
   const onResetAll = useCallback(() => {
     confirm(
       "Reset all app data?",
-      "Everything is removed: your profile, history, scenarios, drills, streak, reminders and choices. The app returns to a fresh install.",
+      "Removes local practice data and choices for the current guest or signed-in owner, clears local audio caches, and signs you out. Other owners' local data and server-held records are not deleted. Subscriptions are not cancelled.",
       () => {
-        reset().then(() => {
+        setError("");
+        void reset().then(() => {
           router.replace("/onboarding");
-        });
+        }).catch(() => setError("Couldn’t reset app data. Some data may already have been removed. Try again to finish."));
       },
     );
   }, [confirm, reset, router]);
@@ -123,7 +127,7 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="Other transcripts"
-            body="Not stored. Rehearsals outside the active journey and setup answers for later practice remain in memory only."
+            body="An active scenario or lesson can keep approved attempts, counterpart lines, coaching and retry checkpoints so you can resume. Scored-practice evidence may also retain approved text. Unapproved drafts are not saved as evidence. Reset all app data removes these local records too."
           />
           <Bullet
             head="Your script for the real conversation"
@@ -155,12 +159,20 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="How it is stored"
-            body="In this app's own storage on this device, under a stable anonymous device ID. This build does not provide an account or cross-device recovery. The data is not separately encrypted by this app; protection is whatever your phone applies to app data."
+            body="Practice data stays in this app's local storage, separated by guest or signed-in owner; it does not automatically sync between devices. On iPhone and Android, account credentials use protected device storage. A newly created guest rehearsal can also keep a protected handoff copy, including approved conversation content and its result. The option to consent to save that copy to your signed-in local account expires 24 hours after creation; expiry does not promise immediate physical erasure while the app is closed. Browser handoff is limited to the current browser session. Other local app data is not separately encrypted by BYSI; protection is whatever your device applies to app data."
             tone={C.amber}
           />
         </Section>
 
         <Section title="Sent off this device">
+          <Bullet
+            head="Free-session recovery"
+            body="During your 24-hour server session, BYSI keeps approved conversation content, transcribed text, generated results and generated speech audio to recover interrupted requests without generating them again. Uploaded recording bytes are processed, not saved in this recovery store. Access stops at expiry. A scheduled cleanup runs every minute in bounded batches to remove expired recovery content; delays or outages mean this is not an immediate erasure guarantee. A content-free spent-allocation record (account and session IDs and expiry) remains to prevent another free allocation. This is separate from local handoff expiry, local deletion controls, backup retention and provider retention."
+          />
+          <Bullet
+            head="Your account"
+            body="Signing in reconnects your eligible access through your existing web account. Access remains subject to a current access check; signing in alone does not create a subscription. An owned web result can be retrieved through the account connection. Local practice data does not automatically sync between devices."
+          />
           <Bullet
             head="Recorded audio"
             body={`Sent to ${TRANSCRIPTION_PROVIDER} to be converted to text.`}
@@ -175,7 +187,7 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="Purchases"
-            body="Handled by RevenueCat with an anonymous app ID. No conversation content is involved."
+            body="Handled by RevenueCat with an anonymous app ID or your signed-in account ID. No conversation content is involved."
           />
           <Bullet
             head="Reminders"
@@ -186,20 +198,28 @@ export default function PrivacyScreen() {
             body="None. There is no analytics sink in this build."
           />
           <Bullet
+            head="Account identity deletion"
+            body="Settings has a separate account identity deletion control. It is currently unavailable until its server capability is enabled. When enabled, it requires your current password and explicit confirmation, then irreversibly soft-deletes the account provider’s sign-in identity. This is not full data erasure: server-held results, original web-session email addresses, purchase records and content-free spent-allocation IDs remain, and subscriptions are not cancelled. Other devices, backups and provider records are not erased. Existing access tokens can last until expiry. Device reset below is separate and never deletes the server account."
+          />
+          <Bullet
             head="What deleting cannot undo"
-            body="Deleting data here removes it from this device. It cannot retroactively delete processing a provider has already completed — that is governed by that provider's own retention policy, not by this app."
+            body="These controls remove the local records described below. Reset does not delete other owners' local data, your web account, server-held results, or provider records, and does not cancel a subscription. It cannot retroactively delete processing a provider has already completed — that is governed by that provider's own retention policy, not by this app."
             tone={C.amber}
           />
         </Section>
 
         <Section title="Your choices">
+          {error ? <Text accessibilityRole="alert" style={styles.bulletBody}>{error}</Text> : null}
           <Toggle
             label="Save scenarios I write on this device"
             body="Off by default. When on, the exact text of scenarios you write is kept so you can rehearse them again another day."
             value={consent.saveCustomScenarioText}
             onChange={(v) => {
               tap("light");
-              setSaveCustomScenarioText(v);
+              setError("");
+              void setSaveCustomScenarioText(v).catch(() => {
+                setError("Couldn’t save your privacy choice. Check the setting and try again.");
+              });
             }}
           />
         </Section>
@@ -231,7 +251,7 @@ export default function PrivacyScreen() {
           />
           <Danger
             label="Reset all app data"
-            body="Removes everything and returns the app to a fresh install."
+            body="Removes local practice data and choices for the current guest or signed-in owner, clears local audio caches, and signs you out. Other owners' local data, your web account, server-held results and subscriptions remain."
             onPress={onResetAll}
           />
           <Text style={styles.perSession}>

@@ -43,9 +43,11 @@ describe("remaining native acquisition and paid experience", () => {
     expect(loading).toContain("Personalizing your");
     expect(loading).toContain("practice plan…");
     expect(results).toContain("YOUR COMMUNICATION BASELINE");
-    expect(results).toContain("You stayed in the room. Now make the ask hold.");
-    expect(results).toContain("You kept the conversation from turning into a fight, but the request still needs a specific owner and rhythm so it can survive defensiveness.");
-    expect(results).toContain("Where it stalls:");
+    // The mounted positive fixture proves these are the saved result, not stock judgments.
+    expect(results).toContain("{moment.headline}");
+    expect(results).toContain("{moment.observation}");
+    expect(results).toContain("{moment.why_it_matters}");
+    expect(results).not.toContain("You stayed in the room. Now make the ask hold.");
     expect(results).toContain("Here’s what practice is helping you say");
     expect(results).toContain("STARTING INDEX");
     expect(results).toContain("observed_count} of 6 signals observed");
@@ -65,10 +67,10 @@ describe("remaining native acquisition and paid experience", () => {
     expect(results).toContain("Return to one clear next step");
     expect(results).not.toContain("currentSteps={result.practice_shift.current_pattern_steps}");
     expect(results).not.toContain(">Practice Shift</Text>");
-    expect(results).toContain('label="Start 7-Day free trial"');
+    expect(results).toContain('label="Review monthly subscription"');
     expect(results.indexOf('label="See what changes with practice"')).toBeLessThan(results.indexOf("Here’s what practice is helping you say"));
     expect(results.indexOf("Here’s what practice is helping you say")).toBeLessThan(results.indexOf("Your thoughts and feelings are valid"));
-    expect(results.indexOf("Your thoughts and feelings are valid")).toBeLessThan(results.indexOf('label="Start 7-Day free trial"'));
+    expect(results.indexOf("Your thoughts and feelings are valid")).toBeLessThan(results.indexOf('label="Review monthly subscription"'));
     expect(results).toContain('storedCheckpoint === "generating"');
     expect(results).toContain('? "communication-baseline"');
     expect(results).toContain('? "practice-shift"');
@@ -76,9 +78,9 @@ describe("remaining native acquisition and paid experience", () => {
     expect(results).toContain('step: "practice-shift-to-trial"');
     const paywall = await source("app/paywall.tsx");
     expect(paywall).toContain("const screen = `pay${stage}`");
-    expect(paywall).toContain("7 days free");
-    expect(paywall.indexOf("7 days free")).toBeLessThan(paywall.indexOf("Your practice plan"));
-    expect(paywall).toContain("START YOUR FREE TRIAL");
+    expect(paywall).toContain("Build your practice");
+    expect(paywall.indexOf("Build your practice")).toBeLessThan(paywall.indexOf("Your practice plan"));
+    expect(paywall).toContain("YOUR PRACTICE SUBSCRIPTION");
     expect(paywall).toContain("Animated.stagger");
     expect(paywall).toContain("segmentProgress.map");
     expect(paywall).toContain("useReducedMotion");
@@ -108,10 +110,11 @@ describe("remaining native acquisition and paid experience", () => {
     expect(layout).toContain("activePracticeSession?.sharedResult");
     expect(layout).toContain("<AuthProvider>");
     expect(continuation).toContain("Use the same account you used on the web");
-    expect(continuation).toContain("await login(email, password)");
+    expect(continuation).toContain("await login(email, password, hasCurrentGuestPractice)");
     expect(auth).toContain("supabase.auth.signInWithPassword");
     expect(auth).toContain("identifyPurchasesUser");
-    expect(purchases).toContain("sdk.logIn(normalizedUserId)");
+    expect(purchases).toContain("sdk.logIn(boundId)");
+    expect(purchases).toContain("nativeBilling ? await nativeBilling.identify() : normalizedUserId");
   });
 
   test("an existing entitlement continues through the current access source of truth", async () => {
@@ -136,8 +139,8 @@ describe("remaining native acquisition and paid experience", () => {
 
   test("live product values remain provider-derived and incomplete store setup blocks checkout", async () => {
     const paywall = await source("app/paywall.tsx");
-    expect(paywall).toContain('monthlyTerms?.trialDurationLabel === "7 days"');
-    expect(paywall).toContain('annualTerms?.trialDurationLabel === "7 days"');
+    expect(paywall).toContain('monthlyTerms?.periodLabel === "1 month"');
+    expect(paywall).toContain('product.identifier === "byis_pro_monthly_5"');
     expect(paywall).toContain('label={actions.primaryLabel}');
     expect(paywall).toContain('!isApprovedStoreOffer');
     expect(paywall).toContain('status: isApprovedStoreOffer ? "ready" : "iap-blocker"');
@@ -152,7 +155,8 @@ describe("remaining native acquisition and paid experience", () => {
     const purchases = await source("lib/purchases.ts");
     const paywall = await source("app/paywall.tsx");
     const purchased = await source("app/purchase-success.tsx");
-    expect(purchases).toContain('hasPro(customerInfo) ? "purchased"');
+    expect(purchases).toContain('nativeBilling ? await nativeBilling.access() : hasPro(customerInfo)');
+    expect(purchases).toContain('status: allowed ? "purchased"');
     expect(purchases).toContain('"entitlement_delayed"');
     expect(paywall).toContain('result.status === "entitlement_delayed"');
     expect(purchased).toContain("if (!isPro)");

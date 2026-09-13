@@ -1,0 +1,56 @@
+{
+  "provenance": "Retained real rejected Adam first reply; replayed offline, no live provider or semantic assessor. Fresh run msg_011CerbeWNuvkt2XMXApZQn7.",
+  "request": {
+    "type": "rehearsal_turn",
+    "turn": "pushback",
+    "contract": {
+      "entry_route": "real_conversation",
+      "context": "work",
+      "scenario": "The late handoff. Counterpart: Adam \u2014 your colleague. Situation: You\u2019re speaking with Adam, a coworker who sends you a weekly client file. Yesterday it arrived at 4:20 PM, leaving you only 40 minutes to finish your part before the 5:00 PM deadline. This has happened twice this month. You want to ask Adam to send future files by noon. Opening: The learner opens in their own words.",
+      "counterpart": "Adam \u2014 your colleague",
+      "counterpart_persona": "Adam is a colleague under quarter-close pressure. He can push back, but he cannot resolve the decision for the learner.",
+      "difficulty": null,
+      "difficulty_behavior": null,
+      "reaction_pattern": "defensive",
+      "opens_with": "user",
+      "opening_line": "",
+      "success_target": "Name one point, one concrete proof, and one answerable move.",
+      "pressure_condition": "Adam is a colleague under quarter-close pressure. He can push back, but he cannot resolve the decision for the learner. Respond directly to the learner's actual point while defending Adam's quarter-close constraints and keeping the requested handoff change unresolved."
+    },
+    "transcript": {
+      "user_turn_1": "I want us to agree on one handoff owner before quarter close. When ownership is unclear, work gets passed back and forth. Can we name the owner together before we send this handoff?",
+      "counterpart_pushback": "",
+      "user_turn_2": "",
+      "counterpart_close": ""
+    },
+    "avoid_repeating": [
+      "That's not really fair. I've been slammed with quarter close.",
+      "Okay... where is this coming from?",
+      "So I'm just failing at this now?",
+      "You're acting like this happens all the time."
+    ],
+    "lesson_constraints": {
+      "lesson_id": "m1-l1",
+      "counterpart": "Adam, the learner's colleague",
+      "approved_transcript": "I want us to agree on one handoff owner before quarter close. When ownership is unclear, work gets passed back and forth. Can we name the owner together before we send this handoff?",
+      "conversation_context": "The late handoff You\u2019re speaking with Adam, a coworker who sends you a weekly client file. Yesterday it arrived at 4:20 PM, leaving you only 40 minutes to finish your part before the 5:00 PM deadline. This has happened twice this month. You want to ask Adam to send future files by noon. Adam is a colleague under quarter-close pressure. He can push back, but he cannot resolve the decision for the learner. I want us to agree on one handoff owner before quarter close. When ownership is unclear, work gets passed back and forth. Can we name the owner together before we send this handoff?",
+      "pressure_objective": "Respond directly to the learner's actual point while defending Adam's quarter-close constraints and keeping the requested handoff change unresolved.",
+      "output": "One short, natural in-character reply of no more than three sentences.",
+      "reject": [
+        "invented facts",
+        "instant agreement",
+        "coaching language",
+        "topic changes"
+      ]
+    },
+    "variation_seed": "lesson-m1-l1-mtt4bc49-pushback_one-0"
+  },
+  "response": {
+    "mode": "turn",
+    "outputVersion": "bysi-rehearsal-turn-v1-2026-08-12",
+    "turn": "pushback",
+    "role": "adam",
+    "text": "Naming an owner right now sounds nice, but I've got three other client files due before close and can't sit in a planning discussion.",
+    "safety": null
+  }
+}

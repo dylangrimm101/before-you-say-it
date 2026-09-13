@@ -1,5 +1,5 @@
-import { hasCanonicalM1L1PressureSequence, isCanonicalM1L1PressureTurn } from "@/lib/convertedLesson";
-import { approvedRehearsalConfigs, hasCanonicalApprovedRehearsalPressureSequence } from "@/lib/approvedRehearsals";
+import { hasCanonicalM1L1PressureSequence } from "@/lib/convertedLesson";
+import { approvedRehearsalConfigs, approvedRehearsalHistoryConfig, hasCanonicalApprovedRehearsalPressureSequence } from "@/lib/approvedRehearsals";
 import { comparePilotAttempts } from "@/lib/pilotCurriculum";
 import { preservePilotAttempt, transitionPilotRun } from "@/lib/practiceSession";
 import type { Difficulty, PersonaVoice, ReactionPattern, Scenario } from "@/types/convo";
@@ -241,7 +241,8 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
     if (run.state === "replay_pending" && (!hasReplayRequest || hasReplayCompletion)) return null;
     canonicalRun.approvedRehearsal = lesson;
     const approvedConfig = approvedRehearsalConfigs().find((config) => config.scenario.id === canonicalRun.scenarioContext?.scenarioId);
-    if (!approvedConfig || !hasCanonicalApprovedRehearsalPressureSequence(approvedConfig, canonicalRun)) return null;
+    const historyConfig = approvedConfig && approvedRehearsalHistoryConfig(approvedConfig, canonicalRun.contentVersion);
+    if (!historyConfig || !hasCanonicalApprovedRehearsalPressureSequence(historyConfig, canonicalRun)) return null;
   }
   if (run.m1L1 !== undefined) {
     if (!run.m1L1 || typeof run.m1L1 !== "object") return null;
@@ -307,8 +308,9 @@ export function normalizeScenarioPracticeRun(value: unknown): PersistedScenarioP
   if (canonicalRun.m1L1) {
     const lesson = canonicalRun.m1L1;
     if (!hasCanonicalM1L1PressureSequence(canonicalRun)) return null;
-    if (lesson.pushbackOne && !isCanonicalM1L1PressureTurn(lesson.pushbackOne, "pushback_one")) return null;
-    if (lesson.pushbackTwo && !isCanonicalM1L1PressureTurn(lesson.pushbackTwo, "evidence_trap")) return null;
+    // The sequence validator above checks exact provider identity and quality with
+    // the approved learner transcript. Rechecking against an empty transcript
+    // rejects legitimate learner-grounded replies after the transport accepts them.
     if ((lesson.secondResponseAttempt || lesson.coachedBeat || lesson.retryCount > 0) && (!lesson.pushbackOne || !lesson.pushbackTwo)) return null;
     if (lesson.pushbackOne && (!canonicalRun.attempt || canonicalRun.attempt.confirmedAt >= (lesson.pushbackOne.authoredAt ?? 0))) return null;
     if (lesson.pushbackTwo && (!canonicalRun.responseAttempt || !lesson.pushbackOne || !((lesson.pushbackOne.authoredAt ?? 0) < canonicalRun.responseAttempt.confirmedAt && canonicalRun.responseAttempt.confirmedAt < (lesson.pushbackTwo.authoredAt ?? 0)))) return null;

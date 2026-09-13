@@ -5,6 +5,7 @@ import { Animated, Easing, Platform, ScrollView, StyleSheet, Text, View } from "
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FreeJourneyResults } from "@/components/FreeJourneyResults";
+import {useAuth} from '@/providers/auth';
 import {
   Backdrop,
   Eyebrow,
@@ -234,6 +235,7 @@ function PlanBuildScreen({ build, onReady }: { build: ConversionBuild; onReady: 
       {build.error ? (
         <StateDock bottomInset={insets.bottom}>
           <Text style={styles.errorText}>{build.error}</Text>
+          {build.retry ? <PrimaryButton label="Recover my result" onPress={() => void build.retry?.()} /> : null}
           <PrimaryButton label="Back to today" onPress={() => router.replace("/(tabs)")} />
         </StateDock>
       ) : null}
@@ -314,9 +316,10 @@ function PhaseGraph() {
 }
 
 function FreeDebrief({ id, build }: { id: string; build: ConversionBuild | null }) {
+  const {user,normalResults}=useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { sessions, activePracticeSession, saveActivePracticeSession } = useStore();
+  const { sessions, activePracticeSession, saveActivePracticeSession, isLocalGuestContinuation } = useStore();
   const hasPurchasedPro = useIsPro();
   const [isChanging, setIsChanging] = useState<boolean>(false);
   const session = sessions.find((item) => item.id === id);
@@ -390,13 +393,19 @@ function FreeDebrief({ id, build }: { id: string; build: ConversionBuild | null 
           <Text style={styles.lockedTitle}>What to do next</Text>
           <Text style={styles.lockedBody}>{insufficient.nextStep}</Text>
         </GlassCard>
-        <PrimaryButton label="Practice this conversation again" onPress={() => void retryAnalysis()} style={styles.missingButton} />
+        {process.env.EXPO_PUBLIC_BYSI_BUILD_MODE !== 'staging-account' && process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN
+          ? <PrimaryButton label="Back to today" onPress={() => router.replace('/(tabs)')} style={styles.missingButton} />
+          : <PrimaryButton label="Practice this conversation again" onPress={() => void retryAnalysis()} style={styles.missingButton} />}
       </View>
     );
   }
 
   if (activePracticeSession?.id === id && activePracticeSession.sharedResult) {
-    return <FreeJourneyResults session={activePracticeSession} />;
+    return <View style={{ flex: 1 }}>
+      {isLocalGuestContinuation ? <Text style={{ color: C.textSoft, backgroundColor: C.bg, paddingHorizontal: GUTTER, paddingVertical: 8 }}>Local user-provided practice · Not an authenticated web result. No paid access granted.</Text> : null}
+      <FreeJourneyResults session={activePracticeSession} />
+      {user && normalResults ? <View style={{paddingHorizontal:GUTTER,paddingBottom:insets.bottom+16,backgroundColor:C.bg}}><PrimaryButton label="Continue with saved result" onPress={()=>router.replace('/saved-result')}/></View> : null}
+    </View>;
   }
 
   if (activePracticeSession?.id === id) {
@@ -512,6 +521,7 @@ function FreeDebrief({ id, build }: { id: string; build: ConversionBuild | null 
 
 export default function DebriefScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { activePracticeSession } = useStore();
   const sessionId = String(id);
   const [showDebrief, setShowDebrief] = useState<boolean>(false);
   const getSnapshot = useCallback(() => getConversionBuild(sessionId), [sessionId]);
@@ -521,8 +531,13 @@ export default function DebriefScreen() {
 
   // Historical navigation has no active build; when live content exists, open
   // directly to its debrief rather than replaying a loading sequence.
-  const shouldBuild = build !== null && !showDebrief;
-  const shouldShowDebrief = showDebrief || (build === null && live !== null);
+  // Insufficient evidence deliberately emits no skill/path events, so the
+  // ordered build cannot reach plan.ready. The durable terminal response itself
+  // is the readiness boundary; do not invent successful assessment events.
+  const insufficientReady = activePracticeSession?.id === sessionId
+    && Boolean(activePracticeSession.insufficientEvidence);
+  const shouldBuild = build !== null && !showDebrief && !insufficientReady;
+  const shouldShowDebrief = insufficientReady || showDebrief || (build === null && live !== null);
 
   if (shouldBuild) {
     return <PlanBuildScreen build={build} onReady={() => setShowDebrief(true)} />;

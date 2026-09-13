@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, useGlobalSearchParams, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useState } from "react";
-import { View } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { LaunchExperience } from "@/components/LaunchExperience";
@@ -25,9 +25,10 @@ let hasPresentedLaunch = false;
 
 function RootLayoutNav() {
   const { hydrated, profile, activePracticeSession, nativeJourneyStarted, migrationNotice, dismissMigrationNotice } = useStore();
-  const { isAuthLoading, user } = useAuth();
+  const { isAuthLoading, user, normalResults, restoredGuestContinuationId, acknowledgeGuestContinuation } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+  const routeParams = useGlobalSearchParams<{ id?: string }>();
   const [showLaunch, setShowLaunch] = useState<boolean>(() => {
     if (hasPresentedLaunch) return false;
     hasPresentedLaunch = true;
@@ -45,7 +46,23 @@ function RootLayoutNav() {
     const firstSegment = segments[0];
     const onboarding = firstSegment === "onboarding";
     const entry = firstSegment === "entry";
-    const continuation = firstSegment === "continue-from-web";
+    const stagingResult = firstSegment === "staging-web-result";
+    const deletionStatus = firstSegment === "delete-account";
+    const normalContinuation = Boolean(user && normalResults && ["saved-result", "approved-lesson", "approved-rehearsal", "paywall", "(tabs)"].includes(firstSegment));
+    // Registered owners may leave an existing result without forging completion.
+    // These destinations retain their own paid operation/screen gates; guest and
+    // public route exceptions are unchanged.
+    const continuation = firstSegment === "continue-from-web" || firstSegment === "account-practice" || stagingResult || normalContinuation;
+    if (stagingResult) return; // This route renders its own fail-closed build/auth gate.
+    // Public disclosures, safety help, and deletion receipt status must remain readable before signup.
+    if (firstSegment === "privacy" || firstSegment === "safety" || firstSegment === "forgot-password" || firstSegment === "reset-password" || deletionStatus) return;
+    if (user && restoredGuestContinuationId && activePracticeSession?.id === restoredGuestContinuationId && activePracticeSession.sharedResult
+      && firstSegment !== "settings") {
+      if (firstSegment === "debrief" && routeParams.id === restoredGuestContinuationId) {
+        void acknowledgeGuestContinuation(restoredGuestContinuationId);
+      } else router.replace(`/debrief/${restoredGuestContinuationId}`);
+      return;
+    }
     const hasLocalJourney = Boolean(user || profile || activePracticeSession || nativeJourneyStarted);
     if (!hasLocalJourney && !entry && !continuation) {
       router.replace("/entry");
@@ -55,8 +72,10 @@ function RootLayoutNav() {
       router.replace("/onboarding");
       return;
     }
-    const isFreeJourney = onboarding || firstSegment === "rehearse" || firstSegment === "debrief" || firstSegment === "safety";
-    const canInterruptFreeJourney = isFreeJourney || firstSegment === "privacy";
+    const isFreeJourney = onboarding || firstSegment === "rehearse" || firstSegment === "debrief";
+    // Account entry must remain reachable during interrupted onboarding/results.
+    // Login changes the storage owner; it must not require completing guest work.
+    const canInterruptFreeJourney = isFreeJourney || entry || continuation;
     if (profile && activePracticeSession?.sharedResult && activePracticeSession.freeJourneyCheckpoint !== "complete" && !canInterruptFreeJourney) {
       router.replace(`/debrief/${activePracticeSession.id}`);
       return;
@@ -72,7 +91,7 @@ function RootLayoutNav() {
       };
       router.replace({ pathname: "/rehearse/[id]", params: sharedParams });
     }
-  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user]);
+  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user, normalResults, restoredGuestContinuationId, routeParams.id, acknowledgeGuestContinuation]);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
 
@@ -88,7 +107,11 @@ function RootLayoutNav() {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="entry" options={{ animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="staging-web-result" options={{ animation: "slide_from_bottom" }} />
+        <Stack.Screen name="saved-result" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="continue-from-web" options={{ animation: "slide_from_bottom" }} />
+        <Stack.Screen name="forgot-password" options={{ animation: "slide_from_bottom" }} />
+        <Stack.Screen name="reset-password" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
         <Stack.Screen name="scenario/[id]" />
         <Stack.Screen name="rehearse/[id]" options={{ animation: "fade", gestureEnabled: false }} />
@@ -110,6 +133,7 @@ function RootLayoutNav() {
         <Stack.Screen name="progress/dimension/[signal]" />
         <Stack.Screen name="progress/how-it-works" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="delete-account" />
         <Stack.Screen name="qa-access" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="approved-lessons" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="approved-lesson/[lessonId]" options={{ animation: "fade", gestureEnabled: false }} />
@@ -124,10 +148,20 @@ function RootLayoutNav() {
   );
 }
 
+function AccountStatusNotice(){
+  const {deletionNotice,checkAccountStatus,accountStatusAvailable}=useAuth();
+  if(!accountStatusAvailable)return null;
+  return <View accessibilityLiveRegion="polite">
+    {deletionNotice?<Text>{deletionNotice}</Text>:null}
+    <Pressable accessibilityRole="button" accessibilityLabel="Check account status" onPress={()=>{void checkAccountStatus();}}><Text>Check account status</Text></Pressable>
+  </View>;
+}
+
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <AccountStatusNotice />
         <StoreProvider>
           <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }}>
             <RootLayoutNav />

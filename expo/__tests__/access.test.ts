@@ -146,7 +146,9 @@ describe("preview pilot access", () => {
     expect(paywall).not.toContain("devProEnabled");
     expect(paywall).not.toContain("toggleDevPro");
     expect(store).toContain("if (!__DEV__) return");
-    expect(store).toContain("__DEV__ ? AsyncStorage.getItem(KEYS.devPro) : Promise.resolve(null)");
+    expect(store).toContain("try { return await AsyncStorage.getItem(key); }");
+    expect(store).toContain("__DEV__ ? readKey(KEYS.devPro) : Promise.resolve(null)");
+    expect(store).toContain("__DEV__ ? readKey(KEYS.devForceUnpaid) : Promise.resolve(null)");
     expect(store).toContain("__DEV__ && devForceUnpaid");
     expect(store).toContain("purchasedPro || (__DEV__ && devPro)");
   });
@@ -184,7 +186,7 @@ describe("preview pilot access", () => {
     expect(purchases).toContain("EXPO_PUBLIC_REVENUECAT_IOS_API_KEY");
     expect(purchases).toContain("EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY");
     expect(paywall).toContain("current?.monthly");
-    expect(paywall).toContain("current?.annual");
+    expect(paywall).toContain('product.identifier === "byis_pro_monthly_5"');
     expect(purchases).not.toContain("productIdentifier ===");
   });
 });

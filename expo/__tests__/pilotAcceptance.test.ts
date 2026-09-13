@@ -159,7 +159,9 @@ describe("required exercised curriculum paths", () => {
     expect(dictation).toContain("WEB_RECORDER_STOP_TIMEOUT_MS");
     expect(dictation).toContain('recorder.state === "inactive"');
     expect(dictation).toContain("webStreamRef.current?.getTracks().forEach");
-    expect(dictation).toContain("transcribeRecording(uri, mediaType, turn)");
+    expect(dictation).toContain("transcribeRecording(uri, mediaType, turn, { signal: transcription.signal, paidPractice })");
+    expect(dictation).toContain("transcriptionAbortRef.current?.abort()");
+    expect(dictation).toContain("if (transcription.signal.aborted || !mountedRef.current) return null");
     expect(dictation).not.toContain("readAudioPayload");
     expect(dictation).not.toContain("reader.readAsDataURL(blob)");
     expect(dictation).toContain("discardTemporaryRecordingStrict(uri)");

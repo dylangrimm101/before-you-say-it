@@ -106,8 +106,9 @@ describe("locked Today card system", () => {
   test("makes the current Communication Index the Home focal point and includes completed lesson evidence", async () => {
     const source = await Bun.file(`${import.meta.dir}/../app/(tabs)/index.tsx`).text();
     expect(source).toContain("Your current Index");
-    expect(source).toContain("Latest lesson included");
-    expect(source).toContain("hasLessonUpdate={scoredPracticeHistory.length > 0}");
+    expect(source).toContain("Scored practice included");
+    expect(source).toContain("hasLessonUpdate={measuredHistory.length > 0}");
+    expect(source).toContain("measuredPracticeHistory(scoredPracticeHistory)");
     expect(source).toContain("todayIndexPresentation(activePracticeSession?.sharedResult, scoredPracticeHistory)");
     expect(source).toContain("fontSize: 58");
   });

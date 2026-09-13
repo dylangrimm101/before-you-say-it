@@ -8,7 +8,7 @@ import { approvedRehearsalAuthoredCorpus, approvedRehearsalConfig, type Approved
 
 const originalFetch = globalThis.fetch;
 const lessonIds: readonly ApprovedRehearsalLessonId[] = [
-  "m1-l2", "m1-l3", "m1-l4", "m1-l5", "m2-l1", "m2-l2", "m2-l3", "m2-l4", "m2-l5",
+  /* Ravi paid v2 is exercised by raviSemanticTransport.test.ts. */ "m1-l3", "m1-l4", "m1-l5", "m2-l1", "m2-l2", "m2-l3", "m2-l4", "m2-l5",
 ];
 const groundedReplies: Readonly<Record<ApprovedRehearsalLessonId, string>> = {
   "m1-l2": "One late file still doesn't prove the approval process needs one owner.",
@@ -130,7 +130,7 @@ describe("all approved lesson dynamic counterparts", () => {
         return new Response(JSON.stringify({ mode: "turn", text: disguised }), { status: 200 });
       }) as typeof fetch;
       await expect(generateApprovedRehearsalDynamicReply(dynamicInput(lessonId))).rejects.toThrow("unavailable");
-      expect(requests, lessonId).toBe(2);
+      expect(requests, lessonId).toBe(lessonId === "m1-l2" ? 1 : 2);
     }
   });
 

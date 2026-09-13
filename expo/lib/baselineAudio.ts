@@ -36,6 +36,11 @@ function baselineFile(sessionId: string): File {
   return new File(baselineDir(), baselineFileName(sessionId));
 }
 
+function entryName(entry: { uri?: string; name?: string }): string {
+  if (typeof entry.name === "string" && entry.name.length > 0) return entry.name;
+  return String(entry.uri ?? "").split("/").filter(Boolean).at(-1) ?? "";
+}
+
 /**
  * Copy a finished recording into the private container. Only ever called when
  * the user has explicitly turned the keep-this-recording option on.
@@ -82,6 +87,13 @@ export async function deleteBaselineAudioStrict(sessionId: string): Promise<void
   const file = baselineFile(sessionId);
   if (file.exists) file.delete();
   if (file.exists) throw new Error("Retained recording deletion was not confirmed");
+}
+
+export async function listBaselineAudioFileNamesStrict(): Promise<string[]> {
+  if (isWebRuntime()) return [];
+  const dir = baselineDir();
+  if (!dir.exists) return [];
+  return dir.list().map(entryName).filter(Boolean).sort();
 }
 
 /** Best-effort cache maintenance. Never use this to confirm a privacy deletion. */
