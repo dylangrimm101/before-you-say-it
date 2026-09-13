@@ -168,9 +168,9 @@ async function input(value:string){assert.equal(root.root.findAllByType('input')
 try{
  await act(async()=>{root=create(React.createElement(Harness));});await flush();await flush();
  assert.equal(routePath(),'/entry');assert.equal(account.user,null);
- if(outputMode==='saved'){await capture(db);await press('Log in');await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});await press('Log in');assert.equal(routePath(),'/saved-result');}
+ if(outputMode==='saved'){await capture(db);await press('I already have an account');await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});await press('Log in');assert.equal(routePath(),'/saved-result');}
  else {
- await press('Sign up now');assert.equal(routePath(),'/continue-from-web');
+ await press('Get started');assert.equal(routePath(),'/continue-from-web');
  await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});
  await press('Create account');assert.ok(text().includes('Check your email'));assert.equal(account.user,null);
  await press('I confirmed my email — log in');await flush();assert.equal(account.user.id,owner);assert.equal(routePath(),'/account-practice');
@@ -298,10 +298,10 @@ try{
   const oldOwner=account.practiceOwner;await go('/entry');await press('Sign out');await flush();
   assert.equal(account.user,null);assert.equal(store.convertedLessonProgress.length,0);assert.equal(store.activeScenarioRun,null);assert.equal(oldOwner.storage.isActive(),false);
   transportUser={...user,id:'22222222-2222-4222-8222-222222222222',email:'second@invalid'};
-  await press('Log in');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(transportUser.email);fields[1].props.onChangeText('synthetic-only-password');});
+  await press('I already have an account');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(transportUser.email);fields[1].props.onChangeText('synthetic-only-password');});
   await press('Log in');await flush();assert.ok(account.user,'second login: '+text());assert.equal(account.user.id,transportUser.id);assert.equal(routePath(),'/saved-result');await flush();assert.ok(text().includes('We couldn’t find a saved result linked to this account.'));assert.ok(text().includes('Don’t buy the same plan again.'));assert.equal(store.convertedLessonProgress.length,0);assert.equal(store.activePracticeSession,null);
   await restart();assert.equal(store.convertedLessonProgress.length,0);assert.equal(store.activePracticeSession,null);
-  await go('/entry');await press('Sign out');transportUser=user;await press('Log in');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(user.email);fields[1].props.onChangeText('synthetic-only-password');});await press('Log in');await flush();
+  await go('/entry');await press('Sign out');transportUser=user;await press('I already have an account');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(user.email);fields[1].props.onChangeText('synthetic-only-password');});await press('Log in');await flush();
   assert.deepEqual(store.convertedLessonProgress,progress);assert.equal(store.activeScenarioRun,null);
   console.log('PASS joined first lesson: library control → approved transcripts → counterpart → retry/comparison → completion → root cold owner hydration; synthetic paid admission/replies only');
 

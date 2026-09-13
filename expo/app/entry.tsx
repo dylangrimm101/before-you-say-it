@@ -72,13 +72,12 @@ export default function EntryScreen(): React.JSX.Element {
           <Text style={styles.title}>Build the qualities of world-class communicators.</Text>
           <Text style={styles.body}>Learn to communicate with Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.</Text>
           <View style={styles.actions}>
-            <PrimaryButton label="Sign up now" onPress={signUp} disabled={isAuthLoading || isStarting} />
+            <PrimaryButton label="Get started" onPress={signUp} disabled={isAuthLoading || isStarting} />
             {isStarting ? <Text style={styles.accountNote} accessibilityLiveRegion="polite">Setting up…</Text> : null}
-            <GhostButton label="Log in" disabled={isStarting} onPress={() => router.push("/continue-from-web")} />
+            <GhostButton label="I already have an account" disabled={isStarting} onPress={() => router.push("/continue-from-web")} />
             {authError ? <Text style={styles.accountNote} accessibilityRole="alert" accessibilityLiveRegion="polite">{authError}</Text> : null}
             <AccountLogout />
           </View>
-          <Text style={styles.accountNote}>Already have an account? Log in with your password. Web purchases can’t be activated in this build. Don’t purchase again if you already paid on the web.</Text>
         </Reveal>
       </ScrollView>
     </View>

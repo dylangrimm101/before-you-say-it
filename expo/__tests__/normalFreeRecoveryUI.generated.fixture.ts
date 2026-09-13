@@ -110,11 +110,11 @@ if(restartFile&&process.env.BYSI_GUEST_RESUME==='1'){
  await act(async()=>root.unmount());client.clear();process.exit(0);
 }
 assert.equal(store.profile,null);assert.equal(store.activePracticeSession,null);
-await press('Sign up now');
+await press('Get started');
 assert.deepEqual(route,{pathname:'/continue-from-web',params:{mode:'signup'}});assert.equal(anonymousCalls,0);
 // Explicit existing guest fixture, not a claim that fresh signup is enabled.
 await act(async()=>{session={user:{id:'synthetic-guest',is_anonymous:true},access_token:'synthetic-guest-token'};for(const cb of listeners)cb('SIGNED_IN',session);});
-await press('Sign up now');assert.equal(route,'/onboarding');assert.equal(store.nativeJourneyStarted,true);
+await press('Get started');assert.equal(route,'/onboarding');assert.equal(store.nativeJourneyStarted,true);
 const branches=[
  {id:'real_conversation',entry:'I have a conversation I need to prepare for'},
  {id:'recurring_problem',entry:'The same communication problem keeps happening'},

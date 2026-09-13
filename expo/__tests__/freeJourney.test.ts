@@ -359,8 +359,8 @@ describe("Claude Design free journey contract", () => {
     const onboarding = await Bun.file(`${import.meta.dir}/../app/onboarding.tsx`).text();
     expect(entry).toContain("Build the qualities of world-class communicators.");
     expect(entry).toContain("Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.");
-    expect(entry).toContain('label="Sign up now"');
-    expect(entry).toContain('label="Log in"');
+    expect(entry).toContain('label="Get started"');
+    expect(entry).toContain('label="I already have an account"');
     expect(entry).toContain("<ConversationMark />");
     expect(entry).toContain('accessibilityLabel="Two people having a conversation"');
     expect(onboarding).toContain("useState<number>(0)");

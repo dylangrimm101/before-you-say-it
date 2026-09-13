@@ -109,11 +109,11 @@ if(restartFile&&process.env.BYSI_GUEST_RESUME==='1'){
  await act(async()=>root.unmount());client.clear();process.exit(0);
 }
 assert.equal(store.profile,null);assert.equal(store.activePracticeSession,null);
-await press('Sign up now');
+await press('Get started');
 assert.deepEqual(route,{pathname:'/continue-from-web',params:{mode:'signup'}});assert.equal(anonymousCalls,0);
 // Explicit existing guest fixture, not a claim that fresh signup is enabled.
 await act(async()=>{session={user:{id:'synthetic-guest',is_anonymous:true},access_token:'synthetic-guest-token'};for(const cb of listeners)cb('SIGNED_IN',session);});
-await press('Sign up now');assert.equal(route,'/onboarding');assert.equal(store.nativeJourneyStarted,true);
+await press('Get started');assert.equal(route,'/onboarding');assert.equal(store.nativeJourneyStarted,true);
 const branches=[
  {id:'real_conversation',entry:'I have a conversation I need to prepare for'},
  {id:'recurring_problem',entry:'The same communication problem keeps happening'},
@@ -321,7 +321,7 @@ await mount(Progress);assert.ok(text().includes('No Index history yet'));assert.
 await press('How the Communication Index works');assert.equal(route,'/progress/how-it-works');await press('Open Settings');assert.equal(route,'/settings');
 await mount(Settings);assert.ok(text().includes('a@invalid'));await press('Privacy & data. See what is stored, shared, retained, and deleted');assert.equal(route,'/privacy');
 await press('Sign out');assert.equal(account.user,null);assert.equal(store.activePracticeSession,null);assert.equal(store.scoredPracticeHistory.length,0);
-await mount(Entry);assert.ok(text().includes('Sign up now'));
+await mount(Entry);assert.ok(text().includes('Get started'));
 await act(async()=>root.unmount());client.clear();
 const {approvedRehearsalConfig}=await import('../lib/approvedRehearsals');
 console.log('Launch inventory',JSON.stringify(LAUNCH_DECK_IDS.map((id:string)=>({id,title:approvedLessonDeck(id as any)?.shortName,kind:id.endsWith('close')?'module-close':'lesson',rehearsal:id==='m1-l1'||Boolean(approvedRehearsalConfig(id))}))));

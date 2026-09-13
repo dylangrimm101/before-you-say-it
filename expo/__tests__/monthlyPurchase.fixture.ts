@@ -89,7 +89,7 @@ const tree=()=>React.createElement(QueryClientProvider,{client},React.createElem
 async function mount(next:any){Screen=next;screenKey++;route=null;await act(async()=>{if(root)root.update(tree());else root=create(tree());});}
 const text=()=>JSON.stringify(root.toJSON());
 async function press(label:string){const b=root.root.findAllByType('button').find((n:any)=>(n.props.label===label||n.props.accessibilityLabel===label)&&!n.props.disabled);assert.ok(b,`enabled control: ${label}`);await act(async()=>{await b.props.onPress();});await act(async()=>{await new Promise(r=>setTimeout(r,5));});}
-await mount(Entry);await press('Sign up now');params={mode:'signup'};await mount(Login);
+await mount(Entry);await press('Get started');params={mode:'signup'};await mount(Login);
 await act(async()=>{root.root.findAllByType('input')[0].props.onChangeText('a@invalid');root.root.findAllByType('input')[1].props.onChangeText('synthetic-password');});
 await press('Create account');assert.ok(text().includes('Check your email'));assert.equal(account.user,null);
 await press('I confirmed my email — log in');assert.equal(account.user.id,'registered-A');

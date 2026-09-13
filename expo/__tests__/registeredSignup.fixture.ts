@@ -87,7 +87,7 @@ async function mount(next:any){Screen=next;screenKey++;route=null;await act(asyn
 const text=()=>JSON.stringify(root.toJSON());
 async function press(label:string){const b=root.root.findAllByType('button').find((n:any)=>(n.props.label===label||n.props.accessibilityLabel===label)&&!n.props.disabled);assert.ok(b,`enabled control: ${label}`);await act(async()=>{await b.props.onPress();});await act(async()=>{await new Promise(r=>setTimeout(r,5));});}
 await mount(Entry);
-await press('Sign up now');
+await press('Get started');
 assert.deepEqual(route,{pathname:'/continue-from-web',params:{mode:'signup'}});
 params={mode:'signup'};await mount(Login);
 await act(async()=>{root.root.findAllByType('input')[0].props.onChangeText('a@invalid');root.root.findAllByType('input')[1].props.onChangeText('synthetic-password');});
