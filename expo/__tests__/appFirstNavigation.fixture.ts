@@ -211,8 +211,7 @@ const exactGuestAttempt=structuredClone(store.activePracticeSession.attemptOne);
 if(positive&&!continuation){await act(async()=>root.unmount());root=null;}
 if(durableMode){await act(async()=>root.unmount());root=null;await mount(Login);assert.equal(account.hasCurrentGuestPractice,true,'secure new-run proof restored after assessment process death');}
 await mount(Login);
-assert.ok(text().includes(continuation?'current rehearsal':'Guest practice cannot be transferred'),'login must disclose the actual continuation boundary');
-if(continuation)assert.ok(text().includes(durableMode?'24 hours':'Keep this browser session open'),'platform-accurate durable continuation support');
+assert.ok(text().includes(continuation?'Save this current rehearsal':'Enter your email'),'login stays sparse and only names a live rehearsal when one can actually continue');
 if(durableMode){
  const isolated=createNativeGuestRuntime(raw,'ios','different-environment');assert.equal(await isolated.restore(account.practiceOwner.storage),false);isolated.dispose();
  secureAvailable=false;const unavailable=createNativeGuestRuntime(raw,'ios','unavailable');await assert.rejects(unavailable.restore(account.practiceOwner.storage));unavailable.dispose();secureAvailable=true;

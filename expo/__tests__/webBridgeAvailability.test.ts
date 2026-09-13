@@ -12,5 +12,7 @@ test("entry does not advertise unavailable web access restoration", async () => 
 test("web account login does not promise the unavailable Stripe bridge", async () => {
   const source = await Bun.file(`${import.meta.dir}/../app/continue-from-web.tsx`).text();
   expect(source).not.toContain("the app will connect it automatically");
-  expect(source).toContain("Web subscription activation and web result restore aren’t available in this build. If you paid on the web, don’t purchase again in the app.");
+  expect(source).not.toContain("Web subscription activation and web result restore aren’t available in this build");
+  expect(source).toContain("Enter your email");
+  expect(source).toContain(": \"Log in\"");
 });

@@ -109,7 +109,7 @@ describe("remaining native acquisition and paid experience", () => {
     expect(layout).toContain("user || profile || activePracticeSession || nativeJourneyStarted");
     expect(layout).toContain("activePracticeSession?.sharedResult");
     expect(layout).toContain("<AuthProvider>");
-    expect(continuation).toContain("Use the same account you used on the web");
+    expect(continuation).toContain("Enter your email");
     expect(continuation).toContain("await login(email, password, hasCurrentGuestPractice)");
     expect(auth).toContain("supabase.auth.signInWithPassword");
     expect(auth).toContain("identifyPurchasesUser");
