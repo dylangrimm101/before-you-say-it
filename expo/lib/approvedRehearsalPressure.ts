@@ -1,3 +1,4 @@
+import { RAVI_NATURAL_FACT_VERSION, raviNaturalFactViolations } from "@/lib/raviNaturalFactContract";
 import { canonicalCounterpartLine } from "@/lib/counterpartLineCanonicalization";
 
 const COACHING_LEAKAGE = /\b(?:learner|lesson|practice|rehearsal|coach|coaching|rubric|transcript|named move|try saying|you should say|good job|well done)\b/i;
@@ -17,23 +18,37 @@ function groundingTerm(word: string): string {
   return word;
 }
 
-function groundingTerms(value: string): Set<string> {
-  return new Set(canonicalCounterpartLine(value)
+// Comparison only, not a general number dictionary: the authored Ravi fact is
+// revisions arriving "until 3". Do not admit "three" elsewhere (e.g. three
+// files), infer AM/PM, or turn ubiquitous "one" into a new numeric allowance.
+function numericComparisonLine(value: string, groundingContext: string): string {
+  const canonical = canonicalCounterpartLine(value);
+  const authored = groundingContext.normalize("NFKC").replace(/\p{Default_Ignorable_Code_Point}/gu, "").toLowerCase();
+  if (!/\brevisions until 3(?![\p{L}\p{N}]|[:.,/-]\d)/u.test(authored)) return canonical;
+  return canonical.replace(/\brevisions until three\b/g, "revisions until 3");
+}
+
+function groundingTerms(value: string, groundingContext: string = value): Set<string> {
+  // Keep exact compound/meridiem keys: the normal tokenizer would otherwise
+  // erase colons and ignore short digits or AM/PM as short dialogue tokens.
+  const numericKeys = value.normalize("NFKC").replace(/\p{Default_Ignorable_Code_Point}/gu, "").toLowerCase()
+    .match(/\d+(?:[:.,/\-]\d+)+(?:\s*[ap]\.?m\.?)?|\b(?:\d+|three)\s*[ap]\.?m\b\.?/g) ?? [];
+  return new Set([...numericComparisonLine(value, groundingContext)
     .split(" ")
-    .filter((word) => word.length >= 3 && !GROUNDING_STOP_WORDS.has(word))
-    .map(groundingTerm));
+    .filter((word) => (word.length >= 3 || /\p{N}/u.test(word)) && !GROUNDING_STOP_WORDS.has(word))
+    .map(groundingTerm), ...numericKeys]);
 }
 
 function isGroundedInApprovedExchange(reply: string, groundingContext: string): boolean {
   const allowed = groundingTerms(groundingContext);
-  const replyTerms = groundingTerms(reply);
-  const overlap = [...replyTerms].filter((word) => allowed.has(word));
+  const replyTerms = groundingTerms(reply, groundingContext);
+  const overlap = [...replyTerms].filter((word) => !/\p{N}/u.test(word) && allowed.has(word));
   const unknown = [...replyTerms].filter((word) => !allowed.has(word) && !DIALOGUE_ALLOWLIST.has(word));
   return new Set(overlap).size >= 2 && unknown.length === 0;
 }
 
 /** Shared quality, grounding, and private-corpus gate for approved rehearsal pressures. */
-export function approvedRehearsalPressurePassesQuality(reply: string, groundingContext: string): boolean {
+export function approvedRehearsalPressurePassesQuality(reply: string, groundingContext: string, factContract?: string): boolean {
   const clean = reply.trim();
   const words = clean.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? [];
   return clean.length >= 3
@@ -43,7 +58,9 @@ export function approvedRehearsalPressurePassesQuality(reply: string, groundingC
     && !COACHING_LEAKAGE.test(clean)
     && !CHANNEL_LEAKAGE.test(clean)
     && !/^(?:i hear you|you(?:'|’)re right|that(?:'|’)s fair|okay|i get that)\b/i.test(clean)
-    && isGroundedInApprovedExchange(clean, groundingContext);
+    && (factContract === RAVI_NATURAL_FACT_VERSION
+      ? raviNaturalFactViolations(clean, groundingContext).length === 0
+      : isGroundedInApprovedExchange(clean, groundingContext));
 }
 
 export function isExcludedApprovedRehearsalLine(value: string, authoredCorpus: readonly string[]): boolean {

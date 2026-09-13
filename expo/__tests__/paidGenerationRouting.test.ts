@@ -1,0 +1,2 @@
+import {test,expect} from 'bun:test';import {readFileSync} from 'node:fs';
+test('isolated paid helpers never fall back to anonymous generation',()=>{const source=readFileSync(new URL('../lib/ai.ts',import.meta.url),'utf8');expect(source).toContain('requestPaidBysiGeneration(payload)');expect(source).toContain('paidPractice: boolean = false');const shared=readFileSync(new URL('../components/ScenarioPaidPractice.tsx',import.meta.url),'utf8');expect(shared).toContain('context.objective, "real_conversation", true');});

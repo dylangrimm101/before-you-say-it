@@ -1,5 +1,5 @@
 import type { Scenario } from "@/types/convo";
-import { approvedRehearsalConfig, type ApprovedRehearsalLessonId } from "@/lib/approvedRehearsals";
+import { approvedRehearsalConfig, RAVI_LEGACY_CONTENT_VERSION, type ApprovedRehearsalLessonId } from "@/lib/approvedRehearsals";
 import { isValidM1L1ProviderTurn, m1L1DynamicReplyPassesQuality } from "@/lib/m1L1DynamicResponse";
 import { canonicalCounterpartLine } from "@/lib/counterpartLineCanonicalization";
 import type { SharedSignalKey } from "@/types/sharedProduct";
@@ -643,7 +643,7 @@ export function normalizeConvertedLessonProgress(value: unknown): ConvertedLesso
     if (!config) return false;
     return item.moduleId === config.moduleId
       && item.practiceId === config.practiceId
-      && (item.lessonId === LESSON_ID ? isString(item.contentVersion) : item.contentVersion === config.contentVersion)
+      && (item.lessonId === LESSON_ID ? isString(item.contentVersion) : (item.contentVersion === config.contentVersion || (item.lessonId === 'm1-l2' && item.contentVersion === RAVI_LEGACY_CONTENT_VERSION)))
       && isString(item.runId)
       && Number.isInteger(item.lessonCardCheckpoint)
       && (item.lessonCardCheckpoint ?? 0) >= config.completionCard

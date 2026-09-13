@@ -20,7 +20,7 @@ describe("consumer settings experience", () => {
 
   test("shows only working subscription, permission, privacy, support, and legal actions", async () => {
     const settings = await source("app/settings.tsx");
-    for (const label of ["Manage subscription", "Restore purchases", "Microphone", "Rehearsal data", "Delete data on this device", "Help & feedback", "Apple standard EULA", "Google Play terms", "Privacy Policy"]) {
+    for (const label of ["Manage subscription", "Restore purchases", "Delete account", "Microphone", "Rehearsal data", "Delete data on this device", "Help & feedback", "Apple standard EULA", "Google Play terms", "Privacy Policy"]) {
       expect(settings).toContain(label);
     }
     expect(settings).toContain("Raw audio is deleted after transcription");
@@ -32,6 +32,28 @@ describe("consumer settings experience", () => {
     expect(settings).not.toMatch(/Camera|Daily commitment|Nudge time|Google Calendar|Appearance|Auto-delete recordings/);
     expect(settings).toContain("{__DEV__ ?");
     expect(settings).toContain("QA access lab");
+  });
+
+  test("delete-account screen uses the approved one-password account deletion flow", async () => {
+    const screen = await source("app/delete-account.tsx");
+    const controls = await source("components/AccountLifecycleControls.tsx");
+    expect(screen).toContain("Manage Apple subscription");
+    expect(screen).toContain("AccountDeletionStatusControls");
+    expect(screen).toContain("useFocusEffect");
+    expect(screen).toContain("AppState.addEventListener");
+    expect(screen).toContain("customer.refetch");
+    expect(screen).toContain("cleanupDeletedAccountOwner");
+    expect(screen).toContain('product_id: "byis_pro_monthly_5"');
+    expect(screen).toContain('return { kind: "web", provider: "stripe" }');
+    expect(screen).not.toContain("one_time: true");
+    expect(screen).not.toContain("const { reset } = useStore()");
+    expect(controls).toContain("BYSI password for account deletion");
+    expect(controls).toContain("Delete account anyway");
+    expect(controls).toContain("clearLocal(result.ownerId)");
+    expect(controls).not.toContain("onBlur={()=>setPassword");
+    expect(controls).not.toContain("Type DELETE to confirm");
+    expect(controls).not.toContain("Delete account identity");
+    expect(controls).not.toContain("soft deletion");
   });
 
   test("puts Settings in the Progress header as a gear action", async () => {

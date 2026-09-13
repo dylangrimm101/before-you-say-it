@@ -27,13 +27,13 @@ export default function SafetyScreen() {
 
   const returnSafely = useCallback(async (): Promise<void> => {
     await leaveGeneration();
-    if (params.returnTo === "generating" && activePracticeSession) {
+    if (params.returnTo === "generating" && activePracticeSession && params.sessionId === activePracticeSession.id) {
       router.replace({ pathname: "/rehearse/[id]", params: { id: activePracticeSession.scenarioId, difficulty: "steady", reaction: activePracticeSession.expectedReaction, entry: "onboarding", persona: activePracticeSession.persona, practiceSessionId: activePracticeSession.id } });
       return;
     }
     if (router.canGoBack()) router.back();
     else router.replace("/onboarding");
-  }, [activePracticeSession, leaveGeneration, params.returnTo, router]);
+  }, [activePracticeSession, leaveGeneration, params.returnTo, params.sessionId, router]);
 
   return (
     <View style={styles.root}>

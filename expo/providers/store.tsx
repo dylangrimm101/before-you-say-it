@@ -1,7 +1,8 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React from "react";
+import { useAuth } from "@/providers/auth";
 import createContextHook from "@nkzw/create-context-hook";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CHALLENGE_TOTAL_DAYS } from "@/constants/challenge";
 import { CURRICULUM_MODULES, isModuleId, type ModuleId } from "@/constants/modules";
@@ -52,11 +53,12 @@ import { sanitizeActivePracticeSessionForPersistence, sanitizeActiveScenarioRunF
 import { errorShape, safeLog } from "@/lib/redact";
 import { normalizeScenarioPracticeRun, type PersistedScenarioPracticeRun } from "@/lib/scenarioPractice";
 import { appendScoredPracticeRecord, normalizeScoredPracticeHistory, type ScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
-import { cancelChallengeNudge, cancelDailyReminder, requestReminderPermission, syncChallengeNudge } from "@/lib/reminders";
+import { cancelChallengeNudge, cancelDailyReminder, syncChallengeNudge } from "@/lib/reminders";
 import { capRecords } from "@/lib/sessionMigration";
+import { commitStoreArray, readStoreArray, serializeStoreOperation, normalizeStoredDrills, normalizeStoredChallenge, normalizeStoredFreeze, normalizeStoredProfile, normalizeStoredCustomScenarios } from "@/lib/storePersistence";
 import { migrateSessionStorage } from "@/lib/sessionStorageMigration";
 import { resetAllDataStrict } from "@/lib/resetAllData";
-import { supabase } from "@/lib/supabase";
+
 import { deleteGeneratedVoiceCacheStrict } from "@/lib/voice";
 import {
   associatePracticeSessionUser,
@@ -68,6 +70,8 @@ import type { ChallengeLogEntry, DrillResult, FreezeState, Profile, Scenario, Se
 import type { SessionRecord } from "@/types/privacy";
 import { PILOT_PROGRAM, currentPilotDay as deriveCurrentPilotDay } from "@/lib/pilotCurriculum";
 import type { PilotModule, PilotProgressEntry } from "@/types/pilotCurriculum";
+
+export { useStore };
 
 const KEYS = {
   profile: "cc.profile.v1",
@@ -119,12 +123,27 @@ function hasProfileFreeText(raw: unknown): boolean {
   return typeof o.dread === "string" || typeof o.outcome === "string";
 }
 
-export const [StoreProvider, useStore] = createContextHook(() => {
+export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const { practiceOwner } = useAuth();
+  if (!practiceOwner) return null;
+  return <OwnerStoreProvider key={practiceOwner.key}>{children}</OwnerStoreProvider>;
+}
+
+const [OwnerStoreProvider, useStore] = createContextHook(() => {
+  // Immutable lease for this keyed mount; stale callbacks cannot switch namespaces.
+  const auth = useAuth();
+  const AsyncStorage = useRef(auth.practiceOwner!.storage).current;
+  const logout = auth.logout;
   const queryClient = useQueryClient();
   const [hydrated, setHydrated] = useState<boolean>(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
-  const [customScenarios, setCustomScenarios] = useState<Scenario[]>([]);
+  const [customScenarios, publishCustomScenarios] = useState<Scenario[]>([]);
+  const customScenariosRef = useRef<Scenario[]>([]);
+  const setCustomScenarios = useCallback((next: Scenario[]) => {
+    customScenariosRef.current = next;
+    publishCustomScenarios(next);
+  }, []);
   const [drillLog, setDrillLog] = useState<DrillResult[]>([]);
   const [challengeLog, setChallengeLog] = useState<ChallengeLogEntry[]>([]);
   const [freeze, setFreeze] = useState<FreezeState>(DEFAULT_FREEZE);
@@ -133,7 +152,13 @@ export const [StoreProvider, useStore] = createContextHook(() => {
   const [pilotProgress, setPilotProgress] = useState<PilotProgressEntry[]>([]);
   const [scoredPracticeHistory, setScoredPracticeHistory] = useState<ScoredPracticeRecord[]>([]);
   const [anonymousUserId, setAnonymousUserId] = useState<string>("");
-  const [activePracticeSession, setActivePracticeSession] = useState<ActivePracticeSession | null>(null);
+  const [isLocalGuestContinuation, setIsLocalGuestContinuation] = useState(false);
+  const [activePracticeSession, publishActivePracticeSession] = useState<ActivePracticeSession | null>(null);
+  const activePracticeSessionRef = useRef<ActivePracticeSession | null>(null);
+  const setActivePracticeSession = useCallback((next: ActivePracticeSession | null) => {
+    activePracticeSessionRef.current = next;
+    publishActivePracticeSession(next);
+  }, []);
   const [activeScenarioRun, setActiveScenarioRun] = useState<PersistedScenarioPracticeRun | null>(null);
   const [convertedLessonProgress, setConvertedLessonProgress] = useState<ConvertedLessonProgress[]>([]);
   const [moduleCloseProgress, setModuleCloseProgress] = useState<ModuleCloseProgress[]>([]);
@@ -145,37 +170,78 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     let alive = true;
     const load = async () => {
       try {
-        const [p, _sv2, sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, scenarioRun, convertedProgress, moduleCloses, journeyStarted, dp, devUnpaid] = await Promise.all([
-          AsyncStorage.getItem(KEYS.profile),
-          AsyncStorage.getItem(KEYS.sessions),
-          AsyncStorage.getItem(KEYS.sessionsLegacy),
-          AsyncStorage.getItem(KEYS.custom),
-          AsyncStorage.getItem(KEYS.drills),
-          AsyncStorage.getItem(KEYS.reminder),
-          AsyncStorage.getItem(KEYS.challenge),
-          AsyncStorage.getItem(KEYS.freeze),
-          AsyncStorage.getItem(KEYS.consent),
-          AsyncStorage.getItem(KEYS.pilotProgress),
-          AsyncStorage.getItem(KEYS.scoredPracticeHistory),
-          AsyncStorage.getItem(KEYS.anonymousUserId),
-          AsyncStorage.getItem(KEYS.activePracticeSession),
-          AsyncStorage.getItem(KEYS.activeScenarioRun),
-          AsyncStorage.getItem(KEYS.convertedLessonProgress),
-          AsyncStorage.getItem(KEYS.moduleCloseProgress),
-          AsyncStorage.getItem(KEYS.nativeJourneyStarted),
-          __DEV__ ? AsyncStorage.getItem(KEYS.devPro) : Promise.resolve(null),
-          __DEV__ ? AsyncStorage.getItem(KEYS.devForceUnpaid) : Promise.resolve(null),
+        const failedReads = new Set<string>();
+        const readKey = async (key: string): Promise<string | null> => {
+          try { return await AsyncStorage.getItem(key); }
+          catch (error) { failedReads.add(key); safeLog("[store] hydration read failed", { key, ...errorShape(error) }); return null; }
+        };
+        const [p, , sv1, c, d, r, ch, f, cs, pp, scoredHistory, anonymousId, practiceSession, , convertedProgress, moduleCloses, journeyStarted, dp, devUnpaid] = await Promise.all([
+          readKey(KEYS.profile),
+          readKey(KEYS.sessions),
+          readKey(KEYS.sessionsLegacy),
+          readKey(KEYS.custom),
+          readKey(KEYS.drills),
+          readKey(KEYS.reminder),
+          readKey(KEYS.challenge),
+          readKey(KEYS.freeze),
+          readKey(KEYS.consent),
+          readKey(KEYS.pilotProgress),
+          readKey(KEYS.scoredPracticeHistory),
+          readKey(KEYS.anonymousUserId),
+          readKey(KEYS.activePracticeSession),
+          readKey(KEYS.activeScenarioRun),
+          readKey(KEYS.convertedLessonProgress),
+          readKey(KEYS.moduleCloseProgress),
+          readKey(KEYS.nativeJourneyStarted),
+          __DEV__ ? readKey(KEYS.devPro) : Promise.resolve(null),
+          __DEV__ ? readKey(KEYS.devForceUnpaid) : Promise.resolve(null),
         ]);
         if (!alive) return;
         const hydrationFailure = (key: string, error: unknown): void => safeLog("[store] malformed hydration key", { key, ...errorShape(error) });
         const storedConsent = normalizeConsent(cs);
+        // Validate independent progress keys before migration/cleanup can fail.
+        // Repair only this key, never quarantine or back up raw private content.
+        const hydrateValue = async <T,>(raw: string | null, key: string, fallback: T, normalize: (value: unknown) => T | null, publish: (value: T) => void): Promise<void> => {
+          if (failedReads.has(key)) return;
+          const next = hydrateJsonEntry(raw, fallback, key, hydrationFailure, normalize);
+          if (raw !== null && raw !== JSON.stringify(next)) {
+            safeLog("[store] hydration normalized", { key });
+            try {
+              if (next === null) await AsyncStorage.removeItem(key);
+              else await AsyncStorage.setItem(key, JSON.stringify(next));
+            } catch (error) { safeLog("[store] hydration repair failed", { key, ...errorShape(error) }); }
+          }
+          publish(next);
+        };
+        await Promise.all([
+          hydrateValue(p, KEYS.profile, null, normalizeStoredProfile, setProfile),
+          hydrateValue(d, KEYS.drills, [], normalizeStoredDrills, setDrillLog),
+          hydrateValue(ch, KEYS.challenge, [], normalizeStoredChallenge, setChallengeLog),
+          hydrateValue(f, KEYS.freeze, DEFAULT_FREEZE, normalizeStoredFreeze, setFreeze),
+          hydrateValue(scoredHistory, KEYS.scoredPracticeHistory, [], normalizeScoredPracticeHistory, setScoredPracticeHistory),
+          hydrateValue(moduleCloses, KEYS.moduleCloseProgress, [], normalizeModuleCloseProgress, setModuleCloseProgress),
+          hydrateValue(pp, KEYS.pilotProgress, [], (value) => {
+            if (!Array.isArray(value)) return [];
+            const valid = value.filter((entry): entry is PilotProgressEntry => {
+              if (!entry || typeof entry !== "object") return false;
+              const item = entry as Partial<PilotProgressEntry>;
+              return typeof item.curriculumVersion === "string"
+                && (item.moduleId === undefined || isModuleId(item.moduleId))
+                && Number.isInteger(item.day) && Number(item.day) >= 1
+                && typeof item.behaviorId === "string"
+                && typeof item.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.date)
+                && typeof item.completedAt === "number" && Number.isFinite(item.completedAt);
+            });
+            return migrateLegacyPilotProgress(valid);
+          }, setPilotProgress),
+        ]);
 
         if (__DEV__ && dp === "1") setDevPro(true);
         if (__DEV__ && devUnpaid === "1") setDevForceUnpaid(true);
         setNativeJourneyStarted(journeyStarted === "1");
         const stableAnonymousId = anonymousId?.trim() || newAnonymousUserId();
         setAnonymousUserId(stableAnonymousId);
-        if (!anonymousId) await AsyncStorage.setItem(KEYS.anonymousUserId, stableAnonymousId);
+        if (!anonymousId && !failedReads.has(KEYS.anonymousUserId)) await AsyncStorage.setItem(KEYS.anonymousUserId, stableAnonymousId);
         // Completion recovery owns the active bytes while its journal exists. It must
         // resume strict audio deletion before generic parsing can quarantine identity.
         const recoveredProgress = await recoverPendingConvertedCompletion(AsyncStorage);
@@ -197,14 +263,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
           }
         }
         if (recoveredProgress) setConvertedLessonProgress(recoveredProgress);
-        if (moduleCloses) {
-          const parsedModuleCloses = hydrateJsonEntry<unknown>(moduleCloses, [], KEYS.moduleCloseProgress, hydrationFailure);
-          const normalizedModuleCloses = normalizeModuleCloseProgress(parsedModuleCloses);
-          setModuleCloseProgress(normalizedModuleCloses);
-          if (JSON.stringify(parsedModuleCloses) !== JSON.stringify(normalizedModuleCloses)) {
-            await AsyncStorage.setItem(KEYS.moduleCloseProgress, JSON.stringify(normalizedModuleCloses));
-          }
-        }
+        setIsLocalGuestContinuation(await AsyncStorage.localContinuation());
         if (practiceSession) {
           const parsedPracticeSession = hydrateJsonEntry<unknown>(practiceSession, null, KEYS.activePracticeSession, hydrationFailure);
           const normalized = normalizePracticeSession(parsedPracticeSession);
@@ -237,66 +296,25 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         }
         setSessions(records);
 
-        // --- Profile: keep the coarse fields, drop the free text. ---
-        if (p) {
-          const parsed = hydrateJsonEntry<Profile | null>(p, null, KEYS.profile, hydrationFailure);
-          if (parsed) {
-          if (hasProfileFreeText(parsed)) {
-            removedContent = true;
-            await AsyncStorage.setItem(KEYS.profile, JSON.stringify(persistableProfile(parsed)));
-          }
-          setProfile(persistableProfile(parsed));
-          }
-        }
+        // Profile was validated and scrubbed independently above.
+        if (hasProfileFreeText(hydrateJsonEntry<unknown>(p, null, KEYS.profile, hydrationFailure))) removedContent = true;
 
         // --- Custom scenarios: exact text is opt-in, and was never opted into. ---
         if (c) {
           const parsed = hydrateJsonEntry<unknown>(c, [], KEYS.custom, hydrationFailure);
           if (storedConsent.saveCustomScenarioText) {
-            setCustomScenarios(Array.isArray(parsed) ? parsed : []);
+            setCustomScenarios(normalizeStoredCustomScenarios(parsed));
           } else {
             if (Array.isArray(parsed) && parsed.length > 0) removedContent = true;
             await AsyncStorage.removeItem(KEYS.custom);
           }
         }
 
-        if (d) setDrillLog(hydrateJsonEntry<DrillResult[]>(d, [], KEYS.drills, hydrationFailure));
         if (r) {
           await cancelDailyReminder();
           await AsyncStorage.removeItem(KEYS.reminder);
         }
-        if (ch) setChallengeLog(hydrateJsonEntry<ChallengeLogEntry[]>(ch, [], KEYS.challenge, hydrationFailure));
-        if (f) setFreeze(hydrateJsonEntry<FreezeState>(f, DEFAULT_FREEZE, KEYS.freeze, hydrationFailure));
         setConsent(storedConsent);
-        if (pp) {
-          const parsed = hydrateJsonEntry<unknown>(pp, [], KEYS.pilotProgress, hydrationFailure);
-          if (Array.isArray(parsed)) {
-            const valid = parsed.filter((entry): entry is PilotProgressEntry => {
-              if (!entry || typeof entry !== "object") return false;
-              const value = entry as Partial<PilotProgressEntry>;
-              return typeof value.curriculumVersion === "string"
-                && (value.moduleId === undefined || isModuleId(value.moduleId))
-                && Number.isInteger(value.day)
-                && typeof value.behaviorId === "string"
-                && typeof value.date === "string"
-                && typeof value.completedAt === "number";
-            });
-            const migrated = migrateLegacyPilotProgress(valid);
-            setPilotProgress(migrated);
-            if (JSON.stringify(valid) !== JSON.stringify(migrated)) {
-              await AsyncStorage.setItem(KEYS.pilotProgress, JSON.stringify(migrated));
-            }
-          }
-        }
-        if (scoredHistory) {
-          const parsedHistory = hydrateJsonEntry<unknown>(scoredHistory, [], KEYS.scoredPracticeHistory, hydrationFailure);
-          const normalizedHistory = normalizeScoredPracticeHistory(parsedHistory);
-          setScoredPracticeHistory(normalizedHistory);
-          if (JSON.stringify(parsedHistory) !== JSON.stringify(normalizedHistory)) {
-            if (normalizedHistory.length > 0) await AsyncStorage.setItem(KEYS.scoredPracticeHistory, JSON.stringify(normalizedHistory));
-            else await AsyncStorage.removeItem(KEYS.scoredPracticeHistory);
-          }
-        }
         setMigrationNotice(needsMigrationNotice(storedConsent, removedContent));
       } catch (e) {
         safeLog("[store] hydrate failed", errorShape(e));
@@ -304,348 +322,295 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         if (alive) setHydrated(true);
       }
     };
-    load();
+    void serializeStoreOperation(AsyncStorage, load);
     return () => {
       alive = false;
     };
-  }, []);
+  }, [setActivePracticeSession, setCustomScenarios]);
 
-  const writeConsent = useCallback(async (next: ConsentState) => {
-    setConsent(next);
-    try {
-      await AsyncStorage.setItem(KEYS.consent, JSON.stringify(next));
-    } catch (e) {
-      safeLog("[store] consent save failed", errorShape(e));
-    }
-  }, []);
-
-  const setKeepBaselineAudio = useCallback(
-    async (enabled: boolean) => {
-      if (!enabled) await deleteAllBaselineAudioStrict();
-      setConsent((prev) => {
-        const next = { ...prev, keepBaselineAudio: enabled };
-        AsyncStorage.setItem(KEYS.consent, JSON.stringify(next)).catch((e) =>
-          safeLog("[store] consent save failed", errorShape(e)),
-        );
-        return next;
-      });
-    },
-    [],
-  );
-
-  const setSaveCustomScenarioText = useCallback(
-    async (enabled: boolean) => {
-      if (!enabled) {
-        const privateConsent = { ...consent, saveCustomScenarioText: false };
-        const sanitizedSessions = sessions.map((record) => sanitizeSessionForPersistence(record, privateConsent));
-        const sanitizedRun = activeScenarioRun
-          ? sanitizeActiveScenarioRunForPersistence(activeScenarioRun, privateConsent)
-          : null;
-        const sanitizedPracticeSession = activePracticeSession
-          ? sanitizeActivePracticeSessionForPersistence(activePracticeSession, privateConsent)
-          : null;
-        setCustomScenarios([]);
-        setSessions(sanitizedSessions);
-        setActiveScenarioRun(sanitizedRun);
-        setActivePracticeSession(sanitizedPracticeSession);
-        await AsyncStorage.removeItem(KEYS.custom);
-        await AsyncStorage.setItem(KEYS.sessions, JSON.stringify(sanitizedSessions));
-        if (sanitizedRun) await AsyncStorage.setItem(KEYS.activeScenarioRun, JSON.stringify(sanitizedRun));
-        if (sanitizedPracticeSession) await AsyncStorage.setItem(KEYS.activePracticeSession, JSON.stringify(sanitizedPracticeSession));
+  // This runs within the same queue as content writes. Revocation cannot race a
+  // stale render's opt-in or restore private bytes after cleanup.
+  const commitConsent = useCallback(async (next: ConsentState) => {
+    if (!next.keepBaselineAudio) await deleteAllBaselineAudioStrict();
+    if (!next.saveCustomScenarioText) {
+      await AsyncStorage.forgetContinuationSnapshot();
+      await AsyncStorage.removeItem(KEYS.custom);
+      setCustomScenarios([]);
+      await commitStoreArray<SessionRecord>(AsyncStorage, KEYS.sessions,
+        (previous) => previous.map((record) => sanitizeSessionForPersistence(record, next)), setSessions);
+      const runRaw = await AsyncStorage.getItem(KEYS.activeScenarioRun);
+      if (runRaw) {
+        const run = normalizeScenarioPracticeRun(JSON.parse(runRaw));
+        const sanitized = run ? sanitizeActiveScenarioRunForPersistence(run, next) : null;
+        if (sanitized) await AsyncStorage.setItem(KEYS.activeScenarioRun, JSON.stringify(sanitized));
+        else await AsyncStorage.removeItem(KEYS.activeScenarioRun);
+        setActiveScenarioRun(sanitized);
       }
-      setConsent((prev) => {
-        const next = { ...prev, saveCustomScenarioText: enabled };
-        AsyncStorage.setItem(KEYS.consent, JSON.stringify(next)).catch((e) =>
-          safeLog("[store] consent save failed", errorShape(e)),
-        );
-        return next;
-      });
-    },
-    [activePracticeSession, activeScenarioRun, consent, sessions],
-  );
+      const practiceRaw = await AsyncStorage.getItem(KEYS.activePracticeSession);
+      if (practiceRaw) {
+        const practice = normalizePracticeSession(JSON.parse(practiceRaw));
+        const sanitized = practice ? sanitizeActivePracticeSessionForPersistence(practice, next) : null;
+        if (sanitized) await AsyncStorage.setItem(KEYS.activePracticeSession, JSON.stringify(sanitized));
+        else await AsyncStorage.removeItem(KEYS.activePracticeSession);
+        setActivePracticeSession(sanitized);
+      }
+    }
+    await AsyncStorage.setItem(KEYS.consent, JSON.stringify(next));
+    setConsent(next);
+  }, [setActivePracticeSession, setCustomScenarios]);
 
-  const dismissMigrationNotice = useCallback(async () => {
+  const writeConsent = useCallback((next: ConsentState) => serializeStoreOperation(AsyncStorage, () => commitConsent(next)), [commitConsent]);
+
+  const setKeepBaselineAudio = useCallback((enabled: boolean) => serializeStoreOperation(AsyncStorage, async () => {
+    const previous = normalizeConsent(await AsyncStorage.getItem(KEYS.consent));
+    await commitConsent({ ...previous, keepBaselineAudio: enabled });
+  }), [commitConsent]);
+
+  const setSaveCustomScenarioText = useCallback((enabled: boolean) => serializeStoreOperation(AsyncStorage, async () => {
+    const previous = normalizeConsent(await AsyncStorage.getItem(KEYS.consent));
+    await commitConsent({ ...previous, saveCustomScenarioText: enabled });
+  }), [commitConsent]);
+
+  const dismissMigrationNotice = useCallback(() => serializeStoreOperation(AsyncStorage, async () => {
+    const previous = normalizeConsent(await AsyncStorage.getItem(KEYS.consent));
+    const next = withMigrationNoticeSeen(previous, Date.now());
+    await AsyncStorage.setItem(KEYS.consent, JSON.stringify(next));
+    setConsent(next);
     setMigrationNotice(false);
-    setConsent((prev) => {
-      const next = withMigrationNoticeSeen(prev, Date.now());
-      AsyncStorage.setItem(KEYS.consent, JSON.stringify(next)).catch((e) =>
-        safeLog("[store] consent save failed", errorShape(e)),
-      );
-      return next;
-    });
-  }, []);
+  }), []);
 
   /** Marks that Entry routed this installation into the native acquisition journey. */
-  const beginNativeJourney = useCallback(async (): Promise<void> => {
+  const beginNativeJourney = useCallback((): Promise<void> => serializeStoreOperation(AsyncStorage, async () => {
+    await AsyncStorage.setItem(KEYS.nativeJourneyStarted, "1");
     setNativeJourneyStarted(true);
-    try {
-      await AsyncStorage.setItem(KEYS.nativeJourneyStarted, "1");
-    } catch (e) {
-      safeLog("[store] entry state save failed", errorShape(e));
-    }
-  }, []);
+  }), []);
 
-  const saveProfile = useCallback(async (next: Profile) => {
+  const saveProfile = useCallback((next: Profile) => serializeStoreOperation(AsyncStorage, async () => {
+    await AsyncStorage.setItem(KEYS.profile, JSON.stringify(persistableProfile(next)));
     setProfile(next);
-    try {
-      await AsyncStorage.setItem(KEYS.profile, JSON.stringify(persistableProfile(next)));
-    } catch (e) {
-      safeLog("[store] profile save failed", errorShape(e));
-    }
-  }, []);
+  }), []);
 
   /** Persist the single active onboarding-to-Day-1 handoff. */
-  const saveActivePracticeSession = useCallback(async (session: ActivePracticeSession | null): Promise<void> => {
-    const protectedSession = session && activePracticeSession
-      ? protectImmutablePracticeRecords(activePracticeSession, session)
-      : session;
-    const privacySafeSession = protectedSession ? sanitizeActivePracticeSessionForPersistence(protectedSession, consent) : null;
-    // Keep exact custom context only in memory for the current app run.
-    setActivePracticeSession(protectedSession);
-    try {
-      if (privacySafeSession) await AsyncStorage.setItem(KEYS.activePracticeSession, JSON.stringify(privacySafeSession));
-      else await AsyncStorage.removeItem(KEYS.activePracticeSession);
-    } catch (e) {
-      safeLog("[store] active practice session save failed", errorShape(e));
+  const commitActivePracticeSession = useCallback(async (session: ActivePracticeSession | null, approvedProducer = false): Promise<void> => {
+    const raw = await AsyncStorage.getItem(KEYS.activePracticeSession);
+    const current = raw ? normalizePracticeSession(JSON.parse(raw)) : null;
+    const protectedSession = session && current ? protectImmutablePracticeRecords(current, session) : session;
+    const currentConsent = normalizeConsent(await AsyncStorage.getItem(KEYS.consent));
+    const privacySafeSession = protectedSession ? sanitizeActivePracticeSessionForPersistence(protectedSession, currentConsent) : null;
+    if (approvedProducer && privacySafeSession?.sharedResult && privacySafeSession.attemptOne && privacySafeSession.freeRehearsalCompletedAt) {
+      const snapshot = JSON.stringify(privacySafeSession);
+      if (JSON.stringify(sanitizeActivePracticeSessionForPersistence(privacySafeSession, { ...normalizeConsent(null), saveCustomScenarioText: false })) === snapshot) {
+        await auth.stageCurrentGuestAssessment?.(AsyncStorage, privacySafeSession.id, snapshot);
+      }
     }
-  }, [activePracticeSession, consent]);
+    if (privacySafeSession) await AsyncStorage.setItem(KEYS.activePracticeSession, JSON.stringify(privacySafeSession));
+    else await AsyncStorage.removeItem(KEYS.activePracticeSession);
+    // Keep exact custom context only in memory for this app run, after commit.
+    setActivePracticeSession(protectedSession);
+    setIsLocalGuestContinuation(privacySafeSession ? await AsyncStorage.localContinuation() : false);
+  }, [setActivePracticeSession, auth.stageCurrentGuestAssessment, AsyncStorage]);
+  const saveActivePracticeSession = useCallback((session: ActivePracticeSession | null): Promise<void> =>
+    serializeStoreOperation(AsyncStorage, () => commitActivePracticeSession(session)), [commitActivePracticeSession]);
+
+  /** Only the actual new onboarding producer calls this; hydration never mints a manifest. */
+  const createCurrentOnboardingPractice = useCallback((session: ActivePracticeSession) => serializeStoreOperation(AsyncStorage, async () => {
+    const previous = await AsyncStorage.getItem(KEYS.activePracticeSession);
+    if ((previous && (JSON.parse(previous) as { id?: string }).id === session.id) || session.userId || session.sharedResult || session.attemptOne || session.freeRehearsalCompletedAt || session.freeRehearsalTurns?.length) throw new Error("New rehearsal required; saved records cannot create continuation provenance");
+    await commitActivePracticeSession(session);
+    await auth.beginCurrentGuestPractice(AsyncStorage, session.id);
+  }), [auth.beginCurrentGuestPractice, commitActivePracticeSession, AsyncStorage]);
+
+  /** Seal only the approved positive result, not a restored record or UI draft. */
+  const saveCurrentGuestAssessment = useCallback((session: ActivePracticeSession) => serializeStoreOperation(AsyncStorage, async () => {
+    await commitActivePracticeSession(session, true);
+    if (!session.sharedResult || !session.attemptOne || !session.freeRehearsalCompletedAt) return;
+    const raw = await AsyncStorage.getItem(KEYS.activePracticeSession);
+    if (!raw) return;
+    const persisted = JSON.parse(raw) as ActivePracticeSession;
+    // Do not carry an opt-in custom-context retention setting into another account.
+    if (JSON.stringify(sanitizeActivePracticeSessionForPersistence(persisted, { ...normalizeConsent(null), saveCustomScenarioText: false })) !== raw) return;
+    await auth.sealCurrentGuestPractice(AsyncStorage, session.id);
+  }), [auth.sealCurrentGuestPractice, commitActivePracticeSession, AsyncStorage]);
+
+  const attachCurrentGuestPractice = useCallback(() => serializeStoreOperation(AsyncStorage, async () => {
+    if (activePracticeSessionRef.current) throw new Error("Account already has a rehearsal");
+    const raw = await auth.attachCurrentGuestPractice(AsyncStorage);
+    if (!AsyncStorage.isActive()) throw new Error("Account changed");
+    const session = JSON.parse(raw) as ActivePracticeSession;
+    setActivePracticeSession(session);
+    setIsLocalGuestContinuation(true);
+    return session.id;
+  }), [auth.attachCurrentGuestPractice, AsyncStorage, setActivePracticeSession]);
 
   /** Creates a run only when the durable active slot is empty. */
-  const createActiveScenarioRunStrict = useCallback(async (value: PersistedScenarioPracticeRun): Promise<void> => {
-    const normalized = await replaceActiveScenarioRunCAS(AsyncStorage, sanitizeActiveScenarioRunForPersistence(value, consent), null);
-    setActiveScenarioRun(consent.saveCustomScenarioText ? normalized : (normalizeScenarioPracticeRun(value) ?? normalized));
-  }, [consent]);
+  const createActiveScenarioRunStrict = useCallback((value: PersistedScenarioPracticeRun): Promise<void> => serializeStoreOperation(AsyncStorage, async () => {
+    const currentConsent = normalizeConsent(await AsyncStorage.getItem(KEYS.consent));
+    const normalized = await replaceActiveScenarioRunCAS(AsyncStorage, sanitizeActiveScenarioRunForPersistence(value, currentConsent), null);
+    setActiveScenarioRun(currentConsent.saveCustomScenarioText ? normalized : (normalizeScenarioPracticeRun(value) ?? normalized));
+  }), []);
 
   /** Compare-and-swap writes a valid active run against the latest durable revision. */
-  const replaceActiveScenarioRunStrict = useCallback(async (value: PersistedScenarioPracticeRun, expected: ActiveRunRevision | null): Promise<void> => {
-    const normalized = await replaceActiveScenarioRunCAS(AsyncStorage, sanitizeActiveScenarioRunForPersistence(value, consent), expected);
-    setActiveScenarioRun(consent.saveCustomScenarioText ? normalized : (normalizeScenarioPracticeRun(value) ?? normalized));
-  }, [consent]);
+  const replaceActiveScenarioRunStrict = useCallback((value: PersistedScenarioPracticeRun, expected: ActiveRunRevision | null): Promise<void> => serializeStoreOperation(AsyncStorage, async () => {
+    const currentConsent = normalizeConsent(await AsyncStorage.getItem(KEYS.consent));
+    const normalized = await replaceActiveScenarioRunCAS(AsyncStorage, sanitizeActiveScenarioRunForPersistence(value, currentConsent), expected);
+    setActiveScenarioRun(currentConsent.saveCustomScenarioText ? normalized : (normalizeScenarioPracticeRun(value) ?? normalized));
+  }), []);
 
   /** Strictly deletes retained run audio, then CAS-clears only the expected durable run. */
-  const clearActiveScenarioRunStrict = useCallback(async (expected: ActiveRunRevision, afterPrivateCleanup?: () => Promise<void>): Promise<void> => {
+  const commitClearActiveScenarioRun = useCallback(async (expected: ActiveRunRevision, afterPrivateCleanup?: () => Promise<void>): Promise<void> => {
     await clearActiveScenarioRunCAS(AsyncStorage, expected, async (current) => {
       await deleteBaselineAudioStrict(current.run.id);
     }, afterPrivateCleanup ? async () => afterPrivateCleanup() : undefined);
     setActiveScenarioRun(null);
   }, []);
+  const clearActiveScenarioRunStrict = useCallback((expected: ActiveRunRevision, afterPrivateCleanup?: () => Promise<void>): Promise<void> =>
+    serializeStoreOperation(AsyncStorage, () => commitClearActiveScenarioRun(expected, afterPrivateCleanup)), [commitClearActiveScenarioRun]);
 
   /** CAS-archives a mismatched/cross-practice run before opening the active slot. */
-  const archiveActiveScenarioRunStrict = useCallback(async (expected: ActiveRunRevision): Promise<void> => {
+  const archiveActiveScenarioRunStrict = useCallback((expected: ActiveRunRevision): Promise<void> => serializeStoreOperation(AsyncStorage, async () => {
     await archiveActiveScenarioRunCAS(AsyncStorage, expected);
     setActiveScenarioRun(null);
-  }, []);
+  }), []);
 
-  const writePendingConvertedLessonCompletion = useCallback(async (record: ConvertedLessonProgress, expected: ActiveRunRevision): Promise<void> => {
+  const writePendingConvertedLessonCompletion = useCallback((record: ConvertedLessonProgress, expected: ActiveRunRevision): Promise<void> => serializeStoreOperation(AsyncStorage, async () => {
     await writePendingConvertedCompletion(AsyncStorage, record, expected);
-  }, []);
+  }), []);
 
+  // Invoked inside clearActiveScenarioRunStrict’s queued cleanup callback.
   const markPendingConvertedLessonPrivateContentDeleted = useCallback(async (expectedRunId: string): Promise<void> => {
     await markPendingPrivateContentDeleted(AsyncStorage, expectedRunId);
   }, []);
 
-  const promotePendingConvertedLessonCompletion = useCallback(async (expectedRunId: string): Promise<void> => {
+  const promotePendingConvertedLessonCompletion = useCallback((expectedRunId: string): Promise<void> => serializeStoreOperation(AsyncStorage, async () => {
     const next = await promotePendingConvertedCompletion(AsyncStorage, expectedRunId);
     setConvertedLessonProgress(next);
-  }, []);
+  }), []);
 
-  const saveModuleCloseCompletion = useCallback(async (record: ModuleCloseProgress): Promise<void> => {
+  const saveModuleCloseCompletion = useCallback((record: ModuleCloseProgress): Promise<void> => serializeStoreOperation(AsyncStorage, async () => {
     const current = await AsyncStorage.getItem(KEYS.moduleCloseProgress);
     const next = mergeModuleCloseProgress(current ? JSON.parse(current) as unknown : [], record);
     await AsyncStorage.setItem(KEYS.moduleCloseProgress, JSON.stringify(next));
     setModuleCloseProgress(next);
-  }, []);
+  }), []);
 
   /** Clears one lesson's completion and any exact active rehearsal; deleted private content is never restored by Undo. */
-  const resetConvertedLesson = useCallback(async (identity: {
+  const resetConvertedLesson = useCallback((identity: {
     lessonId: ConvertedLessonProgress["lessonId"];
     moduleId: string;
     practiceId: string;
-  }): Promise<ConvertedLessonProgress[]> => {
-    const active = activeScenarioRun;
+  }): Promise<ConvertedLessonProgress[]> => serializeStoreOperation(AsyncStorage, async () => {
+    const active = await readActiveScenarioRunStrict(AsyncStorage);
     if (active?.run.convertedModuleId === identity.moduleId && active.run.practiceId === identity.practiceId) {
       const expected = activeRunRevision(active);
       if (!expected) throw new Error("Active rehearsal identity is unavailable");
-      await clearActiveScenarioRunStrict(expected);
+      // Already inside the deletion barrier; do not enqueue its public wrapper.
+      await commitClearActiveScenarioRun(expected);
     }
     const result = await resetConvertedLessonProgress(AsyncStorage, identity.lessonId);
     setConvertedLessonProgress(result.next);
     return result.removed;
-  }, [activeScenarioRun, clearActiveScenarioRunStrict]);
+  }), [commitClearActiveScenarioRun]);
 
   /** Restores only the minimized completion facts captured by a recent lesson reset. */
-  const undoConvertedLessonReset = useCallback(async (
+  const undoConvertedLessonReset = useCallback((
     lessonId: ConvertedLessonProgress["lessonId"],
     snapshot: readonly ConvertedLessonProgress[],
-  ): Promise<void> => {
+  ): Promise<void> => serializeStoreOperation(AsyncStorage, async () => {
     const next = await restoreConvertedLessonProgress(AsyncStorage, lessonId, snapshot);
     setConvertedLessonProgress(next);
-  }, []);
+  }), []);
 
   /** Attach the active anonymous session when an account identity becomes available. */
-  const associateActivePracticeSessionWithUser = useCallback(async (userId: string): Promise<void> => {
-    if (!activePracticeSession) return;
-    await saveActivePracticeSession(associatePracticeSessionUser(activePracticeSession, userId));
-  }, [activePracticeSession, saveActivePracticeSession]);
+  const associateActivePracticeSessionWithUser = useCallback((userId: string): Promise<void> => serializeStoreOperation(AsyncStorage, async () => {
+    const raw = await AsyncStorage.getItem(KEYS.activePracticeSession);
+    const current = raw ? normalizePracticeSession(JSON.parse(raw)) : null;
+    if (!current) return;
+    // Validate ownership against disk, not the old render or ephemeral copy.
+    const associated = associatePracticeSessionUser(current, userId);
+    const memory = activePracticeSessionRef.current;
+    await commitActivePracticeSession(memory?.id === current.id ? { ...memory, userId: associated.userId } : associated);
+  }), [commitActivePracticeSession]);
 
   /** Persist a minimized session record. Content never reaches this function. */
-  const upsertSession = useCallback(async (record: SessionRecord) => {
-    const persistableRecord = sanitizeSessionForPersistence(record, consent);
-    let snapshot: SessionRecord[] = [];
-    setSessions((prev) => {
-      const idx = prev.findIndex((s) => s.id === persistableRecord.id);
-      const next =
-        idx === -1 ? [persistableRecord, ...prev] : prev.map((s) => (s.id === persistableRecord.id ? persistableRecord : s));
-      snapshot = capRecords(next);
-      return snapshot;
-    });
-    try {
-      await AsyncStorage.setItem(KEYS.sessions, JSON.stringify(snapshot));
-    } catch (e) {
-      safeLog("[store] session save failed", errorShape(e));
-    }
-  }, [consent]);
+  const upsertSession = useCallback((record: SessionRecord) => serializeStoreOperation(AsyncStorage, async () => {
+    const currentConsent = normalizeConsent(await AsyncStorage.getItem(KEYS.consent));
+    const persistableRecord = sanitizeSessionForPersistence(record, currentConsent);
+    await commitStoreArray<SessionRecord>(AsyncStorage, KEYS.sessions, (prev) => {
+      const next = prev.some((s) => s.id === record.id)
+        ? prev.map((s) => s.id === record.id ? persistableRecord : s)
+        : [persistableRecord, ...prev];
+      return capRecords(next);
+    }, setSessions);
+  }), []);
 
-  /** Delete one saved session, along with any recording kept for it. */
-  const deleteSession = useCallback(async (id: string) => {
+  /** Delete audio before history; a failed durable delete must reject. */
+  const deleteSession = useCallback((id: string) => serializeStoreOperation(AsyncStorage, async () => {
     await deleteBaselineAudioStrict(id);
-    let snapshot: SessionRecord[] = [];
-    setSessions((prev) => {
-      snapshot = prev.filter((s) => s.id !== id);
-      return snapshot;
-    });
     clearLiveSessionContent(id);
-    try {
-      await AsyncStorage.setItem(KEYS.sessions, JSON.stringify(snapshot));
-    } catch (e) {
-      safeLog("[store] session delete failed", errorShape(e));
-    }
-  }, []);
+    const prev = await readStoreArray<SessionRecord>(AsyncStorage, KEYS.sessions);
+    const next = prev.filter((s) => s.id !== id);
+    await AsyncStorage.setItem(KEYS.sessions, JSON.stringify(next));
+    setSessions(next);
+  }), []);
 
-  /** Delete all practice history. Streaks derived from drills/days survive. */
-  const deleteAllSessions = useCallback(async () => {
+  const deleteAllSessions = useCallback(() => serializeStoreOperation(AsyncStorage, async () => {
     await deleteAllBaselineAudioStrict();
-    setSessions([]);
     clearLiveSessionContent();
-    try {
-      await AsyncStorage.removeItem(KEYS.sessions);
-    } catch (e) {
-      safeLog("[store] history delete failed", errorShape(e));
-    }
-  }, []);
+    await AsyncStorage.removeItem(KEYS.sessions);
+    setSessions([]);
+  }), []);
 
-  const addCustomScenario = useCallback(
-    async (scenario: Scenario) => {
-      let snapshot: Scenario[] = [];
-      setCustomScenarios((prev) => {
-        snapshot = [scenario, ...prev].slice(0, 40);
-        return snapshot;
-      });
-      // Exact scenario text is only written to disk when explicitly opted in.
-      if (!consent.saveCustomScenarioText) return;
-      try {
-        await AsyncStorage.setItem(KEYS.custom, JSON.stringify(snapshot));
-      } catch (e) {
-        safeLog("[store] custom save failed", errorShape(e));
-      }
-    },
-    [consent.saveCustomScenarioText],
-  );
+  const addCustomScenario = useCallback((scenario: Scenario) => serializeStoreOperation(AsyncStorage, async () => {
+    const currentConsent = normalizeConsent(await AsyncStorage.getItem(KEYS.consent));
+    const durable = currentConsent.saveCustomScenarioText ? await readStoreArray<Scenario>(AsyncStorage, KEYS.custom) : [];
+    const previous = [...customScenariosRef.current, ...durable.filter((item) => !customScenariosRef.current.some((memory) => memory.id === item.id))];
+    const next = [scenario, ...previous].slice(0, 40);
+    if (currentConsent.saveCustomScenarioText) await AsyncStorage.setItem(KEYS.custom, JSON.stringify(next));
+    setCustomScenarios(next);
+  }), [setCustomScenarios]);
 
-  const deleteCustomScenario = useCallback(
-    async (id: string) => {
-      let snapshot: Scenario[] = [];
-      setCustomScenarios((prev) => {
-        snapshot = prev.filter((s) => s.id !== id);
-        return snapshot;
-      });
-      if (!consent.saveCustomScenarioText) return;
-      try {
-        await AsyncStorage.setItem(KEYS.custom, JSON.stringify(snapshot));
-      } catch (e) {
-        safeLog("[store] custom delete failed", errorShape(e));
-      }
-    },
-    [consent.saveCustomScenarioText],
-  );
+  const deleteCustomScenario = useCallback((id: string) => serializeStoreOperation(AsyncStorage, async () => {
+    const currentConsent = normalizeConsent(await AsyncStorage.getItem(KEYS.consent));
+    const durable = currentConsent.saveCustomScenarioText ? await readStoreArray<Scenario>(AsyncStorage, KEYS.custom) : [];
+    const previous = [...customScenariosRef.current, ...durable.filter((item) => !customScenariosRef.current.some((memory) => memory.id === item.id))];
+    const next = previous.filter((item) => item.id !== id);
+    if (currentConsent.saveCustomScenarioText) await AsyncStorage.setItem(KEYS.custom, JSON.stringify(next));
+    setCustomScenarios(next);
+  }), [setCustomScenarios]);
 
-  const deleteAllCustomScenarios = useCallback(async () => {
+  const deleteAllCustomScenarios = useCallback(() => serializeStoreOperation(AsyncStorage, async () => {
+    await AsyncStorage.removeItem(KEYS.custom);
     setCustomScenarios([]);
-    try {
-      await AsyncStorage.removeItem(KEYS.custom);
-    } catch (e) {
-      safeLog("[store] custom delete failed", errorShape(e));
-    }
-  }, []);
+  }), [setCustomScenarios]);
 
-  const logDrill = useCallback(async (result: DrillResult) => {
-    let snapshot: DrillResult[] = [];
-    setDrillLog((prev) => {
-      snapshot = [result, ...prev].slice(0, 90);
-      return snapshot;
-    });
-    try {
-      await AsyncStorage.setItem(KEYS.drills, JSON.stringify(snapshot));
-    } catch (e) {
-      safeLog("[store] drill save failed", errorShape(e));
-    }
-  }, []);
+  const logDrill = useCallback((result: DrillResult) => serializeStoreOperation(AsyncStorage, () =>
+    commitStoreArray<DrillResult>(AsyncStorage, KEYS.drills, (prev) => [result, ...prev].slice(0, 90), setDrillLog),
+  ), []);
 
   /** Mark a challenge day complete (idempotent) and persist the log. */
   const markChallengeDayDone = useCallback(async (day: number) => {
     if (!Number.isInteger(day) || day < 1 || day > CHALLENGE_TOTAL_DAYS) return;
-    let snapshot: ChallengeLogEntry[] = [];
-    let changed = false;
-    setChallengeLog((prev) => {
-      if (prev.some((e) => e.day === day)) {
-        snapshot = prev;
-        return prev;
-      }
-      changed = true;
-      snapshot = [...prev, { day, date: dayKey(Date.now()), completedAt: Date.now() }];
-      return snapshot;
-    });
-    if (!changed) return;
-    try {
-      await AsyncStorage.setItem(KEYS.challenge, JSON.stringify(snapshot));
-    } catch (e) {
-      safeLog("[store] challenge save failed", errorShape(e));
-    }
-    // They just finished a rep — the friendliest moment to ask for permission
-    // so tomorrow's 6 PM nudge can be delivered.
-    requestReminderPermission().catch(() => {});
+    await serializeStoreOperation(AsyncStorage, () => commitStoreArray<ChallengeLogEntry>(AsyncStorage, KEYS.challenge,
+      (prev) => prev.some((entry) => entry.day === day) ? prev : [...prev, { day, date: dayKey(Date.now()), completedAt: Date.now() }],
+      setChallengeLog));
   }, []);
 
   /** Persists one immutable scored result; duplicate rehearsal IDs are idempotent. */
   const saveScoredPracticeRecord = useCallback(async (record: ScoredPracticeRecord | null): Promise<void> => {
     if (!record) return;
-    let snapshot: ScoredPracticeRecord[] = [];
-    let changed = false;
-    setScoredPracticeHistory((previous) => {
-      snapshot = appendScoredPracticeRecord(previous, record);
-      changed = snapshot.length !== previous.length;
-      return snapshot;
-    });
-    if (!changed) return;
-    try {
-      await AsyncStorage.setItem(KEYS.scoredPracticeHistory, JSON.stringify(snapshot));
-    } catch (e) {
-      safeLog("[store] scored practice save failed", errorShape(e));
-    }
+    await serializeStoreOperation(AsyncStorage, () => commitStoreArray<ScoredPracticeRecord>(AsyncStorage, KEYS.scoredPracticeHistory,
+      (previous) => previous.some((item) => item.id === record.id) ? previous : appendScoredPracticeRecord(previous, record), setScoredPracticeHistory));
   }, []);
 
   /** Wipe and verify app data, auth identities, refresh tokens, and audio caches. */
-  const reset = useCallback(async () => {
+  const reset = useCallback(() => serializeStoreOperation(AsyncStorage, async () => {
     const nextAnonymousId = await resetAllDataStrict({
       storage: AsyncStorage,
       appKeys: [KEYS.activePracticeSession, ...Object.values(KEYS)],
       anonymousKey: KEYS.anonymousUserId,
       newAnonymousId: newAnonymousUserId,
-      signOutSupabase: async () => {
-        if (!supabase) return;
-        const { error } = await supabase.auth.signOut({ scope: "local" });
-        if (error) throw error;
-      },
+      // Delete and verify this owner namespace before logout revokes its lease.
+      signOutSupabase: async () => {},
       logOutPurchases: clearPurchasesIdentity,
       deletePrivateAudio: deleteAllBaselineAudioStrict,
       deleteGeneratedVoiceCache: deleteGeneratedVoiceCacheStrict,
@@ -671,7 +636,9 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     clearLiveSessionContent();
     queryClient.clear();
     await Promise.allSettled([cancelDailyReminder(), cancelChallengeNudge()]);
-  }, [queryClient]);
+    const signedOut = await logout();
+    if (!signedOut.success) throw new Error(signedOut.message ?? "Sign out not confirmed");
+  }), [logout, queryClient, setCustomScenarios, setActivePracticeSession]);
 
   const findScenario = useCallback(
     (id: string): Scenario | undefined => {
@@ -707,18 +674,12 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     [pilotDoneDays],
   );
 
-  const markPilotDayDone = useCallback(async (module: PilotModule, moduleId?: ModuleId): Promise<void> => {
-    let snapshot: PilotProgressEntry[] = [];
-    let changed = false;
-    setPilotProgress((previous) => {
+  const markPilotDayDone = useCallback((module: PilotModule, moduleId?: ModuleId): Promise<void> => serializeStoreOperation(AsyncStorage, () =>
+    commitStoreArray<PilotProgressEntry>(AsyncStorage, KEYS.pilotProgress, (previous) => {
       const stableModuleId = module.module_id ?? moduleId;
-      if (previous.some((entry) => module.practice_id ? entry.practiceId === module.practice_id : stableModuleId ? entry.moduleId === stableModuleId && !entry.practiceId : entry.day === module.day)) {
-        snapshot = previous;
-        return previous;
-      }
-      changed = true;
+      if (previous.some((entry) => module.practice_id ? entry.practiceId === module.practice_id : stableModuleId ? entry.moduleId === stableModuleId && !entry.practiceId : entry.day === module.day)) return previous;
       const completedAt = Date.now();
-      snapshot = [...previous, {
+      return [...previous, {
         curriculumVersion: module.practice_id ? REVIEW_CURRICULUM_VERSION : PILOT_PROGRAM.curriculum_version,
         ...(stableModuleId ? { moduleId: stableModuleId } : {}),
         ...(module.practice_id ? { practiceId: module.practice_id, contentVersion: module.content_version, legacyClassification: "practice_completion" as const } : {}),
@@ -727,15 +688,7 @@ export const [StoreProvider, useStore] = createContextHook(() => {
         date: dayKey(completedAt),
         completedAt,
       }];
-      return snapshot;
-    });
-    if (!changed) return;
-    try {
-      await AsyncStorage.setItem(KEYS.pilotProgress, JSON.stringify(snapshot));
-    } catch (e) {
-      safeLog("[store] pilot progress save failed", errorShape(e));
-    }
-  }, []);
+    }, setPilotProgress)), []);
 
   const completedPracticeIds = useMemo(() => completedReviewPracticeIds(pilotProgress), [pilotProgress]);
 
@@ -790,27 +743,17 @@ export const [StoreProvider, useStore] = createContextHook(() => {
    * Spend one freeze on yesterday, reconnecting the streak. Returns success.
    * Deliberately not named `use*`: it is an action, not a React hook.
    */
-  const spendStreakFreeze = useCallback(async (): Promise<boolean> => {
-    const oneDay = 86400000;
-    const yesterday = dayKey(Date.now() - oneDay);
-    let snapshot: FreezeState | null = null;
-    setFreeze((prev) => {
-      if (prev.available <= 0 || prev.usedDates.includes(yesterday)) return prev;
-      snapshot = {
-        ...prev,
-        available: prev.available - 1,
-        usedDates: [...prev.usedDates, yesterday].slice(-60),
-      };
-      return snapshot;
-    });
-    if (!snapshot) return false;
-    try {
-      await AsyncStorage.setItem(KEYS.freeze, JSON.stringify(snapshot));
-    } catch (e) {
-      safeLog("[store] freeze save failed", errorShape(e));
-    }
+  const spendStreakFreeze = useCallback((): Promise<boolean> => serializeStoreOperation(AsyncStorage, async () => {
+    const yesterday = dayKey(Date.now() - 86400000);
+    const raw = await AsyncStorage.getItem(KEYS.freeze);
+    const previous = raw ? normalizeStoredFreeze(JSON.parse(raw)) : DEFAULT_FREEZE;
+    if (!previous) throw new Error("Invalid stored freeze state");
+    if (previous.available <= 0 || previous.usedDates.includes(yesterday)) return false;
+    const next = { ...previous, available: previous.available - 1, usedDates: [...previous.usedDates, yesterday].slice(-60) };
+    await AsyncStorage.setItem(KEYS.freeze, JSON.stringify(next));
+    setFreeze(next);
     return true;
-  }, []);
+  }), []);
 
   // Earn a new freeze (max 2 banked) each time the streak crosses a fresh
   // multiple of 7 — consistency refills the safety net.
@@ -818,21 +761,15 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     if (!hydrated) return;
     const milestone = Math.floor(activityStreak / 7) * 7;
     if (milestone <= 0 || milestone <= freeze.lastMilestone) return;
-    let snapshot: FreezeState | null = null;
-    setFreeze((prev) => {
-      if (milestone <= prev.lastMilestone) return prev;
-      snapshot = {
-        ...prev,
-        available: Math.min(MAX_FREEZES, prev.available + 1),
-        lastMilestone: milestone,
-      };
-      return snapshot;
-    });
-    if (snapshot) {
-      AsyncStorage.setItem(KEYS.freeze, JSON.stringify(snapshot)).catch((e) =>
-        safeLog("[store] freeze grant save failed", errorShape(e)),
-      );
-    }
+    serializeStoreOperation(AsyncStorage, async () => {
+      const raw = await AsyncStorage.getItem(KEYS.freeze);
+      const previous = raw ? normalizeStoredFreeze(JSON.parse(raw)) : DEFAULT_FREEZE;
+      if (!previous) throw new Error("Invalid stored freeze state");
+      if (milestone <= previous.lastMilestone) return;
+      const next = { ...previous, available: Math.min(MAX_FREEZES, previous.available + 1), lastMilestone: milestone };
+      await AsyncStorage.setItem(KEYS.freeze, JSON.stringify(next));
+      setFreeze(next);
+    }).catch((error) => safeLog("[store] freeze grant save failed", errorShape(error)));
   }, [hydrated, activityStreak, freeze.lastMilestone]);
 
   const challengeDoneDays = useMemo(
@@ -940,6 +877,10 @@ export const [StoreProvider, useStore] = createContextHook(() => {
     completedPracticeIds,
     anonymousUserId,
     activePracticeSession,
+    isLocalGuestContinuation,
+    createCurrentOnboardingPractice,
+    saveCurrentGuestAssessment,
+    attachCurrentGuestPractice,
     activeScenarioRun,
     convertedLessonProgress,
     moduleCloseProgress,

@@ -229,6 +229,9 @@ describe("onboarding practice-session continuity", () => {
   });
 
   test("anonymous-to-authenticated association is idempotent", () => {
+    const owned = associatePracticeSessionUser(activeSession(), "account-a", 250);
+    expect(() => associatePracticeSessionUser(owned, "account-b", 300)).toThrow("another account");
+    expect(owned.userId).toBe("account-a");
     const migrated = associatePracticeSessionUser(activeSession(), "user-42", 300);
     const repeated = associatePracticeSessionUser(migrated, "user-42", 900);
     expect(migrated.anonymousUserId).toBe("anon-stable");

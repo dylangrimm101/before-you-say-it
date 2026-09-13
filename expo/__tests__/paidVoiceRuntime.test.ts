@@ -1,0 +1,2 @@
+import {test,expect} from 'bun:test';import {spawnSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
+for(const scenario of ['success','logout','missing','wrong-mode'])test('actual speech/transcription runtime adapter: '+scenario,()=>{const r=spawnSync(process.execPath,[fileURLToPath(new URL('./paidVoiceRuntime.fixture.ts',import.meta.url)),scenario],{cwd:fileURLToPath(new URL('..',import.meta.url)),encoding:'utf8',timeout:5000});expect({status:r.status,stderr:r.stderr}).toEqual({status:0,stderr:''});});

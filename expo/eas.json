@@ -1,0 +1,81 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local",
+    "requireCommit": true
+  },
+  "build": {
+    "staging-account-development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "development",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Debug"
+      },
+      "env": {
+        "EXPO_NO_DOTENV": "1",
+        "EXPO_PUBLIC_BYSI_BUILD_MODE": "staging-account",
+        "EXPO_PUBLIC_STAGING_SUPABASE_URL": "https://pqqxaklcburdxjfeolmd.supabase.co",
+        "EXPO_PUBLIC_STAGING_PAID_GENERATE_ENDPOINT": "https://bysi-signup-staging.vercel.app/api/practice/generate"
+      }
+    },
+    "staging-account-testflight": {
+      "developmentClient": false,
+      "distribution": "store",
+      "environment": "production",
+      "channel": "staging-account-testflight",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_NO_DOTENV": "1",
+        "EXPO_PUBLIC_BYSI_BUILD_MODE": "staging-account",
+        "EXPO_PUBLIC_BYSI_STAGING_ACCOUNT_RELEASE": "1",
+        "EXPO_PUBLIC_STAGING_SUPABASE_URL": "https://pqqxaklcburdxjfeolmd.supabase.co"
+      }
+    },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "development",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "channel": "preview",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "testflight": {
+      "extends": "production",
+      "developmentClient": false,
+      "distribution": "store",
+      "environment": "production",
+      "channel": "testflight",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_NO_DOTENV": "1",
+        "EXPO_PUBLIC_NATIVE_BILLING_ORIGIN": "https://beforeyousayit.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://spvksnddzyvycfoefrcf.supabase.co"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "environment": "production",
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

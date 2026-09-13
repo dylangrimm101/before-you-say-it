@@ -9,6 +9,8 @@ import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { Backdrop, PrimaryButton } from "@/components/ui";
 import { canAccessLaunchDeck, isLaunchLessonId, nextLaunchDeck } from "@/lib/launchCurriculum";
 import { useIsPro } from "@/lib/purchases";
+import { useStagingPracticeAdmission } from "@/lib/useStagingPracticeAdmission";
+import { StagingPracticeGate } from "@/components/StagingPracticeGate";
 import { C, GUTTER, T } from "@/constants/theme";
 import { approvedRehearsalConfig, approvedRehearsalRuntimeEnabled, hasCanonicalApprovedRehearsalPressureSequence } from "@/lib/approvedRehearsals";
 import { conversionRuntimeEnabled, isAcceptedM1L1ResumeRun, M1_L1_CONVERSION } from "@/lib/convertedLesson";
@@ -28,7 +30,8 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
     replaceActiveScenarioRunStrict,
   } = useStore();
   const isPro = useIsPro();
-  const isEntitled = isPro || (__DEV__ && devProEnabled);
+  const admission = useStagingPracticeAdmission();
+  const isEntitled = normalBillingEnabled ? isPro : isPro || (__DEV__ && devProEnabled) || admission.allowed;
   const launchLessonId = isLaunchLessonId(params.lessonId) ? params.lessonId : null;
   const lesson = approvedLessonDeck(launchLessonId);
   const hasLaunchAccess = Boolean(launchLessonId && canAccessLaunchDeck(launchLessonId, isEntitled, convertedLessonProgress, moduleCloseProgress));
@@ -128,6 +131,7 @@ export default function ApprovedRehearsalRoute(): React.JSX.Element {
   const runtimeKey = useMemo(() => activeScenarioRun?.run.id ?? "new-run", [activeScenarioRun?.run.id]);
 
   if (!runtimeAvailable) return <Unavailable title="This rehearsal is unavailable." body="Return to your path and choose an approved lesson." onPress={() => router.replace("/path")} />;
+  if (admission.enabled && !isEntitled) return <StagingPracticeGate admission={admission} />;
   if (!hasLaunchAccess) return <Unavailable
     title={isEntitled ? "Finish the current lesson first." : "A subscription is required for this rehearsal."}
     body={isEntitled ? "Your next available lesson stays in order on your path." : "Start or restore your subscription before opening a paid rehearsal."}
@@ -162,3 +166,4 @@ function Unavailable({ title, body, onPress }: { title: string; body: string; on
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, loading: { alignItems: "center", justifyContent: "center" }, unavailable: { alignItems: "center", justifyContent: "center", paddingHorizontal: GUTTER }, unavailableAction: { width: "100%", marginTop: 24 }, title: { ...T.title }, body: { ...T.support },
 });
+import {normalBillingEnabled} from '@/lib/nativeBillingRuntime';

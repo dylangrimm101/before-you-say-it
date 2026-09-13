@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { withRequestDeadline } from "@/lib/requestDeadline";
 
 import { safeLog } from "@/lib/redact";
 import { supabase } from "@/lib/supabase";
@@ -50,71 +51,76 @@ export async function transcribeRecording(
   uri: string,
   mediaType: string,
   turn: TranscriptionTurn,
+  options: { signal?: AbortSignal; timeoutMs?: number; paidPractice?: boolean } = {},
 ): Promise<string> {
-  if (!TRANSCRIBE_ENDPOINT) throw new TranscriptionUnavailableError(503);
+  const stagedPaid = options.paidPractice === true; // Paid callers fail closed outside the reviewed staging runtime.
+  const normalFree = !stagedPaid && process.env.EXPO_PUBLIC_BYSI_BUILD_MODE !== 'staging-account' && !!process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN;
+  if (!stagedPaid && !normalFree && !TRANSCRIBE_ENDPOINT) throw new TranscriptionUnavailableError(503);
 
-  const body = new FormData();
-  body.append("turn", turn);
-
-  if (Platform.OS === "web") {
-    const audioResponse = await fetch(uri);
-    if (!audioResponse.ok) throw new Error("Recorded audio could not be read");
-    const audioBlob = await audioResponse.blob();
-    body.append("audio", audioBlob, fileNameFor(mediaType || audioBlob.type));
-  } else {
-    const nativeAudio = {
-      uri,
-      name: fileNameFor(mediaType),
-      type: mediaType,
-    };
-    body.append("audio", nativeAudio as unknown as Blob);
-  }
-
-  safeLog("[evidence] native transcription request", {
-    endpoint: evidenceEndpoint(TRANSCRIBE_ENDPOINT),
-    platform: Platform.OS,
-    provider: "supabase-openai-transcription",
-    turn,
-  });
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TRANSCRIPTION_TIMEOUT_MS);
-  let response: Response;
   try {
-    const headers = await requestHeaders();
-    response = await fetch(TRANSCRIBE_ENDPOINT, {
-      method: "POST",
-      headers,
-      body,
-      signal: controller.signal,
-    });
-  } catch (error: unknown) {
-    if (controller.signal.aborted) throw new TranscriptionUnavailableError(408);
+    return await withRequestDeadline(async (signal) => {
+      const body = new FormData();
+      body.append("turn", turn);
+
+      if (Platform.OS === "web") {
+        const audioResponse = await fetch(uri, { signal });
+        if (!audioResponse.ok) throw new Error("Recorded audio could not be read");
+        const audioBlob = await audioResponse.blob();
+        body.append("audio", audioBlob, fileNameFor(mediaType || audioBlob.type));
+      } else {
+        const nativeAudio = {
+          uri,
+          name: fileNameFor(mediaType),
+          type: mediaType,
+        };
+        body.append("audio", nativeAudio as unknown as Blob);
+      }
+
+      safeLog("[evidence] native transcription request", {
+        endpoint: evidenceEndpoint(TRANSCRIBE_ENDPOINT),
+        platform: Platform.OS,
+        provider: "supabase-openai-transcription",
+        turn,
+      });
+      const headers = stagedPaid || normalFree ? {} : await requestHeaders();
+      if (signal.aborted) throw new Error("Request aborted");
+      const response = stagedPaid
+        ? await (await import("./paidVoiceRuntime")).requestPaidVoice("transcribe", body, signal)
+        : normalFree ? await (await import('./normalFreeRuntime')).requestNormalFree('transcribe', body, signal, {turn,identity:uri})
+        : await fetch(TRANSCRIBE_ENDPOINT, {
+        method: "POST",
+        headers,
+        body,
+        signal,
+      });
+      safeLog("[evidence] native transcription response", {
+        endpoint: evidenceEndpoint(TRANSCRIBE_ENDPOINT),
+        ok: response.ok,
+        platform: Platform.OS,
+        status: response.status,
+        turn,
+      });
+
+      if (!response.ok) {
+        if (response.status === 402 || response.status === 429 || response.status >= 500) {
+          throw new TranscriptionUnavailableError(response.status);
+        }
+        throw new Error(`Transcription failed (${response.status})`);
+      }
+
+      const result = await response.json() as { text?: unknown };
+      if (signal.aborted) throw new Error("Request aborted");
+      const text = typeof result.text === "string" ? result.text.trim() : "";
+      if (!text) throw new Error("Empty transcription");
+      safeLog("[evidence] native transcription completed", {
+        length: text.length,
+        platform: Platform.OS,
+        turn,
+      });
+      return text;
+    }, options.timeoutMs ?? TRANSCRIPTION_TIMEOUT_MS, options.signal);
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") throw new TranscriptionUnavailableError(408);
     throw error;
-  } finally {
-    clearTimeout(timeout);
   }
-  safeLog("[evidence] native transcription response", {
-    endpoint: evidenceEndpoint(TRANSCRIBE_ENDPOINT),
-    ok: response.ok,
-    platform: Platform.OS,
-    status: response.status,
-    turn,
-  });
-
-  if (!response.ok) {
-    if (response.status === 402 || response.status === 429 || response.status >= 500) {
-      throw new TranscriptionUnavailableError(response.status);
-    }
-    throw new Error(`Transcription failed (${response.status})`);
-  }
-
-  const result = await response.json() as { text?: unknown };
-  const text = typeof result.text === "string" ? result.text.trim() : "";
-  if (!text) throw new Error("Empty transcription");
-  safeLog("[evidence] native transcription completed", {
-    length: text.length,
-    platform: Platform.OS,
-    turn,
-  });
-  return text;
 }

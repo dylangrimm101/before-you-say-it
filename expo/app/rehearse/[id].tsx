@@ -56,9 +56,11 @@ import {
 import { expectedReactionLabel } from "@/constants/onboardingScenarios";
 import { C, GUTTER, eyebrow, font, radius, T } from "@/constants/theme";
 import { generateDebrief, nextCounterpartTurn } from "@/lib/ai";
+import { FreeAcquisitionRequestError, FreeAcquisitionSafetyError } from "@/lib/freeAcquisitionOutcome";
 import { FREE_REHEARSAL_USER_TURNS, rehearsalTurnCap } from "@/lib/access";
 import {
   beginConversionBuild,
+  cancelConversionBuild,
   emitConversionEvent,
   failConversionBuild,
   isConversionBuildActive,
@@ -156,6 +158,7 @@ function LegacyRehearse() {
     activePracticeSession,
     saveActivePracticeSession,
     saveScoredPracticeRecord,
+    saveCurrentGuestAssessment,
   } = useStore();
   const challengeDay = params.challengeDay ? Number(params.challengeDay) : null;
 
@@ -416,16 +419,22 @@ function LegacyRehearse() {
           await speak(spoken, persona, { muted: !voiceOnRef.current });
         }
       } catch (e) {
+        if (e instanceof FreeAcquisitionSafetyError) {
+          setThinking(false);setCanRetry(false);
+          await resetSpeech().catch(() => {});
+          router.replace({ pathname: '/safety', params: { sessionId: activePracticeSession?.id } });
+          return;
+        }
         safeLog("[rehearse] turn failed", errorShape(e));
         setThinking(false);
         // Never invent a reply on the client — offer the turn again instead.
-        setError(turnFailureMessage(themName));
-        setCanRetry(true);
+        setError(e instanceof FreeAcquisitionRequestError ? e.message : turnFailureMessage(themName));
+        setCanRetry(e instanceof FreeAcquisitionRequestError ? e.retryable : true);
       } finally {
         busy.current = false;
       }
     },
-    [scenario, difficulty, reaction, outcome, reveal, persona, themName, activePracticeSession?.entryRoute],
+    [scenario, difficulty, reaction, outcome, reveal, persona, themName, activePracticeSession?.entryRoute, activePracticeSession?.id, router],
   );
 
   /** Commit the user's reviewed line. Only an explicit submit advances a turn. */
@@ -657,6 +666,7 @@ function LegacyRehearse() {
         });
         return;
       }
+      if (!debrief) throw new Error('No assessed debrief is available');
       emitConversionEvent(id, "skill.identified", debrief);
       const focus = selectFocusSkill(debrief, activePracticeSession?.provisionalModuleId);
       const evidence = conversionEvidence(approvedTurns, debrief, activePracticeSession?.provisionalModuleId);
@@ -691,7 +701,7 @@ function LegacyRehearse() {
         };
         const completedAt = Date.now();
         const sharedResult = buildFreeJourneyResult(withRecommendation, debrief, analysis);
-        await saveActivePracticeSession({ ...withRecommendation, sharedResult });
+        await saveCurrentGuestAssessment({ ...withRecommendation, sharedResult });
         const approvedTextByTurnId = new Map(approvedTurns.map((turn) => [turn.id, turn.text]));
         await saveScoredPracticeRecord(createScoredPracticeRecord(sharedResult, {
           completedAt,
@@ -721,10 +731,20 @@ function LegacyRehearse() {
       });
       tap("success");
     } catch (caught) {
+      if (caught instanceof FreeAcquisitionSafetyError) {
+        cancelConversionBuild(id);
+        await resetSpeech().catch(() => {});
+        router.replace({ pathname: '/safety', params: { sessionId: id, returnTo: 'generating' } });
+        return;
+      }
       safeLog("[rehearse] debrief failed", errorShape(caught));
-      failConversionBuild(id);
+      const normalFree = process.env.EXPO_PUBLIC_BYSI_BUILD_MODE !== 'staging-account' && !!process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN;
+      failConversionBuild(id, normalFree ? {
+        message:caught instanceof FreeAcquisitionRequestError ? caught.message : 'Your result could not be confirmed. Recover the same operation without restarting your free session.',
+        retry:caught instanceof FreeAcquisitionRequestError && !caught.retryable ? undefined : async()=>{await analyzeApprovedTranscript(approvedTurns);},
+      } : undefined);
     }
-  }, [scenario, difficulty, reaction, outcome, upsertSession, router, challengeDay, markChallengeDayDone, persona, themName, params.entry, activePracticeSession, saveActivePracticeSession, saveScoredPracticeRecord]);
+  }, [scenario, difficulty, reaction, outcome, upsertSession, router, challengeDay, markChallengeDayDone, persona, themName, params.entry, activePracticeSession, saveActivePracticeSession, saveScoredPracticeRecord, saveCurrentGuestAssessment]);
 
   const openTranscriptReview = useCallback((): void => {
     const userTurns = turns.filter((turn) => turn.role === "user");
@@ -789,7 +809,7 @@ function LegacyRehearse() {
     if (pending.length > 0) return "composing";
     if (thinking) return "waiting";
     if (audioBusy) return "speaking";
-    if (canRetry) return "response-unavailable";
+    if (canRetry || error.length > 0) return "response-unavailable";
     if (speech.phase === "blocked") return "autoplay-blocked";
     if (speech.phase === "failed") return "playback-failed";
     if (hasReachedTurnCap) return "complete";
@@ -805,6 +825,7 @@ function LegacyRehearse() {
     thinking,
     audioBusy,
     canRetry,
+    error,
     speech.phase,
     hasReachedTurnCap,
     mode,
@@ -883,13 +904,13 @@ function LegacyRehearse() {
         </View>
         <StateDock bottomInset={insets.bottom}>
           {permissionDenied ? <PrimaryButton label="Open Settings" onPress={openMicrophoneSettings} /> : <PrimaryButton label={permissionBusy ? "Checking microphone…" : "Allow microphone"} onPress={() => void requestMicrophoneAccess()} disabled={permissionBusy} />}
+          <GhostButton label="Type this turn instead" onPress={() => activatePractice("text")} />
           {permissionDenied ? (
             <PressCard onPress={() => void requestMicrophoneAccess()} accessibilityLabel="Try microphone again">
               <Text style={styles.permissionSecondary}>Try again</Text>
             </PressCard>
           ) : (
             <>
-              <GhostButton label="Type this turn instead" onPress={() => activatePractice("text")} />
               <PressCard onPress={() => setRehearsalStage("briefing")} accessibilityLabel="Not now">
                 <Text style={styles.permissionSecondary}>Not now</Text>
               </PressCard>
@@ -1062,13 +1083,13 @@ function LegacyRehearse() {
           {dockState === "response-unavailable" ? (
             <View style={styles.recoveryRow}>
               <PressCard
-                onPress={retryTurn}
+                onPress={canRetry ? retryTurn : () => router.replace('/(tabs)')}
                 containerStyle={styles.flexWide}
-                accessibilityLabel="Retry sending"
+                accessibilityLabel={canRetry ? 'Retry sending' : 'Back to today'}
               >
                 <View style={styles.analyzeBtn}>
                   <RotateCcw size={18} color={C.onAccent} strokeWidth={1.7} />
-                  <Text style={styles.analyzeText}>Retry sending</Text>
+                  <Text style={styles.analyzeText}>{canRetry ? 'Retry sending' : 'Back to today'}</Text>
                 </View>
               </PressCard>
             </View>
@@ -1256,7 +1277,7 @@ function LegacyRehearse() {
                 editable={!closing}
                 accessibilityLabel="Type your line"
               />
-              <PressCard onPress={send} disabled={draft.trim().length === 0 || thinking}>
+              <PressCard onPress={send} accessibilityLabel="Send your line" disabled={draft.trim().length === 0 || thinking}>
                 <View
                   style={[
                     styles.sendBtn,

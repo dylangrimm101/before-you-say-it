@@ -1,60 +1,101 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, LockKeyhole } from "lucide-react-native";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, Eyebrow, PressCard, PrimaryButton, Reveal } from "@/components/ui";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import { useAuth } from "@/providers/auth";
-import { useStore } from "@/providers/store";
+import { authEnvironment, supabase } from "@/lib/supabase";
+
+
+// Confirmation is completed by Supabase in the browser. This app deliberately
+// uses verified password login on manual return, not an unimplemented token callback.
+// Keep the isolated project's own redirect configuration separate.
+const confirmationOptions = authEnvironment?.staging
+  ? undefined
+  : { emailRedirectTo: "https://beforeyousayit.app/" };
+
 
 export default function ContinueFromWebScreen(): React.JSX.Element {
   const router = useRouter();
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [signup, setSignup] = useState(params.mode === "signup");
+  const [confirmationPending, setConfirmationPending] = useState(false);
+  const busy = useRef(false);
   const insets = useSafeAreaInsets();
-  const { login, isAuthConfigured } = useAuth();
-  const { beginNativeJourney, associateActivePracticeSessionWithUser } = useStore();
+  const { login, isAuthConfigured, stagingWebBridge, normalResults, session, hasCurrentGuestPractice, cancelLogin, durableGuestContinuation, continuationIssue } = useAuth();
+  useEffect(() => () => cancelLogin?.(), [cancelLogin]);
+
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
   const submit = useCallback(async (): Promise<void> => {
-    if (isSubmitting) return;
+    if (busy.current) return;
+    busy.current = true;
     setIsSubmitting(true);
     setError("");
     try {
-      const result = await login(email, password);
+      if (signup && !confirmationPending) {
+        if (!email.trim() || password.length < 8) { setError("Enter your email and a password of at least 8 characters."); return; }
+        if (session?.user && !session.user.is_anonymous) { setError("Sign out before creating another account."); return; }
+        if (!supabase) { setError("Account signup isn’t configured for this build."); return; }
+        const result = await supabase.auth.signUp({ email: email.trim().toLowerCase(), password, ...(confirmationOptions ? { options: confirmationOptions } : {}) });
+        if (result.error) { setError("We couldn’t create your account or send confirmation. Check your details and connection, then retry."); return; }
+        setConfirmationPending(true);
+        return;
+      }
+      const result = await login(email, password, hasCurrentGuestPractice);
       if (!result.success) {
         setError(result.message ?? "We couldn’t log you in.");
         return;
       }
-      if (result.userId) await associateActivePracticeSessionWithUser(result.userId);
-      await beginNativeJourney();
-      router.replace("/(tabs)");
+      if (result.continuationId) { router.replace(`/debrief/${result.continuationId}`); return; }
+      if (result.continuationProblem) { router.replace("/account-practice"); return; }
+      if (signup) { router.replace("/account-practice"); return; }
+      if (stagingWebBridge) { router.replace("/staging-web-result"); return; }
+      if (normalResults) { router.replace("/saved-result"); return; }
+      // AuthProvider has mounted this owner’s isolated store. Never write or
+      // reassign the previous guest/account lease captured before login.
+      router.replace(session?.user.is_anonymous === true ? "/account-practice" : "/(tabs)");
+    } catch {
+      setError("We couldn’t safely connect your local practice. Your saved practice has not been reassigned.");
     } finally {
+      busy.current = false;
       setIsSubmitting(false);
     }
-  }, [associateActivePracticeSessionWithUser, beginNativeJourney, email, isSubmitting, login, password, router]);
+  }, [email, login, password, router, stagingWebBridge, normalResults, session, hasCurrentGuestPractice, signup, confirmationPending]);
 
   return (
     <View style={styles.root}>
       <Backdrop />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
-          <PressCard onPress={() => router.back()} style={styles.back} accessibilityLabel="Back"><ArrowLeft size={21} color={C.textSoft} /></PressCard>
+          <PressCard onPress={() => { cancelLogin?.(); router.back(); }} style={styles.back} accessibilityLabel="Back"><ArrowLeft size={21} color={C.textSoft} /></PressCard>
           <Reveal>
-            <Eyebrow color={C.purple}>Welcome back</Eyebrow>
-            <Text style={styles.title}>Log in to your account.</Text>
-            <Text style={styles.lede}>Use the same account you used on the web. If that account has paid access, the app will connect it automatically.</Text>
+            <Eyebrow color={C.purple}>{signup ? "Welcome" : "Welcome back"}</Eyebrow>
+            <Text style={styles.title}>{signup ? "Create your account." : "Log in to your account."}</Text>
+            <Text style={styles.lede}>{normalResults ? "Sign in to find your account’s saved result and continue with the same lessons and practice. Your result and subscription are checked separately. If you already bought a plan, don’t buy the same plan again." : stagingWebBridge ? "Use your staging web account to activate or restore its saved result after login. Don’t purchase again if you paid on the web." : "Use the same account you used on the web if you already have a password. Web subscription activation and web result restore aren’t available in this build. If you paid on the web, don’t purchase again in the app."}</Text>
           </Reveal>
 
+          <Text style={styles.lede}>{hasCurrentGuestPractice ? "Sign in below to save this current rehearsal to the account you enter and continue on this device. By choosing “Sign in to save this result and continue”, you confirm this is your rehearsal and consent to saving it as local user-provided practice. This is not a verified web result, proof of provider truth, or a purchase; no paid access is granted." : "Guest practice cannot be transferred without a current-run capability. Logging in leaves older guest work separate; it does not attach results, scores, or purchases. You can go back without changing accounts."}</Text>
+          {hasCurrentGuestPractice ? <Text style={styles.lede}>{durableGuestContinuation ? "This new rehearsal has a device-secured handoff for up to 24 hours from creation. You can reopen this app on the same device before signing in. Deleting the rehearsal or signing out cancels that handoff." : "Keep this browser session open until saving finishes. Secure device handoff is not available here; reloading or closing this session before saving can leave guest work separate from your account."}</Text> : null}
+          {continuationIssue ? <Text style={styles.error} accessibilityRole="alert">{continuationIssue}</Text> : null}
           <Reveal index={1} style={styles.formWrap}>
             <View style={styles.form}>
               <Text style={styles.label}>Email</Text>
               <TextInput
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(nextEmail) => {
+                  if (nextEmail.trim().toLowerCase() !== email.trim().toLowerCase()) {
+                    setConfirmationPending(false);
+                    setError("");
+                  }
+                  setEmail(nextEmail);
+                }}
                 placeholder="you@example.com"
                 placeholderTextColor={C.dim}
                 autoCapitalize="none"
@@ -80,12 +121,23 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
                 accessibilityLabel="Password"
                 onSubmitEditing={() => { void submit(); }}
               />
+              {confirmationPending ? <Text style={styles.lede} accessibilityLiveRegion="polite">Check your email and open the confirmation link. After confirming in your browser, return to this app and log in below with the same email and password. The link may open the BYSI website; you don’t need to start another assessment or purchase. If no email arrives, check spam or resend.</Text> : null}
+              {confirmationPending ? <PrimaryButton label="Resend confirmation email" disabled={isSubmitting} onPress={async () => {
+                if (busy.current || !supabase) return;
+                busy.current = true; setIsSubmitting(true); setError("");
+                try { const result = await supabase.auth.resend({ type: "signup", email: email.trim().toLowerCase(), ...(confirmationOptions ? { options: confirmationOptions } : {}) }); if (result.error) setError("Confirmation email could not be sent. Wait a moment and retry."); }
+                catch { setError("Couldn’t reach the email service. Check your connection and retry."); }
+                finally { busy.current = false; setIsSubmitting(false); }
+              }} /> : null}
+              <PrimaryButton label={signup ? "Already have an account? Log in" : "Create an account"} disabled={isSubmitting} onPress={() => { setSignup(!signup); setConfirmationPending(false); setError(""); }} />
               {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
-              <PrimaryButton label={isSubmitting ? "Logging in…" : "Log in"} disabled={isSubmitting || !isAuthConfigured} onPress={() => { void submit(); }} containerStyle={styles.submit} />
+              <PrimaryButton label={isSubmitting ? "Connecting…" : signup ? (confirmationPending ? "I confirmed my email — log in" : "Create account") : hasCurrentGuestPractice ? "Sign in to save this result and continue" : "Log in"} disabled={isSubmitting || !isAuthConfigured} onPress={() => { void submit(); }} containerStyle={styles.submit} />
               {isSubmitting ? <ActivityIndicator color={C.purple} style={styles.spinner} /> : null}
             </View>
           </Reveal>
 
+          {!signup && (!session?.user || session.user.is_anonymous) ? <PrimaryButton label="Forgot password?" disabled={isSubmitting} onPress={() => router.push({ pathname: "/forgot-password", params: email.trim() ? { email } : {} })} /> : null}
+          {__DEV__ ? <PrimaryButton label="Staging web result" onPress={() => router.push("/staging-web-result")} /> : null}
           <View style={styles.security}><LockKeyhole size={16} color={C.sage} /><Text style={styles.securityText}>Your password is sent directly to the account provider and is never stored by this app.</Text></View>
           {!isAuthConfigured ? <Text style={styles.configuration}>Account login isn’t available in this build.</Text> : null}
         </ScrollView>

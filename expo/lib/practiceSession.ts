@@ -445,6 +445,9 @@ export function dayThirtyBaseline(session: ActivePracticeSession | null): Immuta
 /** Prevents later session updates from replacing confirmed records. */
 export function protectImmutablePracticeRecords(existing: ActivePracticeSession, incoming: ActivePracticeSession): ActivePracticeSession {
   if (existing.id !== incoming.id) return incoming;
+  if (existing.userId && incoming.userId && existing.userId !== incoming.userId) {
+    throw new Error("This practice belongs to another account. Clear local practice before switching accounts.");
+  }
   const allRunKeys = new Set([...Object.keys(existing.pilotRuns), ...Object.keys(incoming.pilotRuns)]);
   const pilotRuns = Object.fromEntries([...allRunKeys].map((runKey) => {
     const old = existing.pilotRuns[runKey];
@@ -455,6 +458,7 @@ export function protectImmutablePracticeRecords(existing: ActivePracticeSession,
   const isStale = incoming.updatedAt < existing.updatedAt;
   return {
     ...incoming,
+    userId: existing.userId ?? incoming.userId,
     pilotRuns,
     updatedAt: Math.max(existing.updatedAt, incoming.updatedAt),
     ...(isStale ? { nextState: existing.nextState } : {}),
@@ -470,6 +474,7 @@ export function protectImmutablePracticeRecords(existing: ActivePracticeSession,
 export function associatePracticeSessionUser(session: ActivePracticeSession, userId: string, now: number = Date.now()): ActivePracticeSession {
   const normalizedUserId = userId.trim();
   if (!normalizedUserId || session.userId === normalizedUserId) return session;
+  if (session.userId) throw new Error("This practice belongs to another account. Clear local practice before switching accounts.");
   return { ...session, userId: normalizedUserId, updatedAt: now };
 }
 

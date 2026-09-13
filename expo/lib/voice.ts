@@ -13,9 +13,12 @@ import {
   type SpeechPhase,
 } from "@/lib/speech";
 import type { PersonaVoice } from "@/types/convo";
+import { withRequestDeadline } from "@/lib/requestDeadline";
+import {createOwnerVoiceCache} from "@/lib/ownerVoiceCache";
 import type { PilotAudioLine } from "@/types/pilotCurriculum";
 
 const TTS_ENDPOINT = process.env.EXPO_PUBLIC_TTS_ENDPOINT?.trim() ?? "";
+const TTS_TIMEOUT_MS = 15_000;
 
 function configuredTtsEndpoint(): string {
   if (!TTS_ENDPOINT) throw new Error("BYSI voice endpoint is not configured");
@@ -56,6 +59,7 @@ interface Utterance {
   leadingPauseMs?: number;
   /** Prepared, playable source. Null until audio has been fetched. */
   source: string | null;
+  paidPractice?: boolean;
 }
 
 let snapshot: SpeechSnapshot = { phase: "idle", canReplay: false };
@@ -67,6 +71,7 @@ const listeners = new Set<(s: SpeechSnapshot) => void>();
  * after the user left the screen or moved on.
  */
 let token = 0;
+let pendingSpeech: AbortController | null = null;
 let lastUtterance: Utterance | null = null;
 let currentPlayer: AudioPlayer | null = null;
 let currentPlaybackCleanup: (() => void) | null = null;
@@ -138,48 +143,73 @@ export async function unlockAudioPlayback(): Promise<boolean> {
   }
 }
 
-async function fetchSpeechDataUri(text: string, persona: PersonaVoice): Promise<string> {
-  const endpoint = configuredTtsEndpoint();
-  const role = roleForPersona(persona);
-  safeLog("[evidence] BYSI TTS request", {
-    endpoint: evidenceEndpoint(endpoint),
-    provider: "user-owned-bysi-tts",
-    role,
-  });
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, text }),
-  });
-  const contentType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown";
-  if (!response.ok) {
-    safeLog("[evidence] BYSI TTS response", {
+async function fetchSpeechDataUri(text: string, persona: PersonaVoice, signal?: AbortSignal, paidPractice = false): Promise<string> {
+  const stagedPaid = paidPractice; // Paid callers never downgrade to free/production voice.
+  const normalFree = !paidPractice && process.env.EXPO_PUBLIC_BYSI_BUILD_MODE !== 'staging-account' && !!process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN;
+  const endpoint = stagedPaid ? "https://bysi-signup-staging.vercel.app/api/practice/tts" : normalFree ? 'https://beforeyousayit.app/api/native/free/tts' : configuredTtsEndpoint();
+  return withRequestDeadline(async (requestSignal) => {
+    const role = roleForPersona(persona);
+    safeLog("[evidence] BYSI TTS request", {
       endpoint: evidenceEndpoint(endpoint),
-      ok: false,
+      provider: "user-owned-bysi-tts",
+      role,
+    });
+    const response = stagedPaid
+      ? await (await import("./paidVoiceRuntime")).requestPaidVoice("tts", { role, text }, requestSignal)
+      : normalFree ? await (await import('./normalFreeRuntime')).requestNormalFree('tts', {role,text}, requestSignal)
+      : await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, text }),
+      signal: requestSignal,
+    });
+    const contentType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "unknown";
+    if (!response.ok) {
+      safeLog("[evidence] BYSI TTS response", {
+        endpoint: evidenceEndpoint(endpoint),
+        ok: false,
+        role,
+        status: response.status,
+        type: contentType,
+      });
+      throw new Error(`Voice request failed (${response.status})`);
+    }
+    if (contentType !== "audio/mpeg") throw new Error("Voice response was not MPEG audio");
+
+    const blob = await response.blob();
+    safeLog("[evidence] BYSI TTS response", {
+      count: blob.size,
+      endpoint: evidenceEndpoint(endpoint),
+      ok: true,
       role,
       status: response.status,
       type: contentType,
     });
-    throw new Error(`Voice request failed (${response.status})`);
-  }
-  if (contentType !== "audio/mpeg") throw new Error("Voice response was not MPEG audio");
-
-  const blob = await response.blob();
-  safeLog("[evidence] BYSI TTS response", {
-    count: blob.size,
-    endpoint: evidenceEndpoint(endpoint),
-    ok: true,
-    role,
-    status: response.status,
-    type: contentType,
-  });
-  if (blob.size === 0) throw new Error("Voice response was empty");
-  return await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Could not read voice audio"));
-    reader.readAsDataURL(blob);
-  });
+    if (blob.size === 0) throw new Error("Voice response was empty");
+    if (requestSignal.aborted) throw new Error("Request aborted");
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      const cleanup = (): void => {
+        requestSignal.removeEventListener("abort", onAbort);
+        reader.onloadend = null;
+        reader.onerror = null;
+      };
+      const onAbort = (): void => {
+        cleanup();
+        reader.abort();
+        reject(new Error("Request aborted"));
+      };
+      reader.onloadend = () => { cleanup(); resolve(String(reader.result)); };
+      reader.onerror = () => { cleanup(); reject(new Error("Could not read voice audio")); };
+      requestSignal.addEventListener("abort", onAbort, { once: true });
+      try {
+        reader.readAsDataURL(blob);
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    });
+  }, TTS_TIMEOUT_MS, signal);
 }
 
 /**
@@ -188,24 +218,22 @@ async function fetchSpeechDataUri(text: string, persona: PersonaVoice): Promise<
  * iOS AVPlayer cannot open a `data:` URI, so on native the bytes are written to
  * a cache file and played from `file://`. Browsers play the data URI directly.
  */
-async function prepareSource(dataUri: string, id: number): Promise<string> {
+async function generatedOwnerCacheLease(){
+  if(Platform.OS==='web')return null;
+  const {supabase,authEnvironment}=await import('./supabase');
+  const session=await supabase?.auth.getSession();
+  if(session?.error||!session?.data.session?.user.id)throw new Error('Voice account unavailable');
+  const fs=await import('expo-file-system/legacy');
+  return createOwnerVoiceCache(fs).lease(`${authEnvironment?.url??'local'}:${session.data.session.user.id}`);
+}
+async function prepareSource(dataUri: string, id: number, lease:Awaited<ReturnType<typeof generatedOwnerCacheLease>>): Promise<string> {
   if (Platform.OS === "web") return dataUri;
 
   const parts = parseDataUri(dataUri);
   if (!parts) throw new Error("Unreadable voice audio");
 
-  // Required only on native. Loading it on web logs a missing-module warning.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const FS = require("expo-file-system/legacy") as typeof import("expo-file-system/legacy");
-  const dir = `${FS.cacheDirectory ?? ""}rehearsal-voice/`;
-  try {
-    await FS.makeDirectoryAsync(dir, { intermediates: true });
-  } catch {
-    // Already present.
-  }
-  const uri = `${dir}${speechCacheFileName(id, audioExtensionFor(parts.mime))}`;
-  await FS.writeAsStringAsync(uri, parts.base64, { encoding: FS.EncodingType.Base64 });
-  return uri;
+  if(!lease)throw new Error('Voice cache owner unavailable');
+  return lease.write(speechCacheFileName(id, audioExtensionFor(parts.mime)),parts.base64);
 }
 
 async function staticCacheSource(audioId: string): Promise<string | null> {
@@ -284,6 +312,8 @@ export async function stopSpeech(): Promise<void> {
   activeCompletion?.resolve("interrupted");
   activeCompletion = null;
   token += 1;
+  pendingSpeech?.abort();
+  pendingSpeech = null;
   stopWeb();
   await teardownSound();
   publish({ phase: "idle" });
@@ -335,6 +365,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
     try {
       await el.play();
     } catch (e) {
+      if (id !== token) return "empty";
       if (isAutoplayBlocked(e)) {
         safeLog("[voice] autoplay blocked");
         publish({ phase: "blocked" });
@@ -524,8 +555,12 @@ async function playUtterance(): Promise<SpeakOutcome> {
 
   token += 1;
   const id = token;
+  pendingSpeech?.abort();
+  const request = new AbortController();
+  pendingSpeech = request;
   stopWeb();
   await teardownSound();
+  if (id !== token) return "empty";
 
   if (utterance.source !== null) {
     publish({ phase: "generating" });
@@ -536,16 +571,18 @@ async function playUtterance(): Promise<SpeakOutcome> {
   publish({ phase: "generating" });
   try {
     const cached = utterance.staticAudioId ? await staticCacheSource(utterance.staticAudioId) : null;
+    if (id !== token) return "empty";
     if (cached) {
       utterance.source = cached;
       if ((utterance.leadingPauseMs ?? 0) > 0) await new Promise<void>((resolve) => setTimeout(resolve, utterance.leadingPauseMs));
       return await playPrepared(cached, id);
     }
-    const dataUri = await fetchSpeechDataUri(utterance.text, utterance.persona);
+    const ownedCache=utterance.staticAudioId?null:await generatedOwnerCacheLease();
+    const dataUri = await fetchSpeechDataUri(utterance.text, utterance.persona, request.signal, utterance.paidPractice);
     if (id !== token) return "empty";
     const source = utterance.staticAudioId
       ? await prepareStaticSource(dataUri, utterance.staticAudioId)
-      : await prepareSource(dataUri, id);
+      : await prepareSource(dataUri, id,ownedCache);
     if (id !== token) return "empty";
     utterance.source = source;
     if ((utterance.leadingPauseMs ?? 0) > 0) await new Promise<void>((resolve) => setTimeout(resolve, utterance.leadingPauseMs));
@@ -597,15 +634,20 @@ function pilotUtterance(
  */
 export async function preparePilotAudio(
   line: PilotAudioLine,
-  options: { contextualPersona?: PersonaVoice } = {},
+  options: { contextualPersona?: PersonaVoice; paidPractice?: boolean } = {},
 ): Promise<boolean> {
   const utterance = pilotUtterance(line, options.contextualPersona);
   if (!utterance) return false;
+  utterance.paidPractice = options.paidPractice;
 
   token += 1;
   const id = token;
+  pendingSpeech?.abort();
+  const request = new AbortController();
+  pendingSpeech = request;
   stopWeb();
   await teardownSound();
+  if (id !== token) return false;
   lastUtterance = utterance;
   publish({ phase: "generating", canReplay: true });
   try {
@@ -614,11 +656,12 @@ export async function preparePilotAudio(
     if (cached) {
       utterance.source = cached;
     } else {
-      const dataUri = await fetchSpeechDataUri(utterance.text, utterance.persona);
+      const ownedCache=utterance.staticAudioId?null:await generatedOwnerCacheLease();
+    const dataUri = await fetchSpeechDataUri(utterance.text, utterance.persona, request.signal, utterance.paidPractice);
       if (id !== token || lastUtterance !== utterance) return false;
       utterance.source = utterance.staticAudioId
         ? await prepareStaticSource(dataUri, utterance.staticAudioId)
-        : await prepareSource(dataUri, id);
+        : await prepareSource(dataUri, id,ownedCache);
     }
     if (id !== token || lastUtterance !== utterance) return false;
     publish({ phase: "idle" });
@@ -643,10 +686,11 @@ export async function playPreparedPilotAudio(): Promise<SpeakOutcome> {
 /** Play an approved fixed line through an explicit semantic voice and versioned cache ID. */
 export async function speakPilotAudio(
   line: PilotAudioLine,
-  options: { muted?: boolean; contextualPersona?: PersonaVoice } = {},
+  options: { muted?: boolean; contextualPersona?: PersonaVoice; paidPractice?: boolean } = {},
 ): Promise<SpeakOutcome> {
   const utterance = pilotUtterance(line, options.contextualPersona);
   if (!utterance) return "empty";
+  utterance.paidPractice = options.paidPractice;
   lastUtterance = utterance;
   publish({ canReplay: true });
   if (options.muted === true) return "muted";
@@ -654,9 +698,19 @@ export async function speakPilotAudio(
 }
 
 /** Resolves as completed only after the exact staged audio reaches its terminal end event. */
+export function preparePaidPilotAudio(line: PilotAudioLine, options: { contextualPersona?: PersonaVoice } = {}): Promise<boolean> {
+  return preparePilotAudio(line, { ...options, paidPractice: true });
+}
+export function speakPaidPilotAudio(line: PilotAudioLine, options: { muted?: boolean; contextualPersona?: PersonaVoice } = {}): Promise<SpeakOutcome> {
+  return speakPilotAudio(line, { ...options, paidPractice: true });
+}
+export function speakPaidPilotAudioToCompletion(line: PilotAudioLine, options: { muted?: boolean; contextualPersona?: PersonaVoice } = {}): ReturnType<typeof speakPilotAudioToCompletion> {
+  return speakPilotAudioToCompletion(line, { ...options, paidPractice: true });
+}
+
 export async function speakPilotAudioToCompletion(
   line: PilotAudioLine,
-  options: { muted?: boolean; contextualPersona?: PersonaVoice } = {},
+  options: { muted?: boolean; contextualPersona?: PersonaVoice; paidPractice?: boolean } = {},
 ): Promise<"completed" | "interrupted" | Exclude<SpeakOutcome, "played">> {
   const outcome = await speakPilotAudio(line, options);
   if (outcome !== "played") return outcome;

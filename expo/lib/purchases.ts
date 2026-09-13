@@ -7,7 +7,11 @@ import type {
   PurchasesPackage,
 } from "react-native-purchases";
 
+import { nativeBilling, normalBillingEnabled } from '@/lib/nativeBillingRuntime';
+import * as ReactNative from 'react-native';
+import { useEffect } from 'react';
 import { hasActiveEntitlement } from "@/lib/commerce";
+import { createPurchasesIdentityBoundary } from "@/lib/purchasesIdentity";
 import { errorShape, safeLog } from "@/lib/redact";
 
 export const PRO_ENTITLEMENT = "pro";
@@ -22,6 +26,7 @@ type PurchasesModule = {
   logIn: (appUserID: string) => Promise<{ customerInfo: CustomerInfo; created: boolean }>;
   logOut: () => Promise<CustomerInfo>;
   isAnonymous: () => Promise<boolean>;
+  getAppUserID: () => Promise<string>;
 };
 
 /**
@@ -98,34 +103,53 @@ function requireSdk(): PurchasesModule {
   return sdk;
 }
 
-export function hasPro(info: CustomerInfo | undefined): boolean {
+export function hasPro(info: CustomerInfo | null | undefined): boolean {
   return hasActiveEntitlement(info, PRO_ENTITLEMENT);
 }
 
-/** Associates the authenticated web identity with RevenueCat so web entitlements can be restored. */
-export async function identifyPurchasesUser(userId: string): Promise<CustomerInfo | null> {
-  const normalizedUserId = userId.trim();
-  if (!normalizedUserId || !sdk || !configured) return null;
+let migrationRequired = false;
+const purchasesIdentity = createPurchasesIdentityBoundary<CustomerInfo>(async (userId) => {
+  const normalizedUserId = userId?.trim() ?? "";
+  if (!sdk || !configured) return null;
   try {
-    const result = await sdk.logIn(normalizedUserId);
+    if (!normalizedUserId) {
+      // Preserve anonymous purchases; never identify a disposable Supabase guest ID.
+      if (await sdk.isAnonymous()) return await sdk.getCustomerInfo();
+      return await sdk.logOut();
+    }
+    const boundId = nativeBilling ? await nativeBilling.identify() : normalizedUserId;
+    if (nativeBilling && normalizedUserId !== "restore-existing-purchase" && await sdk.getAppUserID() !== boundId && hasPro(await sdk.getCustomerInfo())) {
+      // Preserve the old account/guest identity until an explicit restore action.
+      migrationRequired = true;
+      return null;
+    }
+    migrationRequired = false;
+    const result = await sdk.logIn(boundId);
     return result.customerInfo;
   } catch (error) {
     safeLog("[purchases] account association failed", errorShape(error));
     return null;
   }
+});
+
+/** Null selects the SDK's anonymous identity, not a Supabase guest ID. */
+export function identifyPurchasesUser(userId: string | null): Promise<CustomerInfo | null> {
+  if(!userId)nativeBilling?.suspend();
+  return purchasesIdentity.sync(userId);
 }
 
 /** Clears any authenticated RevenueCat app-user identity during data reset. */
 export async function clearPurchasesIdentity(): Promise<void> {
+  nativeBilling?.suspend();
   if (!sdk || !configured) return;
-  if (await sdk.isAnonymous()) return;
-  await sdk.logOut();
+  const info = await purchasesIdentity.sync(null);
+  if (!info) throw new Error("Purchases identity reset could not be verified.");
 }
 
 export function useCustomerInfo() {
-  return useQuery<CustomerInfo>({
+  return useQuery<CustomerInfo | null>({
     queryKey: ["rc", "customerInfo"],
-    queryFn: () => requireSdk().getCustomerInfo(),
+    queryFn: () => purchasesIdentity.runVerified(() => requireSdk().getCustomerInfo()),
     enabled: purchasesAvailable,
     staleTime: 60_000,
   });
@@ -134,7 +158,22 @@ export function useCustomerInfo() {
 /** True when the user has the active "pro" entitlement. */
 export function useIsPro(): boolean {
   const { data } = useCustomerInfo();
-  return hasPro(data);
+  const access = useNativeServerAccess();
+  return normalBillingEnabled ? access.data === true && !access.isError && !access.isPending && !access.isFetching : hasPro(data);
+}
+
+export function useNativeServerAccess() {
+  const queryClient = useQueryClient();
+  const query = useQuery<boolean>({queryKey:['native','access'],queryFn:()=>nativeBilling!.access(),enabled:!!nativeBilling,retry:false,staleTime:0,refetchInterval:15000});
+  useEffect(()=>{
+    if(!nativeBilling)return;
+    const sub=ReactNative.AppState?.addEventListener('change',next=>{
+      queryClient.setQueryData(['native','access'],false);
+      nativeBilling?.invalidate();
+      if(next==='active')void queryClient.invalidateQueries({queryKey:['native','access']});
+    });return ()=>sub?.remove();
+  },[queryClient]);
+  return query;
 }
 
 export function useOfferings() {
@@ -154,9 +193,17 @@ export function usePurchasePackage() {
   return useMutation<PurchaseOutcome, Error, PurchasesPackage>({
     mutationFn: async (pkg: PurchasesPackage) => {
       try {
-        const { customerInfo } = await requireSdk().purchasePackage(pkg);
+        if (normalBillingEnabled && pkg.product.identifier !== 'byis_pro_monthly_5') throw Error('Unsupported subscription');
+        if (migrationRequired) throw Error('An existing Apple purchase needs recovery. Choose Restore purchases; do not buy again.');
+        if (nativeBilling && await nativeBilling.access()) return {status:'purchased' as const};
+        const { customerInfo } = await purchasesIdentity.runVerified(async () => {
+          if(nativeBilling && hasPro(await requireSdk().getCustomerInfo()))throw Error('An Apple purchase is awaiting server verification. Retry access or restore; do not buy again.');
+          return requireSdk().purchasePackage(pkg);
+        });
         queryClient.setQueryData(["rc", "customerInfo"], customerInfo);
-        return { status: hasPro(customerInfo) ? "purchased" as const : "entitlement_delayed" as const };
+        const allowed = nativeBilling ? await nativeBilling.access() : hasPro(customerInfo);
+        if(nativeBilling)queryClient.setQueryData(['native','access'],allowed);
+        return { status: allowed ? "purchased" as const : "entitlement_delayed" as const };
       } catch (e) {
         const err = e as { userCancelled?: boolean; code?: string };
         if (err.userCancelled) return { status: "cancelled" as const };
@@ -173,9 +220,17 @@ export function useRestorePurchases() {
   const queryClient = useQueryClient();
   return useMutation<boolean, Error, void>({
     mutationFn: async () => {
-      const info = await requireSdk().restorePurchases();
+      if (nativeBilling && migrationRequired) {
+        // Explicit user-requested restore only. SDK aliasing is not Auth proof;
+        // server admission still requires a trusted event and fresh reconciliation.
+        const ready = await purchasesIdentity.sync('restore-existing-purchase');
+        if(!ready)throw Error('Purchase identity recovery unavailable; retry restore, not purchase.');
+      }
+      const info = await purchasesIdentity.runVerified(() => requireSdk().restorePurchases());
       queryClient.setQueryData(["rc", "customerInfo"], info);
-      return hasPro(info);
+      const allowed = nativeBilling ? await nativeBilling.access() : hasPro(info);
+      if(nativeBilling)queryClient.setQueryData(['native','access'],allowed);
+      return allowed;
     },
   });
 }

@@ -1,3 +1,6 @@
+import { RAVI_NATURAL_FACT_VERSION } from '@/lib/raviNaturalFactContract';
+import { FreeAcquisitionSafetyError, FreeAcquisitionRequestError } from './freeAcquisitionOutcome';
+import { withRequestDeadline } from "@/lib/requestDeadline";
 import { personaFor } from "@/constants/personas";
 import { DIFFICULTY } from "@/constants/scenarios";
 import { renderCounterpartMessage } from "@/lib/rehearsal";
@@ -88,7 +91,7 @@ export interface BysiResultResponse {
     goal_line?: string;
   };
   starting_index?: {
-    overall?: number;
+    overall?: number | null;
     label?: string;
     coverage_note?: string;
     focus_dimension?: string;
@@ -101,7 +104,7 @@ export interface BysiResultResponse {
 }
 
 export interface GeneratedDebrief {
-  debrief: Debrief;
+  debrief: Debrief | null;
   analysis: BysiResultResponse;
 }
 
@@ -110,24 +113,32 @@ function evidenceEndpoint(url: string): string {
 }
 
 /** Performs one bounded BYSI request so a provider stall cannot trap the rehearsal UI. */
-export async function requestBysiGeneration(payload: Record<string, unknown>, timeoutMs: number = BYSI_GENERATION_TIMEOUT_MS): Promise<Response> {
+export async function requestBysiGeneration(payload: Record<string, unknown>, timeoutMs: number = BYSI_GENERATION_TIMEOUT_MS, signal?: AbortSignal): Promise<Response> {
   const endpoint = configuredGenerateEndpoint();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(endpoint, {
+  return withRequestDeadline(async (requestSignal) => {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: controller.signal,
+      signal: requestSignal,
     });
-  } finally {
-    clearTimeout(timeout);
-  }
+    // Preserve the Response API, but do not release the deadline at headers.
+    const bytes = await response.arrayBuffer();
+    return new Response(response.status === 204 || response.status === 205 || response.status === 304 ? null : bytes, {
+      status: response.status, statusText: response.statusText, headers: response.headers,
+    });
+  }, timeoutMs, signal);
 }
 
-async function postBysi<T>(payload: Record<string, unknown>): Promise<T> {
-  const endpoint = configuredGenerateEndpoint();
+async function postBysi<T>(payload: Record<string, unknown>, paidPractice: boolean = true): Promise<T> {
+  // Normal registered free acquisition is separate from paid entitlement authority.
+  const staged = process.env.EXPO_PUBLIC_BYSI_BUILD_MODE === "staging-account";
+  const normalPaid = paidPractice && !staged && !!process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN;
+  const stagedPaid = paidPractice && staged;
+  const stagedFree = !paidPractice && staged;
+  const normalFree = !paidPractice && !staged && !!process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN;
+  const endpoint = normalPaid ? "https://beforeyousayit.app/api/native/generate" : stagedPaid ? "https://bysi-signup-staging.vercel.app/api/practice/generate"
+    : stagedFree ? "https://bysi-signup-staging.vercel.app/api/web-signup/generate" : normalFree ? "https://beforeyousayit.app/api/native/free/generate" : configuredGenerateEndpoint();
   const type = typeof payload.type === "string" ? payload.type : "unknown";
   const contract = payload.contract as { entry_route?: unknown } | undefined;
   const entryRoute = typeof contract?.entry_route === "string" ? contract.entry_route : "unknown";
@@ -137,7 +148,13 @@ async function postBysi<T>(payload: Record<string, unknown>): Promise<T> {
     provider: "user-owned-claude-backend",
     type,
   });
-  const response = await requestBysiGeneration(payload);
+  const response = normalPaid
+    ? await (await import("./nativeBillingRuntime")).nativeBilling!.request("generate", payload)
+    : stagedPaid
+    ? await (await import("./paidGenerationRuntime")).requestPaidBysiGeneration(payload)
+    : stagedFree ? await (await import("./freeAcquisitionRuntime")).requestFreeBysiGeneration(payload)
+    : normalFree ? await (await import("./normalFreeRuntime")).requestNormalFree("generate", payload)
+    : await requestBysiGeneration(payload);
   safeLog("[evidence] BYSI generation response", {
     endpoint: evidenceEndpoint(endpoint),
     entryRoute,
@@ -146,7 +163,10 @@ async function postBysi<T>(payload: Record<string, unknown>): Promise<T> {
     type,
   });
   const result = await response.json().catch((): Record<string, never> => ({})) as T & { error?: unknown };
-  if (!response.ok) throw new Error(`BYSI generation failed (${response.status})`);
+  if (!response.ok) {
+    if (!paidPractice) throw new FreeAcquisitionRequestError(response.status, (result as {code?:unknown}).code);
+    throw new Error(`BYSI generation failed (${response.status})`);
+  }
   return result;
 }
 
@@ -304,12 +324,23 @@ export interface ApprovedRehearsalDynamicReplyInput {
 }
 
 /** Rejects unsafe, ungrounded, or instructional shared-lesson replies before they reach the learner. */
-export function approvedRehearsalDynamicReplyPassesQuality(reply: string, groundingContext: string): boolean {
-  return approvedRehearsalPressurePassesQuality(reply, groundingContext);
+export function approvedRehearsalDynamicReplyPassesQuality(reply: string, groundingContext: string, factContract?: string): boolean {
+  return approvedRehearsalPressurePassesQuality(reply, groundingContext, factContract);
 }
 
 /** Generates a provider-only scenario-aware pressure for an approved lesson. */
 export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehearsalDynamicReplyInput): Promise<M1L1DynamicReplyResult> {
+  if (input.lessonId === 'm1-l2') {
+    try {
+      if (input.counterpartId !== 'ravi') throw new Error('Invalid Ravi identity');
+      const {generateRaviSemanticReply} = await import('./raviSemanticClient');
+      return await generateRaviSemanticReply({turn: input.kind === 'pushback_one' ? 'pushback' : 'close', openingTranscript: input.openingTranscript, firstPressure: input.firstPressure ?? '', firstResponse: input.firstResponse ?? '', excluded: input.authoredCorpus});
+    } catch {
+      // No legacy endpoint fallback and no outer repair: the paid server owns it.
+      throw new Error('AI counterpart response is unavailable');
+    }
+  }
+  const factContract = undefined;
   const pressureObjective = [
     input.kind === "pushback_one"
       ? `Reply directly to the learner's approved opening as ${input.scenario.counterpart}.`
@@ -329,7 +360,8 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
     input.approvedTranscript,
   ].filter(Boolean).join(" ");
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  // The server owns the single repair for Ravi; never multiply that budget.
+  for (let attempt = 0; attempt < (factContract ? 1 : 2); attempt += 1) {
     try {
       const result = await postBysi<BysiTurnResponse>({
         type: "rehearsal_turn",
@@ -347,6 +379,7 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
         avoid_repeating: [...input.authoredCorpus, input.firstPressure ?? ""].filter(Boolean),
         lesson_constraints: {
           lesson_id: input.lessonId,
+          ...(factContract ? {fact_contract_version: factContract} : {}),
           counterpart_id: input.counterpartId,
           counterpart: input.scenario.counterpart,
           approved_transcript: input.approvedTranscript,
@@ -370,7 +403,7 @@ export async function generateApprovedRehearsalDynamicReply(input: ApprovedRehea
       const repeatsCorpus = isExcludedApprovedRehearsalLine(reply, input.authoredCorpus);
       const repeatsFirstPressure = Boolean(input.firstPressure)
         && canonicalReply === canonicalCounterpartLine(input.firstPressure!);
-      if (reply && !repeatsCorpus && !repeatsFirstPressure && approvedRehearsalDynamicReplyPassesQuality(reply, groundingContext)) return { reply };
+      if (reply && !repeatsCorpus && !repeatsFirstPressure && approvedRehearsalDynamicReplyPassesQuality(reply, groundingContext, factContract)) return { reply };
       safeLog("[ai] approved rehearsal quality gate rejected line", { attempt, lessonId: input.lessonId });
     } catch (error) {
       safeLog("[ai] approved rehearsal counterpart request failed", { attempt, lessonId: input.lessonId, ...errorShape(error) });
@@ -405,7 +438,10 @@ export async function generateM1L1DynamicReply(input: M1L1DynamicReplyInput): Pr
     ? "Respond directly to the learner's actual point while defending Adam's quarter-close constraints and keeping the requested handoff change unresolved."
     : "Respond to the full exchange by challenging the learner's evidence or scope without changing topic or resolving the requested handoff change.";
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  // The paid handler already owns one bounded provider repair. A native retry
+  // after its terminal response would silently start another paid generation.
+  const requestLimit = process.env.EXPO_PUBLIC_BYSI_BUILD_MODE === "staging-account" ? 1 : 2;
+  for (let attempt = 0; attempt < requestLimit; attempt += 1) {
     try {
       const result = await postBysi<BysiTurnResponse>({
         type: "rehearsal_turn",
@@ -455,6 +491,7 @@ export async function nextCounterpartTurn(
   outcome?: string,
   persona?: PersonaVoice,
   entryRoute: BysiEntryRoute = "real_conversation",
+  paidPractice: boolean = false,
 ): Promise<CounterpartTurn> {
   const turn: AcquisitionCounterpartTurn = turns.filter((item) => item.role === "user").length >= 2 ? "close" : "pushback";
   const avoidRepeating = turns
@@ -472,11 +509,13 @@ export async function nextCounterpartTurn(
         transcript: bysiTranscript(turns, scenario),
         avoid_repeating: avoidRepeating,
         variation_seed: `${scenario.id}-${turn}-${Date.now().toString(36)}-${attempt}`,
-      });
+      }, paidPractice);
+      if (!paidPractice && result.mode === 'safety') throw new FreeAcquisitionSafetyError();
       const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
       if (reply && counterpartLinePassesQuality(reply, turn, groundingContext)) return { reply, tension: 50, nudge: "" };
       safeLog("[ai] BYSI counterpart quality gate rejected line", { attempt, turn });
     } catch (error) {
+      if (error instanceof FreeAcquisitionSafetyError || error instanceof FreeAcquisitionRequestError) throw error;
       safeLog("[ai] BYSI counterpart request failed", { attempt, ...errorShape(error) });
     }
   }
@@ -492,6 +531,7 @@ export async function generateDebrief(
   reaction?: ReactionPattern,
   outcome?: string,
   entryRoute: BysiEntryRoute = "real_conversation",
+  paidPractice: boolean = false,
 ): Promise<GeneratedDebrief> {
   void difficulty;
   const transcript = bysiTranscript(turns, scenario);
@@ -508,7 +548,10 @@ export async function generateDebrief(
   });
   const result = await postBysi<BysiResultResponse>({
     type: "free_rehearsal_result",
-    contract: bysiContract(scenario, reaction, outcome, entryRoute),
+    // Hosted acquisition signs the exact briefing across both turns and result.
+    // Preserve historical non-staging/paid payloads; no production contract change.
+    contract: bysiContract(scenario, reaction, outcome, entryRoute,
+      !paidPractice && (process.env.EXPO_PUBLIC_BYSI_BUILD_MODE === "staging-account" || !!process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN) ? difficulty : undefined),
     transcript,
     rewrite_requirement: {
       original_ask: transcript.user_turn_1,
@@ -520,7 +563,8 @@ export async function generateDebrief(
         "Do not return coaching advice, instructions, skill labels, or prefatory text",
       ],
     },
-  });
+  }, paidPractice);
+  if (!paidPractice && result.mode === 'safety') throw new FreeAcquisitionSafetyError();
   safeLog("[evidence] BYSI result shape", {
     count: result.starting_index?.observed_dimensions?.length ?? 0,
     status: result.mode ?? "unknown",
@@ -539,6 +583,10 @@ export async function generateDebrief(
     if (!insufficient?.headline?.trim() || !insufficient.note?.trim() || !insufficient.next_step?.trim()) {
       throw new Error("Could not read the BYSI insufficient-evidence result");
     }
+    // Free acquisition terminals carry no measured or legacy placeholder scores,
+    // in normal Release as well as the isolated staging runtime. Paid behavior
+    // remains separate; this does not change provider or web-funnel contracts.
+    if (!paidPractice) return {analysis: result, debrief: null};
     return {
       analysis: result,
       debrief: {

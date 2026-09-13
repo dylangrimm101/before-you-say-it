@@ -2,6 +2,7 @@ import { activeRunRevision } from "@/lib/activeScenarioRunRepository";
 import { finalizeConvertedLesson } from "@/lib/convertedCompletion";
 import { normalizeConvertedLessonProgress, type ConvertedLessonProgress } from "@/lib/convertedLesson";
 import {
+  prepareUnassessedApprovedRehearsal,
   approvedRehearsalCoachExchange,
   approvedRehearsalComparison,
   approvedRehearsalConfig,
@@ -11,14 +12,7 @@ import {
   type ApprovedRehearsalLessonId,
 } from "@/lib/approvedRehearsals";
 import {
-  normalizeScoredPracticeHistory,
-  progressHistoryPresentation,
-  SCORED_PRACTICE_HISTORY_VERSION,
-  type ScoredPracticeRecord,
-} from "@/lib/scoredPracticeHistory";
-import {
   advanceApprovedRehearsalFirstResponse,
-  attachApprovedRehearsalCoaching,
   attachApprovedRehearsalPushbackOne,
   attachApprovedRehearsalPushbackTwo,
   completeScenarioComparison,
@@ -65,21 +59,19 @@ function completedJourney(input: (typeof JOURNEYS)[number]) {
   };
   const opened = preserveScenarioAttempt(identified, "opener", input.opener, 101);
   const pressured = attachApprovedRehearsalPushbackOne(opened, {
-    id: `${runId}-counterpart-turn-1`, text: `I still need a clearer answer about ${config.scenario.title}.`, source: "provider",
+    id: `${runId}-counterpart-turn-1`, text: (config.lessonId === "m1-l2" ? "I don't think one late file proves our approval process is broken." : `I still need a clearer answer about ${config.scenario.title}.`), source: "provider",
     reactionId: `${input.lessonId}-dynamic-pressure-1`, semanticVoiceKey: "contextual_counterpart",
     resolvedAudioId: `${opened.run.curriculumVersion}-${runId}-counterpart-turn-1`,
   }, 102);
   const responded = preserveScenarioAttempt(pressured, "response", input.firstResponse, 103);
   const advanced = advanceApprovedRehearsalFirstResponse(responded, 104);
   const pressuredAgain = attachApprovedRehearsalPushbackTwo(advanced, {
-    id: `${runId}-counterpart-turn-2`, text: `Why does ${config.scenario.goal.toLowerCase()} follow from that?`, source: "provider",
+    id: `${runId}-counterpart-turn-2`, text: (config.lessonId === "m1-l2" ? "Does Tuesday's file prove a pattern with final approval?" : `Why does ${config.scenario.goal.toLowerCase()} follow from that?`), source: "provider",
     reactionId: `${input.lessonId}-dynamic-pressure-2`, semanticVoiceKey: "contextual_counterpart",
     resolvedAudioId: `${opened.run.curriculumVersion}-${runId}-counterpart-turn-2`,
   }, 105);
   const note = approvedRehearsalCoachExchange(config, { opener: input.opener, firstResponse: input.firstResponse });
-  const coached = attachApprovedRehearsalCoaching(pressuredAgain, note.note, note.retryDirection, note.coachedBehaviorId, {
-    coachedBeat: note.coachedBeat, selectedDimension: note.selectedDimension, status: note.flags[0].status, evidenceQuote: note.evidenceQuote,
-  }, 107);
+  const coached = prepareUnassessedApprovedRehearsal(config, pressuredAgain, 107);
   const replayed = confirmApprovedRehearsalReplay(stageApprovedRehearsalReplay(coached, 108), "text_fallback_acknowledged", 109);
   const retried = preserveApprovedRehearsalRetry(replayed, input.retry, 110);
   const comparedBase = completeScenarioComparison(retried, 111);
@@ -103,19 +95,26 @@ function completionRecord(journey: ReturnType<typeof completedJourney>, customWo
 describe("approved lesson M1 L1-shaped journeys", () => {
   test("drives every shared lesson through opening, two pushbacks, one response, coaching, replay, retry, and return validation", () => {
     for (const input of JOURNEYS) {
-      const { config, value, note } = completedJourney(input);
+      const { config, value } = completedJourney(input);
       expect(value.run.state, input.lessonId).toBe("attempt_comparison");
       expect(value.run.approvedRehearsal?.pushbackOne?.reactionId, input.lessonId).toBe(`${input.lessonId}-dynamic-pressure-1`);
       expect(value.run.approvedRehearsal?.pushbackTwo?.reactionId, input.lessonId).toBe(`${input.lessonId}-dynamic-pressure-2`);
-      expect(value.run.coachingObservation, input.lessonId).toEqual({ coachedBeat: note.coachedBeat, selectedDimension: config.coachedBehaviorId, status: "not_met", evidenceQuote: note.evidenceQuote });
+      expect(value.run.coachingObservation, input.lessonId).toBeUndefined();
       expect(value.run.approvedRehearsal?.replayProof, input.lessonId).toBe("text_fallback_acknowledged");
       expect(value.run.retryAttempt?.transcript, input.lessonId).toBe(input.retry);
       expect(validateApprovedRehearsalCompletion(config, value.run, value.run.id), input.lessonId).toBe(true);
       expect(normalizeScenarioPracticeRun(JSON.parse(JSON.stringify(value)))?.run.id, input.lessonId).toBe(value.run.id);
-      expect(approvedRehearsalIndexImpact(config, value.run, []), input.lessonId).toMatchObject({ signalValue: 72, beforeIndex: null, afterIndex: 72, delta: null });
+      expect(approvedRehearsalIndexImpact(config, value.run, []), input.lessonId).toBeNull();
     }
   });
 
+  test("legacy heuristic observations can prove practice completion, never skill or a new verdict", () => {
+    const { config, value } = completedJourney(JOURNEYS[0]!);
+    const legacy = { ...value.run, coachNote: "Old heuristic praise", coachingObservation: { coachedBeat: 3 as const, selectedDimension: config.coachedBehaviorId, status: "met" as const, evidenceQuote: value.run.responseAttempt!.transcript } };
+    expect(validateApprovedRehearsalCompletion(config, legacy, legacy.id)).toBe(true);
+    expect(approvedRehearsalIndexImpact(config, legacy, [])).toBeNull();
+    expect(validateApprovedRehearsalCompletion(config, { ...legacy, coachingObservation: { ...legacy.coachingObservation, evidenceQuote: "Forged quote" } }, legacy.id)).toBe(false);
+  });
   test("normalizes optional-save completion without retaining any exchange transcript", () => {
     for (const input of JOURNEYS) {
       const journey = completedJourney(input);
@@ -146,21 +145,10 @@ describe("approved lesson M1 L1-shaped journeys", () => {
     }
   });
 
-  test("records only retry evidence and preserves previously observed signals", () => {
-    let history: ScoredPracticeRecord[] = [];
-    for (const [index, input] of JOURNEYS.entries()) {
+  test("scoreless completion does not manufacture retry evidence history", () => {
+    for (const input of JOURNEYS) {
       const journey = completedJourney(input);
-      const impact = approvedRehearsalIndexImpact(journey.config, journey.value.run, progressHistoryPresentation(history).rows.flatMap((row) => row.value === null ? [] : [{ key: row.key, value: row.value }]))!;
-      const retryId = journey.value.run.retryAttempt!.id;
-      history = normalizeScoredPracticeHistory([...history, {
-        schemaVersion: SCORED_PRACTICE_HISTORY_VERSION, id: journey.value.run.id, rehearsalId: journey.value.run.id,
-        completedAt: 300 + index, scenarioId: journey.config.scenario.id, scenarioTitle: journey.config.scenario.title,
-        observedSignals: [{ key: impact.signalKey, value: impact.signalValue, evidenceTurnIds: [retryId] }], observedSignalSet: [impact.signalKey],
-        overallIndex: impact.signalValue, evidence: [{ turnId: retryId }], currentFocus: `Keep ${impact.signalLabel.toLowerCase()} visible under pushback`,
-      }]);
-      expect(history.at(-1)?.evidence, input.lessonId).toEqual([{ turnId: retryId }]);
-      expect(JSON.stringify(history.at(-1)), input.lessonId).not.toContain(input.retry);
+      expect(approvedRehearsalIndexImpact(journey.config, journey.value.run, [])).toBeNull();
     }
-    expect(progressHistoryPresentation(history).recordCount).toBe(JOURNEYS.length);
   });
 });

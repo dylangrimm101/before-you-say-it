@@ -1,3 +1,4 @@
+import { approvedRehearsalConfigs } from "@/lib/approvedRehearsals";
 import type { ModuleId } from "@/constants/modules";
 import { PROGRESS_SIGNAL_LABELS, PROGRESS_SIGNAL_ORDER } from "@/lib/progressEvidence";
 import { calculatePartialStartingIndex, type SharedResultContractV1, type SharedSignalKey } from "@/types/sharedProduct";
@@ -158,12 +159,22 @@ export interface ProgressHistoryPresentation {
   currentFocus: string | null;
 }
 
+// Existing v1 records from these scenes came from the retired keyword scorer.
+// Keep them on disk (and keep completion), but never display them as measured evidence.
+// A future calibrated scorer must introduce explicit, validated provenance before opting in.
+const unverifiedApprovedSceneIds = new Set(approvedRehearsalConfigs().map((config) => config.scenario.id));
+
+/** Presentation-only filter; never removes stored records or completion milestones. */
+export function measuredPracticeHistory(history: readonly ScoredPracticeRecord[]): ScoredPracticeRecord[] {
+  return history.filter((record) => !unverifiedApprovedSceneIds.has(record.scenarioId));
+}
+
 /** Derives a cumulative Index: each practice updates only the signals it genuinely observed. */
 export function progressHistoryPresentation(
   history: readonly ScoredPracticeRecord[],
   baseline?: SharedResultContractV1,
 ): ProgressHistoryPresentation {
-  const ordered = [...history].sort((left, right) => left.completedAt - right.completedAt);
+  const ordered = measuredPracticeHistory(history).sort((left, right) => left.completedAt - right.completedAt);
   const bySignal = new Map<SharedSignalKey, ScoredPracticeSignal>();
   const baselineIsAlreadyRecorded = Boolean(baseline && ordered.some((record) => record.rehearsalId === baseline.rehearsal_id));
   if (baseline && !baselineIsAlreadyRecorded) {
@@ -211,7 +222,7 @@ export function dimensionHistoryPresentation(
   key: SharedSignalKey,
   history: readonly ScoredPracticeRecord[],
 ): DimensionHistoryPresentation {
-  const observed = [...history].sort((left, right) => left.completedAt - right.completedAt).flatMap((record) => {
+  const observed = measuredPracticeHistory(history).sort((left, right) => left.completedAt - right.completedAt).flatMap((record) => {
     const signal = record.observedSignals.find((item) => item.key === key);
     return signal ? [{ record, signal }] : [];
   });

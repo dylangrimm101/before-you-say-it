@@ -15,6 +15,7 @@ export interface ConversionBuild {
   events: ConversionEvent[];
   debrief: Debrief | null;
   error: string | null;
+  retry?: () => Promise<void>;
 }
 
 const CONVERSION_EVENT_ORDER: readonly ConversionEvent[] = [
@@ -61,9 +62,9 @@ export function isConversionBuildActive(id: string): boolean {
   return current?.id === id;
 }
 
-export function failConversionBuild(id: string): void {
+export function failConversionBuild(id: string, recovery?: {message:string;retry?:()=>Promise<void>}): void {
   if (current?.id !== id) return;
-  publish({ ...current, error: "We couldn't finish your starting point. Your rehearsal is still safe." });
+  publish({ ...current, error: recovery?.message ?? "We couldn't finish your starting point. Your rehearsal is still safe.", retry:recovery?.retry });
 }
 
 export function getConversionBuild(id: string): ConversionBuild | null {

@@ -55,6 +55,12 @@ function session(entryRoute: "real_conversation" | "recurring_problem" | "desire
 }
 
 describe("Claude Design free journey contract", () => {
+  test("native result preserves explicit null overall and fractional observed provider scores", () => {
+    const result = buildFreeJourneyResult(session(), debrief, { ...analysis, starting_index: { ...analysis.starting_index, overall: null, observed_dimensions: [{ name: "Clarity", score: 49.25, evidence: "Exact fractional observation" }] } });
+    expect(result.starting_index.index_value).toBeNull();
+    expect(result.signals.find(signal => signal.signal_key === "clarity")?.score).toBe(49.25);
+    expect(result.signals.find(signal => signal.signal_key === "listening")?.score).toBeNull();
+  });
   test("every route reaches a personalized contract briefing without a manager fixture default", () => {
     const routes = ["real_conversation", "recurring_problem", "desired_skill"] as const;
     const briefings = routes.map((route) => activePracticeSessionToSharedRoute(session(route)));
@@ -267,7 +273,7 @@ describe("Claude Design free journey contract", () => {
     expect(source).toContain('accessibilityLabel="Edit your opening"');
     expect(source).toContain('accessibilityLabel="Edit your response under pressure"');
     expect(source).toContain('label="Approve transcript"');
-    expect(source.indexOf("approveTranscript")).toBeLessThan(source.indexOf("analyzeApprovedTranscript(approvedTurns)"));
+    expect(source.indexOf("approveTranscript")).toBeLessThan(source.indexOf("void analyzeApprovedTranscript(approvedTurns)"));
   });
 
   test("the local privacy route keeps truthful current-build claims", async () => {
@@ -276,7 +282,7 @@ describe("Claude Design free journey contract", () => {
     expect(layout).toContain('firstSegment === "privacy"');
     expect(layout).toContain("canInterruptFreeJourney");
     expect(privacy).toContain("Privacy &amp; details");
-    expect(privacy).toContain("This build does not provide an account or cross-device recovery.");
+    expect(privacy).toContain("Signing in reconnects your eligible access through your existing web account.");
     expect(privacy).toContain("Each saved session keeps a minimized record of the scenario, date, completion details, and result summary when one is available. It does not keep the rehearsal transcript.");
     expect(privacy).toContain("Raw audio is not stored by this app.");
     expect(privacy).toContain("A recording is sent once for transcription");

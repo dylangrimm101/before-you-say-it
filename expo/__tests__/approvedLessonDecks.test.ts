@@ -71,13 +71,20 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     }
   });
 
-  test("retries transient archive failures and lets a failed WebView load be retried in place", async () => {
+  test("loads bundled sources without network retries and lets a failed WebView load be retried in place", async () => {
     const loader = await source("lib/approvedDeckLoader.ts");
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
-    expect(loader).toContain("ARCHIVE_LOAD_ATTEMPTS = 3");
-    expect(loader).toContain("ARCHIVE_LOAD_TIMEOUT_MS = 12_000");
-    expect(loader).toContain("for (let attempt = 0; attempt < ARCHIVE_LOAD_ATTEMPTS; attempt += 1)");
-    expect(loader).toContain("controller.abort()");
+    expect(loader).toContain('import bundledDeckAssets from "@/assets/approved-decks"');
+    expect(loader).not.toContain("downloadAsync");
+    const manifest = JSON.parse(await source("assets/approved-decks/manifest.json"));
+    const { createHash } = await import("node:crypto");
+    expect(Object.keys(manifest.decks)).toHaveLength(12);
+    for (const [archivePath, digest] of Object.entries(manifest.decks)) {
+      const bytes = await Bun.file(`${import.meta.dir}/../assets/approved-decks/${archivePath.split("/").at(-1)}`).arrayBuffer();
+      expect(createHash("sha256").update(new Uint8Array(bytes)).digest("hex")).toBe(digest);
+    }
+    expect(loader).not.toMatch(/\bunzipSync\s*\(/);
+    expect(loader).toContain("await approvedDeckSource(archivePath)");
     expect(deckScreen).toContain('label="Try again"');
     expect(deckScreen).toContain("setLoadAttempt((current) => current + 1)");
     expect(deckScreen).toContain("lesson, loadAttempt, rehearsalConfig");
@@ -89,7 +96,8 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     const deckScreen = await source("app/approved-lesson/[lessonId].tsx");
     expect(catalog).toContain('archivePath: "BYSI-Rork-Handoff/decks/M1-L1-Buried-Point.html"');
     expect(catalog).not.toContain("deckHtml: require");
-    expect(loader).toContain("unzipSync");
+    expect(loader).toContain("bundledDeckAssets");
+    expect(loader).not.toMatch(/\bunzipSync\s*\(/);
     expect(loader).toContain("authorizedDeckHtml");
     expect(deckScreen).toContain("loadApprovedDeckHtml(lesson.archivePath, lesson.reviewThroughCard)");
     expect(deckScreen).toContain('source={{ html: deckHtml, baseUrl: "about:blank" }}');
@@ -484,7 +492,10 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(dictation).toContain("WEB_RECORDER_STOP_TIMEOUT_MS = 1_500");
     expect(dictation).toContain("await stopWebRecorder(webRecorder)");
     expect(transcription).toContain("TRANSCRIPTION_TIMEOUT_MS = 45_000");
-    expect(transcription).toContain("signal: controller.signal");
+    expect(transcription).toContain("return await withRequestDeadline(async (signal) => {");
+    expect(transcription).toContain("options.timeoutMs ?? TRANSCRIPTION_TIMEOUT_MS, options.signal");
+    expect(transcription).toMatch(/fetch\(TRANSCRIBE_ENDPOINT,\s*\{[^}]*\bsignal,/s);
+    expect(transcription).toContain("await response.json()");
     for (const runtime of [m1L1Runtime, sharedRuntime]) {
       expect(runtime).toContain("Preparing your transcript…");
       expect(runtime).toContain("Your recording has stopped. You’ll approve the wording next.");
@@ -554,12 +565,17 @@ describe("approved Modules 1 and 2 internal deck port", () => {
     expect(implementation).not.toContain("AsyncStorage");
   });
 
-  test("pins the complete production archive digest before unzip", async () => {
+  test("pins archive identity and verifies exact bundled source bytes before materialization", async () => {
     const loader = await source("lib/approvedDeckLoader.ts");
     expect(isApprovedArchiveDigest("62348a014a52c062bbcd691f88b3b77b618a72bf41014b6719b1b0f1de42fd03")).toBe(true);
     expect(isApprovedArchiveDigest("0".repeat(64))).toBe(false);
-    expect(loader).toContain("Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, archiveBytes)");
-    expect(loader.indexOf("isApprovedArchiveDigest")).toBeLessThan(loader.indexOf("unzipSync(archiveBytes)"));
+    expect(loader).toContain("isApprovedArchiveDigest(bundledDeckManifest.archiveSha256)");
+    expect(loader).toContain("Object.hasOwn(digests, archivePath)");
+    expect(loader).toContain("Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, source)");
+    expect(loader).toContain('if (digest !== digests[archivePath]) throw new Error("Approved lesson deck failed authenticity check")');
+    expect(loader).toContain("isApprovedM1L1DeckDigest(archivePath, M1_L1_CONTENT_VERSION, digest)");
+    expect(loader).toContain("materializeApprovedDeckHtml(authorizedDeckHtml(await approvedDeckSource(archivePath), reviewThroughCard))");
+    expect(loader).not.toMatch(/\bunzipSync\s*\(/);
   });
 
   test("accepts a semantically complete nine-card close when harmless source formatting changes", async () => {

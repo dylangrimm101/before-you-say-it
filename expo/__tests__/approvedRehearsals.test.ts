@@ -21,9 +21,9 @@ describe("approved M1 L2-L5 rehearsals", () => {
     const l4 = approvedRehearsalConfig("m1-l4")!;
     const l5 = approvedRehearsalConfig("m1-l5")!;
 
-    expect(l2.contentVersion).toBe("m1-l2-two-pressure-m1-l1-parity-v4-2026-08-29");
+    expect(l2.contentVersion).toBe("m1-l2-thursday-semantic-v7-2026-09-07");
     expect(l2.scenario.situation).toBe(
-      "Wednesday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi points out that the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file was also late, another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.",
+      "Thursday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi says yesterday was the client’s fault: the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file waited because nobody owned the sign-off. Another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.",
     );
     expect(l2.authoredPressureText).toBe("Okay, but that's still one example. What else are you basing this on?");
     expect(l2.namedMove).toBe("One anchor. The rest stays in the folder.");
@@ -54,23 +54,23 @@ describe("approved M1 L2-L5 rehearsals", () => {
     expect([l5.rehearsalHandoffCard, l5.returnCard, l5.completionCard]).toEqual([18, 19, 20]);
   });
 
-  test("checks only the named lesson move and produces a scoreless same-moment comparison", () => {
+  test("keeps the named lesson target without pretending to assess responses", () => {
     const l3 = approvedRehearsalConfig("m1-l3")!;
     const before = "That's not true.";
     const after = "I hear that. Let's finish March's appointments, and tomorrow we can talk about calls.";
-    expect(approvedRehearsalCriterion(l3, before)).toBe(false);
-    expect(approvedRehearsalCriterion(l3, after)).toBe(true);
+    expect(approvedRehearsalCriterion(l3, before)).toBeNull();
+    expect(approvedRehearsalCriterion(l3, after)).toBeNull();
     expect(approvedRehearsalCoachNote(l3, before)).toMatchObject({
       evidenceQuote: before,
       coachedBehaviorId: "park_and_return",
       coachedBeat: 3,
       selectedDimension: "park_and_return",
-      flags: [{ dimension: "park_and_return", status: "not_met", evidenceQuote: before }],
+      flags: [{ dimension: "park_and_return", status: "not_assessed", evidenceQuote: before }],
     });
     expect(approvedRehearsalComparison(l3, before, after)).toEqual({
       behaviorId: "park_and_return",
-      text: "The retry made “Both on the table. One at a time.” observable. That is the only change Hope checked.",
-      criterionChanged: true,
+      text: "These responses are not assessed: a validated assessment is unavailable. Practice completion records your rehearsal, not measured skill improvement. Your Communication Index has not changed.",
+      criterionChanged: false,
     });
   });
 
@@ -161,7 +161,7 @@ describe("approved M2 L1-L5 rehearsals", () => {
     }
   });
 
-  test("checks only each Module 2 named move in scoreless same-moment coaching", () => {
+  test("offers each Module 2 target as self-guided, not assessed coaching", () => {
     const cases = [
       ["m2-l1", "No, do everything anyway.", "What part of the brief can you finish by Thursday?"],
       ["m2-l2", "Can somebody handle it?", "Jen, can you confirm the order?"],
@@ -172,27 +172,27 @@ describe("approved M2 L1-L5 rehearsals", () => {
 
     for (const [lessonId, before, after] of cases) {
       const config = approvedRehearsalConfig(lessonId)!;
-      expect(approvedRehearsalCriterion(config, before)).toBe(false);
-      expect(approvedRehearsalCriterion(config, after)).toBe(true);
+      expect(approvedRehearsalCriterion(config, before)).toBeNull();
+      expect(approvedRehearsalCriterion(config, after)).toBeNull();
       const note = approvedRehearsalCoachNote(config, before);
       expect(note).toMatchObject({
         evidenceQuote: before,
         coachedBehaviorId: config.coachedBehaviorId,
         coachedBeat: 3,
         selectedDimension: config.coachedBehaviorId,
-        flags: [{ dimension: config.coachedBehaviorId, status: "not_met", evidenceQuote: before }],
+        flags: [{ dimension: config.coachedBehaviorId, status: "not_assessed", evidenceQuote: before }],
       });
-      expect(note.worked).toContain(`“${before}”`);
-      expect(note.change).toMatch(/^On the retry,/);
+      expect(note.worked).toContain("not assessed");
+      expect(note.change).toMatch(/^For self-guided practice,/);
       expect(note.retryDirection).toMatch(/^Replay this exact moment and/);
       const positive = approvedRehearsalCoachNote(config, after);
-      expect(positive.flags[0].status).toBe("met");
-      expect(positive.worked).toContain(`“${after}”`);
-      expect(positive.change).toBe("Keep that same choice in the retry.");
+      expect(positive.flags[0].status).toBe("not_assessed");
+      expect(positive.worked).toContain("not assessed");
+      expect(positive.change).toContain("not a judgment of your response");
       expect(approvedRehearsalComparison(config, before, after)).toEqual({
         behaviorId: config.coachedBehaviorId,
-        text: `The retry made “${config.namedMove}” observable. That is the only change Hope checked.`,
-        criterionChanged: true,
+        text: "These responses are not assessed: a validated assessment is unavailable. Practice completion records your rehearsal, not measured skill improvement. Your Communication Index has not changed.",
+        criterionChanged: false,
       });
     }
   });
@@ -281,7 +281,7 @@ describe("approved lesson native completion evidence", () => {
     };
   }
 
-  test("maps every approved lesson to one observed signal and establishes first evidence", () => {
+  test("does not manufacture first evidence for any approved lesson", () => {
     const expectedSignals = {
       "m1-l2": "specificity",
       "m1-l3": "listening",
@@ -293,26 +293,23 @@ describe("approved lesson native completion evidence", () => {
       "m2-l4": "listening",
       "m2-l5": "specificity",
     } as const;
-    for (const [lessonId, signalKey] of Object.entries(expectedSignals)) {
+    for (const lessonId of Object.keys(expectedSignals)) {
       const config = approvedRehearsalConfig(lessonId)!;
       const impact = approvedRehearsalIndexImpact(config, completionRun(lessonId, "No.", passingRetry[lessonId]!), []);
-      expect(impact?.signalKey).toBe(signalKey);
-      expect(impact?.signalValue).toBe(72);
-      expect(impact?.beforeIndex).toBeNull();
-      expect(impact?.delta).toBeNull();
+      expect(impact).toBeNull();
       expect(approvedRehearsalStrongVersion(config).length).toBeGreaterThan(30);
     }
   });
 
-  test("supports evidence-based increase, hold, and decrease without completion points", () => {
+  test("never manufactures an increase, hold, or decrease from unassessed words", () => {
     const config = approvedRehearsalConfig("m2-l4")!;
     const current = [{ key: "listening" as const, value: 60 }];
     const increased = approvedRehearsalIndexImpact(config, completionRun("m2-l4", "Please reconsider.", passingRetry["m2-l4"]!), current);
     const held = approvedRehearsalIndexImpact(config, completionRun("m2-l4", "Please reconsider.", "No, please reconsider."), current);
     const decreased = approvedRehearsalIndexImpact(config, completionRun("m2-l4", passingRetry["m2-l4"]!, "No, please reconsider."), current);
-    expect(increased).toMatchObject({ signalValue: 78, beforeIndex: 60, afterIndex: 78, delta: 18 });
-    expect(held).toMatchObject({ signalValue: 60, beforeIndex: 60, afterIndex: 60, delta: 0 });
-    expect(decreased).toMatchObject({ signalValue: 48, beforeIndex: 60, afterIndex: 48, delta: -12 });
+    expect(increased).toBeNull();
+    expect(held).toBeNull();
+    expect(decreased).toBeNull();
   });
 });
 
@@ -324,12 +321,12 @@ describe("shared provider-only saved-run contract", () => {
     const id = `saved-${lessonId}`;
     const created = initializeApprovedRehearsalRun(createScenarioPracticeRun(config.scenario, "steady", "defensive", id, 1), 1);
     const first = {
-      id: `${id}-counterpart-turn-1`, text: `I still need a clearer answer about ${config.scenario.title}.`, source: "provider" as const,
+      id: `${id}-counterpart-turn-1`, text: (config.lessonId === "m1-l2" ? "I don't think one late file proves our approval process is broken." : `I still need a clearer answer about ${config.scenario.title}.`), source: "provider" as const,
       reactionId: `${lessonId}-dynamic-pressure-1`, semanticVoiceKey: "contextual_counterpart" as const,
       resolvedAudioId: `${created.run.curriculumVersion}-${id}-counterpart-turn-1`, authoredAt: 3,
     };
     const second = {
-      id: `${id}-counterpart-turn-2`, text: `Why does ${config.scenario.goal.toLowerCase()} follow from that?`, source: "provider" as const,
+      id: `${id}-counterpart-turn-2`, text: (config.lessonId === "m1-l2" ? "Does Tuesday's file prove a pattern with final approval?" : `Why does ${config.scenario.goal.toLowerCase()} follow from that?`), source: "provider" as const,
       reactionId: `${lessonId}-dynamic-pressure-2`, semanticVoiceKey: "contextual_counterpart" as const,
       resolvedAudioId: `${created.run.curriculumVersion}-${id}-counterpart-turn-2`, authoredAt: 5,
     };

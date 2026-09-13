@@ -1,0 +1,14 @@
+import {mock} from 'bun:test';import assert from 'node:assert/strict';
+process.env.EXPO_PUBLIC_TTS_ENDPOINT='https://voice.example.invalid/api/tts';delete process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN;
+let owner='A';const files=new Map<string,string>();
+const fs={cacheDirectory:'cache/',EncodingType:{Base64:'base64'},makeDirectoryAsync:async()=>{},writeAsStringAsync:async(k:string,v:string)=>{files.set(k,v);},getInfoAsync:async(k:string)=>({exists:[...files.keys()].some(f=>f===k||f.startsWith(k))}),deleteAsync:async(k:string)=>{for(const f of files.keys())if(f===k||f.startsWith(k))files.delete(f);},readDirectoryAsync:async()=>['owners']};
+mock.module('expo-file-system/legacy',()=>fs);mock.module('react-native',()=>({Platform:{OS:'ios'}}));
+mock.module('expo-audio',()=>({createAudioPlayer:()=>{throw Error('Synthetic playback boundary, no audio device');},setAudioModeAsync:async()=>{}}));
+mock.module('@/lib/supabase',()=>({authEnvironment:{url:'fixture'},supabase:{auth:{getSession:async()=>({data:{session:{user:{id:owner}}},error:null})}}}));
+(globalThis as any).FileReader=class{result:any;onloadend:any;onerror:any;abort(){}async readAsDataURL(blob:Blob){this.result='data:audio/mpeg;base64,'+Buffer.from(await blob.arrayBuffer()).toString('base64');this.onloadend?.();}};
+globalThis.fetch=async(input:any)=>{assert.equal(String(input),'https://voice.example.invalid/api/tts');return new Response(new Uint8Array([1,2,3]),{headers:{'Content-Type':'audio/mpeg'}});};
+const {speak,resetSpeech}=await import('../lib/voice');const {createOwnerVoiceCache}=await import('../lib/ownerVoiceCache');
+await speak('Synthetic A voice','woman-hope');assert.ok([...files.keys()].some(k=>k.includes('fixture%3AA/')));
+owner='B';await speak('Synthetic B voice','woman-hope');assert.ok([...files.keys()].some(k=>k.includes('fixture%3AB/')));
+await createOwnerVoiceCache(fs as any).erase('fixture:A');assert.ok(![...files.keys()].some(k=>k.includes('fixture%3AA/')));assert.ok([...files.keys()].some(k=>k.includes('fixture%3AB/')));
+await resetSpeech();console.log('PASS actual voice writer owner namespaces and targeted removal; synthetic HTTP bytes, playback intentionally unavailable');

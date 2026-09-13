@@ -155,10 +155,11 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
         <Backdrop />
         <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 26, paddingBottom: insets.bottom + 32 }]} showsVerticalScrollIndicator={false}>
           <Text style={styles.baselineEyebrow}>YOUR COMMUNICATION BASELINE</Text>
-          <Text style={styles.title}>You stayed in the room. Now make the ask hold.</Text>
-          <Text style={styles.baselineObservation}>You kept the conversation from turning into a fight, but the request still needs a specific owner and rhythm so it can survive defensiveness.</Text>
+          <Text style={styles.title}>{moment.headline}</Text>
+          <Text style={styles.baselineObservation}>{moment.observation}</Text>
           <View style={styles.stallCard}>
-            <Text style={styles.stallText}><Text style={styles.stallLead}>Where it stalls: </Text>You stayed in the conversation, but the ask still did not hold under pressure.</Text>
+            <Text style={styles.stallText}>{moment.why_it_matters}</Text>
+            <Text style={styles.baselineScope}>{moment.confidence_statement}</Text>
           </View>
           <View style={styles.exchange}>
             <Text style={styles.focusEyebrow}>FIRST PRACTICE FOCUS</Text>
@@ -257,7 +258,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
         </ScrollView>
         <StateDock bottomInset={insets.bottom}>
           <PrimaryButton
-            label="Start 7-Day free trial"
+            label="Review monthly subscription"
             onPress={async () => {
               safeLog("[evidence] native post-rehearsal transition", {
                 platform: Platform.OS,

@@ -1,7 +1,10 @@
+import type { PersistedScenarioPracticeRun } from "@/lib/scenarioPractice";
 import type { ApprovedLessonId } from "@/constants/approvedLessons";
 import type { Scenario } from "@/types/convo";
 import type { PilotDayRun } from "@/types/pilotCurriculum";
 import type { SharedSignalKey } from "@/types/sharedProduct";
+import { raviSemanticDisplaySafe } from './raviSemanticClient';
+export const RAVI_LEGACY_CONTENT_VERSION = 'm1-l2-thursday-natural-facts-v6-2026-09-07';
 import { approvedRehearsalPressurePassesQuality, areDistinctApprovedRehearsalLines, isExcludedApprovedRehearsalLine } from "@/lib/approvedRehearsalPressure";
 
 export type ApprovedRehearsalLessonId = Extract<
@@ -24,7 +27,7 @@ export interface ApprovedRehearsalCurrentSignal {
   value: number;
 }
 
-export type ApprovedRehearsalCriterionStatus = "met" | "not_met";
+export type ApprovedRehearsalCriterionStatus = "met" | "not_met" | "not_assessed";
 
 export interface ApprovedRehearsalBehaviorFlag {
   dimension: string;
@@ -32,7 +35,7 @@ export interface ApprovedRehearsalBehaviorFlag {
   evidenceQuote: string;
 }
 
-/** M1 L1-shaped evidence note used by every shared approved rehearsal. */
+/** Practice guidance shape. not_assessed quotes are approved wording, not evidence of skill. */
 export interface ApprovedRehearsalCoachNote {
   evidenceQuote: string;
   worked: string;
@@ -77,14 +80,14 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     lessonId: "m1-l2",
     moduleId: MODULE_ONE_ID,
     practiceId: "bysi_m01_l02_cut_the_case",
-    contentVersion: "m1-l2-two-pressure-m1-l1-parity-v4-2026-08-29",
+    contentVersion: "m1-l2-thursday-semantic-v7-2026-09-07",
     scenario: {
       id: "bysi-m01-l02-approval-owner",
       category: "work",
       title: "The approval step",
       counterpart: "Ravi",
       counterpartGender: "man",
-      situation: "Wednesday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi points out that the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file was also late, another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.",
+      situation: "Thursday, end of day. You’re talking with Ravi about who should own final approval before client files are sent. You used yesterday’s late file as an example. Ravi says yesterday was the client’s fault: the client didn’t send its revisions until 3, so he doesn’t think yesterday proves the approval process is the problem.\n\nYou know yesterday wasn’t the only issue. Tuesday’s file waited because nobody owned the sign-off. Another file stalled the week before, the specs have been messy since March, and two coworkers have mentioned similar concerns.",
       persona: "Ravi corrects one detail and questions whether a single example supports the pattern. He cannot resolve the decision for the learner.",
       goal: "Use one representative anchor without building the whole case.",
       opensWith: "user",
@@ -94,6 +97,7 @@ const REHEARSALS: Readonly<Record<ApprovedRehearsalLessonId, ApprovedRehearsalCo
     counterpartId: "ravi",
     authoredPressureText: "Okay, but that's still one example. What else are you basing this on?",
     authoredPressureTwoText: "So are you saying there are more examples I need to hear before we decide?",
+    // Exact pinned archive marker, not runtime chronology; the loader replaces it with scenario.situation.
     handoffSourceScene: "Wednesday, end of day. You've told Ravi the approval step needs a clear owner and used yesterday's late file. He isn't brushing you off. He just isn't accepting that example.",
     coachedBehaviorId: "one_anchor",
     namedMoveId: "one-anchor-folder",
@@ -381,7 +385,16 @@ export function approvedRehearsalRuntimeEnabled(lessonId: string | null | undefi
   return Boolean(approvedRehearsalConfig(lessonId));
 }
 
-/** Validates every durable pressure invariant for one shared approved lesson. */
+/** Read-only historical selector. Never use it for new generation or resume.
+ * Stored text is presentation data, not a reusable semantic receipt or access grant.
+ */
+export function approvedRehearsalHistoryConfig(config: ApprovedRehearsalConfig, version: unknown): ApprovedRehearsalConfig | null {
+  if (version === config.contentVersion) return config;
+  if (config.lessonId === 'm1-l2' && version === RAVI_LEGACY_CONTENT_VERSION) return {...config, contentVersion: version};
+  return null;
+}
+
+/** Durable identity/structure only for Ravi; remote assessment is not inferred from storage. */
 export function hasCanonicalApprovedRehearsalPressureSequence(config: ApprovedRehearsalConfig, run: PilotDayRun): boolean {
   const first = run.approvedRehearsal?.pushbackOne;
   const second = run.approvedRehearsal?.pushbackTwo;
@@ -413,7 +426,7 @@ export function hasCanonicalApprovedRehearsalPressureSequence(config: ApprovedRe
     || first.resolvedAudioId !== `${run.curriculumVersion}-${run.id}-counterpart-turn-1`
     || first.source !== "provider"
     || isExcludedApprovedRehearsalLine(first.text, corpus)
-    || !approvedRehearsalPressurePassesQuality(first.text, firstGroundingContext)
+    || !(config.lessonId === 'm1-l2' ? raviSemanticDisplaySafe(first.text) : approvedRehearsalPressurePassesQuality(first.text, firstGroundingContext))
     || (first.authoredAt ?? 0) <= run.attempt.confirmedAt) return false;
   if (!second) return true;
   const secondGroundingContext = [
@@ -428,7 +441,7 @@ export function hasCanonicalApprovedRehearsalPressureSequence(config: ApprovedRe
     && second.resolvedAudioId === `${run.curriculumVersion}-${run.id}-counterpart-turn-2`
     && second.source === "provider"
     && !isExcludedApprovedRehearsalLine(second.text, corpus)
-    && approvedRehearsalPressurePassesQuality(second.text, secondGroundingContext)
+    && (config.lessonId === 'm1-l2' ? raviSemanticDisplaySafe(second.text) : approvedRehearsalPressurePassesQuality(second.text, secondGroundingContext))
     && areDistinctApprovedRehearsalLines(first.text, second.text)
     && (first.authoredAt ?? 0) < run.responseAttempt.confirmedAt
     && run.responseAttempt.confirmedAt < (second.authoredAt ?? 0));
@@ -445,17 +458,25 @@ export function validateApprovedRehearsalCompletion(
   const pressureOne = lesson?.pushbackOne;
   const pressureTwo = lesson?.pushbackTwo;
   const observation = run.coachingObservation;
-  const observedTranscript = observation?.coachedBeat === 1
-    ? run.attempt?.transcript
-    : run.responseAttempt?.transcript;
-  const hasValidObservation = Boolean(observation
+  // This is proof of completing self-guided practice, not a semantic verdict.
+  const expectedNote = approvedRehearsalCoachNote(config, run.responseAttempt?.transcript ?? "", 3);
+  // Legacy observations identify an already-practiced turn only. Their old status
+  // is NOT revalidated as a semantic verdict and can never authorize an Index update.
+  const hasLegacyPracticeTarget = Boolean(observation
     && [1, 3].includes(observation.coachedBeat)
     && observation.selectedDimension === config.coachedBehaviorId
-    && observation.evidenceQuote === observedTranscript
-    && observation.status === (approvedRehearsalCriterion(config, observation.evidenceQuote) ? "met" : "not_met")
+    && ["met", "not_met"].includes(observation.status)
+    && observation.evidenceQuote === (observation.coachedBeat === 1 ? run.attempt?.transcript : run.responseAttempt?.transcript)
     && run.coachedSegment === (observation.coachedBeat === 1 ? "opener" : "pushback_response")
     && run.coachedBehaviorId === config.coachedBehaviorId
     && lesson?.coachedBeat === observation.coachedBeat
+    && lesson.selectedDimension === config.coachedBehaviorId);
+  const hasValidObservation = hasLegacyPracticeTarget || (!observation
+    && run.coachNote === expectedNote.note
+    && run.retryInstruction === expectedNote.retryDirection
+    && run.coachedSegment === "pushback_response"
+    && run.coachedBehaviorId === config.coachedBehaviorId
+    && lesson?.coachedBeat === 3
     && lesson.selectedDimension === config.coachedBehaviorId);
   const hasValidPressureOne = Boolean(pressureOne
     && run.counterpartTurn?.id === pressureOne.id
@@ -499,70 +520,10 @@ export function validateApprovedRehearsalCompletion(
     && run.state === "attempt_comparison";
 }
 
-function hasAny(text: string, patterns: readonly RegExp[]): boolean {
-  return patterns.some((pattern) => pattern.test(text));
+/** No validated scene-grounded evaluator is connected. Null is unknown, not failure. */
+export function approvedRehearsalCriterion(_config: ApprovedRehearsalConfig, _transcript: string): boolean | null {
+  return null;
 }
-
-export function approvedRehearsalCriterion(config: ApprovedRehearsalConfig, transcript: string): boolean {
-  const text = transcript.trim().toLowerCase();
-  if (config.lessonId === "m1-l2") {
-    const listSignals = text.match(/\b(also|another|and then|every time|all the times|plus)\b/g)?.length ?? 0;
-    return text.length >= 12 && listSignals <= 1;
-  }
-  if (config.lessonId === "m1-l3") {
-    const acknowledges = hasAny(text, [/\bi hear\b/, /\bthat[’']s fair\b/, /\bi get that\b/, /\bthat makes sense\b/, /\bi can see that\b/, /\bi appreciate that\b/, /\bwe should talk about\b/]);
-    const returns = hasAny(text, [/\bafter\b/, /\btomorrow\b/, /\btonight\b/, /\bnext\b/, /\bwhen\b/, /\bon \w+day\b/]);
-    return acknowledges && returns;
-  }
-  if (config.lessonId === "m1-l4") {
-    const widening = hasAny(text, [/\balways\b/, /\bnever\b/, /\beverything\b/, /\bthe whole month\b/, /\ball the times\b/]);
-    return text.length >= 12 && !widening;
-  }
-  if (config.lessonId === "m1-l5") {
-    return hasAny(text, [/\bi'm asking\b/, /\bi am asking\b/, /\bmy ask is\b/, /\bthis is about\b/, /\bwhat i want\b/, /\bone thing\b/]);
-  }
-  if (config.lessonId === "m2-l1") {
-    const keepsOneAction = hasAny(text, [/\bbrief\b/, /\bhandoff\b/, /\bhalf\b/, /\bpart\b/, /\bby \w+day\b/, /\bwhat can\b/]);
-    const pilesOn = (text.match(/\b(also|another|plus|and then)\b/g)?.length ?? 0) > 1;
-    return keepsOneAction && !pilesOn;
-  }
-  if (config.lessonId === "m2-l2") {
-    return hasAny(text, [/\brenee\b/, /\bjen\b/, /\bcory\b/, /\bangela\b/, /\byou\b/])
-      && !hasAny(text, [/\banyone\b/, /\bsomeone\b/, /\beveryone\b/, /\bwhoever\b/]);
-  }
-  if (config.lessonId === "m2-l3") {
-    const hears = hasAny(text, [/\bi hear\b/, /\bi get\b/, /\bunderstand\b/, /\bthat makes sense\b/, /\bokay\b/]);
-    const trades = hasAny(text, [/\bafter two\b/, /\bfrom two\b/, /\bsunday\b/, /\bmorning\b/, /\bafternoon\b/, /\binstead\b/, /\bthen\b/]);
-    const states = hasAny(text, [/\bcan you\b/, /\bcould you\b/, /\bthe ask\b/, /\bstill need\b/, /\bthat leaves\b/, /\bso we're\b/]);
-    return hears && trades && states;
-  }
-  if (config.lessonId === "m2-l4") {
-    return hasAny(text, [/\bokay\b/, /\bthanks for telling me\b/, /\bthank you for telling me\b/, /\bi hear you\b/])
-      && !hasAny(text, [/\bare you sure\b/, /\bbut i need\b/, /\bjust this once\b/, /\bplease reconsider\b/]);
-  }
-  return hasAny(text, [/\banything that changes\b/, /\bif .* changes\b/, /\bat risk\b/, /\bwhat i'd have to do next\b/, /\bwhat i would have to do next\b/]);
-}
-
-const INDEX_SIGNAL_BY_LESSON: Readonly<Record<ApprovedRehearsalLessonId, SharedSignalKey>> = {
-  "m1-l2": "specificity",
-  "m1-l3": "listening",
-  "m1-l4": "steadiness",
-  "m1-l5": "clarity",
-  "m2-l1": "clarity",
-  "m2-l2": "clarity",
-  "m2-l3": "listening",
-  "m2-l4": "listening",
-  "m2-l5": "specificity",
-};
-
-const INDEX_SIGNAL_LABELS: Readonly<Record<SharedSignalKey, string>> = {
-  clarity: "Clarity",
-  specificity: "Specificity",
-  steadiness: "Steadiness",
-  listening: "Listening",
-  boundaries: "Boundaries",
-  repair: "Repair",
-};
 
 interface ApprovedRehearsalCoachingCopy {
   positiveObservation: string;
@@ -635,54 +596,22 @@ export function approvedRehearsalStrongVersion(config: ApprovedRehearsalConfig):
   return STRONG_VERSION_BY_LESSON[config.lessonId];
 }
 
-/** Calculates one transparent post-lesson Index update from the lesson's observed retry behavior. */
+/** Practice completion is not a calibrated skill measurement. Never synthesize Index values. */
 export function approvedRehearsalIndexImpact(
-  config: ApprovedRehearsalConfig,
-  run: PilotDayRun,
-  currentSignals: readonly ApprovedRehearsalCurrentSignal[],
+  _config: ApprovedRehearsalConfig,
+  _run: PilotDayRun,
+  _currentSignals: readonly ApprovedRehearsalCurrentSignal[],
 ): ApprovedRehearsalIndexImpact | null {
-  const coachedBeat = run.coachingObservation?.coachedBeat;
-  const original = coachedBeat === 1
-    ? run.attempt?.transcript
-    : run.responseAttempt?.transcript;
-  const retry = run.retryAttempt?.transcript;
-  if (!original || !retry) return null;
-  const beforeMet = approvedRehearsalCriterion(config, original);
-  const afterMet = approvedRehearsalCriterion(config, retry);
-  const signalKey = INDEX_SIGNAL_BY_LESSON[config.lessonId];
-  const values = new Map<SharedSignalKey, number>(currentSignals.map((signal) => [signal.key, signal.value]));
-  const previousSignal = values.get(signalKey);
-  const step = !beforeMet && afterMet ? 18 : afterMet ? 6 : beforeMet ? -12 : 0;
-  const signalValue = Math.max(0, Math.min(100, previousSignal === undefined ? (afterMet ? 72 : 52) : previousSignal + step));
-  const beforeIndex = values.size > 0 ? Math.round([...values.values()].reduce((sum, value) => sum + value, 0) / values.size) : null;
-  values.set(signalKey, signalValue);
-  const afterIndex = Math.round([...values.values()].reduce((sum, value) => sum + value, 0) / values.size);
-  const delta = beforeIndex === null ? null : afterIndex - beforeIndex;
-  const signalLabel = INDEX_SIGNAL_LABELS[signalKey];
-  const explanation = delta === null
-    ? `Hope established ${signalLabel.toLowerCase()} evidence from how you used “${config.namedMove}” in the retry.`
-    : delta > 0
-      ? `Your Index increased because the retry made “${config.namedMove}” observable under pressure.`
-      : delta < 0
-        ? `Your Index adjusted because the retry no longer made “${config.namedMove}” observable.`
-        : `Your Index held. Hope added evidence about ${signalLabel.toLowerCase()} and kept the next practice target clear.`;
-  return { signalKey, signalLabel, signalValue, beforeIndex, afterIndex, delta, explanation };
+  return null;
 }
 
-/**
- * Produces the same scoreless, exact-wording coaching shape as M1 L1 while
- * evaluating only this lesson's approved move at the pressure-response beat.
- */
+/** Offers the unchanged lesson target without pretending a semantic assessment ran. */
 export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, transcript: string, coachedBeat: 1 | 3 = 3): ApprovedRehearsalCoachNote {
   const evidenceQuote = transcript.trim();
-  const status: ApprovedRehearsalCriterionStatus = approvedRehearsalCriterion(config, evidenceQuote) ? "met" : "not_met";
+  const status: ApprovedRehearsalCriterionStatus = "not_assessed";
   const copy = COACHING_COPY_BY_LESSON[config.lessonId];
-  const worked = status === "met"
-    ? `In “${evidenceQuote}” you ${copy.positiveObservation}.`
-    : `In “${evidenceQuote}” ${copy.failureObservation}.`;
-  const change = status === "met"
-    ? "Keep that same choice in the retry."
-    : `On the retry, ${copy.changeInstruction}.`;
+  const worked = "Assessment unavailable: your approved wording is not assessed. No success, failure, or skill improvement has been measured.";
+  const change = `For self-guided practice, ${copy.changeInstruction}. This is the lesson target, not a judgment of your response.`;
   return {
     evidenceQuote,
     worked,
@@ -698,25 +627,33 @@ export function approvedRehearsalCoachNote(config: ApprovedRehearsalConfig, tran
   };
 }
 
-/** Selects one exact learner beat from the M1 L1-shaped exchange, prioritizing an observable miss before reinforcing success. */
+/** Selects the first pressure response for self-guided retry, not a diagnosed miss. */
 export function approvedRehearsalCoachExchange(config: ApprovedRehearsalConfig, exchange: { opener: string; firstResponse: string }): ApprovedRehearsalCoachNote {
-  const candidates = [
-    approvedRehearsalCoachNote(config, exchange.firstResponse, 3),
-    approvedRehearsalCoachNote(config, exchange.opener, 1),
-  ] as const;
-  return candidates.find((candidate) => candidate.flags[0].status === "not_met") ?? candidates[0];
+  return approvedRehearsalCoachNote(config, exchange.firstResponse, 3);
 }
 
-export function approvedRehearsalComparison(config: ApprovedRehearsalConfig, before: string, after: string): { behaviorId: string; text: string; criterionChanged: boolean } {
-  const beforeMet = approvedRehearsalCriterion(config, before);
-  const afterMet = approvedRehearsalCriterion(config, after);
-  const criterionChanged = beforeMet !== afterMet;
-  const text = !beforeMet && afterMet
-    ? `The retry made “${config.namedMove}” observable. That is the only change Hope checked.`
-    : beforeMet && afterMet
-      ? `The retry held “${config.namedMove}” Hope checked no other behavior.`
-      : beforeMet
-        ? `The retry no longer made “${config.namedMove}” observable. Hope checked no other behavior.`
-        : `The retry still did not make “${config.namedMove}” observable. Hope checked no other behavior.`;
-  return { behaviorId: config.coachedBehaviorId, text, criterionChanged };
+/** Stores a practice target, deliberately omitting any measured coachingObservation. */
+export function prepareUnassessedApprovedRehearsal(config: ApprovedRehearsalConfig, value: PersistedScenarioPracticeRun, now: number): PersistedScenarioPracticeRun {
+  const lesson = value.run.approvedRehearsal;
+  if (!lesson?.pushbackTwo || !value.run.attempt || !value.run.responseAttempt) return value;
+  const note = approvedRehearsalCoachNote(config, value.run.responseAttempt.transcript, 3);
+  return { ...value, run: {
+    ...value.run,
+    state: "hope_coaching",
+    coachNote: note.note,
+    retryInstruction: note.retryDirection,
+    coachedBehaviorId: config.coachedBehaviorId,
+    coachedSegment: "pushback_response",
+    coachingObservation: undefined,
+    approvedRehearsal: { ...lesson, beat: 5, coachedBeat: 3, selectedDimension: config.coachedBehaviorId },
+    updatedAt: Math.max(now, value.run.updatedAt + 1),
+  } };
+}
+
+export function approvedRehearsalComparison(config: ApprovedRehearsalConfig, _before: string, _after: string): { behaviorId: string; text: string; criterionChanged: boolean } {
+  return {
+    behaviorId: config.coachedBehaviorId,
+    text: "These responses are not assessed: a validated assessment is unavailable. Practice completion records your rehearsal, not measured skill improvement. Your Communication Index has not changed.",
+    criterionChanged: false,
+  };
 }

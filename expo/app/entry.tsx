@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useCallback } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
@@ -7,6 +7,8 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { Backdrop, GhostButton, PrimaryButton, Reveal } from "@/components/ui";
 import { C, GUTTER, T, font } from "@/constants/theme";
 import { useStore } from "@/providers/store";
+import { useAuth } from "@/providers/auth";
+import { AccountLogout } from "@/components/AccountLogout";
 
 function ConversationMark(): React.JSX.Element {
   return (
@@ -26,12 +28,40 @@ function ConversationMark(): React.JSX.Element {
 export default function EntryScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { beginNativeJourney } = useStore();
+  const { beginNativeJourney, activePracticeSession } = useStore();
+  const { startNativeSession, isAuthLoading, session } = useAuth();
+  const [isStarting, setIsStarting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const starting = useRef(false);
 
   const signUp = useCallback(async (): Promise<void> => {
-    await beginNativeJourney();
-    router.replace("/onboarding");
-  }, [beginNativeJourney, router]);
+    if (starting.current || isAuthLoading) return;
+    starting.current = true;
+    setIsStarting(true);
+    setAuthError(null);
+    try {
+      if (activePracticeSession?.userId && activePracticeSession.userId !== session?.user.id) {
+        setAuthError("This device has account-owned practice. Log in to that account to continue.");
+        return;
+      }
+      if (!session) {
+        router.push({ pathname: "/continue-from-web", params: { mode: "signup" } });
+        return;
+      }
+      const result = await startNativeSession();
+      if (!result.success) {
+        setAuthError(result.message);
+        return;
+      }
+      await beginNativeJourney();
+      router.replace("/onboarding");
+    } catch {
+      setAuthError("We couldn’t start your practice. Please try again.");
+    } finally {
+      starting.current = false;
+      setIsStarting(false);
+    }
+  }, [beginNativeJourney, router, startNativeSession, isAuthLoading, activePracticeSession, session]);
 
   return (
     <View style={styles.root}>
@@ -42,10 +72,13 @@ export default function EntryScreen(): React.JSX.Element {
           <Text style={styles.title}>Build the qualities of world-class communicators.</Text>
           <Text style={styles.body}>Learn to communicate with Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.</Text>
           <View style={styles.actions}>
-            <PrimaryButton label="Sign up now" onPress={signUp} />
-            <GhostButton label="Log in" onPress={() => router.push("/continue-from-web")} />
+            <PrimaryButton label="Sign up now" onPress={signUp} disabled={isAuthLoading || isStarting} />
+            {isStarting ? <Text style={styles.accountNote} accessibilityLiveRegion="polite">Setting up…</Text> : null}
+            <GhostButton label="Log in" disabled={isStarting} onPress={() => router.push("/continue-from-web")} />
+            {authError ? <Text style={styles.accountNote} accessibilityRole="alert" accessibilityLiveRegion="polite">{authError}</Text> : null}
+            <AccountLogout />
           </View>
-          <Text style={styles.accountNote}>Already have an account or paid on the web? Log in to connect your access.</Text>
+          <Text style={styles.accountNote}>Already have an account? Log in with your password. Web purchases can’t be activated in this build. Don’t purchase again if you already paid on the web.</Text>
         </Reveal>
       </ScrollView>
     </View>

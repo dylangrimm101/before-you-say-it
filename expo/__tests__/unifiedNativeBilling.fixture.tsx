@@ -1,0 +1,63 @@
+import {mock} from 'bun:test';
+import assert from 'node:assert/strict';
+import React from 'react';
+import {verifyComponentTestDeps} from '../scripts/component-test-deps';
+const {create,act}=await import(verifyComponentTestDeps());
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
+const Host=(p:any)=>React.createElement('view',p,p.children);
+mock.module('react-native',()=>({View:Host,Text:Host}));
+mock.module('@/components/ui',()=>({PrimaryButton:(p:any)=>React.createElement('button',p,p.label)}));
+let user:any={id:'owner-A'};
+mock.module('@/providers/auth',()=>({useAuth:()=>({user})}));
+let access:any={data:false,isPending:false,isFetching:false,isError:false,refetch:async()=>{}};
+mock.module('@/lib/purchases',()=>({useNativeServerAccess:()=>access,useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
+const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
+const {NativeBillingGate}=await import('../components/NativeBillingGate');
+const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+let continued=0,offerMounts=0;
+function OrdinaryOffer(){offerMounts++;return <Host>ordinary byis_pro_monthly_5 offer</Host>;}
+const app=()=> <QueryClientProvider client={client}><NativeBillingGate onContinue={()=>continued++} onLogin={()=>{}}><OrdinaryOffer/></NativeBillingGate></QueryClientProvider>;
+let root:any;await act(async()=>{root=create(app());});
+const text=()=>JSON.stringify(root.toJSON());
+const button=(label:string)=>root.root.findAllByType('button').find((b:any)=>b.props.label===label);
+await act(async()=>{client.setQueryData(['native','known-web-buyer','owner-A'],true);await new Promise(r=>setTimeout(r,5));});
+assert.equal(offerMounts,0);
+access={...access,data:true};await act(async()=>{root.update(app());});
+assert.ok(button('Continue to practice'),'independently server-verified native access must win over known web purchase warning');
+await act(async()=>button('Continue to practice').props.onPress());assert.equal(continued,1);assert.equal(offerMounts,0);
+for(const transition of [{isFetching:true},{isPending:true}]){
+ access={...access,...transition};await act(async()=>root.update(app()));
+ assert.equal(button('Continue to practice'),undefined,'cached positive must not admit while current query is pending or fetching');
+ access={...access,isFetching:false,isPending:false};
+}
+access={...access,data:false};await act(async()=>root.update(app()));
+assert.equal(button('Continue to practice'),undefined,'warning is never paid authority');assert.equal(offerMounts,0);
+access={...access,data:true,isError:true};await act(async()=>root.update(app()));
+assert.equal(button('Continue to practice'),undefined,'errored cached true must not admit');
+user=null;access={...access,isError:false};await act(async()=>root.update(app()));
+assert.ok(button('Log in to verify access'));assert.equal(button('Continue to practice'),undefined);
+// The audited one-time product is distinct, but this choice verifies no ownership.
+// Only independently verified server access may authorize paid practice.
+user={id:'owner-B'};access={...access,data:false};await act(async()=>root.update(app()));
+assert.ok(button('I bought the one-time Follow-Through plan'),'one-time plan must be distinct from a web subscription');
+assert.ok(!text().includes('Your web subscription is unchanged'));
+await act(async()=>{button('I bought the one-time Follow-Through plan').props.onPress();await new Promise(r=>setTimeout(r,5));});
+assert.ok(text().includes('ordinary byis_pro_monthly_5 offer'),'distinct one-time plan uses the same ordinary additional-practice offer');
+assert.ok(text().includes('This choice does not verify purchase ownership.'));
+assert.ok(text().includes('not a replacement or repurchase of that plan.'));
+assert.equal(client.getQueryData(['native','known-web-buyer','owner-B']),undefined,'one-time classification does not invent a subscription claim');
+assert.equal(button('Continue to practice'),undefined,'one-time selection never grants subscription');
+const oneTimeOffer=root.root.findByType(OrdinaryOffer).type;
+access={...access,data:true};await act(async()=>root.update(app()));
+assert.ok(button('Continue to practice'),'independent entitlement wins for a one-time plan owner too');
+const once=offerMounts;access={...access,data:false};
+await act(async()=>root.unmount());
+user={id:'owner-C'};await act(async()=>{root=create(app());});
+await act(async()=>button('I have not subscribed — view Apple offer').props.onPress());
+assert.ok(text().includes('ordinary byis_pro_monthly_5 offer'));assert.ok(offerMounts>once,'ordinary new-buyer choice still mounts the unchanged offer child');
+assert.equal(root.root.findByType(OrdinaryOffer).type,oneTimeOffer,'one-time plan classification and new buyer mount the same offer component');
+user={id:'owner-D'};await act(async()=>root.update(app()));
+assert.ok(!text().includes('ordinary byis_pro_monthly_5 offer'),'offer choice must not carry across owners');
+assert.ok(button('I have not subscribed — view Apple offer'));
+await act(async()=>root.unmount());client.clear();
+console.log('PASS actual mounted NativeBillingGate independent server access precedence, denial, error and logout. Synthetic hooks/native hosts; no billing/device proof.');

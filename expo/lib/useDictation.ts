@@ -29,6 +29,7 @@ const NATIVE_RECORDING_OPTIONS = {
 };
 
 interface UseDictationOptions {
+  paidPractice?: boolean;
   /**
    * When set, the finished recording is copied into the app's private
    * container under this id instead of being deleted. Opt-in only.
@@ -55,7 +56,7 @@ interface UseDictationReturn {
  * failure, and teardown — unless the caller passed `keepAudioAs`, which only
  * happens when the user explicitly opted in.
  */
-export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDictationReturn {
+export function useDictation({ keepAudioAs, paidPractice = false }: UseDictationOptions = {}): UseDictationReturn {
   const [status, setStatus] = useState<DictationStatus>("idle");
   const [error, setError] = useState<string>("");
   const [level, setLevel] = useState<number>(0);
@@ -66,6 +67,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   const webStreamRef = useRef<MediaStream | null>(null);
   const webChunksRef = useRef<Blob[]>([]);
   const operationRef = useRef<boolean>(false);
+  const transcriptionAbortRef = useRef<AbortController | null>(null);
   const temporaryUriRef = useRef<string | null>(null);
   const mountedRef = useRef<boolean>(true);
 
@@ -200,6 +202,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
   }, [nativeRecorder]);
 
   const cancel = useCallback(async (): Promise<void> => {
+    transcriptionAbortRef.current?.abort();
     await waitForOperation();
     operationRef.current = true;
     const hasNativeRecording = nativeRecordingRef.current;
@@ -277,6 +280,8 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
     const webRecorder = webRecorderRef.current;
     if (!hasNativeRecording && !webRecorder) return null;
     operationRef.current = true;
+    const transcription = new AbortController();
+    transcriptionAbortRef.current = transcription;
     setStatus("transcribing");
     setLevel(0);
     let uri: string | null = temporaryUriRef.current;
@@ -304,7 +309,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       }
       if (!uri) throw new Error("No recording was captured");
       const mediaType = webRecorder?.mimeType || "audio/mp4";
-      result = await transcribeRecording(uri, mediaType, turn);
+      result = await transcribeRecording(uri, mediaType, turn, { signal: transcription.signal, paidPractice });
     } catch (caught) {
       operationError = caught;
       uri = uri ?? nativeRecorder.uri ?? temporaryUriRef.current;
@@ -317,7 +322,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
 
     try {
       if (uri) {
-        if (keepAudioAs && result) await keepBaselineAudio(keepAudioAs, uri);
+        if (keepAudioAs && result && !transcription.signal.aborted) await keepBaselineAudio(keepAudioAs, uri);
         await discard(uri);
       }
       if (!captureStopped) throw operationError ?? new Error("Recording stop was not confirmed");
@@ -332,6 +337,7 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       nativeRecordingRef.current = false;
       webRecorderRef.current = null;
       retryDetachedCleanup = null;
+      if (transcription.signal.aborted || !mountedRef.current) return null;
       if (result) {
         setStatus("idle");
         setError("");
@@ -354,9 +360,10 @@ export function useDictation({ keepAudioAs }: UseDictationOptions = {}): UseDict
       }
       throw cleanupError;
     } finally {
+      if (transcriptionAbortRef.current === transcription) transcriptionAbortRef.current = null;
       operationRef.current = false;
     }
-  }, [keepAudioAs, nativeRecorder]);
+  }, [keepAudioAs, nativeRecorder, paidPractice]);
 
   return { status, error, level, requestPermission, start, stop, cancel, reset };
 }

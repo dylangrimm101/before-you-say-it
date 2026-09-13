@@ -1,0 +1,10 @@
+{
+  "name": "bysi-buyer-component-test-deps",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Test-only renderer; install into an external prefix, never the app dependency tree",
+  "dependencies": {
+    "react": "19.1.0",
+    "react-test-renderer": "19.1.0"
+  }
+}

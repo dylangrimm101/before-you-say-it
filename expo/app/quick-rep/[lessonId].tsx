@@ -23,7 +23,7 @@ export default function QuickRepRoute(): React.JSX.Element {
   const config = quickRepConfig(params.lessonId);
   const { access, convertedLessonProgress, logDrill } = useStore();
   const hasCompletedLesson = Boolean(config && convertedLessonProgress.some((entry) => entry.lessonId === config.lessonId));
-  const dictation = useDictation();
+  const dictation = useDictation({ paidPractice: true });
   const draftRef = useRef<TextInput>(null);
   const submittingRef = useRef<boolean>(false);
   const feedbackRequestRef = useRef<number>(0);
