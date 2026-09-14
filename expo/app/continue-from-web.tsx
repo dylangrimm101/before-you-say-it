@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Backdrop, GhostButton, PressCard, PrimaryButton, Reveal } from "@/components/ui";
+import { Backdrop, PressCard, PrimaryButton, Reveal } from "@/components/ui";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import { useAuth } from "@/providers/auth";
 import { authEnvironment, supabase } from "@/lib/supabase";
@@ -127,8 +127,16 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
             {isSubmitting ? <ActivityIndicator color={C.purple} style={styles.spinner} /> : null}
           </Reveal>
 
-          {!signup && (!session?.user || session.user.is_anonymous) ? <GhostButton label="Forgot password?" disabled={isSubmitting} onPress={() => router.push({ pathname: "/forgot-password", params: email.trim() ? { email } : {} })} containerStyle={styles.ghost} /> : null}
-          <GhostButton label={signup ? "Log in" : "Create an account"} disabled={isSubmitting} onPress={() => { setSignup(!signup); setConfirmationPending(false); setError(""); }} containerStyle={styles.ghost} />
+          {!signup && (!session?.user || session.user.is_anonymous) ? (
+            <PressCard
+              disabled={isSubmitting}
+              onPress={() => router.push({ pathname: "/forgot-password", params: email.trim() ? { email } : {} })}
+              style={styles.forgotWrap}
+              accessibilityLabel="Forgot password?"
+            >
+              <Text style={styles.forgot}>Forgot password?</Text>
+            </PressCard>
+          ) : null}
           {__DEV__ ? <PrimaryButton label="Staging web result" onPress={() => router.push("/staging-web-result")} /> : null}
           {!isAuthConfigured ? <Text style={styles.configuration}>Account login isn’t available in this build.</Text> : null}
         </ScrollView>
@@ -148,6 +156,7 @@ const styles = StyleSheet.create({
   input: { minHeight: 52, borderRadius: radius.md, borderWidth: 1, borderColor: C.line, backgroundColor: "rgba(23,26,31,0.03)", paddingHorizontal: 15, fontFamily: font.regular, fontSize: 16, color: C.text, marginBottom: 14 },
   error: { ...T.caption, color: C.clay, marginBottom: 12 },
   spinner: { marginTop: 14 },
-  ghost: { marginTop: 8 },
+  forgotWrap: { alignItems: "center", marginTop: 18, paddingVertical: 8 },
+  forgot: { ...T.caption, fontSize: 13, color: C.textSoft, textAlign: "center" },
   configuration: { ...T.caption, color: C.clay, textAlign: "center", marginTop: 16 },
 });
