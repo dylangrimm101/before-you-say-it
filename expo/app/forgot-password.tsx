@@ -4,7 +4,7 @@ import React, { useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Backdrop, Eyebrow, PressCard, PrimaryButton, Reveal } from "@/components/ui";
+import { Backdrop, PressCard, PrimaryButton, Reveal } from "@/components/ui";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import { getRecovery } from "@/lib/accountLifecycleRuntime";
 
@@ -44,7 +44,6 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
         <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled">
           <PressCard onPress={() => router.back()} style={styles.back} accessibilityLabel="Back"><ArrowLeft size={21} color={C.textSoft} /></PressCard>
           <Reveal>
-            <Eyebrow color={C.purple}>Before You Say It</Eyebrow>
             <Text style={styles.title}>Forgot your password?</Text>
             <Text style={styles.lede}>Enter the email you used to create your account, and we’ll send you a link to reset your password.</Text>
           </Reveal>
