@@ -145,7 +145,7 @@ try{
  assert.equal(routePath(),'/entry');assert.equal(account.user,null);
  if(outputMode==='saved'){await capture(db);await press('I already have an account');await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});await press('Log in');assert.equal(routePath(),'/saved-result');}
  else {
- await press('Get started');assert.equal(routePath(),'/continue-from-web');
+ await press('I already have an account');await press('Create an account');
  await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});
  await press('Create account');assert.ok(text().includes('Check your email'));assert.equal(account.user,null);
  await press('I confirmed my email — log in');await flush();assert.equal(account.user.id,owner);assert.equal(routePath(),'/account-practice');

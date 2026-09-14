@@ -44,14 +44,12 @@ export default function EntryScreen(): React.JSX.Element {
         setAuthError("This device has account-owned practice. Log in to that account to continue.");
         return;
       }
-      if (!session) {
-        router.push({ pathname: "/continue-from-web", params: { mode: "signup" } });
-        return;
-      }
-      const result = await startNativeSession();
-      if (!result.success) {
-        setAuthError(result.message);
-        return;
+      if (session) {
+        const result = await startNativeSession();
+        if (!result.success) {
+          setAuthError(result.message);
+          return;
+        }
       }
       await beginNativeJourney();
       router.replace("/onboarding");

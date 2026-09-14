@@ -17,6 +17,7 @@ describe("remaining native acquisition and paid experience", () => {
     expect(entry).toContain('label="I already have an account"');
     expect(entry).toContain("await beginNativeJourney()");
     expect(entry).toContain('router.replace("/onboarding")');
+    expect(entry).not.toContain('mode: "signup"');
     expect(onboarding).toContain("useState<number>(0)");
   });
 
