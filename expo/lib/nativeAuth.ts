@@ -13,7 +13,14 @@ export type NativeSessionResult = { success: true; session: Session } | { succes
 export const NATIVE_ANONYMOUS_AUTH_ENABLED = true;
 export const NATIVE_AUTH_UNAVAILABLE = "Private practice setup isn’t available in this build yet. Please try again later or log in to an existing account.";
 
-export type AuthIdentity = { id: string; email?: string; is_anonymous?: boolean };
+export type AuthIdentity = { id: string; email?: string; is_anonymous?: boolean; email_confirmed_at?: string | null };
+
+/** Same rule the free talking client uses. Get started must not reuse a session talking will reject. */
+export function sessionCanTalk(user: { id?: string; is_anonymous?: boolean; email_confirmed_at?: string | null } | null | undefined): boolean {
+  if (!user?.id) return false;
+  if (user.is_anonymous === true) return true;
+  return user.is_anonymous === false && typeof user.email_confirmed_at === "string" && Number.isFinite(Date.parse(user.email_confirmed_at));
+}
 
 /** Device-global practice storage cannot safely switch between real accounts. */
 export function accountLoginAllowed(current: AuthIdentity | null, email: string): boolean {
@@ -41,10 +48,7 @@ export function createNativeSessionStarter(auth: NativeAuthClient | null, enable
             live = verified.data.user;
           }
         }
-        if (live.is_anonymous === false) {
-          return { success: true, session: current };
-        }
-        if (live.is_anonymous === true) {
+        if (sessionCanTalk({ ...current.user, ...live })) {
           return { success: true, session: current };
         }
         if (!enabled) return unavailable;

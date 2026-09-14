@@ -1,4 +1,5 @@
 import {withRequestDeadline} from './requestDeadline';
+import {sessionCanTalk} from './nativeAuth';
 import type {createNativeBilling} from './nativeBilling';
 type Auth=NonNullable<Parameters<typeof createNativeBilling>[0]['auth']>;
 export type RecordingIdentity={turn:'opener'|'reply';identity:string};
@@ -23,7 +24,7 @@ export function createNormalFreeSession(config:{origin:string;authUrl:string;aut
    if(s.error||!session)throw Error('Confirmed account required');
    const verified=await config.auth.getUser(session.access_token);current();const user=verified.data.user;
    if(verified.error||!user||user.id!==session.user.id)throw Error('Confirmed account required');
-   if(user.is_anonymous!==true && (user.is_anonymous!==false||!user.email_confirmed_at))throw Error('Confirmed account required');owner=user.id;
+   if(!sessionCanTalk({...session.user,...user}))throw Error('Confirmed account required');owner=user.id;
    const key='normal-free-v1.'+user.id;const stored=await config.storage.getItem(key);current();
    const journal:Journal=stored?JSON.parse(stored):{nonce:config.random(),operations:{}};
    if(!/^[a-f0-9]{64}$/.test(journal.nonce)||!journal.operations)throw Error('Free session recovery required');

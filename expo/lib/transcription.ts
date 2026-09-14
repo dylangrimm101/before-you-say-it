@@ -62,19 +62,10 @@ export async function transcribeRecording(
       const body = new FormData();
       body.append("turn", turn);
 
-      if (Platform.OS === "web") {
-        const audioResponse = await fetch(uri, { signal });
-        if (!audioResponse.ok) throw new Error("Recorded audio could not be read");
-        const audioBlob = await audioResponse.blob();
-        body.append("audio", audioBlob, fileNameFor(mediaType || audioBlob.type));
-      } else {
-        const nativeAudio = {
-          uri,
-          name: fileNameFor(mediaType),
-          type: mediaType,
-        };
-        body.append("audio", nativeAudio as unknown as Blob);
-      }
+      const audioResponse = await fetch(uri, { signal });
+      if (!audioResponse.ok) throw new Error("Recorded audio could not be read");
+      const audioBlob = await audioResponse.blob();
+      body.append("audio", audioBlob, fileNameFor(mediaType || audioBlob.type || "audio/mp4"));
 
       safeLog("[evidence] native transcription request", {
         endpoint: evidenceEndpoint(TRANSCRIBE_ENDPOINT),

@@ -30,7 +30,7 @@ test("expired leftover sessions are replaced with a new guest before talking", a
 });
 
 test("existing authenticated sessions are reused without replacing account identity", async () => {
-  const account = { ...session, user: { id: "account-a", is_anonymous: false } } as Session;
+  const account = { ...session, user: { id: "account-a", is_anonymous: false, email_confirmed_at: "2026-01-01T00:00:00.000Z" } } as Session;
   const auth = authStub(account);
   expect(await nativeAuth.createNativeSessionStarter(auth)()).toEqual({ success: true, session: account });
   expect(auth.signups).toBe(0);
