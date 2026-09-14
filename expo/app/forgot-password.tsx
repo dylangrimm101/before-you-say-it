@@ -46,7 +46,7 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
           <Reveal>
             <Eyebrow color={C.purple}>Before You Say It</Eyebrow>
             <Text style={styles.title}>Forgot your password?</Text>
-            <Text style={styles.lede}>Request an email, then tap Reset password in the newest message. That link opens the Before You Say It website so you can choose a new password. Return here to sign in. This does not paste links or sign you in.</Text>
+            <Text style={styles.lede}>Enter the email you used to create your account, and we’ll send you a link to reset your password.</Text>
           </Reveal>
           <Reveal index={1} style={styles.formWrap}>
             <View style={styles.form}>
@@ -64,7 +64,7 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
                 style={styles.input}
                 accessibilityLabel="Email address for password recovery"
               />
-              <PrimaryButton label={pending ? "Requesting…" : "Email me a reset link"} disabled={pending} onPress={() => { void request(); }} />
+              <PrimaryButton label={pending ? "Sending…" : "Send reset link"} disabled={pending} onPress={() => { void request(); }} />
               {message ? <Text style={styles.status} accessibilityLiveRegion="polite">{message}</Text> : null}
             </View>
           </Reveal>
