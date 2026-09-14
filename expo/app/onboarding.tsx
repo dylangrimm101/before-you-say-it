@@ -11,6 +11,7 @@ import { buildCustomScenario, fallbackCustomScenario } from "@/lib/ai";
 import { createOnboardingPracticeSession, createPracticeSessionId } from "@/lib/practiceSession";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useStore } from "@/providers/store";
+import { useAuth } from "@/providers/auth";
 import type { CategoryId, Difficulty, ReactionPattern, Scenario } from "@/types/convo";
 
 const ENTRY_CHOICES: readonly { id: OnboardingEntryRoute; label: string; note: string }[] = [
@@ -55,6 +56,7 @@ export default function Onboarding(): React.JSX.Element {
   const { height: screenHeight } = useWindowDimensions();
   const isReduced = useReducedMotion();
   const { saveProfile, addCustomScenario, anonymousUserId, createCurrentOnboardingPractice } = useStore();
+  const { startNativeSession } = useAuth();
   const [step, setStep] = useState<number>(0);
   const [entryRoute, setEntryRoute] = useState<OnboardingEntryRoute | null>(null);
   const [moduleId, setModuleId] = useState<ModuleId | null>(null);
@@ -127,6 +129,12 @@ export default function Onboarding(): React.JSX.Element {
     const selectedGoal = behavioralGoal(entryRoute, moduleId ?? undefined, selectedOutcome);
 
     try {
+      const sessionResult = await startNativeSession();
+      if (!sessionResult.success) {
+        setBuilding(false);
+        setError(sessionResult.message);
+        return;
+      }
       await saveProfile({ focus: selectedFocus, persona, reaction: selectedReaction, outcome: selectedOutcome, dread: approved?.situation ?? situation.trim(), pattern: "avoid", win: "heard", createdAt: Date.now() });
       let scenario: Scenario;
       if (approved) {
@@ -162,7 +170,7 @@ export default function Onboarding(): React.JSX.Element {
       setBuilding(false);
       setError("We couldn't set up your rehearsal. Check your connection and try again.");
     }
-  }, [addCustomScenario, anonymousUserId, building, entryRoute, isReal, moduleId, outcome, router, createCurrentOnboardingPractice, saveProfile, selectionLabel, situation]);
+  }, [addCustomScenario, anonymousUserId, building, entryRoute, isReal, moduleId, outcome, router, createCurrentOnboardingPractice, saveProfile, selectionLabel, situation, startNativeSession]);
 
   const chooseDiagnosis = (nextModuleId: ModuleId, label: string): void => {
     tap("light");

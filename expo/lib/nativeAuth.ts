@@ -4,6 +4,8 @@ type AuthResponse = { data: { session: Session | null }; error: unknown };
 export type NativeAuthClient = {
   getSession: () => Promise<AuthResponse>;
   signInAnonymously: () => Promise<AuthResponse>;
+  getUser?: (jwt: string) => Promise<{ data: { user: { id: string; is_anonymous?: boolean } | null }; error: unknown }>;
+  signOut?: () => Promise<unknown>;
 };
 export type NativeSessionResult = { success: true; session: Session } | { success: false; message: string };
 
@@ -27,9 +29,28 @@ export function createNativeSessionStarter(auth: NativeAuthClient | null, enable
     try {
       const existing = await auth.getSession();
       if (existing.error) return unavailable;
-      if (existing.data.session) {
-        return existing.data.session.access_token && existing.data.session.user?.id
-          ? { success: true, session: existing.data.session } : unavailable;
+      const current = existing.data.session;
+      if (current?.access_token && current.user?.id) {
+        const identity = current.user as { id: string; is_anonymous?: boolean };
+        let live = identity;
+        if (auth.getUser) {
+          const verified = await auth.getUser(current.access_token);
+          if (verified.error || !verified.data.user?.id || verified.data.user.id !== current.user.id) {
+            live = { id: "", is_anonymous: undefined };
+          } else {
+            live = verified.data.user;
+          }
+        }
+        if (live.is_anonymous === false) {
+          return { success: true, session: current };
+        }
+        if (live.is_anonymous === true) {
+          return { success: true, session: current };
+        }
+        if (!enabled) return unavailable;
+        await auth.signOut?.();
+      } else if (!enabled) {
+        return unavailable;
       }
       if (!enabled) return unavailable;
       const { data, error } = await auth.signInAnonymously();

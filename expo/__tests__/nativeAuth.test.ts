@@ -19,6 +19,16 @@ test("Get started creates one anonymous session when none exists", async () => {
   expect(auth.signups).toBe(1);
 });
 
+test("expired leftover sessions are replaced with a new guest before talking", async () => {
+  const leftover = { access_token: "dead", user: { id: "old-guest", is_anonymous: true } } as Session;
+  const auth = authStub(leftover) as typeof authStub extends Function ? any : any;
+  auth.getUser = async () => ({ data: { user: null }, error: new Error("invalid jwt") });
+  auth.signOut = async () => {};
+  const result = await nativeAuth.createNativeSessionStarter(auth)();
+  expect(result.success).toBe(true);
+  expect(auth.signups).toBe(1);
+});
+
 test("existing authenticated sessions are reused without replacing account identity", async () => {
   const account = { ...session, user: { id: "account-a", is_anonymous: false } } as Session;
   const auth = authStub(account);
