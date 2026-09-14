@@ -31,7 +31,7 @@ export function createNormalFreeSession(config:{origin:string;authUrl:string;aut
    const save=async()=>{current();await config.storage.setItem(key,JSON.stringify(journal));current();};
    const send=async(op:string,body:Record<string,unknown>|FormData,extra:Record<string,string>={})=>{
     current();const r=await (config.fetch??fetch)(config.origin+'/api/native/free/'+op,{method:'POST',headers:{...(body instanceof FormData?{}:{'Content-Type':'application/json'}),Authorization:'Bearer '+session.access_token,...extra},body:body instanceof FormData?body:JSON.stringify(body),signal,redirect:'error',credentials:'omit',cache:'no-store'});
-    current();const bytes=await r.arrayBuffer();current();signal.throwIfAborted();if(r.redirected||bytes.byteLength>(op==='tts'?2097152:131072))throw Error('Invalid free response');return new Response(bytes,{status:r.status,headers:r.headers});
+    current();const bytes=await r.arrayBuffer();current();if(signal.aborted)throw Error('Request aborted');if(r.redirected||bytes.byteLength>(op==='tts'?2097152:131072))throw Error('Invalid free response');return new Response(bytes,{status:r.status,headers:r.headers});
    };
    if(!journal.sessionId){await save();const issued=await send('session',{nonce:journal.nonce});if(!issued.ok)return issued;const allocation=await issued.json();if(!/^[a-f0-9-]{36}$/.test(allocation.sessionId??''))throw Error('Free session recovery required');journal.sessionId=allocation.sessionId;await save();}
    let kind:string,fingerprint:string;

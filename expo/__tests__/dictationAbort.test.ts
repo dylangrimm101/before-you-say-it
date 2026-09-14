@@ -14,4 +14,10 @@ describe("dictation transcribe abort", () => {
     expect(rehearsal).toContain("cancelDictationRef.current()");
     expect(rehearsal).not.toContain("}, [cancelDictation]);");
   });
+
+  test("free talking does not call AbortSignal.throwIfAborted", async () => {
+    const source = await Bun.file(`${import.meta.dir}/../lib/normalFreeSession.ts`).text();
+    expect(source).not.toContain("throwIfAborted");
+    expect(source).toContain("if(signal.aborted)throw Error('Request aborted')");
+  });
 });
