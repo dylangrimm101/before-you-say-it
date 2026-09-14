@@ -1422,7 +1422,7 @@ const DOCK_COPY: Record<
   "mic-error": (_them, _counterpart, h) => ({
     label: h.dictation?.startsWith("Voice transcription")
       ? "Transcription unavailable"
-      : "Microphone unavailable",
+      : (h.dictation || "Microphone unavailable"),
     help: h.dictation ?? "Try the microphone again, or type this turn instead.",
   }),
   "playback-failed": (_them, counterpart) => ({

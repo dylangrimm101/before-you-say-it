@@ -141,12 +141,14 @@ describe("required exercised curriculum paths", () => {
 
   test("recording and transcription failures remain recoverable through retry or typed fallback", async () => {
     const dictation = await Bun.file(`${import.meta.dir}/../lib/useDictation.ts`).text();
+    const failure = await Bun.file(`${import.meta.dir}/../lib/dictationFailure.ts`).text();
     const temporaryDeletion = await Bun.file(`${import.meta.dir}/../lib/temporaryRecording.ts`).text();
     const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
     expect(dictation).toContain('"Could not start the microphone."');
-    expect(dictation).toContain('setError("No recording was captured.")');
-    expect(dictation).toContain('"Voice transcription is temporarily unavailable. Type this turn instead."');
-    expect(dictation).toContain('"Could not transcribe that. Try again."');
+    expect(dictation).toContain("visibleDictationFailure(operationError)");
+    expect(failure).toContain("No recording was captured.");
+    expect(failure).toContain("Voice transcription is temporarily unavailable. Type this turn instead.");
+    expect(failure).toContain("Could not transcribe that. Try again.");
     expect(dictation).toContain("TranscriptionUnavailableError");
     expect(dictation).toContain('if (Platform.OS !== "web")');
     expect(dictation).toContain("AudioModule.requestRecordingPermissionsAsync()");
