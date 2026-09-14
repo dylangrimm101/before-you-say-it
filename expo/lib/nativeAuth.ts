@@ -8,7 +8,7 @@ export type NativeAuthClient = {
 export type NativeSessionResult = { success: true; session: Session } | { success: false; message: string };
 
 // Deliberately off: see nativeAuth.setup.md. This is a rollout gate, not authorization.
-export const NATIVE_ANONYMOUS_AUTH_ENABLED = false;
+export const NATIVE_ANONYMOUS_AUTH_ENABLED = true;
 export const NATIVE_AUTH_UNAVAILABLE = "Private practice setup isn’t available in this build yet. Please try again later or log in to an existing account.";
 
 export type AuthIdentity = { id: string; email?: string; is_anonymous?: boolean };

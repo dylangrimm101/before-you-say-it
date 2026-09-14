@@ -12,11 +12,11 @@ function authStub(existing: Session | null = null) {
   };
 }
 
-test("anonymous creation is fail-closed until rollout is approved", async () => {
+test("Get started creates one anonymous session when none exists", async () => {
   const auth = authStub();
   const result = await nativeAuth.createNativeSessionStarter(auth)();
-  expect(result.success).toBe(false);
-  expect(auth.signups).toBe(0);
+  expect(result.success).toBe(true);
+  expect(auth.signups).toBe(1);
 });
 
 test("existing authenticated sessions are reused without replacing account identity", async () => {

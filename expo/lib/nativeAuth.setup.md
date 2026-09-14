@@ -1,6 +1,6 @@
 # Native anonymous auth rollout — BLOCKED by default
 
-`NATIVE_ANONYMOUS_AUTH_ENABLED` in `nativeAuth.ts` remains **false**. This is an explicit reviewed-build rollout gate, not an authentication or server authorization mechanism. Do not flip it merely to make onboarding work.
+`NATIVE_ANONYMOUS_AUTH_ENABLED` in `nativeAuth.ts` is **true**. Guest talking on Get started is approved: anonymous Auth is enabled on production `spvksnddzyvycfoefrcf`, free `/api/native/free/*` accepts anonymous JWTs, paid paths still require a confirmed email.
 
 ## Implemented behavior
 
