@@ -7,4 +7,11 @@ describe("dictation transcribe abort", () => {
     expect(dictation).toContain("void cancelRef.current()");
     expect(dictation).not.toContain("}, [cancel]);");
   });
+
+  test("rehearsal does not cancel dictation when cancelDictation identity changes", async () => {
+    const rehearsal = await Bun.file(`${import.meta.dir}/../app/rehearse/[id].tsx`).text();
+    expect(rehearsal).toContain("cancelDictationRef.current = cancelDictation");
+    expect(rehearsal).toContain("cancelDictationRef.current()");
+    expect(rehearsal).not.toContain("}, [cancelDictation]);");
+  });
 });

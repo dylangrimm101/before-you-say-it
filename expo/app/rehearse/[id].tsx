@@ -234,6 +234,8 @@ function LegacyRehearse() {
   voiceOnRef.current = voiceOn;
   const dictation = useDictation();
   const cancelDictation = dictation.cancel;
+  const cancelDictationRef = useRef(cancelDictation);
+  cancelDictationRef.current = cancelDictation;
   const [rehearsalStage, setRehearsalStage] = useState<RehearsalStage>(() => {
     if (params.entry !== "onboarding" || turns.length > 0) return "practice";
     const checkpoint = activePracticeSession?.freeJourneyCheckpoint;
@@ -371,14 +373,15 @@ function LegacyRehearse() {
   }, [scenario, reveal, persona, themName]);
 
   // Leaving the screen must stop playback and drop the staged line, so nothing
-  // can be heard after the rehearsal is over.
+  // can be heard after the rehearsal is over. Do not depend on cancelDictation:
+  // recorder updates recreate that function and would abort an in-flight transcribe.
   useEffect(() => {
     return () => {
       if (revealTimer.current) clearInterval(revealTimer.current);
-      cancelDictation().catch(() => {});
+      cancelDictationRef.current().catch(() => {});
       resetSpeech().catch(() => {});
     };
-  }, [cancelDictation]);
+  }, []);
 
   /**
    * Produce exactly one counterpart reply for the given transcript. The user
