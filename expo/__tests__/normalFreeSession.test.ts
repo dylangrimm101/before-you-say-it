@@ -4,7 +4,7 @@ test('account changes invalidate owner-bound free playback',async()=>{
  const {createNormalFreeSession}=await import('../lib/normalFreeSession');let event:(name:string,s:any)=>void=()=>{};let invalidated=0;
  const auth={getSession:async()=>({data:{session:null},error:null}),getUser:async()=>({data:{user:null},error:null}),onAuthStateChange:(cb:typeof event)=>{event=cb;return {data:{subscription:{unsubscribe(){}}}};}};
  const client=createNormalFreeSession({auth,origin:'https://beforeyousayit.app',authUrl:'https://spvksnddzyvycfoefrcf.supabase.co',random:()=>randomBytes(32).toString('hex'),hash:async(s:string)=>s,storage:{getItem:async()=>null,setItem:async()=>{}},onInvalidate:()=>{invalidated++;}});
- event('SIGNED_OUT',null);expect(invalidated).toBe(1);client.dispose();
+ event('SIGNED_IN',{user:{id:'11111111-1111-4111-8111-111111111111'}});expect(invalidated).toBe(0);event('SIGNED_OUT',null);expect(invalidated).toBe(1);client.dispose();
 });
 
 test('native FormData without get supports explicit recording identity',async()=>{
@@ -29,4 +29,17 @@ test('normal Release transport persists issuance and exact operation before disp
  const payload={type:'rehearsal_turn',turn:'pushback',contract:{scene:'same'},transcript:{user_turn_1:'hello'},variation_seed:'volatile'};
  const first=mod.createNormalFreeSession(config);await expect(first.request('generate',payload)).rejects.toThrow();first.dispose();
  const resumed=mod.createNormalFreeSession(config);expect((await resumed.request('generate',{...payload,variation_seed:'changed'})).status).toBe(200);expect(sessionCalls).toBe(1);expect(generationCalls).toBe(2);expect(ids[0]).toBe(ids[1]);resumed.dispose();
+});
+
+test('same-guest SIGNED_IN during getSession does not abort transcribe',async()=>{
+ const {createNormalFreeSession}=await import('../lib/normalFreeSession');
+ const user={id:'11111111-1111-4111-8111-111111111111',is_anonymous:true};
+ let event:(name:string,s:any)=>void=()=>{};
+ let sessionCalls=0,transcribeCalls=0,invalidated=0;
+ const auth={getSession:async()=>{event('SIGNED_IN',{user});return {data:{session:{access_token:'synthetic',user}},error:null};},getUser:async()=>({data:{user},error:null}),onAuthStateChange:(cb:typeof event)=>{event=cb;return {data:{subscription:{unsubscribe(){}}}};}};
+ const data=new Map<string,string>();
+ const client=createNormalFreeSession({auth,origin:'https://beforeyousayit.app',authUrl:'https://spvksnddzyvycfoefrcf.supabase.co',random:()=>'aa'.repeat(32),hash:async(s:string)=>createHash('sha256').update(s).digest('hex'),storage:{getItem:async(k)=>data.get(k)??null,setItem:async(k,v)=>{data.set(k,v);}},onInvalidate:()=>{invalidated++;},fetch:async(url)=>{if(String(url).endsWith('/session')){sessionCalls++;return Response.json({sessionId:user.id});}transcribeCalls++;return Response.json({text:'ok'});}});
+ const body=new FormData();
+ const response=await client.request('transcribe',body,undefined,{turn:'opener',identity:'file:///synthetic.m4a'});
+ expect(response.status).toBe(200);expect(sessionCalls).toBe(1);expect(transcribeCalls).toBe(1);expect(invalidated).toBe(0);client.dispose();
 });

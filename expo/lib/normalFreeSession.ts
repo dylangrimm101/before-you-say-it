@@ -9,7 +9,7 @@ export function createNormalFreeSession(config:{origin:string;authUrl:string;aut
  if(config.origin!=='https://beforeyousayit.app'||config.authUrl!=='https://spvksnddzyvycfoefrcf.supabase.co')throw Error('Normal free configuration invalid');
  let revision=0,owner:string|null=null,disposed=false,queue=Promise.resolve();const pending=new Set<AbortController>();
  const invalidate=()=>{revision++;for(const c of pending)c.abort();config.onInvalidate?.();};
- const subscription=config.auth.onAuthStateChange((event,s)=>{const next=s?.user.id??null;if(next!==owner||!['INITIAL_SESSION','TOKEN_REFRESHED'].includes(event))invalidate();owner=next;}).data.subscription;
+ const subscription=config.auth.onAuthStateChange((event,s)=>{const next=s?.user.id??null;if(next!==owner){if(owner!==null)invalidate();owner=next;}}).data.subscription;
  async function perform(operation:'generate'|'tts'|'transcribe',input:Record<string,unknown>|FormData,externalSignal?:AbortSignal,recording?:RecordingIdentity):Promise<Response>{
   const before=revision,controller=new AbortController();pending.add(controller);const abort=()=>controller.abort();externalSignal?.addEventListener('abort',abort,{once:true});if(externalSignal?.aborted)abort();
   const current=()=>{if(disposed||before!==revision||controller.signal.aborted)throw Error('Account changed');};
