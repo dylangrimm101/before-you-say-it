@@ -24,7 +24,6 @@ function prepareReleaseEnvironment(env = process.env) {
   for (const name of ambientNames) delete env[name];
   // Expo has already loaded the runner's dotenv by config evaluation. Child
   // processes inherit this flag so it cannot reintroduce the removed inputs.
-  env.EXPO_NO_DOTENV = "1";
   // Rork does not select an EAS profile. Carry over its reviewed non-secret
   // origin explicitly, without replacing an incorrect or empty supplied value.
   if (env.EAS_BUILD_PROFILE !== "testflight" && env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN === undefined) {
