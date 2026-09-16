@@ -5,16 +5,6 @@
       "name": "Before You Say It",
       "path": "expo",
       "framework": "react-native"
-    },
-    {
-      "name": "Before You Say It",
-      "path": "ios",
-      "framework": "swift"
-    },
-    {
-      "name": "Backend",
-      "path": "backend",
-      "framework": "supabase"
     }
   ]
 }

@@ -71,3 +71,12 @@ Thumbs.db
 .local-tools/
 core
 .rork
+
+# Local-only handoff checks and private composition (never publish)
+/component-deps/
+/handoff-local-results/
+/server/
+/test-deps/
+/review/
+credentials.json
+**/credentials.json

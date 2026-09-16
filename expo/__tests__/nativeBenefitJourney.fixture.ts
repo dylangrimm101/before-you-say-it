@@ -2,20 +2,38 @@ import {mock} from 'bun:test';import assert from 'node:assert/strict';import {re
 import {createClient} from '@supabase/supabase-js';
 import {APPROVED_ONBOARDING_SCENARIOS,scenarioFromApproved} from '../constants/onboardingScenarios';
 import type {Turn} from '../types/convo';
-const web=new URL('../../web/',import.meta.url).pathname.replace(/\/$/,'');
+const web=new URL('../../server/',import.meta.url).pathname.replace(/\/$/,'');
 const {setupContent,capture}=await import(web+'/tests/normal-results-proof.mjs');const {db,database,contentDatabase}=await setupContent();
 const origin='https://beforeyousayit.app',authOrigin='https://spvksnddzyvycfoefrcf.supabase.co',owner='11111111-1111-4111-8111-111111111111';
 const user={id:owner,aud:'authenticated',role:'authenticated',email:'synthetic@invalid',is_anonymous:false,email_confirmed_at:'2026-01-01',created_at:'2026-01-01',app_metadata:{},user_metadata:{}};
-const tokenFor=(id:string)=>[{alg:'HS256',typ:'JWT'},{sub:id,exp:Math.floor(Date.now()/1000)+3600},'synthetic'].map(x=>Buffer.from(JSON.stringify(x)).toString('base64url')).join('.');
+const fixtureTokenExpiry=Math.floor(Date.now()/1000)+3600;
+const tokenFor=(id:string)=>[{alg:'HS256',typ:'JWT'},{sub:id,exp:fixtureTokenExpiry},'synthetic'].map(x=>Buffer.from(JSON.stringify(x)).toString('base64url')).join('.');
 let authReads=0,providerCalls=0;const verifiedTokens:string[]=[];
-let transportUser=user;
-const authFetch=async(url:any,init:any)=>{authReads++;if(String(url).includes('/signup'))return Response.json({user,session:null});if(String(url).includes('/logout'))return new Response(null,{status:204});if(String(url).includes('/token'))return Response.json({access_token:tokenFor(transportUser.id),refresh_token:'synthetic-refresh',expires_in:3600,token_type:'bearer',user:transportUser});verifiedTokens.push(new Headers(init.headers).get('authorization')??'');return Response.json(transportUser);};
+const guestUser={...user,id:'33333333-3333-4333-8333-333333333333',email:'',is_anonymous:true,email_confirmed_at:undefined};
+let transportUser:typeof user|typeof guestUser=user;
+const authSession=(identity:typeof transportUser)=>({access_token:tokenFor(identity.id),refresh_token:'synthetic-refresh',expires_in:3600,token_type:'bearer',user:identity});
+// Anonymous signup returns an actual SDK session. Confirmation-required email
+// signup intentionally does not. The old endpoint-blind stub conflated them.
+const authFetch=async(url:any,init:any)=>{
+ authReads++;
+ if(String(url).includes('/signup')){
+  const body=JSON.parse(init.body??'{}');
+  if(body.email)return Response.json({user,session:null});
+  transportUser=guestUser;return Response.json(authSession(guestUser));
+ }
+ if(String(url).includes('/logout'))return new Response(null,{status:204});
+ if(String(url).includes('/token')){if(JSON.parse(init.body??'{}').email===user.email)transportUser=user;return Response.json(authSession(transportUser));}
+ const authorization=new Headers(init.headers).get('authorization')??'';verifiedTokens.push(authorization);
+ if(authorization==='Bearer '+tokenFor(guestUser.id))return Response.json(guestUser);
+ return Response.json(transportUser);
+};
 const sdk=createClient(authOrigin,'synthetic-public',{global:{fetch:authFetch},auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
 // Sign in only through mounted customer controls below.
 // Real complete source schemas, same DB for result and paid authority.
 const {createServerClients}=await import(web+'/server/revenuecat/http.mjs');const verify=createServerClients({authOrigin,publicKey:'synthetic-public',revenueCatKey:'unused',fetch:authFetch});
 const {createFreeRuntime}=await import(web+'/server/native-free/runtime.mjs');
-const runtime=createFreeRuntime({database:contentDatabase,fetch:authFetch,env:{BYSI_NATIVE_FREE:'registered-v1',BYSI_NATIVE_FREE_PROVENANCE_KEY:'a'.repeat(64),BYSI_NATIVE_SERVICE:'account-v1',BYSI_NATIVE_SERVICE_DATABASE_URL:'postgres://bysi_native_service:fixture@db.spvksnddzyvycfoefrcf.supabase.co:5432/postgres?sslmode=verify-full',BYSI_NATIVE_ORIGIN:origin,BYSI_NATIVE_AUTH_ORIGIN:authOrigin,BYSI_NATIVE_PUBLISHABLE_KEY:'synthetic-public',BYSI_REVENUECAT_SERVER_KEY:'synthetic-server',BYSI_REVENUECAT_WEBHOOK_AUTHORIZATION:'synthetic-webhook-authorization-not-live'}});
+const providerCosts=JSON.stringify({pushback:1,close:1,result:1,tts_pushback:1,tts_close:1,transcribe_opener:1,transcribe_reply:1});
+const runtime=createFreeRuntime({database:contentDatabase,fetch:authFetch,env:{BYSI_NATIVE_FREE:'registered-v1',BYSI_NATIVE_FREE_PROVENANCE_KEY:'a'.repeat(64),BYSI_NATIVE_FREE_DAILY_SPEND_CENTS:'500',BYSI_NATIVE_FREE_PROVIDER_COST_CENTS:providerCosts,BYSI_NATIVE_SERVICE:'account-v1',BYSI_NATIVE_SERVICE_DATABASE_URL:'postgres://bysi_native_service:fixture@db.spvksnddzyvycfoefrcf.supabase.co:5432/postgres?sslmode=verify-full',BYSI_NATIVE_ORIGIN:origin,BYSI_NATIVE_AUTH_ORIGIN:authOrigin,BYSI_NATIVE_PUBLISHABLE_KEY:'synthetic-public',BYSI_REVENUECAT_SERVER_KEY:'synthetic-server',BYSI_REVENUECAT_WEBHOOK_AUTHORIZATION:'synthetic-webhook-authorization-not-live'}});
 mock.module(web+'/server/native-free/runtime.mjs',()=>({createFreeRuntime,getFreeRuntime:()=>runtime}));
 const mounts:Record<string,any>={};for(const op of ['session','generate','tts','transcribe'])mounts[op]=(await import(web+'/app/api/native/free/'+op+'/route.js')).POST;
 const {NextRequest}=await import(web+'/node_modules/next/server.js');
@@ -43,7 +61,7 @@ const paidRoutes:any={};for(const op of ['identify','access','generate','tts','t
 const {createResultsRuntime}=await import(web+'/server/normal-results/runtime.mjs');
 const content=createResultsRuntime({database:contentDatabase,env:{BYSI_NATIVE_RESULTS:'normal-results-v1',BYSI_NATIVE_ORIGIN:origin,BYSI_NATIVE_AUTH_ORIGIN:authOrigin,BYSI_NATIVE_SERVICE_DATABASE_URL:'postgres://bysi_native_service:fixture@db.spvksnddzyvycfoefrcf.supabase.co:5432/postgres?sslmode=verify-full',BYSI_NATIVE_PUBLISHABLE_KEY:'synthetic-public'},fetch:authFetch});
 mock.module(web+'/server/normal-results/runtime.mjs',()=>({createResultsRuntime,getResultsRuntime:()=>content}));
-const contentRoutes:any={};for(const op of ['discover','restore'])contentRoutes[op]=(await import(web+'/app/api/native/results/'+op+'/route.js')).POST;
+const contentRoutes:any={};for(const op of ['discover','restore','delete','claim'])contentRoutes[op]=(await import(web+'/app/api/native/results/'+op+'/route.js')).POST;
 // Same migrated SQL and role-restricted transaction adapter as normal content and native Pro.
 await db.exec(readFileSync(web+'/server/follow-through/schema.sql','utf8'));
 await db.exec(readFileSync(web+'/server/follow-through/recovery.sql','utf8'));
@@ -110,7 +128,7 @@ mock.module('@/lib/lessonFeedbackService',()=>({submitLessonFeedback:async()=>{t
 process.env.EXPO_PUBLIC_NATIVE_RESULTS='normal-results-v1';process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY='appl_fixture';process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN=origin;delete process.env.EXPO_PUBLIC_BYSI_BUILD_MODE;delete process.env.EXPO_PUBLIC_GENERATE_ENDPOINT;process.env.ANTHROPIC_API_KEY='synthetic';
 mock.module('expo-secure-store',()=>({AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY:1,isAvailableAsync:async()=>true,getItemAsync:async(k:string)=>secureDisk.get(k)??null,deleteItemAsync:async(k:string)=>{secureDisk.delete(k);},setItemAsync:async(k:string,v:string)=>{secureDisk.set(k,v);}}));
 mock.module('expo-crypto',()=>({randomUUID,getRandomBytes:randomBytes,CryptoDigestAlgorithm:{SHA256:'sha256'},digestStringAsync:async(_:string,value:string)=>createHash('sha256').update(value).digest('hex')}));
-const outputMode=process.argv[2]??'positive';const {fixture}=await import('/Users/donaldgrimm/bysi-testflight-foundation/artifacts/native-free-release-20260909/source/tests/fixtures/generation-output.mjs');
+const outputMode=process.argv[2]??'positive';const {fixture}=await import('../../server/tests/fixtures/generation-output.mjs');
 let loseResult=outputMode==='recovery';
 const seenOperations:string[]=[];let holdResult=false;let releaseResult:any;
 globalThis.fetch=(async(url:any,init:any)=>{
@@ -168,13 +186,9 @@ async function input(value:string){assert.equal(root.root.findAllByType('input')
 try{
  await act(async()=>{root=create(React.createElement(Harness));});await flush();await flush();
  assert.equal(routePath(),'/entry');assert.equal(account.user,null);
- if(outputMode==='saved'){await capture(db);await press('Log in');await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});await press('Log in');assert.equal(routePath(),'/saved-result');}
+ if(outputMode==='saved'){await capture(db);await press('I already have an account');await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});await press('Log in');assert.equal(routePath(),'/saved-result');}
  else {
- await press('Sign up now');assert.equal(routePath(),'/continue-from-web');
- await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});
- await press('Create account');assert.ok(text().includes('Check your email'));assert.equal(account.user,null);
- await press('I confirmed my email — log in');await flush();assert.equal(account.user.id,owner);assert.equal(routePath(),'/account-practice');
- await press('Start a new account rehearsal');assert.equal(routePath(),'/onboarding');
+ await press('Get started');assert.equal(routePath(),'/onboarding');
  await press('I know what I want to get better at');await press(DESIRED_SKILLS[0].label);await press(PRESSURE_CONDITIONS[0].label);await press('Work');
  assert.equal(route.pathname,'/rehearse/[id]');const runId=store.activePracticeSession.id;
  assert.equal(routePath(),'/rehearse/[id]');await press('Start my rehearsal');await press('Type this turn instead');
@@ -191,7 +205,15 @@ try{
  assert.equal(providerCalls,3);assert.equal(store.activePracticeSession.freeJourneyCheckpoint,outputMode!=='insufficient'?'pressure_moment':'insufficient_evidence');
  await go({pathname:'/debrief/[id]',params:{id:runId}});
  assert.ok(text().includes('You asked for a task.'));assert.ok(store.activePracticeSession.sharedResult);
- await press('Continue with saved result');
+ assert.equal(account.session.user.id,guestUser.id);assert.equal(account.user,null);
+ await press('See what changes with practice');await press('See the practice plan');await press('Review monthly subscription');
+ await press('Log in to verify access');
+ await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});
+ await press('Sign in to save this result and continue');await flush();await flush();
+ assert.equal(account.user.id,owner);
+ if(routePath()==='/debrief/[id]')await press('Continue with saved result');
+ const claimed=(await db.query('select owner_id,phase from bysi_native_free.session where owner_id=$1',[owner])).rows;
+ assert.ok(claimed.some((row:any)=>row.owner_id===owner&&row.phase==='result'),'registered owner owns the generated result after actual login claim');
  }
  assert.equal(routePath(),'/saved-result');await flush();await flush();
  await press('Find my original Follow-Through');
@@ -206,17 +228,19 @@ try{
  }
  assert.deepEqual(root.root.findByType((await import('../components/OriginalFollowThrough')).OriginalBenefitPresentation).props.result,originalBenefit);
  assert.equal(followProviderCalls,1);assert.equal(checkoutCalls,1,'native restore never creates a checkout');
- assert.deepEqual(followRequests.map(r=>r.op),['discover','restore']);
+ assert.ok(followRequests.slice(0,-1).every(r=>r.op==='discover'));
+ assert.equal(followRequests.at(-1)?.op,'restore');
+ assert.equal(followRequests.filter(r=>r.op==='restore').length,1);
  assert.deepEqual(followRequests[0].body,{});assert.equal(followRequests[1].authorization,'Bearer '+tokenFor(owner));
- await press('Request original benefit recovery');
+ loseFollowRequest=true;await press('Request original benefit recovery');
+ assert.equal(followRequests.at(-1).lostResponseStatus,200);
+ assert.ok(text().includes('Your recovery request may already be recorded. Check its status before trying again.'));
+ await press('Check original recovery status');
  assert.ok(text().includes('Independent purchase ownership and original-content proof are required.'));
  assert.ok(text().includes('This is not purchase approval or a promise that the original content can be recovered.'));
  const recoveryBefore=(await db.query('select id,owner_id from bysi_follow_through.recovery_request')).rows;
  assert.equal(recoveryBefore.length,1);assert.equal(recoveryBefore[0].owner_id,owner);
- await restart();loseFollowRequest=true;await press('Request original benefit recovery');
- assert.equal(followRequests.at(-1).lostResponseStatus,200);
- assert.ok(text().includes('Your recovery request may already be recorded. Check its status before trying again.'));
- await press('Check original recovery status');
+ await restart();await press('Check original recovery status');
  assert.ok(text().includes('Recovery needs review'));
  const receiptInput=()=>root.root.findAllByType('input').find((n:any)=>n.props.accessibilityLabel==='Optional checkout receipt reference');
  assert.ok(receiptInput(),'actual optional untrusted receipt control');
@@ -298,10 +322,10 @@ try{
   const oldOwner=account.practiceOwner;await go('/entry');await press('Sign out');await flush();
   assert.equal(account.user,null);assert.equal(store.convertedLessonProgress.length,0);assert.equal(store.activeScenarioRun,null);assert.equal(oldOwner.storage.isActive(),false);
   transportUser={...user,id:'22222222-2222-4222-8222-222222222222',email:'second@invalid'};
-  await press('Log in');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(transportUser.email);fields[1].props.onChangeText('synthetic-only-password');});
+  await press('I already have an account');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(transportUser.email);fields[1].props.onChangeText('synthetic-only-password');});
   await press('Log in');await flush();assert.ok(account.user,'second login: '+text());assert.equal(account.user.id,transportUser.id);assert.equal(routePath(),'/saved-result');await flush();assert.ok(text().includes('We couldn’t find a saved result linked to this account.'));assert.ok(text().includes('Don’t buy the same plan again.'));assert.equal(store.convertedLessonProgress.length,0);assert.equal(store.activePracticeSession,null);
   await restart();assert.equal(store.convertedLessonProgress.length,0);assert.equal(store.activePracticeSession,null);
-  await go('/entry');await press('Sign out');transportUser=user;await press('Log in');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(user.email);fields[1].props.onChangeText('synthetic-only-password');});await press('Log in');await flush();
+  await go('/entry');await press('Sign out');transportUser=user;await press('I already have an account');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(user.email);fields[1].props.onChangeText('synthetic-only-password');});await press('Log in');await flush();
   assert.deepEqual(store.convertedLessonProgress,progress);assert.equal(store.activeScenarioRun,null);
   console.log('PASS joined first lesson: library control → approved transcripts → counterpart → retry/comparison → completion → root cold owner hydration; synthetic paid admission/replies only');
 
@@ -319,6 +343,6 @@ try{
  await press('Sign out');assert.equal(account.user,null);
  releaseResult();holdResult=false;await flush();await flush();
  assert.ok(!text().includes('You asked for a task.'),'ignored-abort late restore must not republish private content after actual logout');
- assert.equal(providerCalls,outputMode==='native'?5:2,'exact ordinary provider dispatch count; no restoration or missing-owner regeneration');
+ assert.equal(providerCalls,outputMode==='saved'?2:5,'exact ordinary provider dispatch count; no restoration or missing-owner regeneration');
  console.log('PASS NORMAL JOINED '+outputMode+': installed SDK login -> exact saved producer record -> actual useNativeServerAccess/Next/SQL -> canonical lesson practice/completion; native first and saved arrival share identical authority. Synthetic Auth/RC/provider/native hosts; no hosted/device claims.');
 }finally{if(root)await act(async()=>root.unmount());sdk.auth.stopAutoRefresh();await db.close();}

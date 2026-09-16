@@ -5,6 +5,6 @@ const operations:string[]=[];mock.module('../lib/normalFreeRuntime',()=>({reques
 const {speak}=await import('../lib/voice');const {transcribeRecording}=await import('../lib/transcription');
 globalThis.fetch=(async()=>new Response(new Blob(['synthetic-upload'],{type:'audio/mpeg'}))) as typeof fetch;
 assert.equal(await speak('Exact approved counterpart.','man-adam'),'failed','must not invent successful audio when exhausted');
-await assert.rejects(()=>transcribeRecording('blob:synthetic','audio/mpeg','opener'),{name:'TranscriptionUnavailableError'});
+await assert.rejects(()=>transcribeRecording('blob:synthetic','audio/mpeg','opener'),/fresh server check/);
 assert.deepEqual(operations,['tts','transcribe'],'normal free voice must use session service, never public/paid/Edge');
 console.log('PASS mounted voice/transcription adapters, normal free exhaustion typed fallback; no playback proof');

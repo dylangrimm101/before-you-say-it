@@ -24,7 +24,7 @@ import {
 import { nextLaunchDeck } from "@/lib/launchCurriculum";
 import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
 import { errorShape, safeLog } from "@/lib/redact";
-import { useCustomerInfo, useIsPro, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
+import { hasPro, useCustomerInfo, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
 import { useStore } from "@/providers/store";
 import { useAuth } from "@/providers/auth";
 import { useStagingWebBridgeState } from "@/lib/useStagingWebBridgeState";
@@ -61,7 +61,6 @@ function ApplePaywall() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ gate?: string; source?: string; moduleId?: string }>();
-  const isPro = useIsPro();
   const { activePracticeSession, convertedLessonProgress, moduleCloseProgress, saveActivePracticeSession } = useStore();
   const nextDeck = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
   const moduleId: ModuleId | null = isModuleId(params.moduleId) ? params.moduleId : activePracticeSession?.recommendation?.moduleId ?? null;
@@ -69,6 +68,7 @@ function ApplePaywall() {
   const purchase = usePurchasePackage();
   const restore = useRestorePurchases();
   const customer = useCustomerInfo();
+  const isPro = normalBillingEnabled ? false : hasPro(customer.data);
   const [offer, setOffer] = useState<OfferState<SharedResultContractV1 | undefined>>(() => {
     const opened = openOffer(activePracticeSession?.sharedResult);
     const checkpoint = activePracticeSession?.postRehearsalState;

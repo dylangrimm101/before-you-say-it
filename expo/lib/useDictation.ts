@@ -12,6 +12,7 @@ import { tap } from "@/components/ui";
 import { keepBaselineAudio } from "@/lib/baselineAudio";
 import { errorShape, safeLog } from "@/lib/redact";
 import { cleanupNativeRecordingStrict, cleanupWebRecordingStrict, discardTemporaryRecordingStrict } from "@/lib/temporaryRecording";
+import { visibleDictationFailure } from "@/lib/dictationFailure";
 import {
   transcribeRecording,
   TranscriptionUnavailableError,
@@ -262,17 +263,21 @@ export function useDictation({ keepAudioAs, paidPractice = false }: UseDictation
     resetState();
   }, [cancel, resetState]);
 
+  const cancelRef = useRef(cancel);
+  cancelRef.current = cancel;
+
   useEffect(() => {
     const detached = retryDetachedCleanup;
     if (detached) void detached().catch((caught: unknown) => safeLog("[dictation] detached cleanup retry remains pending", errorShape(caught)));
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      void cancel().catch((caught: unknown) => {
-        retryDetachedCleanup = cancel;
+      void cancelRef.current().catch((caught: unknown) => {
+        retryDetachedCleanup = cancelRef.current;
         safeLog("[dictation] unmount cleanup remains pending", errorShape(caught));
       });
     };
-  }, [cancel]);
+  }, []);
 
   const stop = useCallback(async (turn: TranscriptionTurn): Promise<string | null> => {
     if (operationRef.current) return null;
@@ -344,13 +349,7 @@ export function useDictation({ keepAudioAs, paidPractice = false }: UseDictation
         tap("success");
       } else {
         setStatus("error");
-        if (operationError instanceof Error && operationError.message === "No recording was captured") {
-          setError("No recording was captured.");
-        } else {
-          setError(operationError instanceof TranscriptionUnavailableError
-            ? "Voice transcription is temporarily unavailable. Type this turn instead."
-            : "Could not transcribe that. Try again.");
-        }
+        setError(visibleDictationFailure(operationError));
       }
       return result;
     } catch (cleanupError) {

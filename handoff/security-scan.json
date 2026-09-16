@@ -1,0 +1,13 @@
+{
+  "scope": "current source-only handoff files, not inherited Git history",
+  "exit": 1,
+  "findings": [
+    {
+      "RuleID": "generic-api-key",
+      "File": "expo/lib/freeAcquisition.ts",
+      "StartLine": 57,
+      "Description": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations."
+    }
+  ],
+  "adjudication": "issuance-pending-v1 at expo/lib/freeAcquisition.ts is a storage sentinel, not a credential; review any other finding before commit"
+}

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Check, ChevronRight, LockKeyhole, Mic, Play, RotateCcw, Square, Volume2, X } from "lucide-react-native";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -101,12 +101,15 @@ export default function PilotModuleScreen() {
   const cancelAttempt = attemptDictation.cancel;
   const cancelResponse = responseDictation.cancel;
   const cancelRetry = retryDictation.cancel;
+  const cancelDictationsRef = useRef({ cancelAttempt, cancelResponse, cancelRetry });
+  cancelDictationsRef.current = { cancelAttempt, cancelResponse, cancelRetry };
   useEffect(() => () => {
     resetSpeech().catch(() => {});
-    cancelAttempt().catch(() => {});
-    cancelResponse().catch(() => {});
-    cancelRetry().catch(() => {});
-  }, [cancelAttempt, cancelResponse, cancelRetry]);
+    const latest = cancelDictationsRef.current;
+    latest.cancelAttempt().catch(() => {});
+    latest.cancelResponse().catch(() => {});
+    latest.cancelRetry().catch(() => {});
+  }, []);
 
   const dictation = activeCapture === "opener" ? attemptDictation : activeCapture === "response" ? responseDictation : retryDictation;
   const setCaptureText = activeCapture === "opener" ? setAttemptText : activeCapture === "response" ? setResponseText : setRetryText;

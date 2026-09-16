@@ -20,7 +20,7 @@ export function OriginalBenefitPresentation({result}:{result:OriginalBenefit}){
   <Text>This is your unchanged saved output. It does not grant a subscription or complete a lesson.</Text>
  </View>;
 }
-export function OriginalFollowThrough({service}:{service:Service}){
+export function OriginalFollowThrough({service,autoDiscover=false}:{service:Service;autoDiscover?:boolean}){
  const [listing,setListing]=useState<BenefitListing|null>(null),[result,setResult]=useState<OriginalBenefit|null>(null),[status,setStatus]=useState('idle');
  const [recovery,setRecovery]=useState<BenefitRecovery|null>(null);
  const [receipt,setReceipt]=useState('');
@@ -38,6 +38,12 @@ export function OriginalFollowThrough({service}:{service:Service}){
   finally{if(generation===live.current)pending.current=null;}
  };
  const discover=()=>run(async signal=>{const generation=live.current;setResult(null);const value=await service.discoverBenefit(signal);if(generation===live.current){setListing(value);setRecovery(value.recovery);}});
+ useEffect(()=>{
+  let active=true;
+  // Defer beyond mount/StrictMode cleanup; never dispatch for a discarded owner.
+  if(autoDiscover)void Promise.resolve().then(()=>{if(active)void discover();});
+  return ()=>{active=false;};
+ },[service,autoDiscover]);
  const recover=(action:'request'|'status',receiptReference?:string)=>run(async signal=>{const generation=live.current;const value=await service.recoverBenefit(action,signal,receiptReference);if(generation===live.current){setRecovery(value);setReceipt('');}},action==='request'?'recovery-uncertain':'unavailable');
  const restore=(id:string)=>run(async signal=>{const generation=live.current;setResult(null);const value=await service.restoreBenefit(id,signal);if(generation===live.current)setResult(value);});
  return <View style={{gap:12}}>

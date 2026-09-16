@@ -167,11 +167,15 @@ export default function PrivacyScreen() {
         <Section title="Sent off this device">
           <Bullet
             head="Free-session recovery"
-            body="During your 24-hour server session, BYSI keeps approved conversation content, transcribed text, generated results and generated speech audio to recover interrupted requests without generating them again. Uploaded recording bytes are processed, not saved in this recovery store. Access stops at expiry. A scheduled cleanup runs every minute in bounded batches to remove expired recovery content; delays or outages mean this is not an immediate erasure guarantee. A content-free spent-allocation record (account and session IDs and expiry) remains to prevent another free allocation. This is separate from local handoff expiry, local deletion controls, backup retention and provider retention."
+            body="BYSI keeps approved conversation content, transcribed text, generated results and generated speech audio for up to 30 days of inactivity so interrupted requests can recover without generating them again. Uploaded recording bytes are processed, not saved in this recovery store. If execution expiry or failed voice capacity blocks an eligible owner, the session can be renewed for ordinary practice without deleting historical spend accounting or duplicating pending work. A scheduled cleanup runs every minute in bounded batches to remove expired recovery content; delays or outages mean this is not an immediate erasure guarantee. Content-free operation and spend records can remain for abuse and cost protection. This is separate from local handoff expiry, local deletion controls, backup retention and provider retention."
           />
           <Bullet
             head="Your account"
             body="Signing in reconnects your eligible access through your existing web account. Access remains subject to a current access check; signing in alone does not create a subscription. An owned web result can be retrieved through the account connection. Local practice data does not automatically sync between devices."
+          />
+          <Bullet
+            head="Saved results"
+            body="A signed-in saved result is kept as account-owned content until you delete it or delete all saved results from the saved-result screen. Unclaimed guest saved results expire after thirty days. Opening or browsing a guest result does not extend that clock."
           />
           <Bullet
             head="Recorded audio"
@@ -199,11 +203,11 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="Account identity deletion"
-            body="Settings has a separate account identity deletion control. It is currently unavailable until its server capability is enabled. When enabled, it requires your current password and explicit confirmation, then irreversibly soft-deletes the account provider’s sign-in identity. This is not full data erasure: server-held results, original web-session email addresses, purchase records and content-free spent-allocation IDs remain, and subscriptions are not cancelled. Other devices, backups and provider records are not erased. Existing access tokens can last until expiry. Device reset below is separate and never deletes the server account."
+            body="Settings has a separate account identity deletion control. It is currently unavailable until its server capability is enabled. When enabled, it requires your current password and explicit confirmation, then irreversibly soft-deletes the account provider’s sign-in identity. account deletion erases saved result content and owner-scoped free-session recovery content from BYSI’s private stores, and suppresses late result finishes, claims and replays for that owner. Purchase records, content-free accounting, other devices, backups, provider records and subscriptions are handled separately. Existing access tokens can last until expiry. Device reset below is separate and never deletes the server account."
           />
           <Bullet
             head="What deleting cannot undo"
-            body="These controls remove the local records described below. Reset does not delete other owners' local data, your web account, server-held results, or provider records, and does not cancel a subscription. It cannot retroactively delete processing a provider has already completed — that is governed by that provider's own retention policy, not by this app."
+            body="These controls remove the local records described below. Reset does not delete other owners' local data, your web account, server-held saved results, or provider records, and does not cancel a subscription. Saved-result deletion is separate. It cannot retroactively delete processing a provider has already completed — that is governed by that provider's own retention policy, not by this app."
             tone={C.amber}
           />
         </Section>
@@ -251,7 +255,7 @@ export default function PrivacyScreen() {
           />
           <Danger
             label="Reset all app data"
-            body="Removes local practice data and choices for the current guest or signed-in owner, clears local audio caches, and signs you out. Other owners' local data, your web account, server-held results and subscriptions remain."
+            body="Removes local practice data and choices for the current guest or signed-in owner, clears local audio caches, and signs you out. Other owners' local data, your web account, server-held saved results and subscriptions remain. Use the saved-result screen for saved-result deletion."
             onPress={onResetAll}
           />
           <Text style={styles.perSession}>

@@ -15,6 +15,7 @@ import {
 import type { PersonaVoice } from "@/types/convo";
 import { withRequestDeadline } from "@/lib/requestDeadline";
 import {createOwnerVoiceCache} from "@/lib/ownerVoiceCache";
+import {speechBytesToBase64} from "@/lib/nativeSpeechBytes";
 import type { PilotAudioLine } from "@/types/pilotCurriculum";
 
 const TTS_ENDPOINT = process.env.EXPO_PUBLIC_TTS_ENDPOINT?.trim() ?? "";
@@ -176,6 +177,16 @@ async function fetchSpeechDataUri(text: string, persona: PersonaVoice, signal?: 
     }
     if (contentType !== "audio/mpeg") throw new Error("Voice response was not MPEG audio");
 
+    if (Platform.OS !== "web") {
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (requestSignal.aborted) throw new Error("Request aborted");
+      const base64 = speechBytesToBase64(bytes);
+      safeLog("[evidence] BYSI TTS response", {
+        count: bytes.byteLength, endpoint: evidenceEndpoint(endpoint),
+        ok: true, role, status: response.status, type: contentType,
+      });
+      return `data:audio/mpeg;base64,${base64}`;
+    }
     const blob = await response.blob();
     safeLog("[evidence] BYSI TTS response", {
       count: blob.size,

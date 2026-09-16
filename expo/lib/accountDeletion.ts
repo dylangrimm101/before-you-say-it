@@ -9,6 +9,15 @@ export type ReceiptlessDeletionNotice={deleted:boolean;uncertain?:boolean;ownerI
 export const STAGING_ACCOUNT_DELETION_REVIEW_FLAG='reviewed-task1-20260910';
 export const STAGING_ACCOUNT_DELETION_ENDPOINT='https://pqqxaklcburdxjfeolmd.supabase.co/functions/v1/bysi-task1-account-delete';
 export type AccountDeletionEndpointReview={authUrl:string|null;enabled:boolean;staging?:boolean;buildMode?:string;applicationId?:string|null;projectId?:string|null;reviewFlag?:string|null};
+export const NORMAL_ACCOUNT_DELETION_ENDPOINT='https://beforeyousayit.app/functions/v1/account-delete';
+export type DeletionDestination=string|Readonly<{url:string;backend:'normal-results-local-v1'}>;
+const candidateDestinations=new WeakSet<object>();
+export function candidateAccountDeletionEndpoint(input:{authUrl:string|null;flag?:string;development:boolean;staging?:boolean;buildMode?:string}):DeletionDestination|null {
+ if(input.authUrl!=='https://spvksnddzyvycfoefrcf.supabase.co'||input.flag!=='normal-results-local-v1'||!input.development||input.staging||input.buildMode)return null;
+ const destination=Object.freeze({url:NORMAL_ACCOUNT_DELETION_ENDPOINT,backend:'normal-results-local-v1' as const});
+ candidateDestinations.add(destination);return destination;
+}
+const deletionUrl=(endpoint:DeletionDestination)=>typeof endpoint==='string'?endpoint:endpoint.url;
 const submissionOwners=new Set<string>();
 function bounded<T>(promise:Promise<T>,signal:AbortSignal):Promise<T>{
  return new Promise((resolve,reject)=>{
@@ -31,7 +40,7 @@ export function reviewedAccountDeletionEndpoint(input:AccountDeletionEndpointRev
   && input.reviewFlag===STAGING_ACCOUNT_DELETION_REVIEW_FLAG
   ? STAGING_ACCOUNT_DELETION_ENDPOINT:null;
 }
-const isReviewedDeletionEndpoint=(endpoint:string)=>endpoint==='https://spvksnddzyvycfoefrcf.supabase.co/functions/v1/account-delete' || endpoint===STAGING_ACCOUNT_DELETION_ENDPOINT;
+const isReviewedDeletionEndpoint=(endpoint:DeletionDestination)=>typeof endpoint==='object'?candidateDestinations.has(endpoint):endpoint==='https://spvksnddzyvycfoefrcf.supabase.co/functions/v1/account-delete' || endpoint===STAGING_ACCOUNT_DELETION_ENDPOINT;
 async function makeReceipt(ownerId:string):Promise<AccountDeletionReceipt>{
  try{
   const crypto=await import('expo-crypto');
@@ -49,7 +58,7 @@ async function makeReceiptlessCapability(ownerId:string):Promise<ReceiptlessDele
  const receipt=await makeReceipt(ownerId);
  return {ownerId,secret:receipt.secret,digest:receipt.digest};
 }
-export async function ensureReceiptlessDeletionCapability(auth:SupabaseClient['auth'],endpoint:string,owner:string,capabilityStore:ReceiptlessDeletionCapabilityStore,fetcher:typeof fetch=fetch,options:{signal?:AbortSignal;deadlineMs?:number}={}):Promise<{registered:boolean;uncertain?:boolean;ownerId?:string}>{
+export async function ensureReceiptlessDeletionCapability(auth:SupabaseClient['auth'],endpoint:DeletionDestination,owner:string,capabilityStore:ReceiptlessDeletionCapabilityStore,fetcher:typeof fetch=fetch,options:{signal?:AbortSignal;deadlineMs?:number}={}):Promise<{registered:boolean;uncertain?:boolean;ownerId?:string}>{
  if(!isReviewedDeletionEndpoint(endpoint))return {registered:false,uncertain:true,ownerId:owner};
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),Math.max(1,Math.min(15000,options.deadlineMs??15000)));
  const stop=()=>controller.abort();options.signal?.addEventListener('abort',stop,{once:true});if(options.signal?.aborted)stop();
@@ -61,7 +70,7 @@ export async function ensureReceiptlessDeletionCapability(auth:SupabaseClient['a
   let capability=await bounded(capabilityStore.load(owner),controller.signal);
   if(!capability || capability.ownerId!==owner){capability=await bounded(makeReceiptlessCapability(owner),controller.signal);await bounded(capabilityStore.save(capability),controller.signal);}
   if(capability.registered)return {registered:true,ownerId:owner};
-  const response=await bounded(fetcher(endpoint,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({deviceStatusDigest:capability.digest}),signal:controller.signal,redirect:'error'}),controller.signal);
+  const response=await bounded(fetcher(deletionUrl(endpoint),{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({deviceStatusDigest:capability.digest}),signal:controller.signal,redirect:'error'}),controller.signal);
   if(!response.ok)return {registered:false,uncertain:true,ownerId:owner};
   const body=await bounded(response.json(),controller.signal);
   if(body.code!=='ok')return {registered:false,uncertain:true,ownerId:owner};
@@ -70,14 +79,14 @@ export async function ensureReceiptlessDeletionCapability(auth:SupabaseClient['a
  }catch{return {registered:false,uncertain:true,ownerId:owner};}
  finally{clearTimeout(timer);options.signal?.removeEventListener('abort',stop);}
 }
-export async function checkReceiptlessDeletionNotice(endpoint:string,owner:string,capabilityStore:ReceiptlessDeletionCapabilityStore,fetcher:typeof fetch=fetch,options:{signal?:AbortSignal;deadlineMs?:number}={}):Promise<ReceiptlessDeletionNotice>{
+export async function checkReceiptlessDeletionNotice(endpoint:DeletionDestination,owner:string,capabilityStore:ReceiptlessDeletionCapabilityStore,fetcher:typeof fetch=fetch,options:{signal?:AbortSignal;deadlineMs?:number}={}):Promise<ReceiptlessDeletionNotice>{
  if(!isReviewedDeletionEndpoint(endpoint))return {deleted:false,uncertain:true,ownerId:owner};
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),Math.max(1,Math.min(15000,options.deadlineMs??15000)));
  const stop=()=>controller.abort();options.signal?.addEventListener('abort',stop,{once:true});if(options.signal?.aborted)stop();
  try{
   const capability=await bounded(capabilityStore.load(owner),controller.signal);
   if(!capability || capability.ownerId!==owner)return {deleted:false,uncertain:true,ownerId:owner};
-  const response=await bounded(fetcher(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceStatusSecret:capability.secret}),signal:controller.signal,redirect:'error'}),controller.signal);
+  const response=await bounded(fetcher(deletionUrl(endpoint),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceStatusSecret:capability.secret}),signal:controller.signal,redirect:'error'}),controller.signal);
   if(!response.ok)return {deleted:false,uncertain:true,ownerId:owner};
   const body=await bounded(response.json(),controller.signal);
   if(body.code!=='ok' || body.ownerId!==owner || !['active','deleting','deleted'].includes(body.status))return {deleted:false,uncertain:true,ownerId:owner};
@@ -87,7 +96,7 @@ export async function checkReceiptlessDeletionNotice(endpoint:string,owner:strin
  }catch{return {deleted:false,uncertain:true,ownerId:owner};}
  finally{clearTimeout(timer);options.signal?.removeEventListener('abort',stop);}
 }
-export async function requestAccountDeletion(auth:SupabaseClient['auth'],endpoint:string,owner:string,password:string,billing:AccountDeletionBilling,receiptStore:AccountDeletionReceiptStore,fetcher:typeof fetch=fetch,options:{signal?:AbortSignal;deadlineMs?:number}={}):Promise<AccountDeletionResult>{
+export async function requestAccountDeletion(auth:SupabaseClient['auth'],endpoint:DeletionDestination,owner:string,password:string,billing:AccountDeletionBilling,receiptStore:AccountDeletionReceiptStore,fetcher:typeof fetch=fetch,options:{signal?:AbortSignal;deadlineMs?:number}={}):Promise<AccountDeletionResult>{
  if(!isReviewedDeletionEndpoint(endpoint))return {success:false,message:'Account deletion is unavailable. No request was sent.'};
  void billing;
  if(submissionOwners.has(owner))return {success:false,message:'Account deletion is already being requested. Wait for the current request to finish before trying again.'};
@@ -105,7 +114,7 @@ export async function requestAccountDeletion(auth:SupabaseClient['auth'],endpoin
   if(controller.signal.aborted)throw new Error('Request stopped before dispatch');
   const latest=await bounded(auth.getSession(),controller.signal);if(latest.data.session?.user.id!==owner)throw new Error('Account changed');
   dispatched=true;
-  const response=await bounded(fetcher(endpoint,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({password,receiptDigest:receipt.digest}),signal:controller.signal,redirect:'error'}),controller.signal);
+  const response=await bounded(fetcher(deletionUrl(endpoint),{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({password,receiptDigest:receipt.digest}),signal:controller.signal,redirect:'error'}),controller.signal);
   if(response.status===403)return {success:false,status:'rejected',ownerId:owner,message:'Your password was not accepted. Re-enter your BYSI password or use Forgot password.'};
   if(response.status===401)return {success:false,status:'rejected',ownerId:owner,message:'Your login has expired. Sign in again before requesting deletion.'};
   if(!response.ok)throw new Error();
@@ -116,14 +125,14 @@ export async function requestAccountDeletion(auth:SupabaseClient['auth'],endpoin
  }catch{return {success:false,status:dispatched?'uncertain':'unavailable',ownerId:owner,message:'Account deletion was not confirmed. Your password may need re-entry, or the service may be unavailable. If the request timed out after submission, the outcome is uncertain; use the saved deletion receipt status before retrying.'};}
  finally{clearTimeout(timer);options.signal?.removeEventListener('abort',stop);submissionOwners.delete(owner);}
 }
-export async function checkAccountDeletionStatus(endpoint:string,owner:string|null,receiptStore:AccountDeletionReceiptStore,fetcher:typeof fetch=fetch,options:{signal?:AbortSignal;deadlineMs?:number}={}):Promise<AccountDeletionResult>{
+export async function checkAccountDeletionStatus(endpoint:DeletionDestination,owner:string|null,receiptStore:AccountDeletionReceiptStore,fetcher:typeof fetch=fetch,options:{signal?:AbortSignal;deadlineMs?:number}={}):Promise<AccountDeletionResult>{
  if(!isReviewedDeletionEndpoint(endpoint))return {success:false,message:'Account deletion status is unavailable in this build.'};
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),Math.max(1,Math.min(15000,options.deadlineMs??15000)));
  const stop=()=>controller.abort();options.signal?.addEventListener('abort',stop,{once:true});if(options.signal?.aborted)stop();
  try{
   const receipt=owner?await bounded(receiptStore.load(owner),controller.signal):await bounded(Promise.resolve(receiptStore.loadLatest?.()),controller.signal);
   if(!receipt || (owner && receipt.ownerId!==owner))return {success:false,message:'No deletion receipt was found on this device.'};
-  const response=await bounded(fetcher(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({receiptSecret:receipt.secret}),signal:controller.signal,redirect:'error'}),controller.signal);
+  const response=await bounded(fetcher(deletionUrl(endpoint),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({receiptSecret:receipt.secret}),signal:controller.signal,redirect:'error'}),controller.signal);
   if(!response.ok)return {success:false,message:'Deletion status could not be checked. Try again later.'};
   const body=await bounded(response.json(),controller.signal);
   if(body.code!=='ok' || typeof body.requestId!=='string' || body.requestId.length<1 || body.requestId.length>128 || !['accepted','processing','data_erased','provider_retry','complete','failed'].includes(body.status))throw new Error();

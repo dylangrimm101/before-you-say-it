@@ -44,3 +44,5 @@ yarn-error.*
 core
 node_modules
 .expo
+
+credentials.json

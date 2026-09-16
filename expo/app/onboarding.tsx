@@ -11,6 +11,11 @@ import { buildCustomScenario, fallbackCustomScenario } from "@/lib/ai";
 import { createOnboardingPracticeSession, createPracticeSessionId } from "@/lib/practiceSession";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useStore } from "@/providers/store";
+import { useAuth } from "@/providers/auth";
+import {normalFreeRecoveryEnabled, requestNormalFree} from '@/lib/normalFreeRuntime';
+import {startNormalFreeConversation} from '@/lib/normalFreeConversation';
+import {mayRequestRestart,recoveryMessage,type RecoveryState} from '@/lib/phaseRecovery';
+import {recoveredNormalFreePractice} from "@/lib/normalFreeCheckpoint";
 import type { CategoryId, Difficulty, ReactionPattern, Scenario } from "@/types/convo";
 
 const ENTRY_CHOICES: readonly { id: OnboardingEntryRoute; label: string; note: string }[] = [
@@ -54,7 +59,8 @@ export default function Onboarding(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const isReduced = useReducedMotion();
-  const { saveProfile, addCustomScenario, anonymousUserId, createCurrentOnboardingPractice } = useStore();
+  const { saveProfile, addCustomScenario, anonymousUserId, createCurrentOnboardingPractice, activePracticeSession, saveActivePracticeSession } = useStore();
+  const { startNativeSession } = useAuth();
   const [step, setStep] = useState<number>(0);
   const [entryRoute, setEntryRoute] = useState<OnboardingEntryRoute | null>(null);
   const [moduleId, setModuleId] = useState<ModuleId | null>(null);
@@ -65,6 +71,7 @@ export default function Onboarding(): React.JSX.Element {
   const [outcome, setOutcome] = useState<string>("");
   const [building, setBuilding] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+  const [recovery, setRecovery] = useState<RecoveryState | null>(null);
   const [isAdvancing, setIsAdvancing] = useState<boolean>(false);
   const [transition, setTransition] = useState<DeckTransition | null>(null);
   const transitionProgress = useRef<Animated.Value>(new Animated.Value(1)).current;
@@ -127,6 +134,29 @@ export default function Onboarding(): React.JSX.Element {
     const selectedGoal = behavioralGoal(entryRoute, moduleId ?? undefined, selectedOutcome);
 
     try {
+      const sessionResult = await startNativeSession();
+      if (!sessionResult.success) {
+        setBuilding(false);
+        setError(sessionResult.message);
+        return;
+      }
+      if(normalFreeRecoveryEnabled){
+        const state=await startNormalFreeConversation(requestNormalFree);
+        if(state.status==='resume'){
+          const recovered=recoveredNormalFreePractice(state,anonymousUserId,createPracticeSessionId());
+          if(recovered){
+            await saveActivePracticeSession(recovered.session);
+            setRecovery(null);
+            tap("success");
+            router.replace({ pathname: "/rehearse/[id]", params: { id: recovered.scenario.id, difficulty: recovered.difficulty, reaction: recovered.reaction, entry: "onboarding", persona: recovered.persona, practiceSessionId: recovered.session.id } });
+            return;
+          }
+        }
+        if(state.status!=='new'&&!(state.status==='start'&&!state.used)){
+          setRecovery(state);setError(recoveryMessage(state.status));setBuilding(false);return;
+        }
+        setRecovery(null);
+      }
       await saveProfile({ focus: selectedFocus, persona, reaction: selectedReaction, outcome: selectedOutcome, dread: approved?.situation ?? situation.trim(), pattern: "avoid", win: "heard", createdAt: Date.now() });
       let scenario: Scenario;
       if (approved) {
@@ -162,7 +192,22 @@ export default function Onboarding(): React.JSX.Element {
       setBuilding(false);
       setError("We couldn't set up your rehearsal. Check your connection and try again.");
     }
-  }, [addCustomScenario, anonymousUserId, building, entryRoute, isReal, moduleId, outcome, router, createCurrentOnboardingPractice, saveProfile, selectionLabel, situation]);
+  }, [addCustomScenario, anonymousUserId, building, entryRoute, isReal, moduleId, outcome, router, createCurrentOnboardingPractice, saveActivePracticeSession, saveProfile, selectionLabel, situation, startNativeSession]);
+
+  const restartPractice = async ():Promise<void> => {
+    if(!recovery||!mayRequestRestart(recovery)||building)return;
+    setBuilding(true);
+    try{
+      const response=await requestNormalFree('restart',{sessionId:recovery.sessionId,generation:recovery.generation});
+      if(!response.ok){const result=await response.json();setError(recoveryMessage(result.code));return;}
+      setRecovery(null);setError('Ready. Choose the conversation again to begin.');
+    }catch{setError('The restart could not be confirmed. Check again before recording.');}
+    finally{setBuilding(false);}
+  };
+  const resumePractice = ():void => {
+    const saved=activePracticeSession;if(!saved)return;
+    router.replace({pathname:'/rehearse/[id]',params:{id:saved.scenarioId,entry:'onboarding',practiceSessionId:saved.id,difficulty:'steady',reaction:saved.expectedReaction,persona:saved.persona}});
+  };
 
   const chooseDiagnosis = (nextModuleId: ModuleId, label: string): void => {
     tap("light");
@@ -235,6 +280,10 @@ export default function Onboarding(): React.JSX.Element {
       {!isReal && cardStep === 2 && entryRoute === "desired_skill" ? <Question title="What usually makes that hardest?" lede="Choose the pressure that most often changes what you say.">{PRESSURE_CONDITIONS.map((item) => <Choice key={item.label} title={item.label} selected={selectionLabel === item.label} disabled={disabled} onPress={() => chooseSecondary(null, item.reaction as ReactionPattern, item.label)} />)}</Question> : null}
       {!isReal && cardStep === 3 ? <Question title="Where would this skill help most?" lede="We’ll choose the matching authored situation automatically.">{contextChoices}</Question> : null}
       {cardStep === step && error ? <Text style={styles.error}>{error}</Text> : null}
+      {cardStep===step&&recovery ? <View style={{gap:12,marginTop:12}}>
+        {activePracticeSession ? <PrimaryButton label="Resume saved rehearsal" onPress={resumePractice} disabled={building}/> : null}
+        {mayRequestRestart(recovery) ? <><Text style={styles.error}>Starting another conversation requires a fresh server check so stale work cannot overwrite the saved practice.</Text><PrimaryButton label="Start new rehearsal" onPress={()=>void restartPractice()} disabled={building}/></> : null}
+      </View> : null}
     </>;
   };
 

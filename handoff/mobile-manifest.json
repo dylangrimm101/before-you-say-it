@@ -1,0 +1,3652 @@
+{
+  "source_pin": "d0a068a1ee849144caf65811f4bf0c457056515a",
+  "files": [
+    {
+      "path": "expo/.gitignore",
+      "source_sha256": "a1dfb737be6d7183e500ef38fd060b8967da67fdb870a00b7cf39b12235b36c7",
+      "handoff_sha256": "a1dfb737be6d7183e500ef38fd060b8967da67fdb870a00b7cf39b12235b36c7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/DESIGN_BRIEF.md",
+      "source_sha256": "d75feb2c3be0b70b32c25a4b4ac6b98622a73cfdd4c19bac71f9c299376197c9",
+      "handoff_sha256": "d75feb2c3be0b70b32c25a4b4ac6b98622a73cfdd4c19bac71f9c299376197c9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/README.md",
+      "source_sha256": "a80f1d13020170fc8e16f324b89e226033ebea2470c103e017b42e8289b3cf74",
+      "handoff_sha256": "a80f1d13020170fc8e16f324b89e226033ebea2470c103e017b42e8289b3cf74",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/access.test.ts",
+      "source_sha256": "c450f220e29765ac4d1bc5950623bdb48920f7e62214af2a3bfdd3bcbfb95094",
+      "handoff_sha256": "c450f220e29765ac4d1bc5950623bdb48920f7e62214af2a3bfdd3bcbfb95094",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/accountDeletion.test.ts",
+      "source_sha256": "ab968d5168484e4ad79b6d959f281284ef8aeebe180af034eca6cbe572b1653f",
+      "handoff_sha256": "ab968d5168484e4ad79b6d959f281284ef8aeebe180af034eca6cbe572b1653f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/accountDeletionComposition.fixture.ts",
+      "source_sha256": "0563e2c33bfe8c8710c4111a5d3b3523abaf7482b097c5b9d47e32e9852a1008",
+      "handoff_sha256": "0563e2c33bfe8c8710c4111a5d3b3523abaf7482b097c5b9d47e32e9852a1008",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/accountLifecycleComponent.fixture.ts",
+      "source_sha256": "a420500a8b3a1061cddba2485eb79849211646e6b4cf3b09b699bd7643876521",
+      "handoff_sha256": "a420500a8b3a1061cddba2485eb79849211646e6b4cf3b09b699bd7643876521",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/accountRecovery.test.ts",
+      "source_sha256": "8caeab9c3ec9e198dcb3bb2f41cc2b2c8df700bc0170b4185c3d5b1a1cf0ea40",
+      "handoff_sha256": "8caeab9c3ec9e198dcb3bb2f41cc2b2c8df700bc0170b4185c3d5b1a1cf0ea40",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/accountsResultsJoined.fixture.ts",
+      "source_sha256": "654eb17f5b7c66020c120ce783f71b7262aa10c97b1f6cd1f7d72fa8dc411d0c",
+      "handoff_sha256": "654eb17f5b7c66020c120ce783f71b7262aa10c97b1f6cd1f7d72fa8dc411d0c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/activeScenarioRunRepository.test.ts",
+      "source_sha256": "2c2b854f7d8af508dcbc3d3e92b5e9fc8a9c474366fb02386725583ead8bb452",
+      "handoff_sha256": "2c2b854f7d8af508dcbc3d3e92b5e9fc8a9c474366fb02386725583ead8bb452",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/allLessonTrajectories.fixture.ts",
+      "source_sha256": "d6e463379533a2606ea08d5e4f9fc24ca94a14e299d4decd8c22e7d417fb09e7",
+      "handoff_sha256": "d6e463379533a2606ea08d5e4f9fc24ca94a14e299d4decd8c22e7d417fb09e7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/allLessonTrajectories.test.ts",
+      "source_sha256": "e664694c70d8da55f02791f3c02546c81d574d2dfd1c39fe4cd1c20c6f70763b",
+      "handoff_sha256": "e664694c70d8da55f02791f3c02546c81d574d2dfd1c39fe4cd1c20c6f70763b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/appFirstNavigation.fixture.ts",
+      "source_sha256": "91617cafcdb0e7fccefd2336d7769f553e3bce04881b7cab663b53d8012f597f",
+      "handoff_sha256": "91617cafcdb0e7fccefd2336d7769f553e3bce04881b7cab663b53d8012f597f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/appRootNavigation.fixture.ts",
+      "source_sha256": "b6524476dca2d0915d36f70f6141afc8df3783cf8999ca379a01951f942b476d",
+      "handoff_sha256": "b6524476dca2d0915d36f70f6141afc8df3783cf8999ca379a01951f942b476d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/appRootNavigation.test.ts",
+      "source_sha256": "4fc933dd66eb70e3b5f6b295b908e4a2026754ac6bc03f698faa532acb6cb067",
+      "handoff_sha256": "4fc933dd66eb70e3b5f6b295b908e4a2026754ac6bc03f698faa532acb6cb067",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/appRouteAcceptance.test.ts",
+      "source_sha256": "117749263e3ae0b630dc10dda00bc8df3d89f46d92cbcde4bda191ea229e2aec",
+      "handoff_sha256": "117749263e3ae0b630dc10dda00bc8df3d89f46d92cbcde4bda191ea229e2aec",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/approvedAssessmentBoundary.test.ts",
+      "source_sha256": "b46eecd58b53e2282a5db8b499863749891eef57cf8b6bacfadb838abd8ff7cf",
+      "handoff_sha256": "b46eecd58b53e2282a5db8b499863749891eef57cf8b6bacfadb838abd8ff7cf",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/approvedContinuation.test.ts",
+      "source_sha256": "5d35635d784033ce7a2cc2253fce739a855fda1a692b4ca2a3f3460bc63dfaf4",
+      "handoff_sha256": "5d35635d784033ce7a2cc2253fce739a855fda1a692b4ca2a3f3460bc63dfaf4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/approvedContinuationMounted.test.ts",
+      "source_sha256": "d8dc08e13cceb2ccb3afe4b90ee5a745fa6b6c62c004caa4232c15f48f90270f",
+      "handoff_sha256": "d8dc08e13cceb2ccb3afe4b90ee5a745fa6b6c62c004caa4232c15f48f90270f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/approvedLessonDecks.test.ts",
+      "source_sha256": "e7eba6edec4cf6ddfe6028c92c98826d5dbc12f1b46d08d792804a0935f70bc3",
+      "handoff_sha256": "e7eba6edec4cf6ddfe6028c92c98826d5dbc12f1b46d08d792804a0935f70bc3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/approvedLessonJourneys.test.ts",
+      "source_sha256": "c1c87dcfbd360a96bef092418ef79c23c06dc6a072353e79f2cfceb9c8ed3d9f",
+      "handoff_sha256": "c1c87dcfbd360a96bef092418ef79c23c06dc6a072353e79f2cfceb9c8ed3d9f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/approvedRehearsalDynamicResponse.test.ts",
+      "source_sha256": "298b770b5c453ac03d5c21525edb8538666a8f901e887e75a0440709db1d82fa",
+      "handoff_sha256": "298b770b5c453ac03d5c21525edb8538666a8f901e887e75a0440709db1d82fa",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/approvedRehearsals.test.ts",
+      "source_sha256": "cbc0bc91c8b1140f733752be045b47763144f17896e5237dbe9349b535ab4ea8",
+      "handoff_sha256": "cbc0bc91c8b1140f733752be045b47763144f17896e5237dbe9349b535ab4ea8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/approvedSpokenNumber.test.ts",
+      "source_sha256": "ab7d98e8e1afb3aa4552cf6e406ab43fdb3cde28eb29b40a6f4b33c8978437fd",
+      "handoff_sha256": "ab7d98e8e1afb3aa4552cf6e406ab43fdb3cde28eb29b40a6f4b33c8978437fd",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/approvedThursdayScene.test.ts",
+      "source_sha256": "1c75ab929628c05d768555c5c208bff39a10c498e451d26af4ccce6972b1ed5e",
+      "handoff_sha256": "1c75ab929628c05d768555c5c208bff39a10c498e451d26af4ccce6972b1ed5e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/backgroundField.test.ts",
+      "source_sha256": "322af067a0984d6a8e89f5a341bd7210872990983d9b7f1c29fbd734e46d2b17",
+      "handoff_sha256": "322af067a0984d6a8e89f5a341bd7210872990983d9b7f1c29fbd734e46d2b17",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/baselineAudio.test.ts",
+      "source_sha256": "352813a9b7832f280c8e4976d45dfbcc587a233129494a0141f6d36b9661b136",
+      "handoff_sha256": "352813a9b7832f280c8e4976d45dfbcc587a233129494a0141f6d36b9661b136",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/behavioralCorrection.test.ts",
+      "source_sha256": "cf1cce1e49e3773898fc863d2f9d40e2616d3d3f5586c2718707bb0a962aa6f7",
+      "handoff_sha256": "cf1cce1e49e3773898fc863d2f9d40e2616d3d3f5586c2718707bb0a962aa6f7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/billingAuthorityClassification.fixture.tsx",
+      "source_sha256": "ab51dcf5ffbea68bc31a20fe93d31fefa19937daf1e0dfcd4a720cc631b9f781",
+      "handoff_sha256": "ab51dcf5ffbea68bc31a20fe93d31fefa19937daf1e0dfcd4a720cc631b9f781",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/blockingVisualCorrections.test.ts",
+      "source_sha256": "70b03fe6984c15325d2dbb641d76ae186798f0e87250c1b48a7157a7ab7c672c",
+      "handoff_sha256": "70b03fe6984c15325d2dbb641d76ae186798f0e87250c1b48a7157a7ab7c672c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/boundedRecordingRecovery.test.ts",
+      "source_sha256": "ab7310f4aa21c788952aef1c4c50d2e3f7923c4b32ca4b50ae51ac339cde761d",
+      "handoff_sha256": "ab7310f4aa21c788952aef1c4c50d2e3f7923c4b32ca4b50ae51ac339cde761d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/bundledApprovedDeckOffline.test.ts",
+      "source_sha256": "028fa483332af5645d7fdcb2d3b09c5eab906963700a57d2dd661451227d85a6",
+      "handoff_sha256": "028fa483332af5645d7fdcb2d3b09c5eab906963700a57d2dd661451227d85a6",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/buyerComponents.test.ts",
+      "source_sha256": "0a7c039bab6d3b1e4a0e08b02e845c3eff6c15b4de25aa4658b873fb4cb0af56",
+      "handoff_sha256": "0a7c039bab6d3b1e4a0e08b02e845c3eff6c15b4de25aa4658b873fb4cb0af56",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/buyerJourneyComponent.fixture.ts",
+      "source_sha256": "c35ef06f77d21d301d3930d04587314ba2ede2ac00a500e9652f2f77d7d79706",
+      "handoff_sha256": "c35ef06f77d21d301d3930d04587314ba2ede2ac00a500e9652f2f77d7d79706",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/buyerLoginComponent.fixture.ts",
+      "source_sha256": "21567d773a27f064c8fb3ba7e489ade054008764281c3283a72ae67e16b49647",
+      "handoff_sha256": "21567d773a27f064c8fb3ba7e489ade054008764281c3283a72ae67e16b49647",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/buyerOwnerComponent.fixture.ts",
+      "source_sha256": "2ec20e4e58c6692d0f3e49f84308f84bd39220b5df5d027583c675ab47c3ce79",
+      "handoff_sha256": "2ec20e4e58c6692d0f3e49f84308f84bd39220b5df5d027583c675ab47c3ce79",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/buyerPracticeVoice.fixture.ts",
+      "source_sha256": "1b4712024d5577624475cf5bcbd2d4cfa5b2ff86df7bb66008e8fbaebdca650f",
+      "handoff_sha256": "1b4712024d5577624475cf5bcbd2d4cfa5b2ff86df7bb66008e8fbaebdca650f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/buyerPracticeVoice.test.ts",
+      "source_sha256": "cc6d8eb4d39ee7d6a848db4a823532ef090030a98f7d33304930ae7442715cba",
+      "handoff_sha256": "cc6d8eb4d39ee7d6a848db4a823532ef090030a98f7d33304930ae7442715cba",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/buyerScreenBoundary.fixture.ts",
+      "source_sha256": "4f74360e9b73ec14ed859d4132e4b450ad20e9a2b5a08ed491a514b6d183b0a1",
+      "handoff_sha256": "4f74360e9b73ec14ed859d4132e4b450ad20e9a2b5a08ed491a514b6d183b0a1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/buyerScreenBoundary.test.ts",
+      "source_sha256": "60efb6ab1a6baabf1e9cff03b97f3c3e57468599baab9461ded87b66f69c72b9",
+      "handoff_sha256": "60efb6ab1a6baabf1e9cff03b97f3c3e57468599baab9461ded87b66f69c72b9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/clientEnvGuard.test.ts",
+      "source_sha256": "965bba1c025b87a78b136b7979df6ed8781d710adef839ddff701e499a0ced4e",
+      "handoff_sha256": "965bba1c025b87a78b136b7979df6ed8781d710adef839ddff701e499a0ced4e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/componentTestSetup.test.ts",
+      "source_sha256": "59da679ef2c06a146bd2f999f02f5b57e16013fbaee770cae511b103ec2bc955",
+      "handoff_sha256": "59da679ef2c06a146bd2f999f02f5b57e16013fbaee770cae511b103ec2bc955",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/composedReturnRepair.test.ts",
+      "source_sha256": "c770153c2bd1d71142938c3bc2866cfd33ea2f347628678ac667619fd236d39a",
+      "handoff_sha256": "c770153c2bd1d71142938c3bc2866cfd33ea2f347628678ac667619fd236d39a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/connectedDeletion.fixture.ts",
+      "source_sha256": "dfbb51dccf899fd7320b5a01f07633dcbb0b563fbcb6cde062f36a1c47a3ae5e",
+      "handoff_sha256": "dfbb51dccf899fd7320b5a01f07633dcbb0b563fbcb6cde062f36a1c47a3ae5e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/connectedDeletionConfig.test.ts",
+      "source_sha256": "672f4679064fd1d3a7e90b847519ed00e4f47b15af09355431c1d5684e7f52d8",
+      "handoff_sha256": "672f4679064fd1d3a7e90b847519ed00e4f47b15af09355431c1d5684e7f52d8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/connectedDeletionDefault.fixture.ts",
+      "source_sha256": "971fb375f78b2e5b21b49a37c8105f3828a82e63b4e96c53e9c83fc11310d1fe",
+      "handoff_sha256": "971fb375f78b2e5b21b49a37c8105f3828a82e63b4e96c53e9c83fc11310d1fe",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/consent.test.ts",
+      "source_sha256": "e9bc1f7c7f5ab286efc114d026286625cf3585dfd551f3676e06e05e8a343fd7",
+      "handoff_sha256": "e9bc1f7c7f5ab286efc114d026286625cf3585dfd551f3676e06e05e8a343fd7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/context-recovery.fixture.ts",
+      "source_sha256": "9fd2fd64fb13251a5a74407e5b63bfeebe2b8f3aa3863b043d0b7d2a04401bc0",
+      "handoff_sha256": "9fd2fd64fb13251a5a74407e5b63bfeebe2b8f3aa3863b043d0b7d2a04401bc0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/contextRecoveryMounted.test.ts",
+      "source_sha256": "87a238c080b18da1f96b89496d07d9268bc2fc8bd31958c8f4fcf31853f0cf58",
+      "handoff_sha256": "87a238c080b18da1f96b89496d07d9268bc2fc8bd31958c8f4fcf31853f0cf58",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/conversion.test.ts",
+      "source_sha256": "768bcba18c924b35f50d32bdcddc1efde2a1359dcc9736af8fe66bbb07d24205",
+      "handoff_sha256": "768bcba18c924b35f50d32bdcddc1efde2a1359dcc9736af8fe66bbb07d24205",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/convertedCompletionJournal.test.ts",
+      "source_sha256": "9adf76f5a1af1ca23ee2071b3e5bad0c30dd7861d8ce45916568a539172962f8",
+      "handoff_sha256": "9adf76f5a1af1ca23ee2071b3e5bad0c30dd7861d8ce45916568a539172962f8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/convertedLesson.test.ts",
+      "source_sha256": "226dfbd1eaa351beedb0bd2b51b71f696958bbd32fccb7643fbc8d77c3767e18",
+      "handoff_sha256": "226dfbd1eaa351beedb0bd2b51b71f696958bbd32fccb7643fbc8d77c3767e18",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/convertedLessonReset.test.ts",
+      "source_sha256": "93caa05da4eb1fba45d534ea1d19920d93706e6d8c966515bc3cc30522ce721b",
+      "handoff_sha256": "93caa05da4eb1fba45d534ea1d19920d93706e6d8c966515bc3cc30522ce721b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/copy.test.ts",
+      "source_sha256": "79073bff3b682b42838999a4002cc2ec5cdf2633a4181dc4b5ef79a69cc54809",
+      "handoff_sha256": "79073bff3b682b42838999a4002cc2ec5cdf2633a4181dc4b5ef79a69cc54809",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/currentGuestComponents.test.ts",
+      "source_sha256": "fd497bb2b4b03f676449c6bf9e853d5603880a60e0853e0b12cbabe4fab08dec",
+      "handoff_sha256": "fd497bb2b4b03f676449c6bf9e853d5603880a60e0853e0b12cbabe4fab08dec",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/currentGuestContinuation.test.ts",
+      "source_sha256": "6c3622fe90e08ed5877725cc766bd7a75230e23ee9f5b3aecd207fd829a775df",
+      "handoff_sha256": "6c3622fe90e08ed5877725cc766bd7a75230e23ee9f5b3aecd207fd829a775df",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/curriculum.test.ts",
+      "source_sha256": "f79e8982c3ca27193d5fb05df1202cf9556c958c026e1fffe6b2d1bd5bd62336",
+      "handoff_sha256": "f79e8982c3ca27193d5fb05df1202cf9556c958c026e1fffe6b2d1bd5bd62336",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/curriculumMigration.test.ts",
+      "source_sha256": "9c5c239564bc46287aa40ed060e53a2122248cd9cb2dbe80fa46c5af96830baa",
+      "handoff_sha256": "9c5c239564bc46287aa40ed060e53a2122248cd9cb2dbe80fa46c5af96830baa",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/customerLessonJourney.test.ts",
+      "source_sha256": "63b4356d2230d3b69535c3c4050901923ee4b93b2ec573f9cc0f8b12386a56e6",
+      "handoff_sha256": "63b4356d2230d3b69535c3c4050901923ee4b93b2ec573f9cc0f8b12386a56e6",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/dailyMotivation.test.ts",
+      "source_sha256": "4459298bc09dfb352fce966df0aec620056f1a7ebfcd38bc29567f9c403d038b",
+      "handoff_sha256": "4459298bc09dfb352fce966df0aec620056f1a7ebfcd38bc29567f9c403d038b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deadlineMedia.agent.fixture.ts",
+      "source_sha256": "899e626933bdc11f94d165d52f496fff27f41568573cc5246eaace05383478fa",
+      "handoff_sha256": "899e626933bdc11f94d165d52f496fff27f41568573cc5246eaace05383478fa",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deadlineMedia.agent.test.ts",
+      "source_sha256": "b8c721042bfb9047d91673ba65d69a8688b38cac634777f52016f3b77bf26531",
+      "handoff_sha256": "b8c721042bfb9047d91673ba65d69a8688b38cac634777f52016f3b77bf26531",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deadlineRecovery.agent.test.ts",
+      "source_sha256": "79a1082e3c75b8698c6c5d7091bf8f3087bb0a9aaa582474ff7b246844f97a63",
+      "handoff_sha256": "79a1082e3c75b8698c6c5d7091bf8f3087bb0a9aaa582474ff7b246844f97a63",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deletedOwnerBaselineCleanup.fixture.ts",
+      "source_sha256": "923a74081e8483935b8a58cabe434596697aeff7b1a30873d8dab19d632356d7",
+      "handoff_sha256": "923a74081e8483935b8a58cabe434596697aeff7b1a30873d8dab19d632356d7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deletedOwnerBaselineCleanup.test.ts",
+      "source_sha256": "c757d8819d5b65b35b86c5afa41d036eb142de32e4af40341fcaafe820138aaa",
+      "handoff_sha256": "c757d8819d5b65b35b86c5afa41d036eb142de32e4af40341fcaafe820138aaa",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deletedOwnerCleanup.test.ts",
+      "source_sha256": "042c6e5cc0beec7175e140d09d796262e6f641b2b294c2038dac9be0b2e4be47",
+      "handoff_sha256": "042c6e5cc0beec7175e140d09d796262e6f641b2b294c2038dac9be0b2e4be47",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deletionPendingServer.test.ts",
+      "source_sha256": "867cdc3b22a695dd71b0093f5fd2d0d77d21d4e67f3b6a707e8466260a068cb9",
+      "handoff_sha256": "867cdc3b22a695dd71b0093f5fd2d0d77d21d4e67f3b6a707e8466260a068cb9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deletionRecoveryUx.fixture.ts",
+      "source_sha256": "8cb7310a972017197627581037d407f8452a3e7ff9c9680a4151a61d1e83260c",
+      "handoff_sha256": "8cb7310a972017197627581037d407f8452a3e7ff9c9680a4151a61d1e83260c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deletionRequestRecovery.test.ts",
+      "source_sha256": "914b62f507ab41551d630dbbe484a9b0ee747485eb73cfa3877c890f8c621cb8",
+      "handoff_sha256": "914b62f507ab41551d630dbbe484a9b0ee747485eb73cfa3877c890f8c621cb8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deletionRootJourney.fixture.ts",
+      "source_sha256": "cfee8294b2cd8991f1bda6f4ea9d0b438a59ef84de5c21384f22ad7da8d8f6cc",
+      "handoff_sha256": "cfee8294b2cd8991f1bda6f4ea9d0b438a59ef84de5c21384f22ad7da8d8f6cc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/deletionSuccessor.test.ts",
+      "source_sha256": "15d73c6165d464abaf2f87970d1af1460ebf44c318b5416da61bbd640b8dc555",
+      "handoff_sha256": "15d73c6165d464abaf2f87970d1af1460ebf44c318b5416da61bbd640b8dc555",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/dictationAbort.test.ts",
+      "source_sha256": "458b206c9f79479826f3641bf24d67ae10b37f1d2d865e5089d1f2bc3b3eac71",
+      "handoff_sha256": "458b206c9f79479826f3641bf24d67ae10b37f1d2d865e5089d1f2bc3b3eac71",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/dictationFailure.test.ts",
+      "source_sha256": "c35e8b0f51c505884e89b9922802df5097abdb7ed8c513ad4cfeb176ad962b82",
+      "handoff_sha256": "c35e8b0f51c505884e89b9922802df5097abdb7ed8c513ad4cfeb176ad962b82",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/durableGuestComponents.test.ts",
+      "source_sha256": "38b4fe3ae76362817438229755c890eb1c0cdb079c49d4077a56ac4797e562bf",
+      "handoff_sha256": "38b4fe3ae76362817438229755c890eb1c0cdb079c49d4077a56ac4797e562bf",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/durableGuestContinuation.test.ts",
+      "source_sha256": "e3939175252056c81bc0bce86f9ae34eafb2623bc1f82ea058804bc5ef51b0ca",
+      "handoff_sha256": "e3939175252056c81bc0bce86f9ae34eafb2623bc1f82ea058804bc5ef51b0ca",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/durableGuestStorageLimits.test.ts",
+      "source_sha256": "2b057e4de867f050fb67ecf95673aea75b82c6ee557861c37b7cbcb6b5e56627",
+      "handoff_sha256": "2b057e4de867f050fb67ecf95673aea75b82c6ee557861c37b7cbcb6b5e56627",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/experiments.test.ts",
+      "source_sha256": "9566d94c95adea6b31ffba96302bc4f4bf53e96101e0075a7751aa8e52ca00c8",
+      "handoff_sha256": "9566d94c95adea6b31ffba96302bc4f4bf53e96101e0075a7751aa8e52ca00c8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/fixtures/deletionDatabaseHost.ts",
+      "source_sha256": "612fc164fb9abf2273f47796f1cb49e2deb9aa2f0f1b042335955961bc11ba81",
+      "handoff_sha256": "612fc164fb9abf2273f47796f1cb49e2deb9aa2f0f1b042335955961bc11ba81",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/fixtures/freeJourneyVisual.ts",
+      "source_sha256": "467405b9b2398dd639a9961a9113d8ae4536b3b5f10a348363262f09f0193b86",
+      "handoff_sha256": "467405b9b2398dd639a9961a9113d8ae4536b3b5f10a348363262f09f0193b86",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/fixtures/legacyChallenge.pre.ts",
+      "source_sha256": "47defddc8c747146cdc844e201690fb34897a44f40939ab3b0ede7f2b60b208b",
+      "handoff_sha256": "47defddc8c747146cdc844e201690fb34897a44f40939ab3b0ede7f2b60b208b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/fixtures/m1l1-retained.json",
+      "source_sha256": "2e59ce1e65c40228a19a25496821f7853d42614a082e8759d2d4a2ebacad1da0",
+      "handoff_sha256": "2e59ce1e65c40228a19a25496821f7853d42614a082e8759d2d4a2ebacad1da0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/followThroughSameBenefit.test.ts",
+      "source_sha256": "160c26af05561f0c12b2052b4f5bde49301aac5146ff310737b647b03717c998",
+      "handoff_sha256": "160c26af05561f0c12b2052b4f5bde49301aac5146ff310737b647b03717c998",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/freeAcquisition.test.ts",
+      "source_sha256": "457a7c9af1e9e5cc14939888bb63e4a3823ea183cc445c665bc164e53066258d",
+      "handoff_sha256": "457a7c9af1e9e5cc14939888bb63e4a3823ea183cc445c665bc164e53066258d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/freeAcquisitionHarness.fixture.ts",
+      "source_sha256": "159bb97e13589f4e87448d8dca87598ef4d6bc5983ad48daa96347645cfd1477",
+      "handoff_sha256": "159bb97e13589f4e87448d8dca87598ef4d6bc5983ad48daa96347645cfd1477",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/freeAcquisitionIssuance.test.ts",
+      "source_sha256": "1c2e4762727ae5d3496cf6adb2dd9f1440dc6b665930123746e1324dc95bf6fb",
+      "handoff_sha256": "1c2e4762727ae5d3496cf6adb2dd9f1440dc6b665930123746e1324dc95bf6fb",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/freeAcquisitionJourney.fixture.ts",
+      "source_sha256": "3b49173dfee5e1302a6c18488e5dda6b8da9fea34efd7ccdf0457b6aa8f377ad",
+      "handoff_sha256": "3b49173dfee5e1302a6c18488e5dda6b8da9fea34efd7ccdf0457b6aa8f377ad",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/freeAcquisitionTerminal.fixture.ts",
+      "source_sha256": "1a2fad24edfcb44b1f7af339b7eb07b4f968643c2738e41a18b3e53b4fc25e1e",
+      "handoff_sha256": "1a2fad24edfcb44b1f7af339b7eb07b4f968643c2738e41a18b3e53b4fc25e1e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/freeAcquisitionTerminal.test.ts",
+      "source_sha256": "c992a1673ea3162a259fc0cc2cf483e6bf11542ff017808f5d1182bbbd01856a",
+      "handoff_sha256": "c992a1673ea3162a259fc0cc2cf483e6bf11542ff017808f5d1182bbbd01856a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/freeJournalStorage.test.ts",
+      "source_sha256": "5564eb694837b247668a9f5c8680e4db023ec5b609899b72b50e65cdacf617a1",
+      "handoff_sha256": "5564eb694837b247668a9f5c8680e4db023ec5b609899b72b50e65cdacf617a1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/freeJourney.test.ts",
+      "source_sha256": "28cefdb7515de6f9748876f974ae012967a5f21159e448081406651bed2cb94c",
+      "handoff_sha256": "28cefdb7515de6f9748876f974ae012967a5f21159e448081406651bed2cb94c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/frontDoorAcceptance.fixture.ts",
+      "source_sha256": "4ebd3d84f76f8ccbc4649964498ccb1b13942b2e502d4f19ab2952e67c81cf66",
+      "handoff_sha256": "4ebd3d84f76f8ccbc4649964498ccb1b13942b2e502d4f19ab2952e67c81cf66",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/frontDoorAcceptance.test.ts",
+      "source_sha256": "da008234c4e5eba05b8073086f3070e447f20319d91514bd449cf5e16d10962f",
+      "handoff_sha256": "da008234c4e5eba05b8073086f3070e447f20319d91514bd449cf5e16d10962f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/guestContinuationRuntime.test.ts",
+      "source_sha256": "cb7cb4b67f4570896828ba7e3cfd1e539a94a9c4795b670cf04181cbb06fc6a2",
+      "handoff_sha256": "cb7cb4b67f4570896828ba7e3cfd1e539a94a9c4795b670cf04181cbb06fc6a2",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/historicalOwnershipJourney.test.ts",
+      "source_sha256": "9013db57f03b87668571999908731d86e8cd2c427df4827ab9a285533e5e8dbe",
+      "handoff_sha256": "9013db57f03b87668571999908731d86e8cd2c427df4827ab9a285533e5e8dbe",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/historicalVoiceOwnership.test.ts",
+      "source_sha256": "8e35142249c1023b23abdff4ee69c4a1dc24abfb57f6d8e573c0d3e79bf87a27",
+      "handoff_sha256": "8e35142249c1023b23abdff4ee69c4a1dc24abfb57f6d8e573c0d3e79bf87a27",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/hybridCurriculum.test.ts",
+      "source_sha256": "e5ffdb1cebd00e42f383ab4f2d5f89899b1e6faa0da7ff00ac83f416419febb2",
+      "handoff_sha256": "e5ffdb1cebd00e42f383ab4f2d5f89899b1e6faa0da7ff00ac83f416419febb2",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/hydration.test.ts",
+      "source_sha256": "4a938ba3d6c833f19f76f7bf413c29a33ad98b2e565e5d9d985648efdad5f702",
+      "handoff_sha256": "4a938ba3d6c833f19f76f7bf413c29a33ad98b2e565e5d9d985648efdad5f702",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/integratedFreeOwnerRace.test.ts",
+      "source_sha256": "39bb941fb5a9f199c2949920179365eddd2b4f26533a4a294079d79c581c6edc",
+      "handoff_sha256": "39bb941fb5a9f199c2949920179365eddd2b4f26533a4a294079d79c581c6edc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/integratedQuickRep.fixture.ts",
+      "source_sha256": "dae969172f262840c20bdd4f786f11c755342d9f47bca24f102e0674b1f8a2ce",
+      "handoff_sha256": "dae969172f262840c20bdd4f786f11c755342d9f47bca24f102e0674b1f8a2ce",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/internalReviewEvidence.test.ts",
+      "source_sha256": "c0e30cdeb670637177d1d8fec66dd266a55b12dafbebb18f2bbcd55cbdea7931",
+      "handoff_sha256": "c0e30cdeb670637177d1d8fec66dd266a55b12dafbebb18f2bbcd55cbdea7931",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/iphoneBuildPreflight.test.ts",
+      "source_sha256": "0e6dfa1c90f0190b07daf40d82c7fcb00bc286bebd189dac9890824fafe35219",
+      "handoff_sha256": "0e6dfa1c90f0190b07daf40d82c7fcb00bc286bebd189dac9890824fafe35219",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/launch.test.ts",
+      "source_sha256": "1cd56c33fa53b0c6120cd3d07ea1e34c8018b2cbf092af3747f483b424662ba6",
+      "handoff_sha256": "1cd56c33fa53b0c6120cd3d07ea1e34c8018b2cbf092af3747f483b424662ba6",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/launchCurriculum.test.ts",
+      "source_sha256": "798df29983fe17525e4a42f0e1516720ec6b0cfe992e27b2ed5351d3cb36cb70",
+      "handoff_sha256": "798df29983fe17525e4a42f0e1516720ec6b0cfe992e27b2ed5351d3cb36cb70",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/lessonFeedback.test.ts",
+      "source_sha256": "5795a7ff5f93d5bc9c6b5f0e268eb4352f4abce58ba3f25aa8af6bd819dce1ca",
+      "handoff_sha256": "5795a7ff5f93d5bc9c6b5f0e268eb4352f4abce58ba3f25aa8af6bd819dce1ca",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/loginPersistenceRecovery.test.ts",
+      "source_sha256": "4c8707fa7e6b5c781b46332c9895a58019e62c5faf3aee292a275f2baa7d00e4",
+      "handoff_sha256": "4c8707fa7e6b5c781b46332c9895a58019e62c5faf3aee292a275f2baa7d00e4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/m1L1DynamicResponse.test.ts",
+      "source_sha256": "d9467a9150abc884749cbd3fd0ab0f95028e8545c5ebb1fe682540cd3b928353",
+      "handoff_sha256": "d9467a9150abc884749cbd3fd0ab0f95028e8545c5ebb1fe682540cd3b928353",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/m1l1ProviderPersistenceContext.test.ts",
+      "source_sha256": "d05937e05c696b14c75fae0e402f7a60001bf98e6a382fe4fe6500e31fbbab32",
+      "handoff_sha256": "d05937e05c696b14c75fae0e402f7a60001bf98e6a382fe4fe6500e31fbbab32",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/m1l1UnsupportedFacts.fixture.ts",
+      "source_sha256": "6245a1d5489c0a0fc45582a8204bddbd8789527c578cbcc7bfe2f1a70e8e765e",
+      "handoff_sha256": "6245a1d5489c0a0fc45582a8204bddbd8789527c578cbcc7bfe2f1a70e8e765e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/m1l1UnsupportedFacts.test.ts",
+      "source_sha256": "e24cb3930f9eb662217a4cf7d1537d58b90bd7257c9bc9176452e64fed3397c6",
+      "handoff_sha256": "e24cb3930f9eb662217a4cf7d1537d58b90bd7257c9bc9176452e64fed3397c6",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/m1l1UnsupportedFactsComposition.test.ts",
+      "source_sha256": "00ca504905fe7159007b39cccb4911f38c7ec6aa134ff017bd8866cb0859720f",
+      "handoff_sha256": "00ca504905fe7159007b39cccb4911f38c7ec6aa134ff017bd8866cb0859720f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/masterOnboarding.test.ts",
+      "source_sha256": "8652fca8dde6a4f5997741a5356d85158737907fe204fb8d1ecff7f66ef11cb3",
+      "handoff_sha256": "8652fca8dde6a4f5997741a5356d85158737907fe204fb8d1ecff7f66ef11cb3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/modularCurriculum.test.ts",
+      "source_sha256": "6120234f92d0369f3ade9031b3c583235e0d43f27bffc79cdca8322bd5a91966",
+      "handoff_sha256": "6120234f92d0369f3ade9031b3c583235e0d43f27bffc79cdca8322bd5a91966",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/monthlyPurchase.fixture.ts",
+      "source_sha256": "0bdb8fb377a061ee2cabac682e33678c29cb52e1499ddf9a6045072b83a9c0f0",
+      "handoff_sha256": "0bdb8fb377a061ee2cabac682e33678c29cb52e1499ddf9a6045072b83a9c0f0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeAuth.test.ts",
+      "source_sha256": "1bfb5991b55043413b6d96414c781f6e9d9d015a510d01e67b5299aea647c6f7",
+      "handoff_sha256": "1bfb5991b55043413b6d96414c781f6e9d9d015a510d01e67b5299aea647c6f7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeBenefitControl.fixture.ts",
+      "source_sha256": "fb8ecc9380dcf204c7bbe5f8a9868bebabc65d954b7ab6212512f5b2c466264a",
+      "handoff_sha256": "fb8ecc9380dcf204c7bbe5f8a9868bebabc65d954b7ab6212512f5b2c466264a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeBenefitJourney.fixture.ts",
+      "source_sha256": "3b6206f1f677fe966e972843a2afedf6a603ebf81d20734977b3d4827646f8f3",
+      "handoff_sha256": "3b6206f1f677fe966e972843a2afedf6a603ebf81d20734977b3d4827646f8f3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeBenefitReview.ts",
+      "source_sha256": "701c3306771f1834bf8dbf0d41271a1a3fb0c53f867ebaf62688a486bc17c7c3",
+      "handoff_sha256": "701c3306771f1834bf8dbf0d41271a1a3fb0c53f867ebaf62688a486bc17c7c3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeBilling.test.ts",
+      "source_sha256": "8c4683f4e0130f97c308de2a103a2d463ef0ece125082389f76c80a3338e95d0",
+      "handoff_sha256": "8c4683f4e0130f97c308de2a103a2d463ef0ece125082389f76c80a3338e95d0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeBillingJoined.fixture.ts",
+      "source_sha256": "db4c55900af0f167a7efc009257db2aae27132c06987e41460b5035c49186ed7",
+      "handoff_sha256": "db4c55900af0f167a7efc009257db2aae27132c06987e41460b5035c49186ed7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeBillingJoined.test.ts",
+      "source_sha256": "20e2d632df502552305564eeb9316585ccf656ce3c7dec31f4e53cfaf334c3cb",
+      "handoff_sha256": "20e2d632df502552305564eeb9316585ccf656ce3c7dec31f4e53cfaf334c3cb",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeCustomerJourney.test.ts",
+      "source_sha256": "f7c5b2a905d8ca584b4e6692b0f554e7365e78c46556369e286d1e8b9983fbdf",
+      "handoff_sha256": "f7c5b2a905d8ca584b4e6692b0f554e7365e78c46556369e286d1e8b9983fbdf",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeSpeechBytes.fixture.ts",
+      "source_sha256": "2ebce9799a3ae28eee9006b679faf0e1250cf20e41733854c72c231e574a73c5",
+      "handoff_sha256": "2ebce9799a3ae28eee9006b679faf0e1250cf20e41733854c72c231e574a73c5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeSpeechBytes.test.ts",
+      "source_sha256": "2771dac5656fc3dace26c1e7c13a2ded5775ed2e9ad2d26207047dc1eac288fc",
+      "handoff_sha256": "2771dac5656fc3dace26c1e7c13a2ded5775ed2e9ad2d26207047dc1eac288fc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeTalkingBoundaries.test.ts",
+      "source_sha256": "45a87ab754debbfca7c77f5852f552d26c99e7b46a47bc4ab1e5f0a684f0e6d1",
+      "handoff_sha256": "45a87ab754debbfca7c77f5852f552d26c99e7b46a47bc4ab1e5f0a684f0e6d1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeTalkingCallers.fixture.ts",
+      "source_sha256": "61483547629d505ed60927d425c7dcb6f4157e649aec7c3c53ae82af2003ce5f",
+      "handoff_sha256": "61483547629d505ed60927d425c7dcb6f4157e649aec7c3c53ae82af2003ce5f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeTalkingCompatibility.test.ts",
+      "source_sha256": "ef0256450c1fa0263a435ced6d46578e8b10bbb55a6cb1496566141933705495",
+      "handoff_sha256": "ef0256450c1fa0263a435ced6d46578e8b10bbb55a6cb1496566141933705495",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeTalkingMounted.test.ts",
+      "source_sha256": "a8030b4410d7b27de39802aff457d6192cfb7188557dd971d4724db905ac4b4e",
+      "handoff_sha256": "a8030b4410d7b27de39802aff457d6192cfb7188557dd971d4724db905ac4b4e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeTalkingPlayback.fixture.ts",
+      "source_sha256": "d6afcf29652c2170a5bac905c3001937e87a6a918bc1facad0d236ea12ff8516",
+      "handoff_sha256": "d6afcf29652c2170a5bac905c3001937e87a6a918bc1facad0d236ea12ff8516",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeTalkingSdk.test.ts",
+      "source_sha256": "501aa78926edb450720ad24c17a39c237a33c2a693b5155fd55b7bdfecfad35f",
+      "handoff_sha256": "501aa78926edb450720ad24c17a39c237a33c2a693b5155fd55b7bdfecfad35f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/nativeTalkingUpload.fixture.ts",
+      "source_sha256": "2d666fa90c12decbc34aa92b3bcee3768051e7e052a5f5f508195f798c5b3686",
+      "handoff_sha256": "2d666fa90c12decbc34aa92b3bcee3768051e7e052a5f5f508195f798c5b3686",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalBuildAssociation.test.ts",
+      "source_sha256": "4ea0bad8492e58f6103750a3fcf3a8878c42f0f69c4e46e7a7a84ceed9c2286d",
+      "handoff_sha256": "4ea0bad8492e58f6103750a3fcf3a8878c42f0f69c4e46e7a7a84ceed9c2286d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeIntegration.test.ts",
+      "source_sha256": "6e3857dffe86b7ac46c836c3132f5994721ecec164c7838eb6801872aea94088",
+      "handoff_sha256": "6e3857dffe86b7ac46c836c3132f5994721ecec164c7838eb6801872aea94088",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeJoined.fixture.ts",
+      "source_sha256": "2785d35fcd0aea8958a1b3cf5c9ce15eff30ce0c7d245d5b6eade845638d4325",
+      "handoff_sha256": "2785d35fcd0aea8958a1b3cf5c9ce15eff30ce0c7d245d5b6eade845638d4325",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeMountedColdResume.fixture.ts",
+      "source_sha256": "072c48ec35726ef129e94f3e4b226fea867505b4c39e54040cc0fa1d609ab529",
+      "handoff_sha256": "072c48ec35726ef129e94f3e4b226fea867505b4c39e54040cc0fa1d609ab529",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeMountedColdResume.test.ts",
+      "source_sha256": "7a9ec80d9978babebc625c1445005488c9e623746d75098ebf02f4de36490d23",
+      "handoff_sha256": "7a9ec80d9978babebc625c1445005488c9e623746d75098ebf02f4de36490d23",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeMountedJoined.generated.fixture.ts",
+      "source_sha256": "182b641cb4d63b437b054b197e18a2ed048d65454eee2bb4dfa5135de3f7996a",
+      "handoff_sha256": "182b641cb4d63b437b054b197e18a2ed048d65454eee2bb4dfa5135de3f7996a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreePrivacy.test.ts",
+      "source_sha256": "441abeeeb005101d07b40f1f8f83dba0ebf77f78e438ab4c40321844a061041f",
+      "handoff_sha256": "441abeeeb005101d07b40f1f8f83dba0ebf77f78e438ab4c40321844a061041f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeRecovery.test.ts",
+      "source_sha256": "b70d165135bfafc2743e8f065710a01ae0ccd1caf20c11431fbc96693c0ea1cb",
+      "handoff_sha256": "b70d165135bfafc2743e8f065710a01ae0ccd1caf20c11431fbc96693c0ea1cb",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeRecoveryUI.generated.fixture.ts",
+      "source_sha256": "59aa6d123eb02cc586f578685185c3ffa806b22a01423a6cfa6ff1d23780fa2a",
+      "handoff_sha256": "59aa6d123eb02cc586f578685185c3ffa806b22a01423a6cfa6ff1d23780fa2a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeResultRecovery.test.ts",
+      "source_sha256": "73e4679e9c4bd9c28a8fe62ebd012017faa790f3514ff698a7f32ed511f1e181",
+      "handoff_sha256": "73e4679e9c4bd9c28a8fe62ebd012017faa790f3514ff698a7f32ed511f1e181",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeRouting.fixture.ts",
+      "source_sha256": "f3e01dd372634b5efe9e86ac9941d82839df13d0fd125b97345d6b1545a637fc",
+      "handoff_sha256": "f3e01dd372634b5efe9e86ac9941d82839df13d0fd125b97345d6b1545a637fc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeSession.test.ts",
+      "source_sha256": "b03a16572e6085ad5312600d1e4bc2c3408053db472275ec00ab3be243cc5a32",
+      "handoff_sha256": "b03a16572e6085ad5312600d1e4bc2c3408053db472275ec00ab3be243cc5a32",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeTerminal.fixture.ts",
+      "source_sha256": "cae0c24f1a8601d086a5b7e86cc8144c3f0cc33f0e87c3ec4e5722df1e46528e",
+      "handoff_sha256": "cae0c24f1a8601d086a5b7e86cc8144c3f0cc33f0e87c3ec4e5722df1e46528e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeTerminal.test.ts",
+      "source_sha256": "454ee0f6633bb747cf6733af6e9fb80ebca793da9afaf6eb885e726c158a7f15",
+      "handoff_sha256": "454ee0f6633bb747cf6733af6e9fb80ebca793da9afaf6eb885e726c158a7f15",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeTerminalUI.generated.fixture.ts",
+      "source_sha256": "faeea3e77124f986eae32ed7b4565ab1e694a48ba52fa1fe69965a416b68fb33",
+      "handoff_sha256": "faeea3e77124f986eae32ed7b4565ab1e694a48ba52fa1fe69965a416b68fb33",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalFreeVoice.fixture.ts",
+      "source_sha256": "7c9ffa19e9e99da22d1760772f4318f8ad17fcbfc7c621b8783edf2220993842",
+      "handoff_sha256": "7c9ffa19e9e99da22d1760772f4318f8ad17fcbfc7c621b8783edf2220993842",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalResultsConfig.test.ts",
+      "source_sha256": "7e4414343e7eec0c109cc091991073fd5690abb1006882acf177b8db636cb6ee",
+      "handoff_sha256": "7e4414343e7eec0c109cc091991073fd5690abb1006882acf177b8db636cb6ee",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalResultsReturnPolicy.test.ts",
+      "source_sha256": "e8d890b6722260353be4ca4b6cbc22290812d358ae387be48689d2c069b1cf21",
+      "handoff_sha256": "e8d890b6722260353be4ca4b6cbc22290812d358ae387be48689d2c069b1cf21",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalSavedJourney.fixture.ts",
+      "source_sha256": "5e72166e35ae064a1af12690ada7e1e3fad013a9d98d664bcb749d525bae2024",
+      "handoff_sha256": "5e72166e35ae064a1af12690ada7e1e3fad013a9d98d664bcb749d525bae2024",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/normalSavedJourneyWithRefund.fixture.ts",
+      "source_sha256": "1f131533ee240b5a795345b93b17252a207bf8b3c5a50e4e9512a2ed1bef47fe",
+      "handoff_sha256": "1f131533ee240b5a795345b93b17252a207bf8b3c5a50e4e9512a2ed1bef47fe",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/ownerDiscovery.test.ts",
+      "source_sha256": "da3422167757623b99150f30279ea395b17d9a7622a36655dcae615943c63f51",
+      "handoff_sha256": "da3422167757623b99150f30279ea395b17d9a7622a36655dcae615943c63f51",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/ownerPracticeStorage.test.ts",
+      "source_sha256": "772656a4250ccadbc421d27a746faeeb2e7b2296a27caa753e73f968c483b318",
+      "handoff_sha256": "772656a4250ccadbc421d27a746faeeb2e7b2296a27caa753e73f968c483b318",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/ownerVoiceCache.test.ts",
+      "source_sha256": "67b050cf81ecf19c17dfd398b0be779ab8c10a13b58c87d00387c1eabe3c5e5f",
+      "handoff_sha256": "67b050cf81ecf19c17dfd398b0be779ab8c10a13b58c87d00387c1eabe3c5e5f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/ownerVoiceRuntime.fixture.ts",
+      "source_sha256": "4dde31e455b02eeadb97b3e6376176ae480925bd711f46b806ccb1bbf5ca4dcc",
+      "handoff_sha256": "4dde31e455b02eeadb97b3e6376176ae480925bd711f46b806ccb1bbf5ca4dcc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/paidGeneration.test.ts",
+      "source_sha256": "fdb226b92108f13232727dfca7c2ee8cb7a95bbba79250b65165e217bbd141d2",
+      "handoff_sha256": "fdb226b92108f13232727dfca7c2ee8cb7a95bbba79250b65165e217bbd141d2",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/paidGenerationNativeBody.test.ts",
+      "source_sha256": "9390328edee7becf12441e2c8817694326893bd591b9f01a5fdc8da8bdd39797",
+      "handoff_sha256": "9390328edee7becf12441e2c8817694326893bd591b9f01a5fdc8da8bdd39797",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/paidGenerationRouting.test.ts",
+      "source_sha256": "3253c20f9f3dbf7a88be93d17d2fe83d5275d0c4bff5cb7b6e936e07d69c44e6",
+      "handoff_sha256": "3253c20f9f3dbf7a88be93d17d2fe83d5275d0c4bff5cb7b6e936e07d69c44e6",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/paidGenerationRuntime.test.ts",
+      "source_sha256": "045a464f43164e8894761d88534d2894ab86e750d282c81d7ed9604916f6fbfa",
+      "handoff_sha256": "045a464f43164e8894761d88534d2894ab86e750d282c81d7ed9604916f6fbfa",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/paidJourneyHarness.test.ts",
+      "source_sha256": "422124f2026293ca03a1727e704c11e1fa162cee54df480fb9673fec304f8e46",
+      "handoff_sha256": "422124f2026293ca03a1727e704c11e1fa162cee54df480fb9673fec304f8e46",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/paidVoice.test.ts",
+      "source_sha256": "cf55376eec6ace5bccf4744b10da70570ad2154b12f5fd2685093988d0b144f5",
+      "handoff_sha256": "cf55376eec6ace5bccf4744b10da70570ad2154b12f5fd2685093988d0b144f5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/paidVoiceRouting.test.ts",
+      "source_sha256": "8cb97a14c387eb510391fa9d590ee7036f627082f8e66295b8fd0eb0eb795ecc",
+      "handoff_sha256": "8cb97a14c387eb510391fa9d590ee7036f627082f8e66295b8fd0eb0eb795ecc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/paidVoiceRuntime.fixture.ts",
+      "source_sha256": "989aed6d2751f30d61455d5a915d11c8b60565d8dfba6ee9d79f823e82b458e3",
+      "handoff_sha256": "989aed6d2751f30d61455d5a915d11c8b60565d8dfba6ee9d79f823e82b458e3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/paidVoiceRuntime.test.ts",
+      "source_sha256": "fc123f0ef23db972c588b6ec8821141198dc198d1ccc9ba961ea94fce80525a5",
+      "handoff_sha256": "fc123f0ef23db972c588b6ec8821141198dc198d1ccc9ba961ea94fce80525a5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/passwordRecoveryCallback.test.ts",
+      "source_sha256": "61a1bae7f834050ed624aa36699b8483099d81c51861a8b1fa9cac6f2ef90927",
+      "handoff_sha256": "61a1bae7f834050ed624aa36699b8483099d81c51861a8b1fa9cac6f2ef90927",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/passwordRecoveryScreens.test.ts",
+      "source_sha256": "e15857e85137c2499182ade6d289ce3056e25c169ea6d407f26c4f80d269fb10",
+      "handoff_sha256": "e15857e85137c2499182ade6d289ce3056e25c169ea6d407f26c4f80d269fb10",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/personas.test.ts",
+      "source_sha256": "2c4e396d66c23831cb28cff62d85e351fb5fcdfefcb0512ac50a3fde0629de07",
+      "handoff_sha256": "2c4e396d66c23831cb28cff62d85e351fb5fcdfefcb0512ac50a3fde0629de07",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/phaseRecovery.test.ts",
+      "source_sha256": "3737d45ee45fdfa878be75f91ae6617e169dbb161749519e051d23df5a6036d9",
+      "handoff_sha256": "3737d45ee45fdfa878be75f91ae6617e169dbb161749519e051d23df5a6036d9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/phaseRecoveryMounted.fixture.ts",
+      "source_sha256": "a4d2b505234452ed35962d7c6482f12ae3a5e51cdfb2a22cc8c5cbcc84e701a7",
+      "handoff_sha256": "a4d2b505234452ed35962d7c6482f12ae3a5e51cdfb2a22cc8c5cbcc84e701a7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/pilotAcceptance.test.ts",
+      "source_sha256": "f26ce15c9305c848953aba51747553b9c7179e941ea4a991642610479ca31546",
+      "handoff_sha256": "f26ce15c9305c848953aba51747553b9c7179e941ea4a991642610479ca31546",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/pilotCurriculum.test.ts",
+      "source_sha256": "5edb2119c01bc0243372b3efe8f94fd003d408d610ebc05563711091b9a78150",
+      "handoff_sha256": "5edb2119c01bc0243372b3efe8f94fd003d408d610ebc05563711091b9a78150",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/postLoginPaidProduct.test.ts",
+      "source_sha256": "f609ff972f2a24bc8486f501c015998e17281a1e659beecdb123f6da5fbf83cb",
+      "handoff_sha256": "f609ff972f2a24bc8486f501c015998e17281a1e659beecdb123f6da5fbf83cb",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/postRehearsalFlow.test.ts",
+      "source_sha256": "d8ceb6633456cfee1caca87cd5220408bc70cdeaf9573fe1a1bc3fcebc1c8afe",
+      "handoff_sha256": "d8ceb6633456cfee1caca87cd5220408bc70cdeaf9573fe1a1bc3fcebc1c8afe",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/practiceSession.test.ts",
+      "source_sha256": "a54897a17a80a45a18448bfc3489d868b9933b232e187231a6ec92ea19511ab9",
+      "handoff_sha256": "a54897a17a80a45a18448bfc3489d868b9933b232e187231a6ec92ea19511ab9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/practiceTab.test.ts",
+      "source_sha256": "d0844dee90d3b11e253493d9950f3f7c9f030c533374e529990688218f97e8fb",
+      "handoff_sha256": "d0844dee90d3b11e253493d9950f3f7c9f030c533374e529990688218f97e8fb",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/privacyPersistence.test.ts",
+      "source_sha256": "94ff1b8c9f8012ba5da0b4d1770b4a2b7fca414caaab19e7f058d1c476f10412",
+      "handoff_sha256": "94ff1b8c9f8012ba5da0b4d1770b4a2b7fca414caaab19e7f058d1c476f10412",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/privateWebBridge.test.ts",
+      "source_sha256": "cf9d86ffd52599b33a467d48f958c6cd346f5b4a2c6efc0ab4b2689c825f1983",
+      "handoff_sha256": "cf9d86ffd52599b33a467d48f958c6cd346f5b4a2c6efc0ab4b2689c825f1983",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/privateWebBridgeCoordinator.test.ts",
+      "source_sha256": "4af0ecc62c9adc9714f10732f4520c1bd1f513f90b0a95aefd31b7c93bdd300a",
+      "handoff_sha256": "4af0ecc62c9adc9714f10732f4520c1bd1f513f90b0a95aefd31b7c93bdd300a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/privateWebBridgeHttpContract.test.ts",
+      "source_sha256": "5d5875eee2d71daa58b490fae6fd3263fefc755d4746e1a7967020824a384020",
+      "handoff_sha256": "5d5875eee2d71daa58b490fae6fd3263fefc755d4746e1a7967020824a384020",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/privateWebResult.test.ts",
+      "source_sha256": "09f2ee01f0fba1c873205db0c0627387f7a871c0c3b580b09ba832d7c7664b9a",
+      "handoff_sha256": "09f2ee01f0fba1c873205db0c0627387f7a871c0c3b580b09ba832d7c7664b9a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/privateWebResultRoundtrip.test.ts",
+      "source_sha256": "f15257b3d4321dcf742a5ba3fbbfb5457edacc30e396db8e621c89302daba52e",
+      "handoff_sha256": "f15257b3d4321dcf742a5ba3fbbfb5457edacc30e396db8e621c89302daba52e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/purchasesIdentity.test.ts",
+      "source_sha256": "39458b92926d6f1f0e6da8db5cc82270c539a74d43b7ed38863810233aa700c2",
+      "handoff_sha256": "39458b92926d6f1f0e6da8db5cc82270c539a74d43b7ed38863810233aa700c2",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/quickRep.test.ts",
+      "source_sha256": "c6893994e73ae41b5831edda0412c7c83600b680cd95c130553728b387709b44",
+      "handoff_sha256": "c6893994e73ae41b5831edda0412c7c83600b680cd95c130553728b387709b44",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/raviNaturalAdapter.fixture.ts",
+      "source_sha256": "4ddcb66ea97861fd792e9ea90faefe813701a702d1bf5a4e3ae313e8fe595ce1",
+      "handoff_sha256": "4ddcb66ea97861fd792e9ea90faefe813701a702d1bf5a4e3ae313e8fe595ce1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/raviNaturalAdapter.test.ts",
+      "source_sha256": "eba2eda122763c7e660fa6c09a97e385c3fc429659456d5eaa303ec028d918f0",
+      "handoff_sha256": "eba2eda122763c7e660fa6c09a97e385c3fc429659456d5eaa303ec028d918f0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/raviNaturalContract.test.ts",
+      "source_sha256": "8e7488af4fdab10617987e5c64ef104d5887c79c63da9d7271b85afef4cc156a",
+      "handoff_sha256": "8e7488af4fdab10617987e5c64ef104d5887c79c63da9d7271b85afef4cc156a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/raviSemanticClient.test.ts",
+      "source_sha256": "bbbb757e9d6a7ffa38b2745ade88c1b27e98796d4928d648b05de5b09219032f",
+      "handoff_sha256": "bbbb757e9d6a7ffa38b2745ade88c1b27e98796d4928d648b05de5b09219032f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/raviSemanticHistory.test.ts",
+      "source_sha256": "3e2745d77e5e3ea3f2f5708dc6266284d95d2043cd2ccbee248597e70fa1e270",
+      "handoff_sha256": "3e2745d77e5e3ea3f2f5708dc6266284d95d2043cd2ccbee248597e70fa1e270",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/raviSemanticTransport.fixture.ts",
+      "source_sha256": "a32dd8ab28933ab494436fd190784e03aa3095690f7ba715afafd9758ef41640",
+      "handoff_sha256": "a32dd8ab28933ab494436fd190784e03aa3095690f7ba715afafd9758ef41640",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/raviSemanticTransport.test.ts",
+      "source_sha256": "a988a4542db07c0fb051c49fd741a2d981631335e960c987a865a571909b0d12",
+      "handoff_sha256": "a988a4542db07c0fb051c49fd741a2d981631335e960c987a865a571909b0d12",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/receiptlessDeletionRuntime.fixture.ts",
+      "source_sha256": "ec379a8efed60d1da0a04759311ddeada209fa0555dc7c1c4635336d5b63a429",
+      "handoff_sha256": "ec379a8efed60d1da0a04759311ddeada209fa0555dc7c1c4635336d5b63a429",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/receiptlessDeletionRuntime.test.ts",
+      "source_sha256": "293bdda1f6ac86cb2ccaf3b71870cd25941e21132dc0162835da4af379e8acc8",
+      "handoff_sha256": "293bdda1f6ac86cb2ccaf3b71870cd25941e21132dc0162835da4af379e8acc8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/receiptlessDevice.fixture.ts",
+      "source_sha256": "c8c1d7ed28c229b91b0033e0c69f46dfa1cd042e8f7ba445ccd761d93870b6a0",
+      "handoff_sha256": "c8c1d7ed28c229b91b0033e0c69f46dfa1cd042e8f7ba445ccd761d93870b6a0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/receiptlessJournal.test.ts",
+      "source_sha256": "e381d51ad34f45a84ae58c095718e25191a29b70d71e3e1b414995aca38ff51f",
+      "handoff_sha256": "e381d51ad34f45a84ae58c095718e25191a29b70d71e3e1b414995aca38ff51f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/receiptlessTwoDevice.fixture.ts",
+      "source_sha256": "1810fb413d48ea881398fa7222a94472906d952da7cf22d37a72011f8ae60e9a",
+      "handoff_sha256": "1810fb413d48ea881398fa7222a94472906d952da7cf22d37a72011f8ae60e9a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/receiptlessTwoDevice.test.ts",
+      "source_sha256": "870fb13f4d76148abfabc50dd46863ff901bc36f9b07a359879042652b9ca469",
+      "handoff_sha256": "870fb13f4d76148abfabc50dd46863ff901bc36f9b07a359879042652b9ca469",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/redact.test.ts",
+      "source_sha256": "773b479fd932803a038d3c00b1ee49904033ba68b765a4388340cb86b539abc0",
+      "handoff_sha256": "773b479fd932803a038d3c00b1ee49904033ba68b765a4388340cb86b539abc0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/registeredSignup.fixture.ts",
+      "source_sha256": "96a53905ce031035205347ecfd7a3b0acb12cb0bd1228db90ddffe4db460817a",
+      "handoff_sha256": "96a53905ce031035205347ecfd7a3b0acb12cb0bd1228db90ddffe4db460817a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/rehearsal.test.ts",
+      "source_sha256": "b3129b5db285e9e79b74ca314d7beecdfd482d3ba26105ca868f407af91835d3",
+      "handoff_sha256": "b3129b5db285e9e79b74ca314d7beecdfd482d3ba26105ca868f407af91835d3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/releaseJoinedJourney.fixture.ts",
+      "source_sha256": "120810993d53d934f29d66e2b885d859c1498694402c6b0756c9551527fc611f",
+      "handoff_sha256": "120810993d53d934f29d66e2b885d859c1498694402c6b0756c9551527fc611f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/releaseJoinedJourney.test.ts",
+      "source_sha256": "ed2aa9292b56510031a08f3e55911d5724da65457ad12b9a0b8128ad12ff0c05",
+      "handoff_sha256": "ed2aa9292b56510031a08f3e55911d5724da65457ad12b9a0b8128ad12ff0c05",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/remainingNative.test.ts",
+      "source_sha256": "f6f004211d33110c00536df95d70f05ef3d38a33a50f0d93e6307c98800adc82",
+      "handoff_sha256": "f6f004211d33110c00536df95d70f05ef3d38a33a50f0d93e6307c98800adc82",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/remainingRouteControls.fixture.ts",
+      "source_sha256": "7ae54050e73d6897229a9f15fecbb62498003ad5ec40489f6621461819a60ac0",
+      "handoff_sha256": "7ae54050e73d6897229a9f15fecbb62498003ad5ec40489f6621461819a60ac0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/remainingRouteControls.test.ts",
+      "source_sha256": "41a30eaca5ede6ba9bfb2ee4284b652e608cfd2b7ce4608f63cfa8f3dcffb110",
+      "handoff_sha256": "41a30eaca5ede6ba9bfb2ee4284b652e608cfd2b7ce4608f63cfa8f3dcffb110",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/resetAllData.test.ts",
+      "source_sha256": "9226c8d964f95e9ad0fa5e4f253036ebe7dd0f2678d2f566bea0695b2227c756",
+      "handoff_sha256": "9226c8d964f95e9ad0fa5e4f253036ebe7dd0f2678d2f566bea0695b2227c756",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/reviewCurriculumMigration.test.ts",
+      "source_sha256": "7d3805dac2c23ecffc151b29f6511861f53878bb0ad0d38ffe98e239fe3f7a9f",
+      "handoff_sha256": "7d3805dac2c23ecffc151b29f6511861f53878bb0ad0d38ffe98e239fe3f7a9f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/reviewRuntime.test.ts",
+      "source_sha256": "93e61bddfaf1dcee262045a2f5919a7950d41a6869aa6eb1f428ed63d54a446c",
+      "handoff_sha256": "93e61bddfaf1dcee262045a2f5919a7950d41a6869aa6eb1f428ed63d54a446c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/reviewer-approved-continuation.fixture.ts",
+      "source_sha256": "425688fb80aefd694ab50efecc575f4c4602a484d5baebe1055708b41b24933a",
+      "handoff_sha256": "425688fb80aefd694ab50efecc575f4c4602a484d5baebe1055708b41b24933a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/routingLifecycleA11y.test.ts",
+      "source_sha256": "fe5bf5749234334a20efc74325e2b91b3853cda44107a6beda0b31e186b4b552",
+      "handoff_sha256": "fe5bf5749234334a20efc74325e2b91b3853cda44107a6beda0b31e186b4b552",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/safety.test.ts",
+      "source_sha256": "fcc2bc02535fb27dd2fc1a862733fd31345e21405d1117445ef77183457c2f02",
+      "handoff_sha256": "fcc2bc02535fb27dd2fc1a862733fd31345e21405d1117445ef77183457c2f02",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/savedResultMountedHistory.fixture.ts",
+      "source_sha256": "12a6e2f47e9a00264319dec58bc189790cfefd9be630f8ebf360807947b97391",
+      "handoff_sha256": "12a6e2f47e9a00264319dec58bc189790cfefd9be630f8ebf360807947b97391",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/savedResultMountedHistory.test.ts",
+      "source_sha256": "206ea47105bd391ea663b8abe4a82168822c07896feb55389c479b8d1c620012",
+      "handoff_sha256": "206ea47105bd391ea663b8abe4a82168822c07896feb55389c479b8d1c620012",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/scenarioContinuity.test.ts",
+      "source_sha256": "65bc593a2dea70447f842a8dd5384e8d57dd66e06bd2dd39095bda1f6c47724b",
+      "handoff_sha256": "65bc593a2dea70447f842a8dd5384e8d57dd66e06bd2dd39095bda1f6c47724b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/scenarioExpansion.test.ts",
+      "source_sha256": "8fd1e042b4785175d2da760c2f2bc72702ee2b24a7858e47f706bb9566929d7b",
+      "handoff_sha256": "8fd1e042b4785175d2da760c2f2bc72702ee2b24a7858e47f706bb9566929d7b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/scenarioPresentation.test.ts",
+      "source_sha256": "d8b15ebffbdfdfc280480f8ce17b0141765293ca2ea2bbae64995992e8158b7d",
+      "handoff_sha256": "d8b15ebffbdfdfc280480f8ce17b0141765293ca2ea2bbae64995992e8158b7d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/scenarioRecommendation.test.ts",
+      "source_sha256": "7cab3d721f8dd43b7da3a0977f47ff09bc00bacef2a9ea46d30deac8be7a4ac8",
+      "handoff_sha256": "7cab3d721f8dd43b7da3a0977f47ff09bc00bacef2a9ea46d30deac8be7a4ac8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/scenarioRolePayload.test.ts",
+      "source_sha256": "ddb5f78c24d2e08758bb63d56fe96950bf12706f7148727e44486e02efc70585",
+      "handoff_sha256": "ddb5f78c24d2e08758bb63d56fe96950bf12706f7148727e44486e02efc70585",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/scoredPracticeHistory.test.ts",
+      "source_sha256": "39d4f16deafed56b576c16ffd2c487772efda6f97bb0241aae42fba49b5b6f74",
+      "handoff_sha256": "39d4f16deafed56b576c16ffd2c487772efda6f97bb0241aae42fba49b5b6f74",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/scorelessApprovedCompletion.test.ts",
+      "source_sha256": "b81667306cb646c319d02f45dc377a9a224c84eeb4df83931dfa0701b7b0fcbb",
+      "handoff_sha256": "b81667306cb646c319d02f45dc377a9a224c84eeb4df83931dfa0701b7b0fcbb",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/secureDeletionRuntime.fixture.ts",
+      "source_sha256": "aad72ea7d453f1506f5be272cf4c8ea52a223dc8b659f4df232591150b3bb3b0",
+      "handoff_sha256": "aad72ea7d453f1506f5be272cf4c8ea52a223dc8b659f4df232591150b3bb3b0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/secureOwnerErasure.test.ts",
+      "source_sha256": "ec931b41ca0435e9d2f576044b41975574bab9403da6e339922fc93f1f2f9f79",
+      "handoff_sha256": "ec931b41ca0435e9d2f576044b41975574bab9403da6e339922fc93f1f2f9f79",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/secureSessionStorage.test.ts",
+      "source_sha256": "65331c44dc92d0b25fb880a3348e7ed5483046aaf62ba16a656908bfc7a06404",
+      "handoff_sha256": "65331c44dc92d0b25fb880a3348e7ed5483046aaf62ba16a656908bfc7a06404",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/serverTranscription.test.ts",
+      "source_sha256": "e709941fcf7b7597e6c29f454cdd9191e459bdd3f1a59bf27b782d4e41411ed5",
+      "handoff_sha256": "e709941fcf7b7597e6c29f454cdd9191e459bdd3f1a59bf27b782d4e41411ed5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/sessionMigration.test.ts",
+      "source_sha256": "b9e6f50ccbf856e5736d0f1553dd6ce22564868a13b00f69bd4d546277a96c1a",
+      "handoff_sha256": "b9e6f50ccbf856e5736d0f1553dd6ce22564868a13b00f69bd4d546277a96c1a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/sessionStorageMigration.test.ts",
+      "source_sha256": "9af5233efa308e4dd1a1cf99413ac4a2e8f2dd09d0f6a08cc6a3f38512fbf534",
+      "handoff_sha256": "9af5233efa308e4dd1a1cf99413ac4a2e8f2dd09d0f6a08cc6a3f38512fbf534",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/settingsExperience.test.ts",
+      "source_sha256": "2c48346beb2173d44c715894fabc47f551d600f49c57c900b4a4df86a8ac621a",
+      "handoff_sha256": "2c48346beb2173d44c715894fabc47f551d600f49c57c900b4a4df86a8ac621a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/sharedLessonSources.fixture.ts",
+      "source_sha256": "24c356b1746497bd45135de48e5a7a1c6a5e07040401c58d316b9a91c4ee587c",
+      "handoff_sha256": "24c356b1746497bd45135de48e5a7a1c6a5e07040401c58d316b9a91c4ee587c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/sharedLessonSources.test.ts",
+      "source_sha256": "208539045eacc356d9d655c5e2a2c007756d3a3023e2d766c100238d252873cb",
+      "handoff_sha256": "208539045eacc356d9d655c5e2a2c007756d3a3023e2d766c100238d252873cb",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/sharedPracticeTruthfulRecovery.test.ts",
+      "source_sha256": "9812209e77bc88842804c35fabe0cfcfc3920ce1e987b950bf323ab04eef30a9",
+      "handoff_sha256": "9812209e77bc88842804c35fabe0cfcfc3920ce1e987b950bf323ab04eef30a9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/sharedProductContract.test.ts",
+      "source_sha256": "d831569471b9ca146d2d3515b0c6dd986e50df8fe069c0330cb5957b08d92d71",
+      "handoff_sha256": "d831569471b9ca146d2d3515b0c6dd986e50df8fe069c0330cb5957b08d92d71",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/signedOutDeletionOwnership.fixture.ts",
+      "source_sha256": "a96a0ceced6f57ba997ebd59b4daa84267fb2b52d1ed57e38a365cf5747277bf",
+      "handoff_sha256": "a96a0ceced6f57ba997ebd59b4daa84267fb2b52d1ed57e38a365cf5747277bf",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/signedOutDeletionOwnership.test.ts",
+      "source_sha256": "77603f044cc676a078636605fa1c7ec0bcb2f13df6632e1f0d8fb749b249f5b7",
+      "handoff_sha256": "77603f044cc676a078636605fa1c7ec0bcb2f13df6632e1f0d8fb749b249f5b7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/signupConfirmation.test.ts",
+      "source_sha256": "79a892cc48107e81d9073b0fe21f1fe62618e81015497574588bd5c21fe3f664",
+      "handoff_sha256": "79a892cc48107e81d9073b0fe21f1fe62618e81015497574588bd5c21fe3f664",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/speech.test.ts",
+      "source_sha256": "86606dce6dc60e07d3a19c41608b04d2de19941215227d25200a2a9b17b3f232",
+      "handoff_sha256": "86606dce6dc60e07d3a19c41608b04d2de19941215227d25200a2a9b17b3f232",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/stagingAccountDeletion.test.ts",
+      "source_sha256": "bfecbc7b660b9667a77fc970b9708f0e1f13259eb79401ea9e63a363dd19f257",
+      "handoff_sha256": "bfecbc7b660b9667a77fc970b9708f0e1f13259eb79401ea9e63a363dd19f257",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/stagingAuthRuntime.fixture.ts",
+      "source_sha256": "4025d36bfbe0dedf5b30397b09b7fff689a1fe8d0615813d4b29aafa59c9a1aa",
+      "handoff_sha256": "4025d36bfbe0dedf5b30397b09b7fff689a1fe8d0615813d4b29aafa59c9a1aa",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/stagingBuild.test.ts",
+      "source_sha256": "137f7c9a8205420243686745cc51e6b16cf8356483a0904151dedc4676a1e44d",
+      "handoff_sha256": "137f7c9a8205420243686745cc51e6b16cf8356483a0904151dedc4676a1e44d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/stagingEasAssociation.test.ts",
+      "source_sha256": "04e3d481ae10e5632ebfcdc3dc337f17a9dd138995855c8d6947146e9bc4bdf3",
+      "handoff_sha256": "04e3d481ae10e5632ebfcdc3dc337f17a9dd138995855c8d6947146e9bc4bdf3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/stagingPracticeAccess.test.ts",
+      "source_sha256": "66c14f7484bdb85d2e93dc1911b093f7d0f7119b2a849e973fd2aa7cfeb2799e",
+      "handoff_sha256": "66c14f7484bdb85d2e93dc1911b093f7d0f7119b2a849e973fd2aa7cfeb2799e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/stagingWebBuyer.test.ts",
+      "source_sha256": "3d34465b4bc6d11cb4a483411f77dd75617f5f047a9a12af655b24a5e2229d56",
+      "handoff_sha256": "3d34465b4bc6d11cb4a483411f77dd75617f5f047a9a12af655b24a5e2229d56",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/stagingWebRoute.fixture.ts",
+      "source_sha256": "cbaa16cc4457baaa7e88588751a56ec51c224d0d34cd4846f8ccfe816bd2d8c6",
+      "handoff_sha256": "cbaa16cc4457baaa7e88588751a56ec51c224d0d34cd4846f8ccfe816bd2d8c6",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/stagingWebRoute.test.ts",
+      "source_sha256": "b8b9c66cee10bc5578350226212ebd72e72b68a394c8823e830d83608fa4e7ae",
+      "handoff_sha256": "b8b9c66cee10bc5578350226212ebd72e72b68a394c8823e830d83608fa4e7ae",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/staleWriteProtection.test.ts",
+      "source_sha256": "89fb71da4ddc92778274c008a9a494e2cb3b05a64bef3daf683a877bd3cd829c",
+      "handoff_sha256": "89fb71da4ddc92778274c008a9a494e2cb3b05a64bef3daf683a877bd3cd829c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/storePersistence.test.ts",
+      "source_sha256": "67f5400961020b00c7ba8941d40f3cf3560716bc0769c40beb9b0bc7dfa3576f",
+      "handoff_sha256": "67f5400961020b00c7ba8941d40f3cf3560716bc0769c40beb9b0bc7dfa3576f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/testflightFoundation.test.ts",
+      "source_sha256": "629cbcf8c41d0f0f59c796a08b363ebf77d6ec32d26a6ae4eaadd38bbbf293b5",
+      "handoff_sha256": "629cbcf8c41d0f0f59c796a08b363ebf77d6ec32d26a6ae4eaadd38bbbf293b5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/testflightReleaseConfig.test.ts",
+      "source_sha256": "6635af89f242ce54c39320127062b0fe1711288585732bc563b79dad52486e78",
+      "handoff_sha256": "6635af89f242ce54c39320127062b0fe1711288585732bc563b79dad52486e78",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/today.test.ts",
+      "source_sha256": "69e58d0860fe1988383c86a3a033ec84b3a265a94dfd6e0fb9652e4e50bf58b3",
+      "handoff_sha256": "69e58d0860fe1988383c86a3a033ec84b3a265a94dfd6e0fb9652e4e50bf58b3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/truthfulApprovedAssessment.test.ts",
+      "source_sha256": "2665db519834d60e3c5eebbcb19081fecca4e0d9691abde1307f205fc8a6a360",
+      "handoff_sha256": "2665db519834d60e3c5eebbcb19081fecca4e0d9691abde1307f205fc8a6a360",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/truthfulApprovedHistory.test.ts",
+      "source_sha256": "da30dc70d96ec4aa32caac86d8c4005e273d0258961489b4f77e53918f7d280d",
+      "handoff_sha256": "da30dc70d96ec4aa32caac86d8c4005e273d0258961489b4f77e53918f7d280d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/truthfulCoachingPresentation.fixture.ts",
+      "source_sha256": "0c3efb5cdd3a7c6e426118403eb8757e2ff31083f9d98fd46ff744bbaf431ef3",
+      "handoff_sha256": "0c3efb5cdd3a7c6e426118403eb8757e2ff31083f9d98fd46ff744bbaf431ef3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/truthfulCoachingPresentation.test.ts",
+      "source_sha256": "3a29d29c2cd515bf6aadd2cc99535e9c757eb79fd93408d28cd6e3b610333578",
+      "handoff_sha256": "3a29d29c2cd515bf6aadd2cc99535e9c757eb79fd93408d28cd6e3b610333578",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/unifiedNativeBilling.fixture.tsx",
+      "source_sha256": "e31f27decab52d5493f8f8fdbcef6a794b5f5727253c9b4d34d00c0d0b29747c",
+      "handoff_sha256": "e31f27decab52d5493f8f8fdbcef6a794b5f5727253c9b4d34d00c0d0b29747c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/unifiedNativeBilling.test.ts",
+      "source_sha256": "f46d964d5910376d9ffa4d915b8877a12a72c1daf9f4210ef09272f66ee8c12d",
+      "handoff_sha256": "f46d964d5910376d9ffa4d915b8877a12a72c1daf9f4210ef09272f66ee8c12d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/unifiedNativeBillingJoined.fixture.ts",
+      "source_sha256": "28407607190b1c0f0e178f73d7a8e574d400dd2a9ae6fd084535e8bedcb834e9",
+      "handoff_sha256": "28407607190b1c0f0e178f73d7a8e574d400dd2a9ae6fd084535e8bedcb834e9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/__tests__/webBridgeAvailability.test.ts",
+      "source_sha256": "7421d116cc5ac029c95ca50567866747cf3d289e952f6495daaab4ebf3f3f4d5",
+      "handoff_sha256": "7421d116cc5ac029c95ca50567866747cf3d289e952f6495daaab4ebf3f3f4d5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app.config.ts",
+      "source_sha256": "3748797ea287ee677da78ee51dea6911ca1d02d9059f3cd5ffadfa8868f39353",
+      "handoff_sha256": "3748797ea287ee677da78ee51dea6911ca1d02d9059f3cd5ffadfa8868f39353",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app.json",
+      "source_sha256": "6272df76cdd98fa9d1b114d6ef7b7bd82437774c335b88272fa34493598103b8",
+      "handoff_sha256": "6272df76cdd98fa9d1b114d6ef7b7bd82437774c335b88272fa34493598103b8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/(tabs)/_layout.tsx",
+      "source_sha256": "93df98156defd4a58ced55c51d06fc966929d11a1f6165cd9ebda3a2d0491174",
+      "handoff_sha256": "93df98156defd4a58ced55c51d06fc966929d11a1f6165cd9ebda3a2d0491174",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/(tabs)/index.tsx",
+      "source_sha256": "310b86d7b4b31b39f04789f8b15ec2327997326d9f25988da0409c9bd711072f",
+      "handoff_sha256": "310b86d7b4b31b39f04789f8b15ec2327997326d9f25988da0409c9bd711072f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/(tabs)/library.tsx",
+      "source_sha256": "5ab41acd5df74d22df7f46ef75e3b08408320957696fd0e798623b0cd0624043",
+      "handoff_sha256": "5ab41acd5df74d22df7f46ef75e3b08408320957696fd0e798623b0cd0624043",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/(tabs)/progress.tsx",
+      "source_sha256": "5496cf0a85b6d80ebf01804eae20ec3691ea2f8467b7c6cdde641af55438c174",
+      "handoff_sha256": "5496cf0a85b6d80ebf01804eae20ec3691ea2f8467b7c6cdde641af55438c174",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/+native-intent.tsx",
+      "source_sha256": "4c943729700d16fb5000f52035dbb013697bb975221cda85fb3b71532ece044c",
+      "handoff_sha256": "4c943729700d16fb5000f52035dbb013697bb975221cda85fb3b71532ece044c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/+not-found.tsx",
+      "source_sha256": "de2191178cc5fe99f94e346206ffb10c93cbb4e81371b0a73fedda4d88526f97",
+      "handoff_sha256": "de2191178cc5fe99f94e346206ffb10c93cbb4e81371b0a73fedda4d88526f97",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/_layout.tsx",
+      "source_sha256": "185fa16b51673fd1ba064dcfcad4c9951c4d61a813f55f0d3ad7c62997b62371",
+      "handoff_sha256": "185fa16b51673fd1ba064dcfcad4c9951c4d61a813f55f0d3ad7c62997b62371",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/account-practice.tsx",
+      "source_sha256": "dd8b368f8e171edca3e7e469cc6f0ccc9da2d1148c365c8d62d4f72597c1823d",
+      "handoff_sha256": "dd8b368f8e171edca3e7e469cc6f0ccc9da2d1148c365c8d62d4f72597c1823d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/approved-lesson/[lessonId].tsx",
+      "source_sha256": "159bf400211e020f27692c3e8f46d76ba0fd10228362be94a2faa4691ce05fe0",
+      "handoff_sha256": "159bf400211e020f27692c3e8f46d76ba0fd10228362be94a2faa4691ce05fe0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/approved-lessons.tsx",
+      "source_sha256": "24cbc6d2993dd5a4b2946d5c652130a13fa379964767467c5c896cb921788785",
+      "handoff_sha256": "24cbc6d2993dd5a4b2946d5c652130a13fa379964767467c5c896cb921788785",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/approved-rehearsal/[lessonId].tsx",
+      "source_sha256": "1542fb49a8ee8a9c982cf94a34d5db13b2835b16e0482611b4b201c33a5e980c",
+      "handoff_sha256": "1542fb49a8ee8a9c982cf94a34d5db13b2835b16e0482611b4b201c33a5e980c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/continue-from-web.tsx",
+      "source_sha256": "1ddb3d0ac186d94396238610bba85282dc31852c3a9d8d06196f525c68de4a67",
+      "handoff_sha256": "1ddb3d0ac186d94396238610bba85282dc31852c3a9d8d06196f525c68de4a67",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/custom.tsx",
+      "source_sha256": "8fab4934656b08dff5ac5340b952eb7d58d186c809eeb718092c84c479a258fb",
+      "handoff_sha256": "8fab4934656b08dff5ac5340b952eb7d58d186c809eeb718092c84c479a258fb",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/debrief/[id].tsx",
+      "source_sha256": "352c4c05811dea22ca27642036d32c8452eadfc958571f3387736f9e8fc16dd1",
+      "handoff_sha256": "352c4c05811dea22ca27642036d32c8452eadfc958571f3387736f9e8fc16dd1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/delete-account.tsx",
+      "source_sha256": "9f705d4c8c20b2593b849d95fdfbcce2dc0947872647117995f350d252ca5cd8",
+      "handoff_sha256": "9f705d4c8c20b2593b849d95fdfbcce2dc0947872647117995f350d252ca5cd8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/drill/[id].tsx",
+      "source_sha256": "bcbf165ac7b7e2ec8bf48b6fba94f302ebba4d3e9ed34e795b16e872a0560239",
+      "handoff_sha256": "bcbf165ac7b7e2ec8bf48b6fba94f302ebba4d3e9ed34e795b16e872a0560239",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/entry.tsx",
+      "source_sha256": "f7593379bc82a8fbcf474aa41e86b5290247f7b24331ec8242a3a76620428a66",
+      "handoff_sha256": "f7593379bc82a8fbcf474aa41e86b5290247f7b24331ec8242a3a76620428a66",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/forgot-password.tsx",
+      "source_sha256": "5b94bee429189c434062bc18c1dc703e3398bd64a63fe7aa523948576775ed93",
+      "handoff_sha256": "5b94bee429189c434062bc18c1dc703e3398bd64a63fe7aa523948576775ed93",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/internal-review-evidence.tsx",
+      "source_sha256": "4b29bd93c7a1f2634060b4d3ea52b756e07b750bee9249d0b409686907261579",
+      "handoff_sha256": "4b29bd93c7a1f2634060b4d3ea52b756e07b750bee9249d0b409686907261579",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/interrupted/[moduleId].tsx",
+      "source_sha256": "323e7e4b68d3a3d47eae0f66be9bdaba45ddbe1dabd696b186a3ce84dfa5db1b",
+      "handoff_sha256": "323e7e4b68d3a3d47eae0f66be9bdaba45ddbe1dabd696b186a3ce84dfa5db1b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/module/[day].tsx",
+      "source_sha256": "64b6f3ca4f201bbea3c5174bb7f7b7193b9ea55fb9be26df1ae06cc5da5ab2a4",
+      "handoff_sha256": "64b6f3ca4f201bbea3c5174bb7f7b7193b9ea55fb9be26df1ae06cc5da5ab2a4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/onboarding.tsx",
+      "source_sha256": "d8358b5e49773d9c773825207e7f1d2afc6bee22e908aa9e95a5f2db6ba85c5a",
+      "handoff_sha256": "d8358b5e49773d9c773825207e7f1d2afc6bee22e908aa9e95a5f2db6ba85c5a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/path.tsx",
+      "source_sha256": "6b24a2065997a796559443da7509b95a1aafcad693d314e78175d32c6d37605e",
+      "handoff_sha256": "6b24a2065997a796559443da7509b95a1aafcad693d314e78175d32c6d37605e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/paywall.tsx",
+      "source_sha256": "308c4f82fcf60c359938e607daacdb5da6891d7b435ad804a7d80cea133dee3a",
+      "handoff_sha256": "308c4f82fcf60c359938e607daacdb5da6891d7b435ad804a7d80cea133dee3a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/privacy.tsx",
+      "source_sha256": "70c941008b41922c412c40f8c45fa915b9170dbd7889effdad924f21b3dc5475",
+      "handoff_sha256": "70c941008b41922c412c40f8c45fa915b9170dbd7889effdad924f21b3dc5475",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/progress/dimension/[signal].tsx",
+      "source_sha256": "e32a5e225a4993938c23111c48172abe09aa6ed97c8f211a4f5cf4d8db2833e3",
+      "handoff_sha256": "e32a5e225a4993938c23111c48172abe09aa6ed97c8f211a4f5cf4d8db2833e3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/progress/how-it-works.tsx",
+      "source_sha256": "6a254f8ec23d07f6ea771d3edb3b5250e8fe80fb2bebed5e807828606788b6a2",
+      "handoff_sha256": "6a254f8ec23d07f6ea771d3edb3b5250e8fe80fb2bebed5e807828606788b6a2",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/purchase-success.tsx",
+      "source_sha256": "113264c1ffe0f9b9e883531aa862211b62b4b5bdee6fecffaa11aad4bd031178",
+      "handoff_sha256": "113264c1ffe0f9b9e883531aa862211b62b4b5bdee6fecffaa11aad4bd031178",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/qa-access.tsx",
+      "source_sha256": "ac6c7b2d44b990b11ad0215fd8799a5220c31d98326036b3c33159ad970da883",
+      "handoff_sha256": "ac6c7b2d44b990b11ad0215fd8799a5220c31d98326036b3c33159ad970da883",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/quick-rep/[lessonId].tsx",
+      "source_sha256": "37634d173856608230af1d3573695439a85bac43300da8e8dd8fefdc19b4ea2e",
+      "handoff_sha256": "37634d173856608230af1d3573695439a85bac43300da8e8dd8fefdc19b4ea2e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/rehearse/[id].tsx",
+      "source_sha256": "874f37bd803c8bbe3b74f7026c3342fd95b95821ebc67be65dc640591611dc55",
+      "handoff_sha256": "874f37bd803c8bbe3b74f7026c3342fd95b95821ebc67be65dc640591611dc55",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/reset-password.tsx",
+      "source_sha256": "5d37e3e359dc503499e17bdda09707c21245e92ed4ccaaa4c139744e999ab055",
+      "handoff_sha256": "5d37e3e359dc503499e17bdda09707c21245e92ed4ccaaa4c139744e999ab055",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/safety.tsx",
+      "source_sha256": "8e86ef4175bf4d9a7b15b3bbae446a56e2bc39f65db73bdb39dc703ac4b25c29",
+      "handoff_sha256": "8e86ef4175bf4d9a7b15b3bbae446a56e2bc39f65db73bdb39dc703ac4b25c29",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/saved-result.tsx",
+      "source_sha256": "f493506b6769c780da0d500ebef665093aec05d7d5911a255bdab71bf33b7d40",
+      "handoff_sha256": "f493506b6769c780da0d500ebef665093aec05d7d5911a255bdab71bf33b7d40",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/scenario/[id].tsx",
+      "source_sha256": "206784c5335406ca7b03a26d149e73add40d1b28a207346b4c01ba0271c0cce3",
+      "handoff_sha256": "206784c5335406ca7b03a26d149e73add40d1b28a207346b4c01ba0271c0cce3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/settings.tsx",
+      "source_sha256": "f037f133181823f4ca9696ae20bfc581df714320a4ff46a50487d2d99a1cd3ba",
+      "handoff_sha256": "f037f133181823f4ca9696ae20bfc581df714320a4ff46a50487d2d99a1cd3ba",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/app/staging-web-result.tsx",
+      "source_sha256": "c0de52857d51b1e6a3ee8a3766bf3cf7f4396be179b70e21a911946e00b801d1",
+      "handoff_sha256": "c0de52857d51b1e6a3ee8a3766bf3cf7f4396be179b70e21a911946e00b801d1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M1-Close.html",
+      "source_sha256": "dd1c05e912778b25e52cdefd705a7e998a2095042cf5a55a46feeacdb2c9c467",
+      "handoff_sha256": "dd1c05e912778b25e52cdefd705a7e998a2095042cf5a55a46feeacdb2c9c467",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M1-L1-Buried-Point.html",
+      "source_sha256": "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e",
+      "handoff_sha256": "aa4f4016888794b8f43139e8defdc01c14c4455476fa47f7d1ebb94cd412bd9e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M1-L2-Cut-the-Case.html",
+      "source_sha256": "f534110656bf67d009dcc19f8c5d8084d95eff73725878c7a1af185eae9c91cb",
+      "handoff_sha256": "f534110656bf67d009dcc19f8c5d8084d95eff73725878c7a1af185eae9c91cb",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M1-L3-Park-and-Return.html",
+      "source_sha256": "6a1b00ac4b166863d989804a8cd5ad4a4c6d5e1cf9290980debc5dd092515f34",
+      "handoff_sha256": "6a1b00ac4b166863d989804a8cd5ad4a4c6d5e1cf9290980debc5dd092515f34",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M1-L4-Make-It-Repeatable.html",
+      "source_sha256": "69cc481ddadaea9d9847bd767d7a3442ad23e26f73c8d6fa62d90fbebfc159d9",
+      "handoff_sha256": "69cc481ddadaea9d9847bd767d7a3442ad23e26f73c8d6fa62d90fbebfc159d9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M1-L5-Fit-in-One.html",
+      "source_sha256": "20f6ec8335736a211f8ecea8e244bff0eb4163fbd615cd41e55a518dead8041b",
+      "handoff_sha256": "20f6ec8335736a211f8ecea8e244bff0eb4163fbd615cd41e55a518dead8041b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M2-Close.html",
+      "source_sha256": "3f86d8cb5b9779dd26a5bd0fa1ea032619baa090c816bf8eee76ba2f0cc84dc4",
+      "handoff_sha256": "3f86d8cb5b9779dd26a5bd0fa1ea032619baa090c816bf8eee76ba2f0cc84dc4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M2-L1-Clear-Ask.html",
+      "source_sha256": "3b170a783715a00038979e96ea3d6d0e1dbc477b997b5a29d7d93250789ea086",
+      "handoff_sha256": "3b170a783715a00038979e96ea3d6d0e1dbc477b997b5a29d7d93250789ea086",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M2-L2-Say-Who.html",
+      "source_sha256": "590d340afe4cdc915bb4a4a8a05e24f5508a8cd4dc3a221422407c71e263bc51",
+      "handoff_sha256": "590d340afe4cdc915bb4a4a8a05e24f5508a8cd4dc3a221422407c71e263bc51",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M2-L3-When-They-Say-They-Cant.html",
+      "source_sha256": "0a594dfa8e3aed3badcd79119802e1453ab94bbdc5bb8b3f6c07cfc96c43cb04",
+      "handoff_sha256": "0a594dfa8e3aed3badcd79119802e1453ab94bbdc5bb8b3f6c07cfc96c43cb04",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M2-L4-Say-Whether-No.html",
+      "source_sha256": "bf550d4ce2e9a3e74e2e3dae8bab2bc7586c6b2f24a14c5fec33e0f234b9b6a1",
+      "handoff_sha256": "bf550d4ce2e9a3e74e2e3dae8bab2bc7586c6b2f24a14c5fec33e0f234b9b6a1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/M2-L5-Ask-for-the-Loop.html",
+      "source_sha256": "405dc1c6b2df9e62d49448ac14a48349fb93420cc01269089fe68b38ad3b79f3",
+      "handoff_sha256": "405dc1c6b2df9e62d49448ac14a48349fb93420cc01269089fe68b38ad3b79f3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/README.md",
+      "source_sha256": "73163b4921328f0259413cadaddb40a1061175fb0b8e25576ac64e17b69542ac",
+      "handoff_sha256": "73163b4921328f0259413cadaddb40a1061175fb0b8e25576ac64e17b69542ac",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/index.ts",
+      "source_sha256": "cd5f2cbd752dd92e4c65a045816c6afdfaee58b7ba71bfd0ba8127acb71ebe1f",
+      "handoff_sha256": "cd5f2cbd752dd92e4c65a045816c6afdfaee58b7ba71bfd0ba8127acb71ebe1f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/approved-decks/manifest.json",
+      "source_sha256": "f4291c7068caa222dc1087b02a936424e4e7f3397cfb4d94ab755e0f07631bc0",
+      "handoff_sha256": "f4291c7068caa222dc1087b02a936424e4e7f3397cfb4d94ab755e0f07631bc0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/fonts/PlusJakartaSans-400.ttf",
+      "source_sha256": "e6c9add36a54351c1d35e32296523512895fe2e470aa4646ccc40153015c8b6a",
+      "handoff_sha256": "e6c9add36a54351c1d35e32296523512895fe2e470aa4646ccc40153015c8b6a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/fonts/PlusJakartaSans-500.ttf",
+      "source_sha256": "92a867e43fee76ff9c154dd05b1a36249cb4d796ddf3e676158662576b23c3a5",
+      "handoff_sha256": "92a867e43fee76ff9c154dd05b1a36249cb4d796ddf3e676158662576b23c3a5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/fonts/PlusJakartaSans-600.ttf",
+      "source_sha256": "b91182886c83d924716e8b901a42fc29b9c84b6b6f35065498e510761f0dec2f",
+      "handoff_sha256": "b91182886c83d924716e8b901a42fc29b9c84b6b6f35065498e510761f0dec2f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/fonts/PlusJakartaSans-700.ttf",
+      "source_sha256": "0e64e5b1eb931d6feaf8fa75ec16a20d46de2093fcce40a248a304937db5f919",
+      "handoff_sha256": "0e64e5b1eb931d6feaf8fa75ec16a20d46de2093fcce40a248a304937db5f919",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/images/adaptive-icon.png",
+      "source_sha256": "80f6acf9121e556da43076f6e157ba93656933611b884ad39dde2c952b958235",
+      "handoff_sha256": "80f6acf9121e556da43076f6e157ba93656933611b884ad39dde2c952b958235",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/images/favicon-32.png",
+      "source_sha256": "b1a3449e47efdf5fa11d1fb0b3558348d4139658c8dde2b9a886493c69d83d7c",
+      "handoff_sha256": "b1a3449e47efdf5fa11d1fb0b3558348d4139658c8dde2b9a886493c69d83d7c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/images/favicon.png",
+      "source_sha256": "80f6acf9121e556da43076f6e157ba93656933611b884ad39dde2c952b958235",
+      "handoff_sha256": "80f6acf9121e556da43076f6e157ba93656933611b884ad39dde2c952b958235",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/images/icon-dark.png",
+      "source_sha256": "696d8643977a717f2c075ea0d60463d41c38cfd9a41c3f083a98796f5244cc07",
+      "handoff_sha256": "696d8643977a717f2c075ea0d60463d41c38cfd9a41c3f083a98796f5244cc07",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/images/icon-mono.png",
+      "source_sha256": "0966ed14ec45dfa5b5d61f10c26f91bd510f108c5c4fcc863dd6fbc1d6552c69",
+      "handoff_sha256": "0966ed14ec45dfa5b5d61f10c26f91bd510f108c5c4fcc863dd6fbc1d6552c69",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/images/icon.png",
+      "source_sha256": "80f6acf9121e556da43076f6e157ba93656933611b884ad39dde2c952b958235",
+      "handoff_sha256": "80f6acf9121e556da43076f6e157ba93656933611b884ad39dde2c952b958235",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/images/launch-screen.png",
+      "source_sha256": "4d5367642278139b533832ed445e1291680263ea8618d8ee93da8cb8b034b793",
+      "handoff_sha256": "4d5367642278139b533832ed445e1291680263ea8618d8ee93da8cb8b034b793",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/images/splash-icon.png",
+      "source_sha256": "d8c5f4e0f4d03af8a045aa0d3c4a3b113b8771e6ea071cdbc6e0010ba218be47",
+      "handoff_sha256": "d8c5f4e0f4d03af8a045aa0d3c4a3b113b8771e6ea071cdbc6e0010ba218be47",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M1-Close.html",
+      "source_sha256": "b6c01f82b927133ea6a988402a019046290b40e3fb346e3146551fda665ce19f",
+      "handoff_sha256": "b6c01f82b927133ea6a988402a019046290b40e3fb346e3146551fda665ce19f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M1-L1-Buried-Point.html",
+      "source_sha256": "b1cd8f3868ea6e5b684eda9a11c1803d20fb69376d1562f6c3b40cb6095d1138",
+      "handoff_sha256": "b1cd8f3868ea6e5b684eda9a11c1803d20fb69376d1562f6c3b40cb6095d1138",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M1-L2-Cut-the-Case.html",
+      "source_sha256": "eb49c3e6c90833f9499e8ba1ee0f53eff28bb48278721b5d2fb8ab0c67f3de2b",
+      "handoff_sha256": "eb49c3e6c90833f9499e8ba1ee0f53eff28bb48278721b5d2fb8ab0c67f3de2b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M1-L3-Park-and-Return.html",
+      "source_sha256": "01996ed82debe5e8970bbb5dda183716da2cae30ae802f9a8a497ef209e5a76a",
+      "handoff_sha256": "01996ed82debe5e8970bbb5dda183716da2cae30ae802f9a8a497ef209e5a76a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M1-L4-Make-It-Repeatable.html",
+      "source_sha256": "666b1c19aac8e7b66a18ba9fc1a45a500879828acb1b159cfbedd7dbcb5ffcd8",
+      "handoff_sha256": "666b1c19aac8e7b66a18ba9fc1a45a500879828acb1b159cfbedd7dbcb5ffcd8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M1-L5-Fit-in-One.html",
+      "source_sha256": "355897b20e3aea74f56db695ae222f46fbc6fb90511367a89050da1824af3584",
+      "handoff_sha256": "355897b20e3aea74f56db695ae222f46fbc6fb90511367a89050da1824af3584",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M2-Close.html",
+      "source_sha256": "c7e2abc300cd2654f0e2ac76871040a3ccc0bfb0a16c75c8de91d69247da84c5",
+      "handoff_sha256": "c7e2abc300cd2654f0e2ac76871040a3ccc0bfb0a16c75c8de91d69247da84c5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M2-L1-Clear-Ask.html",
+      "source_sha256": "52b7718be36c606e2661583ec41fb9d3f9d0582e5ae5345c859367e0f8d1c6b8",
+      "handoff_sha256": "52b7718be36c606e2661583ec41fb9d3f9d0582e5ae5345c859367e0f8d1c6b8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M2-L2-Say-Who.html",
+      "source_sha256": "31ce4807e77059d4981c9d832a55f90e98e960dcc3ca929b242ea9364a2abefa",
+      "handoff_sha256": "31ce4807e77059d4981c9d832a55f90e98e960dcc3ca929b242ea9364a2abefa",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M2-L3-When-They-Say-They-Cant.html",
+      "source_sha256": "6c531bc970cd842eb1fb69b7c41362e675a278ad85d072eb99c75c6ca43edd74",
+      "handoff_sha256": "6c531bc970cd842eb1fb69b7c41362e675a278ad85d072eb99c75c6ca43edd74",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M2-L4-Say-Whether-No.html",
+      "source_sha256": "876880adcac378b78d6ed0ba65c7d444020453ce8cf1c3c58ed95f3902e3407b",
+      "handoff_sha256": "876880adcac378b78d6ed0ba65c7d444020453ce8cf1c3c58ed95f3902e3407b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-decks/M2-L5-Ask-for-the-Loop.html",
+      "source_sha256": "4ec4181d85ecfba3de6d8914c0131309012da27fcab927db1a9795b0c5c0fe67",
+      "handoff_sha256": "4ec4181d85ecfba3de6d8914c0131309012da27fcab927db1a9795b0c5c0fe67",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-thumbnails/m1-l1-buried-point.png",
+      "source_sha256": "bf12be6fb5e73a5d2e44a05b86383bfcc7c4a4950ee09f94be90cbd6113dacd5",
+      "handoff_sha256": "bf12be6fb5e73a5d2e44a05b86383bfcc7c4a4950ee09f94be90cbd6113dacd5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-thumbnails/m1-l2-cut-the-case.png",
+      "source_sha256": "86aa5ef4c37074503079a5f634e6c92af21cb1615f793ef055a90835c081ca68",
+      "handoff_sha256": "86aa5ef4c37074503079a5f634e6c92af21cb1615f793ef055a90835c081ca68",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-thumbnails/m1-l3-park-and-return.png",
+      "source_sha256": "843ca0e083b0d6bad0a149d6de38918c54980c7b39cbeefa99c5ca9f38fb597c",
+      "handoff_sha256": "843ca0e083b0d6bad0a149d6de38918c54980c7b39cbeefa99c5ca9f38fb597c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-thumbnails/m1-l4-make-it-repeatable.png",
+      "source_sha256": "a2e30c0a5fe25c01732d322fd68aac89df42801c10b528ca48984afee4bcedea",
+      "handoff_sha256": "a2e30c0a5fe25c01732d322fd68aac89df42801c10b528ca48984afee4bcedea",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-thumbnails/m1-l5-fit-in-one.png",
+      "source_sha256": "0baf782ccd95de86b1aea202cab093b3ffde4319e074ff162e8878ce37365a6c",
+      "handoff_sha256": "0baf782ccd95de86b1aea202cab093b3ffde4319e074ff162e8878ce37365a6c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-thumbnails/m2-l1-clear-ask.png",
+      "source_sha256": "940b9d6b2ce380484f701ae4c0f87595506b64128df325a9d5da437cce6a548d",
+      "handoff_sha256": "940b9d6b2ce380484f701ae4c0f87595506b64128df325a9d5da437cce6a548d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-thumbnails/m2-l2-say-who.png",
+      "source_sha256": "a97e43d8e92e2c528733bca0c89f419ffee3fe22bca348a51b804db4e9f6385b",
+      "handoff_sha256": "a97e43d8e92e2c528733bca0c89f419ffee3fe22bca348a51b804db4e9f6385b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-thumbnails/m2-l3-when-they-say-they-cant.png",
+      "source_sha256": "3ac94724c083934ddcff74e3be8ec372958b137e6f55998ecd02c0a254acaf62",
+      "handoff_sha256": "3ac94724c083934ddcff74e3be8ec372958b137e6f55998ecd02c0a254acaf62",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-thumbnails/m2-l4-say-whether-no.png",
+      "source_sha256": "9804c6ecbb3fb39d20ae4efc838e68c452160fd228dd6d35cf56d9f9c7b0b6d9",
+      "handoff_sha256": "9804c6ecbb3fb39d20ae4efc838e68c452160fd228dd6d35cf56d9f9c7b0b6d9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/assets/lesson-thumbnails/m2-l5-ask-for-the-loop.png",
+      "source_sha256": "efb937c4266fa971d00173adb9a48c14f4c934eaa9dcd5f98354766038584953",
+      "handoff_sha256": "efb937c4266fa971d00173adb9a48c14f4c934eaa9dcd5f98354766038584953",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/babel.config.js",
+      "source_sha256": "30a599822c666e5e1052681fc036ee33e6bf53dff49f81d3474ee33ce91b3f9d",
+      "handoff_sha256": "30a599822c666e5e1052681fc036ee33e6bf53dff49f81d3474ee33ce91b3f9d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/bun.lock",
+      "source_sha256": "ace5c55f08b8a7e6971d0ef1ed01c468bdd8b7eade6732e127642033a38928b9",
+      "handoff_sha256": "ace5c55f08b8a7e6971d0ef1ed01c468bdd8b7eade6732e127642033a38928b9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/bunfig.toml",
+      "source_sha256": "4ca4040bb16ea08577a3a80a75769af868a2e64af131b0c9cf7767350e90a66b",
+      "handoff_sha256": "4ca4040bb16ea08577a3a80a75769af868a2e64af131b0c9cf7767350e90a66b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/AccountLifecycleControls.tsx",
+      "source_sha256": "109326c8893ed48e923f35d01bdac17d7167d2dbe54b18712b196ad20dea1584",
+      "handoff_sha256": "109326c8893ed48e923f35d01bdac17d7167d2dbe54b18712b196ad20dea1584",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/AccountLogout.tsx",
+      "source_sha256": "ce8a6a7c9c51acff93d34a43cf57e7d4b95be0d6f57bc3027547962f5865094d",
+      "handoff_sha256": "ce8a6a7c9c51acff93d34a43cf57e7d4b95be0d6f57bc3027547962f5865094d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/FreeJourneyResults.tsx",
+      "source_sha256": "ecbcb87f0b601a3ca2ff102da189af74acff7fd5e7dc43e36adb1065fd7b230c",
+      "handoff_sha256": "ecbcb87f0b601a3ca2ff102da189af74acff7fd5e7dc43e36adb1065fd7b230c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/LaunchExperience.tsx",
+      "source_sha256": "86ed6b276410a34f09e47864c1d7dfae30d5f9338e45e57228040edaf3ef15f3",
+      "handoff_sha256": "86ed6b276410a34f09e47864c1d7dfae30d5f9338e45e57228040edaf3ef15f3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/M1L1PaidPractice.tsx",
+      "source_sha256": "32e48aa736ba0410467a0290f372b1d7c99f18bcc85b1696e323604f58eb433b",
+      "handoff_sha256": "32e48aa736ba0410467a0290f372b1d7c99f18bcc85b1696e323604f58eb433b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/MigrationNotice.tsx",
+      "source_sha256": "afa1d160677a57c2b3ffe8f35597d4aef8518218def3b3b3a97df318d1ef9978",
+      "handoff_sha256": "afa1d160677a57c2b3ffe8f35597d4aef8518218def3b3b3a97df318d1ef9978",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/NativeBillingGate.tsx",
+      "source_sha256": "4d072e1e5b6cd00f9208885e5325a9118ce0c2ee22d58d19f34c64ffa47a0b60",
+      "handoff_sha256": "4d072e1e5b6cd00f9208885e5325a9118ce0c2ee22d58d19f34c64ffa47a0b60",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/OriginalFollowThrough.tsx",
+      "source_sha256": "28d7265b30deccc7487bb9c6388d959cff7588eef8c5ae0fa57a55846d0b2f7e",
+      "handoff_sha256": "28d7265b30deccc7487bb9c6388d959cff7588eef8c5ae0fa57a55846d0b2f7e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/PaidProductUI.tsx",
+      "source_sha256": "1f7a99f8535a8e3fb59b18c54ede0cdc09c44778831bfbefc3a2d3df4da6fa33",
+      "handoff_sha256": "1f7a99f8535a8e3fb59b18c54ede0cdc09c44778831bfbefc3a2d3df4da6fa33",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/PrivateWebResultPresentation.tsx",
+      "source_sha256": "13129af567c448610541634b94d2226433d93b2ed8bf7f58a3aa115259a14420",
+      "handoff_sha256": "13129af567c448610541634b94d2226433d93b2ed8bf7f58a3aa115259a14420",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/RehearsalBriefing.tsx",
+      "source_sha256": "68d721fb3f72d7cc1be181e7ff86a3aedd32e1c125957b403c99b95e5b31f9ff",
+      "handoff_sha256": "68d721fb3f72d7cc1be181e7ff86a3aedd32e1c125957b403c99b95e5b31f9ff",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/ScenarioPaidPractice.tsx",
+      "source_sha256": "834aa3c84f4c83b2584ad7b5cc1b8ed05db5726a951104754d17d959723501f5",
+      "handoff_sha256": "834aa3c84f4c83b2584ad7b5cc1b8ed05db5726a951104754d17d959723501f5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/StagingPracticeGate.tsx",
+      "source_sha256": "8a24a3929e541fb8d7d31150fd63216282cbb7aaf725a812d30707fbe7bdff3a",
+      "handoff_sha256": "8a24a3929e541fb8d7d31150fd63216282cbb7aaf725a812d30707fbe7bdff3a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/components/ui.tsx",
+      "source_sha256": "8305723b1e78eb25cea2a526c299fdc162c18070a4baba2af5ea4fa523a9f260",
+      "handoff_sha256": "8305723b1e78eb25cea2a526c299fdc162c18070a4baba2af5ea4fa523a9f260",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/approvedLessons.ts",
+      "source_sha256": "f08dc79d20107b136b8bec67239580bfda520d7a6621f6ff91331a056ce3b2b8",
+      "handoff_sha256": "f08dc79d20107b136b8bec67239580bfda520d7a6621f6ff91331a056ce3b2b8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/challenge.ts",
+      "source_sha256": "93066bb0e89aee04c601a026c39552e473bc2838ed1fd5b0c8793b3478cf9d9c",
+      "handoff_sha256": "93066bb0e89aee04c601a026c39552e473bc2838ed1fd5b0c8793b3478cf9d9c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/colors.ts",
+      "source_sha256": "e069ab0c01592889091a4b49969c4102291280ffa8e2aaa38deb8f5e8ca3eaf0",
+      "handoff_sha256": "e069ab0c01592889091a4b49969c4102291280ffa8e2aaa38deb8f5e8ca3eaf0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/curriculum.json",
+      "source_sha256": "8c0d1e4a057c0c3f1d7845198cba83b8538c5f40048d2a007dcb8f7aca40ee72",
+      "handoff_sha256": "8c0d1e4a057c0c3f1d7845198cba83b8538c5f40048d2a007dcb8f7aca40ee72",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/curriculumRegistry.review.json",
+      "source_sha256": "f23e8de87591fb64a4759f7930787cd4d769d71938b80f48f6cca621d4aa521f",
+      "handoff_sha256": "f23e8de87591fb64a4759f7930787cd4d769d71938b80f48f6cca621d4aa521f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/drills.ts",
+      "source_sha256": "fe1f6f43ce42613c678572b8b592a1f65c52e0530561637794e7ee783ccf3ea0",
+      "handoff_sha256": "fe1f6f43ce42613c678572b8b592a1f65c52e0530561637794e7ee783ccf3ea0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/modularCurriculum.review.json",
+      "source_sha256": "f7fdc29b284bee0cad7ea15ea0af341b3bcfcec9c5ce335a9fae57cf84869fe4",
+      "handoff_sha256": "f7fdc29b284bee0cad7ea15ea0af341b3bcfcec9c5ce335a9fae57cf84869fe4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/modules.ts",
+      "source_sha256": "9a569142e48af317c8bb7aa281130d95ef3ea64006344ef50a7e6db9c31449c1",
+      "handoff_sha256": "9a569142e48af317c8bb7aa281130d95ef3ea64006344ef50a7e6db9c31449c1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/onboardingScenarios.ts",
+      "source_sha256": "5469983d1a76cfb3aef60eabf8dc7aecc635e587b9bb4f702b84957cebb58073",
+      "handoff_sha256": "5469983d1a76cfb3aef60eabf8dc7aecc635e587b9bb4f702b84957cebb58073",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/personas.ts",
+      "source_sha256": "86a4296e2ad72945a1b01b521eaa69e622b3519a96cab6b15f2b02eb03e29d7c",
+      "handoff_sha256": "86a4296e2ad72945a1b01b521eaa69e622b3519a96cab6b15f2b02eb03e29d7c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/pilotCurriculum.json",
+      "source_sha256": "bf23bcd68d3abbc258b9e8fa192e4aee2620ed18800cb05a486cd9a710ce52fc",
+      "handoff_sha256": "bf23bcd68d3abbc258b9e8fa192e4aee2620ed18800cb05a486cd9a710ce52fc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/scenarios.ts",
+      "source_sha256": "90bdd3a8be5fe1f727e6b520e28ce4e6e4211483fd93e0afd8a04768682297e3",
+      "handoff_sha256": "90bdd3a8be5fe1f727e6b520e28ce4e6e4211483fd93e0afd8a04768682297e3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/constants/theme.ts",
+      "source_sha256": "8719d94e0395f9eb03335a218f632107a0f2026d2e03514264c094f2f3a74494",
+      "handoff_sha256": "8719d94e0395f9eb03335a218f632107a0f2026d2e03514264c094f2f3a74494",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/design/RORK-HANDOFF.md",
+      "source_sha256": "fad8173f0c4b91c47029eda901fc343bdd2c4421e48f1aa05405457058241bb6",
+      "handoff_sha256": "fad8173f0c4b91c47029eda901fc343bdd2c4421e48f1aa05405457058241bb6",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/design/final-purple-standalone.html",
+      "source_sha256": "e39c16049a11adfca845ae25e68aa6fd235a0baa915aeaa1fec4e29a38941f5d",
+      "handoff_sha256": "e39c16049a11adfca845ae25e68aa6fd235a0baa915aeaa1fec4e29a38941f5d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/design/final-purple.html",
+      "source_sha256": "ccee855b31008095a33b54875c2798f800f318cc4c731a14a7cb5b0994470a6c",
+      "handoff_sha256": "ccee855b31008095a33b54875c2798f800f318cc4c731a14a7cb5b0994470a6c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/eas.json",
+      "source_sha256": "a8e94970459b3e8faa1a54bda47c120b3f624d1b46dd3375dd448cb62f17e4f7",
+      "handoff_sha256": "6fd13d7e6d96539a6e9a2d13106d27df579596369632fe34658760c1d20bab37",
+      "equal": false,
+      "adaptation": "Remove machine-local credentialsSource only"
+    },
+    {
+      "path": "expo/eslint.config.js",
+      "source_sha256": "1173c12ce96fb713a0a60af32745bd02793a5adfe4f50848324ec74ddedb8d57",
+      "handoff_sha256": "1173c12ce96fb713a0a60af32745bd02793a5adfe4f50848324ec74ddedb8d57",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/access.ts",
+      "source_sha256": "0b60c1705c2f68deac700217178806fd25eeb970a04bd9d5586a26bed7893aee",
+      "handoff_sha256": "0b60c1705c2f68deac700217178806fd25eeb970a04bd9d5586a26bed7893aee",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/accountDeletion.ts",
+      "source_sha256": "bba2eebe60112951ec0487ec4a38decd443e269756b2888eabfe1406a7765192",
+      "handoff_sha256": "bba2eebe60112951ec0487ec4a38decd443e269756b2888eabfe1406a7765192",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/accountLifecycleRuntime.ts",
+      "source_sha256": "a3f23da4ce35eb342fec8dfa84027f4b27f4c09eea28b5a36f95176db3aebd6d",
+      "handoff_sha256": "a3f23da4ce35eb342fec8dfa84027f4b27f4c09eea28b5a36f95176db3aebd6d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/accountRecovery.ts",
+      "source_sha256": "ea0bcc34c2433681f484077c0664d8f89440a496bcfc1a800abd1ab74be97b14",
+      "handoff_sha256": "ea0bcc34c2433681f484077c0664d8f89440a496bcfc1a800abd1ab74be97b14",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/activeScenarioRunRepository.ts",
+      "source_sha256": "5d150289a95c47122a7006671d5b5563cab1c33c88127e2982db779655cb4031",
+      "handoff_sha256": "5d150289a95c47122a7006671d5b5563cab1c33c88127e2982db779655cb4031",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/ai.ts",
+      "source_sha256": "c67c07825e3437bf58139fccb08ea9a19dc623e587f2e05701d05af549740c41",
+      "handoff_sha256": "c67c07825e3437bf58139fccb08ea9a19dc623e587f2e05701d05af549740c41",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/analytics.ts",
+      "source_sha256": "0a6073931e0b067e95a755ac1893530cc93abb542e8a305540350d3ab03cab14",
+      "handoff_sha256": "0a6073931e0b067e95a755ac1893530cc93abb542e8a305540350d3ab03cab14",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/approvedDeckLoader.ts",
+      "source_sha256": "caf73a24d335bf308e794564b00720a2bb9e4337fe52a5f35a1b3f0d5ce5fdb8",
+      "handoff_sha256": "caf73a24d335bf308e794564b00720a2bb9e4337fe52a5f35a1b3f0d5ce5fdb8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/approvedRehearsalAssessment.ts",
+      "source_sha256": "cdd1eea5e88a3b794b0c8f82ed39777763a68c326a0e115e083f91d54037b943",
+      "handoff_sha256": "cdd1eea5e88a3b794b0c8f82ed39777763a68c326a0e115e083f91d54037b943",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/approvedRehearsalPressure.ts",
+      "source_sha256": "9a1b3d2a635f32fa4bc9a23dcc761bd8c004bc1a8cf3ae58fdd003bf1147fa9b",
+      "handoff_sha256": "9a1b3d2a635f32fa4bc9a23dcc761bd8c004bc1a8cf3ae58fdd003bf1147fa9b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/approvedRehearsals.ts",
+      "source_sha256": "ca4409dee989c0bc5a89b3ac8425b512cd4471c2f0812c7bf3c1479f84995094",
+      "handoff_sha256": "ca4409dee989c0bc5a89b3ac8425b512cd4471c2f0812c7bf3c1479f84995094",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/authEnvironment.ts",
+      "source_sha256": "4db2c25747d745773196db079e5cf25611e5c9114ad30cf3b0e1348c6d381816",
+      "handoff_sha256": "4db2c25747d745773196db079e5cf25611e5c9114ad30cf3b0e1348c6d381816",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/baselineAudio.ts",
+      "source_sha256": "42c54150321743d1e61c28f193fde84469eb8c022480cc2f4224745e6c895f9a",
+      "handoff_sha256": "42c54150321743d1e61c28f193fde84469eb8c022480cc2f4224745e6c895f9a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/clientEnvGuard.ts",
+      "source_sha256": "94647ad3eb3a5c4d623b774cb4b6ff6e58669f984b1c0de873bfb3303dc0356d",
+      "handoff_sha256": "94647ad3eb3a5c4d623b774cb4b6ff6e58669f984b1c0de873bfb3303dc0356d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/commerce.ts",
+      "source_sha256": "cb5447e8f6e82b243aefca297c2ae96d1d2a058ac4b9bb4e8ba8d8df0f3997d8",
+      "handoff_sha256": "cb5447e8f6e82b243aefca297c2ae96d1d2a058ac4b9bb4e8ba8d8df0f3997d8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/consent.ts",
+      "source_sha256": "27381fde6d31e1304e60f8d174748958b91bfcce8fe210bd07c595cb0594e4d9",
+      "handoff_sha256": "27381fde6d31e1304e60f8d174748958b91bfcce8fe210bd07c595cb0594e4d9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/conversion.ts",
+      "source_sha256": "e097330e74281bdacb7fe5311d75aa0e58d1fb0976c7e1912fd11831a5a64cc9",
+      "handoff_sha256": "e097330e74281bdacb7fe5311d75aa0e58d1fb0976c7e1912fd11831a5a64cc9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/conversionBuild.ts",
+      "source_sha256": "ec6535481b39f7e97786264a049d3789805114200c6a238c088e1ceddb1b4d15",
+      "handoff_sha256": "ec6535481b39f7e97786264a049d3789805114200c6a238c088e1ceddb1b4d15",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/convertedCompletion.ts",
+      "source_sha256": "0012ccf8c5aeb75e06f1f7cf8baffd72dec778807bf625974f866fe4c887fc09",
+      "handoff_sha256": "0012ccf8c5aeb75e06f1f7cf8baffd72dec778807bf625974f866fe4c887fc09",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/convertedCompletionJournal.ts",
+      "source_sha256": "4c6a614b96c48d493f51f2c2392f5b601d8b16e3460aed6cb8adf7321bb8f3ab",
+      "handoff_sha256": "4c6a614b96c48d493f51f2c2392f5b601d8b16e3460aed6cb8adf7321bb8f3ab",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/convertedLesson.ts",
+      "source_sha256": "e5dd8b82f74eed876cf47e4a9a378fbb34f7b4c3afef6e5a6932dc53f49c1238",
+      "handoff_sha256": "e5dd8b82f74eed876cf47e4a9a378fbb34f7b4c3afef6e5a6932dc53f49c1238",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/convertedProgressRepository.ts",
+      "source_sha256": "aba19f2754c5560a3237c388652ccce52f221506a2df751e6233def825bb10e4",
+      "handoff_sha256": "aba19f2754c5560a3237c388652ccce52f221506a2df751e6233def825bb10e4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/counterpartLineCanonicalization.ts",
+      "source_sha256": "2031cb2c587e0a3eb05075d0e3db564de404eafff9164afc0bc953dce8e855d3",
+      "handoff_sha256": "2031cb2c587e0a3eb05075d0e3db564de404eafff9164afc0bc953dce8e855d3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/curriculum.ts",
+      "source_sha256": "a9908ff9c6e03ad88c2b721ab6ed3f05da33a39bd3d95c68521e1443906d24e3",
+      "handoff_sha256": "a9908ff9c6e03ad88c2b721ab6ed3f05da33a39bd3d95c68521e1443906d24e3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/curriculumMigration.ts",
+      "source_sha256": "db6f7c4b3d58223f4dc955e006e631c25f7fb0b6b256ac7d6b01e74ba60325a8",
+      "handoff_sha256": "db6f7c4b3d58223f4dc955e006e631c25f7fb0b6b256ac7d6b01e74ba60325a8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/customerLessonExperience.ts",
+      "source_sha256": "e121f697ad6754b13d0617dca181c220fc18587c997fc875f5a2ed01e3d4accf",
+      "handoff_sha256": "e121f697ad6754b13d0617dca181c220fc18587c997fc875f5a2ed01e3d4accf",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/dailyMotivation.ts",
+      "source_sha256": "42c4fe202352aff0c84539bf04d2bb493c1c58688f416940296a056c190f506f",
+      "handoff_sha256": "42c4fe202352aff0c84539bf04d2bb493c1c58688f416940296a056c190f506f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/deletedOwnerCleanup.ts",
+      "source_sha256": "ae05310258c374da740fdb1a8906112d1df3ecfd6d6a5ee59a63cece35a3758f",
+      "handoff_sha256": "ae05310258c374da740fdb1a8906112d1df3ecfd6d6a5ee59a63cece35a3758f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/dictationFailure.ts",
+      "source_sha256": "05a37c5a4e22824cea2c3fa24afa0b222ecbf9ba0dea9ba7240aee7bd788350b",
+      "handoff_sha256": "05a37c5a4e22824cea2c3fa24afa0b222ecbf9ba0dea9ba7240aee7bd788350b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/durableGuestContinuation.ts",
+      "source_sha256": "b4f89091d36ed2ecaa614b3cc7df1637164f9e350236fb4478f0dfa8f7b98ea8",
+      "handoff_sha256": "b4f89091d36ed2ecaa614b3cc7df1637164f9e350236fb4478f0dfa8f7b98ea8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/ephemeral.ts",
+      "source_sha256": "e55c15b881ce78e27f7830422a6a14ccda4276343099ec214880373a496a3357",
+      "handoff_sha256": "e55c15b881ce78e27f7830422a6a14ccda4276343099ec214880373a496a3357",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/experiments.ts",
+      "source_sha256": "771402a3bd2ad05653b2a0c1f5780c7524952aafc2b86862aa13581d3c0490b4",
+      "handoff_sha256": "771402a3bd2ad05653b2a0c1f5780c7524952aafc2b86862aa13581d3c0490b4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/freeAcquisition.ts",
+      "source_sha256": "eefc0aaf8c36129f5bdc83824a8c7bc04b8c757e765c783d9813442bc65c4c68",
+      "handoff_sha256": "eefc0aaf8c36129f5bdc83824a8c7bc04b8c757e765c783d9813442bc65c4c68",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/freeAcquisitionOutcome.ts",
+      "source_sha256": "05dfed2f5572d9cfa4b2d409120f07bc0a6a49752755aff539b87088c4cd90a6",
+      "handoff_sha256": "05dfed2f5572d9cfa4b2d409120f07bc0a6a49752755aff539b87088c4cd90a6",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/freeAcquisitionRuntime.ts",
+      "source_sha256": "5da95fe96be6206be6ffa47a7c3003a6f63d54a12bf6bc0f3836cb26e8897e71",
+      "handoff_sha256": "5da95fe96be6206be6ffa47a7c3003a6f63d54a12bf6bc0f3836cb26e8897e71",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/freeJournalStorage.ts",
+      "source_sha256": "98670e0c273febe9ddb47cc2598b262f24e3714a88f0cd06aa234d301bc2983b",
+      "handoff_sha256": "98670e0c273febe9ddb47cc2598b262f24e3714a88f0cd06aa234d301bc2983b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/freeJourney.ts",
+      "source_sha256": "7ffbf9cf17dce7afefa936af5599671a725ea2a780587f8de296ef2e359d0031",
+      "handoff_sha256": "7ffbf9cf17dce7afefa936af5599671a725ea2a780587f8de296ef2e359d0031",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/guestContinuationRuntime.ts",
+      "source_sha256": "fe0efd447f9c3b0e79dd9ab939dec1878eff7482f10964f06ff73d8a64aab00f",
+      "handoff_sha256": "fe0efd447f9c3b0e79dd9ab939dec1878eff7482f10964f06ff73d8a64aab00f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/hydration.ts",
+      "source_sha256": "cb0e6fa5e0dc0117d7f004ab29cc8b4f5360e97add73b8affb5bb84b59aa84f1",
+      "handoff_sha256": "cb0e6fa5e0dc0117d7f004ab29cc8b4f5360e97add73b8affb5bb84b59aa84f1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/launchCurriculum.ts",
+      "source_sha256": "1f04433ef659222fb946d8d95cc230572125ee38fabbe37e8b4643e661ad3112",
+      "handoff_sha256": "1f04433ef659222fb946d8d95cc230572125ee38fabbe37e8b4643e661ad3112",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/lessonFeedback.ts",
+      "source_sha256": "b0dcedab0806cc818208b9fba7edcadde28c0ee69322a0b0dc87c2ba31fd38bc",
+      "handoff_sha256": "b0dcedab0806cc818208b9fba7edcadde28c0ee69322a0b0dc87c2ba31fd38bc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/lessonFeedbackService.ts",
+      "source_sha256": "eb3205b8bd818b98be9f7baccb1a728f1579bfed9e6120583e36ecb1b52bde75",
+      "handoff_sha256": "eb3205b8bd818b98be9f7baccb1a728f1579bfed9e6120583e36ecb1b52bde75",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/m1L1DynamicResponse.ts",
+      "source_sha256": "d24611c944027834b35e0c38f4ce9f7aebd6ddc711d9f5f752e4ca62a475603a",
+      "handoff_sha256": "d24611c944027834b35e0c38f4ce9f7aebd6ddc711d9f5f752e4ca62a475603a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/modularCurriculum.ts",
+      "source_sha256": "df92b10eb26a1a5b73618bfb8ffc8fe8c5c11d073c00c11f74e0b52fa1e4c2e5",
+      "handoff_sha256": "df92b10eb26a1a5b73618bfb8ffc8fe8c5c11d073c00c11f74e0b52fa1e4c2e5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/moduleAudio.ts",
+      "source_sha256": "b9cfef23d018d0b77ee54f90e32c132c462e761d876c1071dacc09860af24809",
+      "handoff_sha256": "b9cfef23d018d0b77ee54f90e32c132c462e761d876c1071dacc09860af24809",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/nativeAuth.setup.md",
+      "source_sha256": "5b95130584d43ab2a2314752be888eaaa2a1d0a99b70ff28e6c83e5bca8fa6c2",
+      "handoff_sha256": "5b95130584d43ab2a2314752be888eaaa2a1d0a99b70ff28e6c83e5bca8fa6c2",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/nativeAuth.ts",
+      "source_sha256": "f3ab1d2c4f50808dc9d2cd311117a37497b99379df2fa0b4ecc88903eee97eea",
+      "handoff_sha256": "f3ab1d2c4f50808dc9d2cd311117a37497b99379df2fa0b4ecc88903eee97eea",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/nativeBilling.ts",
+      "source_sha256": "9e86915209131e80600ba5236baf4583d597969dfcdd2a653b3df99d9b2688bc",
+      "handoff_sha256": "9e86915209131e80600ba5236baf4583d597969dfcdd2a653b3df99d9b2688bc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/nativeBillingRuntime.ts",
+      "source_sha256": "e17c3107186e01bd5acbce950e115e523ebd9c4a6b64b02ab6fb771361ce5b1e",
+      "handoff_sha256": "e17c3107186e01bd5acbce950e115e523ebd9c4a6b64b02ab6fb771361ce5b1e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/nativeCommerce.ts",
+      "source_sha256": "63d1c2ec46cb61a0130941c7153b078822799a6e732bd006b9a983a65f1062ae",
+      "handoff_sha256": "63d1c2ec46cb61a0130941c7153b078822799a6e732bd006b9a983a65f1062ae",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/nativeIntent.ts",
+      "source_sha256": "0bf5ea214bb873c2fa9753efc6f4e1c521bc4c23139e33a3f846d19e1a84825e",
+      "handoff_sha256": "0bf5ea214bb873c2fa9753efc6f4e1c521bc4c23139e33a3f846d19e1a84825e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/nativeSpeechBytes.ts",
+      "source_sha256": "6e01207fa5e85d2465877ca742ea0c97118d352754b53de1bccbf9d85cc15fe7",
+      "handoff_sha256": "6e01207fa5e85d2465877ca742ea0c97118d352754b53de1bccbf9d85cc15fe7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/normalFreeCheckpoint.ts",
+      "source_sha256": "2476636dc22a7040ac3830f40999214bfcef83b70daff0190ad5952c025170ac",
+      "handoff_sha256": "2476636dc22a7040ac3830f40999214bfcef83b70daff0190ad5952c025170ac",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/normalFreeConversation.ts",
+      "source_sha256": "78af87c317dbb673095782901eb218f44551e6cfc8f207c85852130cd70019d2",
+      "handoff_sha256": "78af87c317dbb673095782901eb218f44551e6cfc8f207c85852130cd70019d2",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/normalFreeRecoveryPayload.ts",
+      "source_sha256": "392c4636b215be3ee89666851712b57c63d540f493d75005d80aba39ad26aa15",
+      "handoff_sha256": "392c4636b215be3ee89666851712b57c63d540f493d75005d80aba39ad26aa15",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/normalFreeRuntime.ts",
+      "source_sha256": "9b4923b32b16d26e261e1ea0a1bc88661fa0eaee964a5eef82680d276be8d031",
+      "handoff_sha256": "9b4923b32b16d26e261e1ea0a1bc88661fa0eaee964a5eef82680d276be8d031",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/normalFreeSession.ts",
+      "source_sha256": "3407f323dca909df1c3cc5f61e83561386d1da04da52862036e799052ef788c4",
+      "handoff_sha256": "3407f323dca909df1c3cc5f61e83561386d1da04da52862036e799052ef788c4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/normalResultClaimRetry.ts",
+      "source_sha256": "580686774c5650207a960b4c61aad47652a23237ba5216eeaaf860bfe3b8fdbb",
+      "handoff_sha256": "580686774c5650207a960b4c61aad47652a23237ba5216eeaaf860bfe3b8fdbb",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/normalResults.ts",
+      "source_sha256": "fd7fb06052274de1bf4e3fa4eba2d601b178f91a9d3a4644d3dcfca60ac3afcc",
+      "handoff_sha256": "fd7fb06052274de1bf4e3fa4eba2d601b178f91a9d3a4644d3dcfca60ac3afcc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/normalResultsRuntime.ts",
+      "source_sha256": "191f9641b949e78fb96c9f73b49af8e35acf6312ac912f628df5479a66dc55c3",
+      "handoff_sha256": "191f9641b949e78fb96c9f73b49af8e35acf6312ac912f628df5479a66dc55c3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/ownerPracticeStorage.ts",
+      "source_sha256": "9a0f96dbc93390ee3319e755af132de5f50086a2dbaad3b0df4b6eedefd8d225",
+      "handoff_sha256": "9a0f96dbc93390ee3319e755af132de5f50086a2dbaad3b0df4b6eedefd8d225",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/ownerVoiceCache.ts",
+      "source_sha256": "9f3d4b84b40b9aade4f8d3d1e20246e822d0d0b535d379999f1757f29a7655dc",
+      "handoff_sha256": "9f3d4b84b40b9aade4f8d3d1e20246e822d0d0b535d379999f1757f29a7655dc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/paidGeneration.ts",
+      "source_sha256": "7fae3000a3343e1da2e5b3adc07ba79e73a7268184ba77664df2ca8ec7b1412f",
+      "handoff_sha256": "7fae3000a3343e1da2e5b3adc07ba79e73a7268184ba77664df2ca8ec7b1412f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/paidGenerationRuntime.ts",
+      "source_sha256": "5d4a32151d98769cba6cd5865a0d27eafe62016828fb234e163155ddd7ef434b",
+      "handoff_sha256": "5d4a32151d98769cba6cd5865a0d27eafe62016828fb234e163155ddd7ef434b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/paidProduct.ts",
+      "source_sha256": "419c4e0467bd8e925b9713a76e81c948ac8e637c7dee45e3919272821145abe1",
+      "handoff_sha256": "419c4e0467bd8e925b9713a76e81c948ac8e637c7dee45e3919272821145abe1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/paidVoice.ts",
+      "source_sha256": "740b72e62723748a94d27339eed9f899b7a34da307d0e508c469af09003b8d8f",
+      "handoff_sha256": "740b72e62723748a94d27339eed9f899b7a34da307d0e508c469af09003b8d8f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/paidVoiceRuntime.ts",
+      "source_sha256": "dcc1574fdf48e656e9c67200f899b49c77e6b2ea2abae79dd4598caf46492bec",
+      "handoff_sha256": "dcc1574fdf48e656e9c67200f899b49c77e6b2ea2abae79dd4598caf46492bec",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/passwordRecoveryCallback.ts",
+      "source_sha256": "cdbd0f5012356c893e63def687d51ee51b4d2e8be892f48c9fb99a32e0db36b2",
+      "handoff_sha256": "cdbd0f5012356c893e63def687d51ee51b4d2e8be892f48c9fb99a32e0db36b2",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/passwordRecoveryIntent.ts",
+      "source_sha256": "ddc18a5d8c8c29223954c690b5a38b5a7c0592a8b95602e8363ca29e0f6cf492",
+      "handoff_sha256": "ddc18a5d8c8c29223954c690b5a38b5a7c0592a8b95602e8363ca29e0f6cf492",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/phaseRecovery.ts",
+      "source_sha256": "9944e81a78e12073397419f98f229beb1eacbdc803e73cb9b53ca99a09d90a30",
+      "handoff_sha256": "9944e81a78e12073397419f98f229beb1eacbdc803e73cb9b53ca99a09d90a30",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/pilotCurriculum.ts",
+      "source_sha256": "2fda57e25b79a811da0a9697f0c982aac984e7a2ec71b5808d40f63b19275ad8",
+      "handoff_sha256": "2fda57e25b79a811da0a9697f0c982aac984e7a2ec71b5808d40f63b19275ad8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/postRehearsalFlow.ts",
+      "source_sha256": "a68e545ffc51798df8041a2bb2d0306c1f481c6cff20e199e9d5c28cc865a47d",
+      "handoff_sha256": "a68e545ffc51798df8041a2bb2d0306c1f481c6cff20e199e9d5c28cc865a47d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/practiceSession.ts",
+      "source_sha256": "dd22a2e4e491410bb0f40d3a48415c636a6bb1a11dfd0e74d29a745ca8a862ea",
+      "handoff_sha256": "dd22a2e4e491410bb0f40d3a48415c636a6bb1a11dfd0e74d29a745ca8a862ea",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/privacyPersistence.ts",
+      "source_sha256": "c9e2e54ea8f7097b6d6f7cfc6087140a537770335bb23768ce52c74f91a899c5",
+      "handoff_sha256": "c9e2e54ea8f7097b6d6f7cfc6087140a537770335bb23768ce52c74f91a899c5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/privateWebBridge.setup.md",
+      "source_sha256": "cb9a2d7ffc2e571a2b6d8a091a479db7d5dfad56ac36aaa00bb93dcc115acf07",
+      "handoff_sha256": "cb9a2d7ffc2e571a2b6d8a091a479db7d5dfad56ac36aaa00bb93dcc115acf07",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/privateWebBridge.ts",
+      "source_sha256": "7c250fd46e099685808ca7709fd1316e0f0c13f3d7d80e90a1b899f7d4a95534",
+      "handoff_sha256": "7c250fd46e099685808ca7709fd1316e0f0c13f3d7d80e90a1b899f7d4a95534",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/privateWebBridgeCoordinator.ts",
+      "source_sha256": "1318111151100369562c11e1431b2c614c216f34bb491080446d701047b60b47",
+      "handoff_sha256": "1318111151100369562c11e1431b2c614c216f34bb491080446d701047b60b47",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/privateWebResult.setup.md",
+      "source_sha256": "60a3461a1729584222be57839c898c7e9275e73b905a303a852683a30392d097",
+      "handoff_sha256": "60a3461a1729584222be57839c898c7e9275e73b905a303a852683a30392d097",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/privateWebResult.ts",
+      "source_sha256": "94f9ab4bb823fc849cd0e975c4a569dcfe5f43393fecf51c551c3caf7a991a28",
+      "handoff_sha256": "94f9ab4bb823fc849cd0e975c4a569dcfe5f43393fecf51c551c3caf7a991a28",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/progress.ts",
+      "source_sha256": "648e44dca3df353bdec895384336ce4ba0c5ac020ca05a1af5b14cdfe143c349",
+      "handoff_sha256": "648e44dca3df353bdec895384336ce4ba0c5ac020ca05a1af5b14cdfe143c349",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/progressEvidence.ts",
+      "source_sha256": "38aced6ab291a240e2820c08274ed44008d4c5e2b9c81166452e1eec0f34a5f3",
+      "handoff_sha256": "38aced6ab291a240e2820c08274ed44008d4c5e2b9c81166452e1eec0f34a5f3",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/purchases.ts",
+      "source_sha256": "995941580d3bf9f344770260242ccaba4744b39b3766fc7c93dbaec40182e462",
+      "handoff_sha256": "995941580d3bf9f344770260242ccaba4744b39b3766fc7c93dbaec40182e462",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/purchasesIdentity.ts",
+      "source_sha256": "c7c5d21354f73c695ec6fb9467f5a6222d2223555e161ef516fd013ebd69a6dc",
+      "handoff_sha256": "c7c5d21354f73c695ec6fb9467f5a6222d2223555e161ef516fd013ebd69a6dc",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/quickRep.ts",
+      "source_sha256": "b716ca70382c61732ea7c5a086d04aeb7f53a95981aa2e47acf7dc75ce5aeaac",
+      "handoff_sha256": "b716ca70382c61732ea7c5a086d04aeb7f53a95981aa2e47acf7dc75ce5aeaac",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/raviNaturalFactContract.ts",
+      "source_sha256": "68d84cc45170562a0f943ebebb6a2b41dfee0d1f7fc72d22d55e339a70231e1a",
+      "handoff_sha256": "68d84cc45170562a0f943ebebb6a2b41dfee0d1f7fc72d22d55e339a70231e1a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/raviSemanticClient.ts",
+      "source_sha256": "702207e5956f17c48b990f399bbe6448756eda5d60989d2933c84c806cb7dcf6",
+      "handoff_sha256": "702207e5956f17c48b990f399bbe6448756eda5d60989d2933c84c806cb7dcf6",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/receiptlessDeletionJournal.ts",
+      "source_sha256": "d80a9fae51b67190187b9e87c31cd45f2ad4f26479507062be1007c899546239",
+      "handoff_sha256": "d80a9fae51b67190187b9e87c31cd45f2ad4f26479507062be1007c899546239",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/redact.ts",
+      "source_sha256": "b8285d31b0c8d59143dbe9a55f2896881feb909eeaf1aed5b1387c24036ee32b",
+      "handoff_sha256": "b8285d31b0c8d59143dbe9a55f2896881feb909eeaf1aed5b1387c24036ee32b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/rehearsal.ts",
+      "source_sha256": "a932fc4c66dfd012ff238b4fe8a82604eba18f483e8e0d497798a7157851775f",
+      "handoff_sha256": "a932fc4c66dfd012ff238b4fe8a82604eba18f483e8e0d497798a7157851775f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/reminders.ts",
+      "source_sha256": "2b5f5c1c4c0fe7b0f5ddc13cf6d0c2bf3b8404f22f72efc66f13909bae8e281c",
+      "handoff_sha256": "2b5f5c1c4c0fe7b0f5ddc13cf6d0c2bf3b8404f22f72efc66f13909bae8e281c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/requestDeadline.ts",
+      "source_sha256": "7554a9c702fd47cd0ea5910495f91623675c23b022636e195fe845ad864390f0",
+      "handoff_sha256": "7554a9c702fd47cd0ea5910495f91623675c23b022636e195fe845ad864390f0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/resetAllData.ts",
+      "source_sha256": "b7bbcd1f91f1a4ef48bb7c38ae21dfb7b67972670545d23910b90aae55351411",
+      "handoff_sha256": "b7bbcd1f91f1a4ef48bb7c38ae21dfb7b67972670545d23910b90aae55351411",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/scenarioAudio.ts",
+      "source_sha256": "5e34d5faf597734536121c93363c861690b7112e4f2ed2b33a2dcca523967e24",
+      "handoff_sha256": "5e34d5faf597734536121c93363c861690b7112e4f2ed2b33a2dcca523967e24",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/scenarioLifecycle.ts",
+      "source_sha256": "faa7572a36f35efc26b01ad56068ceee205c0302ce3996e533d24c03797da4d5",
+      "handoff_sha256": "faa7572a36f35efc26b01ad56068ceee205c0302ce3996e533d24c03797da4d5",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/scenarioPractice.ts",
+      "source_sha256": "ca2f41bb2bcd0777e9b049f47b359e516b4ba31b79bd234a6f11b06563f324ad",
+      "handoff_sha256": "ca2f41bb2bcd0777e9b049f47b359e516b4ba31b79bd234a6f11b06563f324ad",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/scenarioPracticeRecovery.ts",
+      "source_sha256": "96e5dcf36d6a69b08ff89b4c6a8c42eadea7eb8d8f8757b668ab8e2ce524f800",
+      "handoff_sha256": "96e5dcf36d6a69b08ff89b4c6a8c42eadea7eb8d8f8757b668ab8e2ce524f800",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/scenarioRecommendation.ts",
+      "source_sha256": "ad2cc8de2e235464151e806bf3320083d93182775fef90994f0d76bc64062c8a",
+      "handoff_sha256": "ad2cc8de2e235464151e806bf3320083d93182775fef90994f0d76bc64062c8a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/scoredPracticeHistory.ts",
+      "source_sha256": "5db2025d2caa6907843879711b767317cf25b4df312767246d4eb665dd26a21b",
+      "handoff_sha256": "5db2025d2caa6907843879711b767317cf25b4df312767246d4eb665dd26a21b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/secureSessionStorage.ts",
+      "source_sha256": "1a043c10b1971f60961b6bcafd76e4e25289e79828b5c31b4d6304dbed2af7a0",
+      "handoff_sha256": "1a043c10b1971f60961b6bcafd76e4e25289e79828b5c31b4d6304dbed2af7a0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/sessionMigration.ts",
+      "source_sha256": "817e9df39c174b3353e9e71cf8d149b9424eb9bbefc0a7afcd3af908f1396730",
+      "handoff_sha256": "817e9df39c174b3353e9e71cf8d149b9424eb9bbefc0a7afcd3af908f1396730",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/sessionStorageMigration.ts",
+      "source_sha256": "450195888f2e848d8a69e768d82c0a8b0d04c975729c24ec0d00ff720a3f324c",
+      "handoff_sha256": "450195888f2e848d8a69e768d82c0a8b0d04c975729c24ec0d00ff720a3f324c",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/sharedProductAdapters.ts",
+      "source_sha256": "1087d2a3a6665154824445f20b4ab62df284a3f99aeb68eb28daa7de0f23381f",
+      "handoff_sha256": "1087d2a3a6665154824445f20b4ab62df284a3f99aeb68eb28daa7de0f23381f",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/speech.ts",
+      "source_sha256": "b8648101fc5e45235996d55289c6699d91470128a1e8d7d149be4c4845003d4b",
+      "handoff_sha256": "b8648101fc5e45235996d55289c6699d91470128a1e8d7d149be4c4845003d4b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/stagingPracticeAccess.ts",
+      "source_sha256": "5ca996aba379f3540351dade9c097e1ef8b4652014318a1199a92ed0512644fd",
+      "handoff_sha256": "5ca996aba379f3540351dade9c097e1ef8b4652014318a1199a92ed0512644fd",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/stagingWebBridge.setup.md",
+      "source_sha256": "42d7b90bc801f50acd49e48fe0223ec515aea280541abe2f737b72ae16f95042",
+      "handoff_sha256": "42d7b90bc801f50acd49e48fe0223ec515aea280541abe2f737b72ae16f95042",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/stagingWebBridge.ts",
+      "source_sha256": "2217a1239376179ac8649a46589d56443f368fe8b66d0519b2bbcdc8ba66e4f9",
+      "handoff_sha256": "2217a1239376179ac8649a46589d56443f368fe8b66d0519b2bbcdc8ba66e4f9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/storePersistence.ts",
+      "source_sha256": "cffd01b141b88b38b973954f3d9d54c4d196781ab747867e1c33f54f39f7690e",
+      "handoff_sha256": "cffd01b141b88b38b973954f3d9d54c4d196781ab747867e1c33f54f39f7690e",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/supabase.ts",
+      "source_sha256": "88cf761625d859964621a5b3c363cbf6238f9857885260d40484c9a895427455",
+      "handoff_sha256": "88cf761625d859964621a5b3c363cbf6238f9857885260d40484c9a895427455",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/temporaryRecording.ts",
+      "source_sha256": "a5c6989c52b9d4df053e2a9fa876a59a519eb5160e5c0e116e33c6181622b3b7",
+      "handoff_sha256": "a5c6989c52b9d4df053e2a9fa876a59a519eb5160e5c0e116e33c6181622b3b7",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/today.ts",
+      "source_sha256": "e3b890e5bdb3822590f0864293c19c6b49bd1ae0b943cfb60904c400a555299b",
+      "handoff_sha256": "e3b890e5bdb3822590f0864293c19c6b49bd1ae0b943cfb60904c400a555299b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/transcription.ts",
+      "source_sha256": "3e1420e9800df8d8ee428c80cf249078b898eeb5257fe79e36771919f9ea59cd",
+      "handoff_sha256": "3e1420e9800df8d8ee428c80cf249078b898eeb5257fe79e36771919f9ea59cd",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/transcriptionConfig.ts",
+      "source_sha256": "df261accb0e4e616f6d9df9864630a8965dd0cca8a1bdffb009375c26ff55976",
+      "handoff_sha256": "df261accb0e4e616f6d9df9864630a8965dd0cca8a1bdffb009375c26ff55976",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/useDictation.ts",
+      "source_sha256": "29b0181912b1a6b1da9bab35c7c6706c5c268ac7aa5667e813f8e80495ad6104",
+      "handoff_sha256": "29b0181912b1a6b1da9bab35c7c6706c5c268ac7aa5667e813f8e80495ad6104",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/useKeyboardReveal.ts",
+      "source_sha256": "ee805f173f6179f1c4c24147f11bc9a7525909eb3683d43d5b0f726e1526c8f4",
+      "handoff_sha256": "ee805f173f6179f1c4c24147f11bc9a7525909eb3683d43d5b0f726e1526c8f4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/useStagingPracticeAdmission.ts",
+      "source_sha256": "59b604d12289ed5f13dbbc5daa495b32f441f59f54cadfba46bc9a4e79fd3be1",
+      "handoff_sha256": "59b604d12289ed5f13dbbc5daa495b32f441f59f54cadfba46bc9a4e79fd3be1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/useStagingWebBridgeState.ts",
+      "source_sha256": "b3a9120c641490189cc2580fbdf72a3380b7cd30d00866de93665b1e9e8e10d4",
+      "handoff_sha256": "b3a9120c641490189cc2580fbdf72a3380b7cd30d00866de93665b1e9e8e10d4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/lib/voice.ts",
+      "source_sha256": "bf1986d7fc9589a6396637aa64b479814a65bb9f073892b7b6e68ba310bccf38",
+      "handoff_sha256": "bf1986d7fc9589a6396637aa64b479814a65bb9f073892b7b6e68ba310bccf38",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/metro.config.js",
+      "source_sha256": "2cea879700b36d93cfbdf5ee8370dcc7fe906bef5fd03a128487378fd735bc2a",
+      "handoff_sha256": "2cea879700b36d93cfbdf5ee8370dcc7fe906bef5fd03a128487378fd735bc2a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/package.json",
+      "source_sha256": "9138b1a9a8dfd87e7b81899b022f598977e58518d00744dd1353e8e3c082f8ab",
+      "handoff_sha256": "9138b1a9a8dfd87e7b81899b022f598977e58518d00744dd1353e8e3c082f8ab",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/providers/auth.tsx",
+      "source_sha256": "5b6505fc926d311229a086dd08d0385aa9c7428aa56ed09e9a2d47741d269743",
+      "handoff_sha256": "5b6505fc926d311229a086dd08d0385aa9c7428aa56ed09e9a2d47741d269743",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/providers/store.tsx",
+      "source_sha256": "276b5274626405021ccc7ed6a64100bb4339c9923fc4a8d6de4d2b43a19bb272",
+      "handoff_sha256": "276b5274626405021ccc7ed6a64100bb4339c9923fc4a8d6de4d2b43a19bb272",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/qa-launch/routing.md",
+      "source_sha256": "375f6603eed5cd6de84664386005b88d2585217b4f237fb836a61ef8d41b1b90",
+      "handoff_sha256": "375f6603eed5cd6de84664386005b88d2585217b4f237fb836a61ef8d41b1b90",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/client-env-preflight.cjs",
+      "source_sha256": "f3fb8e2e2b6233eeb0370e061e3a1aafce79fa12af97ab4f8bed97f78346a7b9",
+      "handoff_sha256": "f3fb8e2e2b6233eeb0370e061e3a1aafce79fa12af97ab4f8bed97f78346a7b9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/component-test-deps.ts",
+      "source_sha256": "8aa5234a29cac3e788449a31d1dc17c37053c75d3372b9c6ce5165b38904529b",
+      "handoff_sha256": "8aa5234a29cac3e788449a31d1dc17c37053c75d3372b9c6ce5165b38904529b",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/component-test-deps/package-lock.json",
+      "source_sha256": "4b6edd02e3d22208514937e125ce9d1704c209e1c66e5ed6c485e48e1d768cc9",
+      "handoff_sha256": "4b6edd02e3d22208514937e125ce9d1704c209e1c66e5ed6c485e48e1d768cc9",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/component-test-deps/package.json",
+      "source_sha256": "98d898119a28cddc794d36e96dc6dca8411504674dc6a753af53feaf604dd825",
+      "handoff_sha256": "98d898119a28cddc794d36e96dc6dca8411504674dc6a753af53feaf604dd825",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/iphone-build-preflight.ts",
+      "source_sha256": "1e352fa553c8a529a05d8024432987632661edfcdb40ede80e2220f7a840e17d",
+      "handoff_sha256": "1e352fa553c8a529a05d8024432987632661edfcdb40ede80e2220f7a840e17d",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/package-approved-decks.py",
+      "source_sha256": "8facdecf7ec52e5b19e814d5ee59462c6b635da9ce8320f8fd6fef8de13bbc28",
+      "handoff_sha256": "8facdecf7ec52e5b19e814d5ee59462c6b635da9ce8320f8fd6fef8de13bbc28",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/run-client-checks.ts",
+      "source_sha256": "3580bada82585564c8ffd0d9b15928731c3db5088568e87efea49a35c8027306",
+      "handoff_sha256": "3580bada82585564c8ffd0d9b15928731c3db5088568e87efea49a35c8027306",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/run-client-command.ts",
+      "source_sha256": "82c005407da5fd526cb7fca40611cea0703532883a75355deb5ea981746a75a0",
+      "handoff_sha256": "82c005407da5fd526cb7fca40611cea0703532883a75355deb5ea981746a75a0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/run-staging-account.ts",
+      "source_sha256": "140a5251db5298302000642a55b659790d268067c7e979347ea74e9ecdf06297",
+      "handoff_sha256": "140a5251db5298302000642a55b659790d268067c7e979347ea74e9ecdf06297",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/sanitize-client-env.ts",
+      "source_sha256": "8a1c1c7378f965b98791441d3b917766537709d0eb982ccba0bd54afb9aa12d8",
+      "handoff_sha256": "8a1c1c7378f965b98791441d3b917766537709d0eb982ccba0bd54afb9aa12d8",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/smoke-staging-account.ts",
+      "source_sha256": "3bab705cf88349458ed0a817a7498cadabfe9065d30e5c32044848d1bd44eb70",
+      "handoff_sha256": "3bab705cf88349458ed0a817a7498cadabfe9065d30e5c32044848d1bd44eb70",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/scripts/verify-staging-account-export.ts",
+      "source_sha256": "0bd525789390fa99dbaaa49a0f43ab1a2c7948013ec41b1c7865baf75ebca337",
+      "handoff_sha256": "0bd525789390fa99dbaaa49a0f43ab1a2c7948013ec41b1c7865baf75ebca337",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/src/integrations/supabase/types.ts",
+      "source_sha256": "ddc81fbdef57d0741869fdc705ea896de2ea6614e1f605828ab6063fe68d2e62",
+      "handoff_sha256": "ddc81fbdef57d0741869fdc705ea896de2ea6614e1f605828ab6063fe68d2e62",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/staging-account.env.example",
+      "source_sha256": "043f3e62959833b1f91fb5bcabaa331941c3811f8710c7ce743d92573e48fbbd",
+      "handoff_sha256": "043f3e62959833b1f91fb5bcabaa331941c3811f8710c7ce743d92573e48fbbd",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/test/setup.ts",
+      "source_sha256": "7d13b06aa490384d95a0ad1d69352bbd6178881bd5c0ab7e9afee44599d7d66a",
+      "handoff_sha256": "7d13b06aa490384d95a0ad1d69352bbd6178881bd5c0ab7e9afee44599d7d66a",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/tsconfig.json",
+      "source_sha256": "753e00ffacf9677b2a025c099de41774cc81a68b9cd564127f331b2e0ab1b3c1",
+      "handoff_sha256": "753e00ffacf9677b2a025c099de41774cc81a68b9cd564127f331b2e0ab1b3c1",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/types/convo.ts",
+      "source_sha256": "9c4d1c5d02ada81d1a2931bb2099fa8e875b501e59da8ee74f787d13de6853ec",
+      "handoff_sha256": "9c4d1c5d02ada81d1a2931bb2099fa8e875b501e59da8ee74f787d13de6853ec",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/types/curriculum.ts",
+      "source_sha256": "0569af4466f0b12168126ba79960aea8fc37b124ea74d37ec126832f980100e4",
+      "handoff_sha256": "0569af4466f0b12168126ba79960aea8fc37b124ea74d37ec126832f980100e4",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/types/modularCurriculum.ts",
+      "source_sha256": "d6f087d00845f1f68042413089d4b5bbdd70047436ee5dffa36271e7ab7a4ac0",
+      "handoff_sha256": "d6f087d00845f1f68042413089d4b5bbdd70047436ee5dffa36271e7ab7a4ac0",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/types/pilotCurriculum.ts",
+      "source_sha256": "412859361b062030b06015a568b1a4b3535017272debe5000025cb9aa4a3efef",
+      "handoff_sha256": "412859361b062030b06015a568b1a4b3535017272debe5000025cb9aa4a3efef",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/types/privacy.ts",
+      "source_sha256": "efcdffe26f4eddb50cf58bae874115a1c537215c9983168dfff75cc636f43175",
+      "handoff_sha256": "efcdffe26f4eddb50cf58bae874115a1c537215c9983168dfff75cc636f43175",
+      "equal": true,
+      "adaptation": null
+    },
+    {
+      "path": "expo/types/sharedProduct.ts",
+      "source_sha256": "3b55140cc7f42f77ee802fbfb84304b5f1bf328b017f8fa72c5d65313e7afd51",
+      "handoff_sha256": "3b55140cc7f42f77ee802fbfb84304b5f1bf328b017f8fa72c5d65313e7afd51",
+      "equal": true,
+      "adaptation": null
+    }
+  ]
+}

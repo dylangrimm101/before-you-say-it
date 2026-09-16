@@ -1,0 +1,230 @@
+[
+  {
+    "path": "expo/__tests__/accountDeletionComposition.fixture.ts",
+    "lines": [
+      7,
+      15,
+      16,
+      17,
+      25,
+      26,
+      27
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/accountLifecycleComponent.fixture.ts",
+    "lines": [
+      53
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/accountsResultsJoined.fixture.ts",
+    "lines": [
+      5,
+      117
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/billingAuthorityClassification.fixture.tsx",
+    "lines": [
+      14
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/composedReturnRepair.test.ts",
+    "lines": [
+      6,
+      7,
+      8,
+      9,
+      13,
+      30,
+      31
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/connectedDeletion.fixture.ts",
+    "lines": [
+      66,
+      67,
+      71,
+      116,
+      137,
+      138
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/connectedDeletionDefault.fixture.ts",
+    "lines": [
+      17,
+      21
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/context-recovery.fixture.ts",
+    "lines": [
+      17,
+      18,
+      367
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/contextRecoveryMounted.test.ts",
+    "lines": [
+      14
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/deletionRootJourney.fixture.ts",
+    "lines": [
+      28
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/fixtures/deletionDatabaseHost.ts",
+    "lines": [
+      8,
+      14
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/frontDoorAcceptance.fixture.ts",
+    "lines": [
+      16,
+      17,
+      365
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/integratedQuickRep.fixture.ts",
+    "lines": [
+      5,
+      121
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/m1l1UnsupportedFacts.fixture.ts",
+    "lines": [
+      9,
+      10
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/nativeBenefitControl.fixture.ts",
+    "lines": [
+      5,
+      90
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/nativeBenefitJourney.fixture.ts",
+    "lines": [
+      5,
+      131
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/nativeBillingJoined.fixture.ts",
+    "lines": [
+      9
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/normalFreeJoined.fixture.ts",
+    "lines": [
+      5,
+      6
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/normalFreeMountedColdResume.fixture.ts",
+    "lines": [
+      23,
+      29,
+      30,
+      34,
+      45,
+      81
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/normalFreeMountedJoined.generated.fixture.ts",
+    "lines": [
+      5,
+      6
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/normalSavedJourney.fixture.ts",
+    "lines": [
+      90
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/normalSavedJourneyWithRefund.fixture.ts",
+    "lines": [
+      90
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/raviSemanticTransport.fixture.ts",
+    "lines": [
+      8
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/receiptlessTwoDevice.fixture.ts",
+    "lines": [
+      18
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/releaseJoinedJourney.fixture.ts",
+    "lines": [
+      5,
+      6
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/sharedLessonSources.fixture.ts",
+    "lines": [
+      9,
+      10
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  },
+  {
+    "path": "expo/__tests__/unifiedNativeBillingJoined.fixture.ts",
+    "lines": [
+      9,
+      14,
+      15
+    ],
+    "status": "external private fixture/backend or historical absolute-path dependency; not portable standalone"
+  }
+]

@@ -1,0 +1,457 @@
+[
+  {
+    "attempt": "1789556242181161000",
+    "results": [
+      {
+        "name": "locked-install",
+        "command": [
+          "bun",
+          "install",
+          "--frozen-lockfile",
+          "--ignore-scripts"
+        ],
+        "exit": 0,
+        "seconds": 3.49,
+        "counts": [],
+        "log_sha256": "0f63b6e73711a83510eec2a6a8047b764816000efae33b402eea9c48651193d8"
+      },
+      {
+        "name": "renderer-install",
+        "command": [
+          "bun",
+          "scripts/component-test-deps.ts",
+          "--install"
+        ],
+        "exit": 0,
+        "seconds": 0.61,
+        "counts": [],
+        "log_sha256": "0a88302676298d0e2a09d1d781cd75a4bc980484fffe0751dc0f01cfdbc9ee20"
+      },
+      {
+        "name": "standalone-mobile",
+        "command": [
+          "bun",
+          "test",
+          "__tests__/nativeAuth.test.ts",
+          "__tests__/normalFreeRecovery.test.ts",
+          "__tests__/normalFreeSession.test.ts",
+          "__tests__/normalResultsReturnPolicy.test.ts",
+          "__tests__/normalResultsConfig.test.ts",
+          "__tests__/dictationAbort.test.ts",
+          "__tests__/dictationFailure.test.ts",
+          "__tests__/nativeTalkingCompatibility.test.ts",
+          "__tests__/nativeSpeechBytes.test.ts",
+          "__tests__/testflightReleaseConfig.test.ts",
+          "__tests__/phaseRecovery.test.ts",
+          "__tests__/boundedRecordingRecovery.test.ts",
+          "__tests__/approvedContinuation.test.ts",
+          "__tests__/freeJournalStorage.test.ts",
+          "__tests__/approvedLessonDecks.test.ts",
+          "__tests__/approvedLessonJourneys.test.ts",
+          "__tests__/approvedRehearsals.test.ts",
+          "__tests__/bundledApprovedDeckOffline.test.ts",
+          "__tests__/clientEnvGuard.test.ts",
+          "__tests__/purchasesIdentity.test.ts",
+          "__tests__/privacyPersistence.test.ts"
+        ],
+        "exit": 0,
+        "seconds": 1.71,
+        "counts": [
+          [
+            "122",
+            "pass"
+          ],
+          [
+            "0",
+            "fail"
+          ],
+          [
+            "1845",
+            "expect() calls"
+          ]
+        ],
+        "log_sha256": "a7fd2368c2c4fb26c377e86df53aac321defa29c069b531653ea35df755118c1"
+      },
+      {
+        "name": "typecheck",
+        "command": [
+          "bun",
+          "node_modules/typescript/bin/tsc",
+          "--noEmit"
+        ],
+        "exit": 0,
+        "seconds": 3.02,
+        "counts": [],
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  {
+    "attempt": "1789556339969598000",
+    "results": [
+      {
+        "name": "standalone-mobile",
+        "command": [
+          "bun",
+          "test",
+          "__tests__/nativeAuth.test.ts",
+          "__tests__/normalFreeRecovery.test.ts",
+          "__tests__/normalFreeSession.test.ts",
+          "__tests__/normalResultsReturnPolicy.test.ts",
+          "__tests__/normalResultsConfig.test.ts",
+          "__tests__/dictationAbort.test.ts",
+          "__tests__/dictationFailure.test.ts",
+          "__tests__/nativeTalkingCompatibility.test.ts",
+          "__tests__/nativeSpeechBytes.test.ts",
+          "__tests__/testflightReleaseConfig.test.ts",
+          "__tests__/phaseRecovery.test.ts",
+          "__tests__/boundedRecordingRecovery.test.ts",
+          "__tests__/approvedContinuation.test.ts",
+          "__tests__/freeJournalStorage.test.ts",
+          "__tests__/approvedLessonDecks.test.ts",
+          "__tests__/approvedLessonJourneys.test.ts",
+          "__tests__/approvedRehearsals.test.ts",
+          "__tests__/bundledApprovedDeckOffline.test.ts",
+          "__tests__/clientEnvGuard.test.ts",
+          "__tests__/purchasesIdentity.test.ts",
+          "__tests__/privacyPersistence.test.ts"
+        ],
+        "exit": 0,
+        "seconds": 1.59,
+        "counts": [
+          [
+            "122",
+            "pass"
+          ],
+          [
+            "0",
+            "fail"
+          ],
+          [
+            "1845",
+            "expect() calls"
+          ]
+        ],
+        "log_sha256": "16698e753e25cabbb5be14bf079e7990304e95fdd42adf9b64513bc642c39e4d"
+      },
+      {
+        "name": "typecheck",
+        "command": [
+          "bun",
+          "node_modules/typescript/bin/tsc",
+          "--noEmit"
+        ],
+        "exit": 0,
+        "seconds": 2.99,
+        "counts": [],
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "lint",
+        "command": [
+          "bun",
+          "node_modules/eslint/bin/eslint.js",
+          "."
+        ],
+        "exit": 1,
+        "seconds": 9.72,
+        "counts": [],
+        "log_sha256": "8a3c6f2e639381ced15512f966791ece478af111008d0c362edc3feca04bc889"
+      },
+      {
+        "name": "composed-frontDoorAcceptance",
+        "command": [
+          "bun",
+          "test",
+          "__tests__/frontDoorAcceptance.test.ts"
+        ],
+        "exit": 1,
+        "seconds": 11.84,
+        "counts": [
+          [
+            "0",
+            "pass"
+          ],
+          [
+            "18",
+            "fail"
+          ],
+          [
+            "18",
+            "expect() calls"
+          ]
+        ],
+        "log_sha256": "d52d9af83332e8fccd3cf9a0e44b5273812e6dbfd2ddfa0f6e79b698ccc3fb6b"
+      },
+      {
+        "name": "composed-contextRecoveryMounted",
+        "command": [
+          "bun",
+          "test",
+          "__tests__/contextRecoveryMounted.test.ts"
+        ],
+        "exit": 1,
+        "seconds": 2.57,
+        "counts": [
+          [
+            "0",
+            "pass"
+          ],
+          [
+            "4",
+            "fail"
+          ],
+          [
+            "4",
+            "expect() calls"
+          ]
+        ],
+        "log_sha256": "e1f149e461c8e03d6a9f3e2b36c517970c5eb0f2810e1b6240dd0253658908dc"
+      },
+      {
+        "name": "composed-composedReturnRepair",
+        "command": [
+          "bun",
+          "test",
+          "__tests__/composedReturnRepair.test.ts"
+        ],
+        "exit": 1,
+        "seconds": 0.11,
+        "counts": [
+          [
+            "0",
+            "pass"
+          ],
+          [
+            "1",
+            "fail"
+          ]
+        ],
+        "log_sha256": "d877fccc2700892302f7caf72c997bdd07f7c0420c101ed60ac72dc66977789b"
+      },
+      {
+        "name": "composed-normalFreeMountedColdResume",
+        "command": [
+          "bun",
+          "test",
+          "__tests__/normalFreeMountedColdResume.test.ts"
+        ],
+        "exit": 0,
+        "seconds": 2.42,
+        "counts": [
+          [
+            "1",
+            "pass"
+          ],
+          [
+            "0",
+            "fail"
+          ],
+          [
+            "2",
+            "expect() calls"
+          ]
+        ],
+        "log_sha256": "69bfeda4c9a2c7e1a6753a5ef662cf0783cd11d6446ef2b4e213922d5746407e"
+      },
+      {
+        "name": "composed-approvedContinuationMounted",
+        "command": [
+          "bun",
+          "test",
+          "__tests__/approvedContinuationMounted.test.ts"
+        ],
+        "exit": 1,
+        "seconds": 4.67,
+        "counts": [
+          [
+            "0",
+            "pass"
+          ],
+          [
+            "7",
+            "fail"
+          ],
+          [
+            "7",
+            "expect() calls"
+          ]
+        ],
+        "log_sha256": "4423bcf6343cbaa5cda59035a92820935f4483e7e0ce3ac1167ae835a31ca722"
+      },
+      {
+        "name": "composed-savedResultMountedHistory",
+        "command": [
+          "bun",
+          "test",
+          "__tests__/savedResultMountedHistory.test.ts"
+        ],
+        "exit": 0,
+        "seconds": 0.28,
+        "counts": [
+          [
+            "1",
+            "pass"
+          ],
+          [
+            "0",
+            "fail"
+          ],
+          [
+            "2",
+            "expect() calls"
+          ]
+        ],
+        "log_sha256": "44f136f1bc65cba094856add40ac2a6dd6055599bbe32ab2f104852fdef1701d"
+      }
+    ]
+  },
+  {
+    "attempt": "1789556427824567000",
+    "results": [
+      {
+        "name": "standalone-mobile",
+        "command": [
+          "bun",
+          "test",
+          "__tests__/nativeAuth.test.ts",
+          "__tests__/normalFreeRecovery.test.ts",
+          "__tests__/normalFreeSession.test.ts",
+          "__tests__/normalResultsReturnPolicy.test.ts",
+          "__tests__/normalResultsConfig.test.ts",
+          "__tests__/dictationAbort.test.ts",
+          "__tests__/dictationFailure.test.ts",
+          "__tests__/nativeTalkingCompatibility.test.ts",
+          "__tests__/nativeSpeechBytes.test.ts",
+          "__tests__/testflightReleaseConfig.test.ts",
+          "__tests__/phaseRecovery.test.ts",
+          "__tests__/boundedRecordingRecovery.test.ts",
+          "__tests__/approvedContinuation.test.ts",
+          "__tests__/freeJournalStorage.test.ts",
+          "__tests__/approvedLessonDecks.test.ts",
+          "__tests__/approvedLessonJourneys.test.ts",
+          "__tests__/approvedRehearsals.test.ts",
+          "__tests__/bundledApprovedDeckOffline.test.ts",
+          "__tests__/clientEnvGuard.test.ts",
+          "__tests__/purchasesIdentity.test.ts",
+          "__tests__/privacyPersistence.test.ts"
+        ],
+        "exit": 0,
+        "seconds": 1.52,
+        "counts": [
+          [
+            "122",
+            "pass"
+          ],
+          [
+            "0",
+            "fail"
+          ],
+          [
+            "1845",
+            "expect() calls"
+          ]
+        ],
+        "log_sha256": "0a59ea766e1f0001a475dda222c8c86b522dd03831ebd326f3932eadb018a39b"
+      },
+      {
+        "name": "typecheck",
+        "command": [
+          "bun",
+          "node_modules/typescript/bin/tsc",
+          "--noEmit"
+        ],
+        "exit": 0,
+        "seconds": 2.88,
+        "counts": [],
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "canonical-check",
+        "command": [
+          "bun",
+          "run",
+          "check"
+        ],
+        "exit": 0,
+        "seconds": 4.58,
+        "counts": [],
+        "log_sha256": "9f0df26aa090f2c0b1f4f7de700db560d13bcfd46df71e8dc6d33af60555b943"
+      }
+    ]
+  },
+  {
+    "attempt": "1789556590162815000",
+    "results": [
+      {
+        "name": "standalone-mobile",
+        "command": [
+          "bun",
+          "test",
+          "__tests__/nativeAuth.test.ts",
+          "__tests__/normalFreeRecovery.test.ts",
+          "__tests__/normalFreeSession.test.ts",
+          "__tests__/normalResultsReturnPolicy.test.ts",
+          "__tests__/normalResultsConfig.test.ts",
+          "__tests__/dictationAbort.test.ts",
+          "__tests__/dictationFailure.test.ts",
+          "__tests__/nativeTalkingCompatibility.test.ts",
+          "__tests__/nativeSpeechBytes.test.ts",
+          "__tests__/testflightReleaseConfig.test.ts",
+          "__tests__/phaseRecovery.test.ts",
+          "__tests__/boundedRecordingRecovery.test.ts",
+          "__tests__/approvedContinuation.test.ts",
+          "__tests__/freeJournalStorage.test.ts",
+          "__tests__/approvedLessonDecks.test.ts",
+          "__tests__/approvedLessonJourneys.test.ts",
+          "__tests__/approvedRehearsals.test.ts",
+          "__tests__/bundledApprovedDeckOffline.test.ts",
+          "__tests__/clientEnvGuard.test.ts",
+          "__tests__/purchasesIdentity.test.ts",
+          "__tests__/privacyPersistence.test.ts"
+        ],
+        "exit": 0,
+        "seconds": 1.52,
+        "counts": [
+          [
+            "122",
+            "pass"
+          ],
+          [
+            "0",
+            "fail"
+          ],
+          [
+            "1845",
+            "expect() calls"
+          ]
+        ],
+        "log_sha256": "dfac72e26bd7caeb0a8c880ac95a261b8ff145546adfb1e96e95d4992a9c2378"
+      },
+      {
+        "name": "typecheck",
+        "command": [
+          "bun",
+          "node_modules/typescript/bin/tsc",
+          "--noEmit"
+        ],
+        "exit": 0,
+        "seconds": 3.18,
+        "counts": [],
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "canonical-check",
+        "command": [
+          "bun",
+          "run",
+          "check"
+        ],
+        "exit": 0,
+        "seconds": 6.55,
+        "counts": [],
+        "log_sha256": "9f0df26aa090f2c0b1f4f7de700db560d13bcfd46df71e8dc6d33af60555b943"
+      }
+    ]
+  }
+]

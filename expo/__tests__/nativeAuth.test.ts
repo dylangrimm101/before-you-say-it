@@ -12,15 +12,25 @@ function authStub(existing: Session | null = null) {
   };
 }
 
-test("anonymous creation is fail-closed until rollout is approved", async () => {
+test("Get started creates one anonymous session when none exists", async () => {
   const auth = authStub();
   const result = await nativeAuth.createNativeSessionStarter(auth)();
-  expect(result.success).toBe(false);
-  expect(auth.signups).toBe(0);
+  expect(result.success).toBe(true);
+  expect(auth.signups).toBe(1);
+});
+
+test("expired leftover sessions are replaced with a new guest before talking", async () => {
+  const leftover = { access_token: "dead", user: { id: "old-guest", is_anonymous: true } } as Session;
+  const auth = authStub(leftover) as typeof authStub extends Function ? any : any;
+  auth.getUser = async () => ({ data: { user: null }, error: new Error("invalid jwt") });
+  auth.signOut = async () => {};
+  const result = await nativeAuth.createNativeSessionStarter(auth)();
+  expect(result.success).toBe(true);
+  expect(auth.signups).toBe(1);
 });
 
 test("existing authenticated sessions are reused without replacing account identity", async () => {
-  const account = { ...session, user: { id: "account-a", is_anonymous: false } } as Session;
+  const account = { ...session, user: { id: "account-a", is_anonymous: false, email_confirmed_at: "2026-01-01T00:00:00.000Z" } } as Session;
   const auth = authStub(account);
   expect(await nativeAuth.createNativeSessionStarter(auth)()).toEqual({ success: true, session: account });
   expect(auth.signups).toBe(0);
@@ -58,11 +68,14 @@ test("real account changes are blocked before authentication while genuine guest
 test("entry gates journey persistence and navigation on authenticated success with visible failure", async () => {
   const entry = await Bun.file(`${import.meta.dir}/../app/entry.tsx`).text();
   expect(entry).toContain("await startNativeSession()");
-  expect(entry.indexOf("if (!result.success)")).toBeLessThan(entry.indexOf("await beginNativeJourney()"));
+  expect(entry).not.toContain("beginNativeJourney");
+  expect(entry.indexOf("if (!result.success)")).toBeLessThan(entry.indexOf('router.replace("/onboarding")'));
   expect(entry).toContain('accessibilityRole="alert"');
   expect(entry).toContain("disabled={isAuthLoading || isStarting}");
   const provider = await Bun.file(`${import.meta.dir}/../providers/auth.tsx`).text();
   expect(provider).toContain("createNativeSessionStarter");
+  const startNativeSession = provider.slice(provider.indexOf("const startNativeSession"));
+  expect(startNativeSession.indexOf("applySession(result.session)")).toBeLessThan(startNativeSession.indexOf("NATIVE_JOURNEY_STARTED_KEY"));
   expect(provider).toContain("accountLoginAllowed");
   expect(provider.indexOf("accountLoginAllowed(current")).toBeLessThan(provider.indexOf("signInWithPassword"));
   expect(provider).toContain("nextSession?.user.is_anonymous === true");
