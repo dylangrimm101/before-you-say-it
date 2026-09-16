@@ -44,9 +44,43 @@ test("auth failures never become local-only success or replacement identities", 
     if (failure === "empty") auth.signInAnonymously = async () => ({ data: { session: null }, error: null } as any);
     if (failure === "network") auth.signInAnonymously = async () => { throw new Error("fetch failed with secret detail"); };
     const result = await nativeAuth.createNativeSessionStarter(auth, true)();
-    expect(result).toEqual({ success: false, message: nativeAuth.NATIVE_AUTH_UNAVAILABLE });
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("Expected setup failure");
+    const codes: Record<string, string> = { restore: "session-read/rejected", disabled: "guest-signin/rejected", empty: "guest-signin/empty-session", network: "guest-signin/exception" };
+    expect(result.message).toContain(`Setup code: ${codes[failure]}.`);
+    expect(result.message).not.toContain("secret detail");
     expect(auth.signups).toBe(0);
   }
+});
+
+test("setup diagnostics distinguish missing configuration and allowlisted server rejection without leaking details", async () => {
+  const missing = await nativeAuth.createNativeSessionStarter(null)();
+  expect(missing.success).toBe(false);
+  if (!missing.success) expect(missing.message).toContain("configuration/unavailable");
+  for (const code of ["anonymous_provider_disabled", "over_request_rate_limit", "private-token-canary"]) {
+    const auth: nativeAuth.NativeAuthClient = {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      signInAnonymously: async () => ({ data: { session: null }, error: { code, message: "private-message-canary" } }),
+    };
+    const result = await nativeAuth.createNativeSessionStarter(auth)();
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("Expected setup failure");
+    expect(result.message).toContain(`guest-signin/${code === "private-token-canary" ? "rejected" : code}`);
+    expect(result.message).not.toContain("private-token-canary");
+    expect(result.message).not.toContain("private-message-canary");
+  }
+});
+
+test("setup reports storage-read exceptions without starting a replacement identity", async () => {
+  const auth = authStub();
+  auth.getSession = async () => { throw new Error("private-keychain-detail"); };
+  const result = await nativeAuth.createNativeSessionStarter(auth)();
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.message).toContain("session-read/exception");
+    expect(result.message).not.toContain("private-keychain-detail");
+  }
+  expect(auth.signups).toBe(0);
 });
 
 test("concurrent continuation requests create only one anonymous identity", async () => {
