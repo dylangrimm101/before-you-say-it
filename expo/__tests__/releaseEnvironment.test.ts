@@ -8,6 +8,7 @@ import { runInNewContext } from "node:vm";
 import { createHash, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { selectAuthEnvironment } from "../lib/authEnvironment";
+import { describeAuthConfiguration } from "../lib/authConfigurationDiagnostic";
 import { createMigratingSecureSessionStorage } from "../lib/secureSessionStorage";
 import { createNativeSessionStarter } from "../lib/nativeAuth";
 
@@ -44,6 +45,9 @@ test.skipIf(!exportDirectory)("actual iOS export contains production credentials
   expect(bundle.includes("https://spvksnddzyvycfoefrcf.supabase.co")).toBe(true);
   expect(bundle.includes("relay-GnBZ")).toBe(false);
   expect(bundle.includes("RorkAnalyticsProvider")).toBe(false);
+  for (const marker of ["BYSI setup diagnostic D1", "normal-url-missing-or-blank", "normal-key-missing-or-blank", "Copy setup details"]) {
+    expect(bundle.includes(marker)).toBe(true);
+  }
   for (const name of ["EXPO_PUBLIC_REVENUECAT_TEST_API_KEY", "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY", "EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY", "OPENAI_API_KEY", "SUPABASE_ACCESS_TOKEN"]) {
     const value = saved[name];
     if (value && value.length > 8) expect(bundle.includes(value)).toBe(false);
@@ -173,6 +177,7 @@ test("compiled production Supabase module starts guest setup with no device envi
     "expo-constants": { executionEnvironment: "bare" },
     "expo-application": { applicationId: app.expo.ios.bundleIdentifier },
     "./authEnvironment": { selectAuthEnvironment },
+    "./authConfigurationDiagnostic": { describeAuthConfiguration },
     "expo-secure-store": { AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 1, getItemAsync: async (key: string) => disk.get(key) ?? null, setItemAsync: async (key: string, value: string) => { disk.set(key, value); }, deleteItemAsync: async (key: string) => { disk.delete(key); } },
     "react-native": { Platform: { OS: "ios" } },
     "react-native-url-polyfill/auto": {},
