@@ -1,0 +1,83 @@
+{
+  "recordedDate": "2026-09-16",
+  "purpose": "User-authorized TestFlight-only build with dotenv loading enabled; no public App Store review or backend rollout",
+  "authorization": "User requested a new TestFlight build and explicitly approved restoring required Babel/Metro configuration while preserving the dotenv fix, Supabase credentials, and authentication logic.",
+  "appPath": "expo",
+  "version": "1.0.0",
+  "requestedBuildNumber": 23,
+  "baseCommit": "9e52b2fbd582186e07f2a4d3def0be772972d003",
+  "trackedExpoDiffSHA256": "5205e4b7ba872764ad25534b72826b61aa62af61b028a29171b87f8a8e37db70",
+  "diffCommand": "git diff --binary HEAD -- expo | sha256sum",
+  "fileGitBlobHashes": {
+    "expo/app.json": "d73322ecfe42369b15a371ba34d297ff2ad67f2e",
+    "expo/babel.config.js": "e5aeeeaacaaebe6c53ed6e38050814cac0bf3090",
+    "expo/metro.config.js": "c1037982fac61f18101a94f6ec6091f26328d0a8",
+    "expo/eas.json": "c669481ad9b6ae65ac15cbaac71862ff4945f222",
+    "expo/scripts/release-env.cjs": "d3d99205f6d8e2891e15aac1c592d3110f5407ca",
+    "expo/app.config.ts": "86ca0a6072fbff2e386d65c1bdbcf3a6f8e0a930",
+    "expo/scripts/client-env-preflight.cjs": "0519163fba305a96a50d20cac8f860471f5af9d1",
+    "expo/lib/supabase.ts": "e07a1a3bc6005a5c56edf618887403930e9ce06c",
+    "expo/lib/nativeAuth.ts": "c3ae25a9fa3575bbb3f9b7098b698b5b730d25fb",
+    "expo/package.json": "0503e95d0d5f8cead402b468889881a66b27b71b",
+    "expo/bun.lock": "d2c4a234d07b99ca9ac71a3781f55617efe04ef0"
+  },
+  "candidateChanges": [
+    "Preserves prior removal of all three EXPO_NO_DOTENV build-profile settings and release preparation assignment",
+    "Restores exact reviewed Babel and Metro configuration; neither sets EXPO_NO_DOTENV",
+    "Increments iOS build number from 22 to 23",
+    "No Supabase project, credentials, authentication logic, application screens, dependencies, or backend changes"
+  ],
+  "validation": {
+    "focusedAuthAndGuardSuite": "19 passed across nativeAuth, clientEnvGuard, normalBuildAssociation, connectedDeletionConfig; 114 assertions",
+    "selectedReleaseEnvironmentSuite": "7 passed; 33 assertions; includes compiled actual Supabase source initialization with synthetic transport/storage",
+    "actualExportScan": "1 passed; 10 assertions; expected production Auth and iOS RevenueCat inputs present, checked excluded secrets and analytics relay/provider absent",
+    "distinctSelectedTestsPassed": 27,
+    "dotenvInjectionCheck": "Actual Expo loader discovers synthetic .env.production.local, injects both Supabase input names, and restored preflight/Babel preserve them with dotenv remaining enabled; no dotenv files changed",
+    "runChecks": "passed",
+    "gitDiffCheck": "passed",
+    "iosJavaScriptExport": "passed under Node with dotenv enabled; 3229 modules, 49 assets including authored HTML; no-bytecode export for inspection, not a signed artifact",
+    "exportDirectory": "/tmp/bysi-release23-ios-export",
+    "exportBundle": "entry-38a6857684c0cc3de4eb81a005458bd1.js",
+    "exportWarning": "Metro discarded an incompatible cache and successfully completed a full crawl; exit code 0",
+    "suiteLimit": "Focused checks only, not the full suite. Existing assertions requiring EXPO_NO_DOTENV=1 or forbidding dotenv reload are obsolete under the requested change and were not run or edited. Historical device, voice, and build-22 test results are not new-build acceptance evidence."
+  },
+  "releaseConfiguration": {
+    "dotenvDisabledByEasProfiles": false,
+    "dotenvDisabledByReleasePreparation": false,
+    "authURL": "https://spvksnddzyvycfoefrcf.supabase.co",
+    "nativeOrigin": "https://beforeyousayit.app",
+    "credentialValuesRecorded": false,
+    "toolkitVersion": "0.3.0",
+    "toolkitWrapperEnabled": false,
+    "savedResultsCapabilityEnabled": false,
+    "otaEnabled": false,
+    "backendChangesPerformed": false
+  },
+  "publishingReadiness": {
+    "appleSession": "ready",
+    "distributionCertificate": "ready",
+    "ascAppId": "6811494369",
+    "appRecord": "existing app reused",
+    "capabilitySync": "passed; no capabilities enabled or disabled",
+    "previousSubmission": "747f867c-957e-4976-a566-f91c719d225b completed; no active build reported"
+  },
+  "appleReadbackBeforeSubmission": {
+    "buildNumber": "22",
+    "buildId": "2f73036a-2bc0-4ada-a804-5e386350e965",
+    "processingState": "VALID"
+  },
+  "notVerified": [
+    "Resolution of configuration/unavailable on a signed iPhone build",
+    "Actual remote publish dotenv injection or signed-artifact equivalence to the inspected local export",
+    "Physical microphone capture, live AI transcription/counterpart requests, or audible iPhone playback"
+  ],
+  "submissionResult": {
+    "submissionId": "ce4e6dde-243b-43b9-86ff-75c22c93e4f7",
+    "buildNumber": "23",
+    "status": "Signed build succeeded; publishing service reports uploaded to App Store Connect and processing",
+    "immediateAppleReadback": "Latest listed build remains 22 VALID; build 23 processing completion not yet independently confirmed",
+    "postSubmissionConfiguration": "app.json, Babel, Metro, eas.json and release-env.cjs hashes match the recorded candidate",
+    "publicAppStoreReviewSubmitted": false
+  },
+  "provenanceLimit": "This records the local candidate before submission. The publishing service captures a separate immutable snapshot; remote source mapping is not independently verified."
+}
