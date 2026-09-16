@@ -1,0 +1,143 @@
+{
+  "preparedDate": "2026-09-16",
+  "purpose": "Preserved D1 diagnostic candidate for a deliberate external Expo EAS build; not a proven Get started fix",
+  "pinnedCommit": "c504d722cb05bfb6af57d3d947ff48ce741a6202",
+  "pinnedExpoTree": "43570d287d4d19ca003cf423bdd6f7df769f2ce1",
+  "originalCandidateRecord": "handoff/testflight24-candidate.json at the pinned commit",
+  "provenance": {
+    "recordedCommittedBlobHashesVerified": 14,
+    "currentTrackedExpoDirectoryMatchesPinnedCommit": true,
+    "workspaceHeadMovedToPin": false,
+    "remoteGitHubCommitAvailabilityVerified": false,
+    "restoredFiles": {
+      "expo/babel.config.js": "e5aeeeaacaaebe6c53ed6e38050814cac0bf3090",
+      "expo/metro.config.js": "c1037982fac61f18101a94f6ec6091f26328d0a8"
+    },
+    "otherAppFilesChanged": false
+  },
+  "branchPreservation": {
+    "requestedBranch": "release/d1-eas-24",
+    "targetCommit": "c504d722cb05bfb6af57d3d947ff48ce741a6202",
+    "status": "Requires user Mac/GitHub step; not created or remotely verified by this agent",
+    "remoteBranchCreated": false,
+    "remoteBranchReadback": null,
+    "reason": "No direct Git branch/commit/push capability in this workspace",
+    "instructions": "handoff/D1-EAS-HANDOFF.md: Mac mini — fresh checkout and dedicated GitHub branch"
+  },
+  "application": {
+    "path": "expo",
+    "name": "Before You Say It",
+    "version": "1.0.0",
+    "buildNumber": "24",
+    "bundleIdentifier": "app.rork.8fc4qwsqaurkxk0pimyvx",
+    "easProjectId": "1b655360-557d-4dba-ad69-fbf26120e852",
+    "easOwner": "dgrim101",
+    "easSlug": "8fc4qwsqaurkxk0pimyvx",
+    "appleTeamId": "86T6AJ43A5",
+    "ascAppId": "6811494369"
+  },
+  "eas": {
+    "buildProfile": "testflight",
+    "environment": "production",
+    "distribution": "store",
+    "iosBuildConfiguration": "Release",
+    "simulator": false,
+    "developmentClient": false,
+    "autoIncrement": false,
+    "appVersionSource": "local",
+    "requireCommit": true,
+    "handoffCliVersion": "24.6.0",
+    "envExecSyntaxVerified": "eas env:exec production 'command'",
+    "cliExecutedHere": false,
+    "remoteEnvironmentReadHere": false,
+    "remoteSigningReadinessVerifiedHere": false,
+    "buildsDispatchedHere": 0,
+    "buildId": null,
+    "rorkPublishingRetried": false,
+    "submittedToTestFlight": false,
+    "submittedForPublicAppStoreReview": false
+  },
+  "releaseEnvironment": {
+    "requiredPublicNames": [
+      "EXPO_PUBLIC_SUPABASE_URL",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+      "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
+      "EXPO_PUBLIC_NATIVE_BILLING_ORIGIN"
+    ],
+    "profileSuppliedNames": [
+      "EXPO_PUBLIC_SUPABASE_URL",
+      "EXPO_PUBLIC_NATIVE_BILLING_ORIGIN"
+    ],
+    "requiredEasProductionKeyNames": [
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+      "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY"
+    ],
+    "keyVisibility": "Sensitive or Plain text; never EAS Secret for these client/config inputs",
+    "mustBeUnset": [
+      "EXPO_PUBLIC_BYSI_BUILD_MODE",
+      "EXPO_PUBLIC_BYSI_STAGING_ACCOUNT_RELEASE",
+      "EXPO_PUBLIC_STAGING_*",
+      "EXPO_PUBLIC_NATIVE_RESULTS",
+      "EXPO_NO_DOTENV",
+      "EXPO_NO_CLIENT_ENV_VARS"
+    ],
+    "credentialsPrintedOrChanged": false,
+    "publicAuthInputsFingerprintSHA256": "f7492c4788fcdedf8f2ea618fc0d3d65f2b283e98b69680b414804302d65b930",
+    "fingerprintMeaning": "SHA256 of previously reviewed public URL + NUL + public client key; baseline comparison only, not independent ownership or validity evidence",
+    "serverSecretSubstitutionPermitted": false,
+    "stagingIsolationChanged": false,
+    "authBypassOrFallbackAdded": false
+  },
+  "localVerification": {
+    "exportCompletedAt": "2026-09-16T18:53:16.816Z",
+    "exportDirectory": "/tmp/bysi-d1-eas-KfV2kK",
+    "bundleName": "entry-a8032b72d6fabe40a77535d0d3386069.js",
+    "bundleSHA256": "d12ef21c45c9ee53de66e2e31e2c5012a8f7ea248aa92fb63c8883e6ea018c11",
+    "inspectionOptions": ["ios", "production", "clear cache", "no bytecode", "no minification", "source maps"],
+    "actualExportedAuthFactoryExecuted": true,
+    "actualExportedSelectorAndDiagnosticExecuted": true,
+    "emptyDevicePublicEnvironment": true,
+    "normalAuthSelected": true,
+    "embeddedAuthInputsMatchReviewedBaseline": true,
+    "realInstalledSupabaseClientConstructed": true,
+    "installedSupabaseVersionMatchesPinnedLock": "2.112.3",
+    "clientCreations": 1,
+    "networkRequests": 0,
+    "nativeStorageCalls": 0,
+    "d1StartupChecksPassed": true,
+    "resolvedIdentityVerified": true,
+    "otaDisabledInResolvedConfig": true,
+    "savedResultsInputUnset": true,
+    "dotenvFilesUnchangedDuringExport": true,
+    "nodeVersion": "v22.22.0",
+    "bunVersion": "1.3.9",
+    "focusedAppTestsPassed": 30,
+    "focusedAppAssertions": 407,
+    "standaloneVerifierTestsPassed": 9,
+    "distinctFocusedTestsPassed": 39,
+    "runChecks": "passed",
+    "nodeSyntaxChecks": "passed",
+    "gitDiffCheck": "passed",
+    "fullSuiteAccepted": false,
+    "fullSuiteLimit": "Historical stale dotenv assertions, absent backend fixtures, and Bun data-module limitation remain; no broad suite claim or edits to the pinned candidate",
+    "evidenceLimit": "Local restored tree matching the pin, not exact-HEAD checkout; local dotenv-loaded inputs, not EAS remote values; native identity/storage boundaries supplied by harness; native persistence/auto-refresh disabled in harness; no real sign-in or signed artifact verification"
+  },
+  "handoffFiles": {
+    "instructions": "handoff/D1-EAS-HANDOFF.md",
+    "standaloneVerifier": "handoff/verify-d1-eas.cjs",
+    "verifierSHA256": "62de5bcca72fdd20847effa607b118a3c5d93029dc54696d56b3e7394c5e835d",
+    "verifierTests": "handoff/verify-d1-eas.test.cjs",
+    "includedInHistoricalPinnedCommit": false,
+    "placement": "Download companion files outside the fresh pinned checkout; do not add them to the candidate branch"
+  },
+  "remainingChecks": [
+    "Create GitHub branch at exact pin and retain matching remote readback",
+    "Run strict source and export verifier from a fresh exact-commit Mac checkout using actual EAS production public inputs",
+    "Review EAS project/account-scoped production variables, true absence of staging flags, and key visibility",
+    "Check no duplicate active build and build number 24 remains usable before dispatch",
+    "Verify EAS signing access and eventual build-record source identity",
+    "Inspect and retain the exact signed IPA and its hash",
+    "Install 1.0.0 (24) through a separate deliberate TestFlight-only upload and collect D1 if setup fails",
+    "Verify real native storage, backend sign-in, then voice behavior"
+  ]
+}
