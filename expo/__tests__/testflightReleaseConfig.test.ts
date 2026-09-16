@@ -38,18 +38,19 @@ test.each(['testflight', 'rork-production'])('fixture-only exact config accepts 
   process.env.EXPO_PUBLIC_NATIVE_RESULTS='unknown';
   expect(()=>configure({config} as any)).toThrow('TestFlight');
   delete process.env.EXPO_PUBLIC_NATIVE_RESULTS;
-  for(const [name,value] of Object.entries({EXPO_PUBLIC_SUPABASE_ANON_KEY:'not-a-publishable-key',EXPO_PUBLIC_STAGING_PAID_GENERATE_ENDPOINT:'https://bysi-signup-staging.vercel.app/api/practice/generate',EXPO_PUBLIC_REVENUECAT_TEST_API_KEY:'test_fixture',EXPO_PUBLIC_BYSI_BUILD_MODE:'staging-account',EXPO_PUBLIC_NATIVE_BILLING_ORIGIN:'https://beforeyousayit.app?bypass=1',EXPO_PUBLIC_GENERATE_ENDPOINT:'https://wrong.example/api/generate'})){
+  for(const [name,value] of Object.entries({EXPO_PUBLIC_SUPABASE_ANON_KEY:'not-a-publishable-key',EXPO_PUBLIC_STAGING_PAID_GENERATE_ENDPOINT:'https://bysi-signup-staging.vercel.app/api/practice/generate',EXPO_PUBLIC_BYSI_BUILD_MODE:'staging-account',EXPO_PUBLIC_NATIVE_BILLING_ORIGIN:'https://beforeyousayit.app?bypass=1',EXPO_PUBLIC_GENERATE_ENDPOINT:'https://wrong.example/api/generate'})){
    if(runner==='rork-production' && name==='EXPO_PUBLIC_BYSI_BUILD_MODE') continue;
    const original=process.env[name];process.env[name]=value;
    expect(()=>configure({config} as any)).toThrow('TestFlight');
    if(original===undefined)delete process.env[name];else process.env[name]=original;
   }
-  for(const name of ['EXPO_PUBLIC_GENERATE_ENDPOINT','EXPO_PUBLIC_TTS_ENDPOINT','EXPO_PUBLIC_TRANSCRIBE_ENDPOINT','EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY','EXPO_PUBLIC_UNREVIEWED_SERVICE']) {
+  for(const name of ['EXPO_PUBLIC_GENERATE_ENDPOINT','EXPO_PUBLIC_TTS_ENDPOINT','EXPO_PUBLIC_TRANSCRIBE_ENDPOINT','EXPO_PUBLIC_UNREVIEWED_SERVICE']) {
    process.env[name]='https://beforeyousayit.app/api/generate';
    expect(()=>configure({config} as any)).toThrow('TestFlight');delete process.env[name];
   }
   for(const name of ['EXPO_PUBLIC_SUPABASE_URL','EXPO_PUBLIC_SUPABASE_ANON_KEY','EXPO_PUBLIC_REVENUECAT_IOS_API_KEY','EXPO_PUBLIC_NATIVE_BILLING_ORIGIN']) {
    const original=process.env[name];delete process.env[name];
+   if(runner==='rork-production' && name==='EXPO_PUBLIC_NATIVE_BILLING_ORIGIN') process.env[name]='';
    expect(()=>configure({config} as any)).toThrow('TestFlight');process.env[name]=original;
   }
   expect(()=>configure({config:{...config,extra:{eas:{projectId:'b25c7aba-ef9d-4f88-b7c5-4da1678fcf44'}}}} as any)).toThrow('TestFlight');

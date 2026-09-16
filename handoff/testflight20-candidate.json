@@ -1,0 +1,53 @@
+{
+  "recordedDate": "2026-09-16",
+  "purpose": "TestFlight only; no App Store review submission or backend rollout",
+  "appPath": "expo",
+  "version": "1.0.0",
+  "buildNumber": 20,
+  "baseCommit": "25f18d211e1f906d7e6cf93916c2b224f4b13540",
+  "trackedExpoDiffSHA256": "eea243f1ee7ca94fb5d7e3658e2762bde34fc69a6b321dd249d2ef3df19c9f36",
+  "diffCommand": "git diff --binary HEAD -- expo | sha256sum",
+  "newFileGitBlobHashes": {
+    "expo/scripts/release-env.cjs": "9320baa77c68e46fb3db6f7f11435feebc8bffc1",
+    "expo/__tests__/releaseEnvironment.test.ts": "4ea4f7784a26733edd2b54a752025662d1d8aa7a"
+  },
+  "configurationGitBlobHashes": {
+    "expo/babel.config.js": "e5aeeeaacaaebe6c53ed6e38050814cac0bf3090",
+    "expo/metro.config.js": "c1037982fac61f18101a94f6ec6091f26328d0a8",
+    "expo/package.json": "0503e95d0d5f8cead402b468889881a66b27b71b",
+    "expo/bun.lock": "d2c4a234d07b99ca9ac71a3781f55617efe04ef0",
+    "expo/app.config.ts": "56c8d0489d371f9eb6e9d216a8e4cc3ed6556c1b",
+    "expo/app.json": "16572ca50b641549fbfe5279b7e90da4ee5ff2ac"
+  },
+  "releaseEnvironment": {
+    "source": "Runner credentials; reviewed EAS TestFlight backend origin applied explicitly when the runner omits it",
+    "authURL": "https://spvksnddzyvycfoefrcf.supabase.co",
+    "nativeOrigin": "https://beforeyousayit.app",
+    "authAndIOSRevenueCatKeyShapesVerified": true,
+    "credentialValuesRecorded": false,
+    "savedResultsCapabilityEnabled": false,
+    "otaEnabled": false,
+    "toolkitVersion": "0.3.0",
+    "toolkitWrapperEnabled": false,
+    "developmentDotenvRewrittenByReleaseFilter": false
+  },
+  "validation": {
+    "runChecks": "passed",
+    "focusedTestsPassed": 26,
+    "iosJavaScriptExport": "passed, 3229 modules; approved HTML assets included",
+    "exportBundle": "entry-4c0d0d471b65559db05c51ce73ace5a1.js",
+    "exportScan": "production Auth and iOS RevenueCat values present; checked excluded secret values and Rork analytics relay/provider absent",
+    "nativeDeviceAcceptance": "not performed",
+    "latestObservedAppleBuild": "1.0.0 (19), VALID"
+  },
+  "submissionResult": {
+    "submissionId": "8e87cba1-bec7-42e8-b268-d7c3f0bc2b54",
+    "requestedBuildNumber": 20,
+    "runnerAssignedBuildNumber": 21,
+    "status": "Build succeeded and upload reported successful; Apple processing pending",
+    "immediateAppleListReadback": "Still returned build 19; build 21 not yet independently visible",
+    "postSubmissionConfigurationHashes": "Babel, Metro, release-env, app.config, and app.json remained identical to recorded candidate",
+    "publicAppStoreSubmission": false
+  },
+  "provenanceLimit": "This records the local candidate before submission. The submission service captures its own immutable source snapshot; its exact source mapping has not independently been verified."
+}

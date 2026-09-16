@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { prepareReleaseEnvironment } = require("./release-env.cjs");
 
 const allowedPublic = new Set([
   "EXPO_PUBLIC_BYSI_BUILD_MODE", "EXPO_PUBLIC_STAGING_SUPABASE_URL", "EXPO_PUBLIC_STAGING_SUPABASE_PUBLISHABLE_KEY",
@@ -25,6 +26,8 @@ function classification(name) {
 }
 
 function runClientEnvPreflight(rootDirectory) {
+  // Release filtering is in-memory only; do not rewrite development dotenv.
+  if (prepareReleaseEnvironment()) return;
   const rejected = [];
   Object.keys(process.env).forEach((name) => {
     const kind = classification(name);

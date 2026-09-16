@@ -1,6 +1,9 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
+const { prepareReleaseEnvironment, assertReleaseToolchain } = require("./scripts/release-env.cjs");
+
 export default function configure({ config }: ConfigContext): ExpoConfig {
+  if (prepareReleaseEnvironment()) assertReleaseToolchain(__dirname);
   const mode = process.env.EXPO_PUBLIC_BYSI_BUILD_MODE;
   // Rork's native release runner need not set an EAS profile.
   // Apply the same reviewed checks to non-staging production exports.
