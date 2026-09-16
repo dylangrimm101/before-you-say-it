@@ -10,6 +10,10 @@ import {verifyComponentTestDeps} from '../scripts/component-test-deps';
 const {create,act}=await import(verifyComponentTestDeps());
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;(globalThis as any).__DEV__=true;
 plugin({name:'app-first-assets',setup(b){b.onLoad({filter:/\.(png|ttf)$/},()=>({contents:'export default 1',loader:'js'}));}});
+const matrixTrack=process.env.BYSI_ONBOARDING_TRACK;
+let unexpectedNetworkCalls=0;
+globalThis.fetch=Object.assign(async()=>{unexpectedNetworkCalls++;throw Error('Network forbidden in offline onboarding fixture');}, {preconnect:()=>{}}) as typeof fetch;
+mock.module('@/lib/normalFreeRuntime',()=>({normalFreeRecoveryEnabled:process.env.BYSI_ONBOARDING_RECOVERY==='1',currentNormalFreeSessionId:async()=>null,requestNormalFree:async(operation:string)=>{assert.equal(operation,'recover');return Response.json({status:'new'});}}));
 const disk=new Map<string,string>();
 const durableMode=process.env.BYSI_DURABLE_GUEST==='1';
 const createNativeGuestRuntime=actualGuestRuntime;
@@ -34,9 +38,9 @@ if(restartFile&&process.env.BYSI_GUEST_RESUME==='1'){
  const saved=JSON.parse(readFileSync(restartFile,'utf8'));for(const [k,v] of saved.disk)disk.set(k,v);for(const [k,v] of saved.secure)secureDisk.set(k,v);session=saved.session;
 }
 let coldRefreshSent=false;
-const auth={getSession:async()=>{if(process.env.BYSI_GUEST_COLD_REFRESH==='1'&&!coldRefreshSent){coldRefreshSent=true;await Promise.resolve();for(const cb of listeners)cb('TOKEN_REFRESHED',session);}return {data:{session},error:null};},getUser:async()=>({data:{user:process.env.BYSI_GUEST_DENIAL==="wrong-owner"?{...session?.user,id:"wrong-owner"}:process.env.BYSI_GUEST_DENIAL==="expired"?null:session?.user??null},error:process.env.BYSI_GUEST_DENIAL==="expired"?Error("synthetic expired access"):null}),onAuthStateChange:(cb:any)=>{listeners.add(cb);return {data:{subscription:{unsubscribe(){listeners.delete(cb);}}}};},signInAnonymously:async()=>{anonymousCalls++;session={user:{id:'synthetic-guest',is_anonymous:true},access_token:'synthetic-guest-token'};for(const cb of listeners)cb('SIGNED_IN',session);return {data:{session},error:null};},signInWithPassword:async()=>{if(process.env.BYSI_GUEST_DENIAL==='cancel')await loginGate;if(process.env.BYSI_GUEST_DENIAL==='login-retry'&&!failedLogin){failedLogin=true;return {data:{session:null},error:Error('synthetic network failure')};}abrupt('consent');session={user:{id:'registered-A',email:'a@invalid',is_anonymous:false},access_token:'fixture-A'};for(const cb of listeners)cb('SIGNED_IN',session);abrupt('auth');return {data:{session},error:null};},signOut:async()=>{session=null;for(const cb of listeners)cb('SIGNED_OUT',null);return {error:null};}};
+const auth={getSession:async()=>{if(process.env.BYSI_GUEST_COLD_REFRESH==='1'&&!coldRefreshSent){coldRefreshSent=true;await Promise.resolve();for(const cb of listeners)cb('TOKEN_REFRESHED',session);}return {data:{session},error:null};},getUser:async()=>({data:{user:process.env.BYSI_GUEST_DENIAL==="wrong-owner"?{...session?.user,id:"wrong-owner"}:process.env.BYSI_GUEST_DENIAL==="expired"?null:session?.user??null},error:process.env.BYSI_GUEST_DENIAL==="expired"?Error("synthetic expired access"):null}),onAuthStateChange:(cb:any)=>{listeners.add(cb);return {data:{subscription:{unsubscribe(){listeners.delete(cb);}}}};},signInAnonymously:async()=>{anonymousCalls++;session={user:{id:'synthetic-guest',is_anonymous:true},access_token:'synthetic-guest-token'};for(const cb of listeners)cb('SIGNED_IN',session);return {data:{session},error:null};},signInWithPassword:async()=>{if(process.env.BYSI_GUEST_DENIAL==='cancel')await loginGate;if(process.env.BYSI_GUEST_DENIAL==='login-retry'&&!failedLogin){failedLogin=true;return {data:{session:null},error:Error('synthetic network failure')};}abrupt('consent');session={user:{id:'registered-A',email:'a@invalid',is_anonymous:false,email_confirmed_at:'2026-01-01T00:00:00.000Z'},access_token:'fixture-A'};for(const cb of listeners)cb('SIGNED_IN',session);abrupt('auth');return {data:{session},error:null};},signOut:async()=>{session=null;for(const cb of listeners)cb('SIGNED_OUT',null);return {error:null};}};
 mock.module('@/lib/supabase',()=>({supabase:{auth},authEnvironment:{url:'https://production.invalid',staging:false},isAuthConfigured:true}));
-mock.module('@/lib/purchases',()=>({PRO_ENTITLEMENT:'pro',identifyPurchasesUser:async(id:string|null)=>{if(id==='registered-A'&&process.env.BYSI_GUEST_DENIAL==='late-switch'){session={user:{id:'registered-B',email:'b@invalid',is_anonymous:false},access_token:'fixture-B'};for(const cb of listeners)cb('SIGNED_IN',session);}return null;},clearPurchasesIdentity:async()=>{},useIsPro:()=>false,useCustomerInfo:()=>({data:null,isLoading:false}),useOfferings:()=>({data:null,isLoading:false}),usePurchasePackage:()=>({isPending:false,mutateAsync:async()=>{throw Error('no purchase in navigation fixture');}}),useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
+mock.module('@/lib/purchases',()=>({hasPro:()=>false,PRO_ENTITLEMENT:'pro',identifyPurchasesUser:async(id:string|null)=>{if(id==='registered-A'&&process.env.BYSI_GUEST_DENIAL==='late-switch'){session={user:{id:'registered-B',email:'b@invalid',is_anonymous:false},access_token:'fixture-B'};for(const cb of listeners)cb('SIGNED_IN',session);}return null;},clearPurchasesIdentity:async()=>{},useIsPro:()=>false,useCustomerInfo:()=>({data:null,isLoading:false}),useOfferings:()=>({data:null,isLoading:false}),usePurchasePackage:()=>({isPending:false,mutateAsync:async()=>{throw Error('no purchase in navigation fixture');}}),useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
 mock.module('@/lib/reminders',()=>({cancelChallengeNudge:async()=>{},cancelDailyReminder:async()=>{},syncChallengeNudge:async()=>{}}));
 mock.module('@/lib/baselineAudio',()=>({deleteAllBaselineAudioStrict:async()=>{},deleteBaselineAudioStrict:async()=>{}}));
 const dictation={status:'denied',error:'synthetic permission denied',cancel:async()=>{},reset:async()=>{},requestPermission:async()=>false};
@@ -48,7 +52,8 @@ const continuation=process.env.BYSI_CURRENT_GUEST_CONTINUATION==='1';
 const positive=process.env.BYSI_APP_FIRST_POSITIVE==='1'||continuation;
 const syntheticGenerated={analysis:{mode:'result',starting_index:{overall:process.env.BYSI_GUEST_DENIAL==='nullable'?null:0,observed_dimensions:[{name:'Clarity',score:process.env.BYSI_GUEST_DENIAL==='nullable'?12.75:0,evidence:'Synthetic exact observed evidence.'}],unobserved_dimensions:['Specificity','Steadiness','Listening','Boundaries','Repair']},practice_shift:{headline:'Synthetic exact practice target',practice_target:['Name the owner','Ask for confirmation'],goal_line:'Synthetic exact goal'}},debrief:{headline:'Synthetic exact headline',scores:{clarity:0,empathy:0,assertiveness:0,composure:0},wins:['Synthetic exact observation'],flags:[],script:['Can we name one owner for the handoff?'],nextRep:'Synthetic exact next rep'}};
 let scenarioBuilds=0;let counterpartCalls=0;let analysisCalls=0;
-mock.module('@/lib/ai',()=>({nextCounterpartTurn:async()=>{counterpartCalls++;if(process.env.BYSI_FREE_TERMINAL_UI==='turn')throw new FreeAcquisitionSafetyError();return {reply:counterpartCalls===1?'Synthetic counterpart: I still need the current handoff.':'Synthetic counterpart close: I can try, but the deadline remains.',tension:40};},generateDebrief:async()=>{analysisCalls++;if(process.env.BYSI_FREE_TERMINAL_UI==='result')throw new FreeAcquisitionSafetyError();if(process.env.BYSI_GUEST_DENIAL==='secure-full-result')rejectSecureWrites=true;if(positive)return structuredClone(syntheticGenerated);if(producedTerminal)return structuredClone(producedTerminal);return {analysis:{mode:'insufficient_evidence',insufficient_evidence:{headline:'Synthetic insufficient evidence',note:'Synthetic local transport fixture, not a model judgment.',next_step:'Try the rehearsal again.'}},debrief:null};},buildCustomScenario:async()=>{scenarioBuilds++;return {title:'Synthetic builder output',counterpart:'Hope',situation:'Synthetic',goal:'Synthetic',category:'work',opensWith:'user',difficulty:'steady'};},fallbackCustomScenario:()=>{throw Error('unexpected fallback');}}));
+const actualAI={...await import('../lib/ai')};
+mock.module('@/lib/ai',()=>({...actualAI,nextCounterpartTurn:async()=>{counterpartCalls++;if(process.env.BYSI_FREE_TERMINAL_UI==='turn')throw new FreeAcquisitionSafetyError();return {reply:counterpartCalls===1?'Synthetic counterpart: I still need the current handoff.':'Synthetic counterpart close: I can try, but the deadline remains.',tension:40};},generateDebrief:async()=>{analysisCalls++;if(process.env.BYSI_FREE_TERMINAL_UI==='result')throw new FreeAcquisitionSafetyError();if(process.env.BYSI_GUEST_DENIAL==='secure-full-result')rejectSecureWrites=true;if(positive)return structuredClone(syntheticGenerated);if(producedTerminal)return structuredClone(producedTerminal);return {analysis:{mode:'insufficient_evidence',insufficient_evidence:{headline:'Synthetic insufficient evidence',note:'Synthetic local transport fixture, not a model judgment.',next_step:'Try the rehearsal again.'}},debrief:null};},buildCustomScenario:async()=>{scenarioBuilds++;return {title:'Synthetic builder output',counterpart:'Hope',situation:'Synthetic',goal:'Synthetic',category:'work',opensWith:'user',difficulty:'steady'};},fallbackCustomScenario:()=>{throw Error('unexpected fallback');}}));
 const Host=(p:any)=>React.createElement('host',p,p.children);
 class Value{constructor(public value=0){}setValue(v:number){this.value=v;}stopAnimation(){}interpolate(){return this;}addListener(){return 'listener';}removeListener(){}}
 const animation={start:(cb?:any)=>cb?.({finished:true}),stop(){}};
@@ -84,6 +89,16 @@ const client=new QueryClient();
 const tree=()=>React.createElement(QueryClientProvider,{client},React.createElement(AuthProvider,null,React.createElement(StoreProvider,null,React.createElement(Probe))));
 async function mount(next:any){Screen=next;screenKey++;route=null;await act(async()=>{if(root)root.update(tree());else root=create(tree());});}
 const text=()=>JSON.stringify(root.toJSON());
+async function verifyResultRemount(){
+ const {sanitizeActivePracticeSessionForPersistence}=await import('../lib/privacyPersistence');
+ const {normalizeConsent}=await import('../lib/consent');
+ const expected=JSON.parse(JSON.stringify(sanitizeActivePracticeSessionForPersistence(store.activePracticeSession,normalizeConsent(null))));
+ await act(async()=>root.unmount());root=null;params={id:expected.id};await mount(Debrief);
+ assert.deepEqual(JSON.parse(JSON.stringify(store.activePracticeSession)),expected,'privacy-safe result survives provider remount');
+ assert.equal(analysisCalls,1,'remount never regenerates a result');
+ // Positive runs have already advanced to the completed Index card before remount.
+ assert.ok(text().includes(positive?'Partial Starting Index card':'Synthetic insufficient evidence'));
+}
 async function press(label:string){const b=root.root.findAllByType('button').find((n:any)=>(n.props.label===label||n.props.accessibilityLabel===label)&&!n.props.disabled);assert.ok(b,`enabled control: ${label}`);await act(async()=>{await b.props.onPress();});await act(async()=>{await new Promise(r=>setTimeout(r,5));});}
 await mount(Entry);
 if(restartFile&&process.env.BYSI_GUEST_RESUME==='1'){
@@ -119,26 +134,68 @@ const branches=[
  {id:'recurring_problem',entry:'The same communication problem keeps happening'},
  {id:'desired_skill',entry:'I know what I want to get better at'},
 ];
-for(const branch of branches){
+const selectedBranches=matrixTrack?branches.filter(branch=>branch.id===matrixTrack):branches;
+assert.ok(selectedBranches.length>0,'known onboarding track');
+const contextLabel=process.env.BYSI_ONBOARDING_CONTEXT??'Work';
+const contextCategory=({'Work':'work','Partner or co-parent':'partner','Family member':'family','Friend':'friends'} as const)[contextLabel as 'Work'];
+assert.ok(contextCategory,'known context');
+const diagnosisIndex=Number(process.env.BYSI_ONBOARDING_CHOICE??0);
+const secondaryIndex=Number(process.env.BYSI_ONBOARDING_SECONDARY??0);
+for(const branch of selectedBranches){
  await mount(Onboarding);await press(branch.entry);
+ if(process.env.BYSI_ONBOARDING_AUTH_FAILURE==='1')auth.getSession=async()=>{throw Error('private-storage-canary');};
  if(branch.id==='real_conversation'){
-  await press('Work');
+  await press(contextLabel);
   assert.equal(root.root.findAllByType('button').find((b:any)=>b.props.label==='Continue').props.disabled,true);
+  if(matrixTrack){
+   await act(async()=>root.root.findByType('input').props.onChangeText('   1234567   '));
+   assert.equal(root.root.findAllByType('button').find((b:any)=>b.props.label==='Continue').props.disabled,true,'trimmed short input cannot continue');
+   await act(async()=>root.root.findByType('input').props.onChangeText('12345678'));
+   assert.equal(root.root.findAllByType('button').find((b:any)=>b.props.label==='Continue').props.disabled,false,'eight characters enables Continue');
+  }
   await act(async()=>root.root.findByType('input').props.onChangeText('Synthetic: my colleague interrupts the handoff discussion.'));
   await press('Continue');await press('Say the request clearly');await press('Gets defensive');
  }else{
-  await press(branch.id==='recurring_problem'?RECURRING_PROBLEMS[0].label:DESIRED_SKILLS[0].label);
-  await press(branch.id==='recurring_problem'?DESIRED_SHIFTS[0].label:PRESSURE_CONDITIONS[0].label);
-  await press('Work');
+  await press(branch.id==='recurring_problem'?RECURRING_PROBLEMS[diagnosisIndex].label:DESIRED_SKILLS[diagnosisIndex].label);
+  await press(branch.id==='recurring_problem'?DESIRED_SHIFTS[secondaryIndex].label:PRESSURE_CONDITIONS[secondaryIndex].label);
+  await press(contextLabel);
+ }
+ if(process.env.BYSI_ONBOARDING_AUTH_FAILURE==='1'){
+  assert.equal(route,null);assert.equal(store.activePracticeSession,null);assert.equal(store.profile,null);assert.equal(scenarioBuilds,0);
+  assert.ok(text().includes('session-read/exception'));assert.ok(!text().includes('private-storage-canary'));
+  assert.equal(unexpectedNetworkCalls,0);await act(async()=>root.unmount());client.clear();
+  console.log('PASS onboarding matrix auth failure '+branch.id);process.exit(0);
  }
  assert.equal(route.pathname,'/rehearse/[id]');assert.equal(route.params.entry,'onboarding');
  assert.equal(store.activePracticeSession.entryRoute,branch.id);
  assert.equal(route.params.practiceSessionId,store.activePracticeSession.id);
  assert.equal(store.activePracticeSession.scenarioSource,branch.id==='real_conversation'?'user_supplied':'approved_authored');
- assert.equal(store.profile.focus,'work');assert.equal(store.scoredPracticeHistory.length,0);assert.equal(store.completed.length,0);
+ assert.equal(store.profile.focus,contextCategory);assert.equal(store.scoredPracticeHistory.length,0);assert.equal(store.completed.length,0);
+ if(matrixTrack){
+  const expectedPersona=contextCategory==='work'?'man-adam':'woman-hope';
+  assert.equal(route.params.persona,expectedPersona);assert.equal(store.activePracticeSession.persona,expectedPersona);
+  assert.equal(route.params.difficulty,'steady');
+  const expectedReaction=branch.id==='real_conversation'?'defensive':branch.id==='recurring_problem'?'not-sure':PRESSURE_CONDITIONS[secondaryIndex].reaction;
+  assert.equal(store.activePracticeSession.expectedReaction,expectedReaction);assert.equal(route.params.reaction,expectedReaction);
+  if(branch.id!=='real_conversation'){
+   const selected=branch.id==='recurring_problem'?DESIRED_SHIFTS[secondaryIndex]:DESIRED_SKILLS[diagnosisIndex];
+   assert.equal(store.activePracticeSession.provisionalModuleId,selected.moduleId);
+   assert.equal(store.activePracticeSession.selectionLabel,branch.id==='recurring_problem'?DESIRED_SHIFTS[secondaryIndex].label:PRESSURE_CONDITIONS[secondaryIndex].label);
+   const {approvedScenarioForContext}=await import('../constants/onboardingScenarios');
+   const approved=approvedScenarioForContext(contextCategory);
+   assert.equal(route.params.id,approved?.id);assert.equal(store.activePracticeSession.usefulOutcome,approved?.desiredOutcome);
+  }else{
+   assert.equal(store.activePracticeSession.provisionalModuleId,undefined);
+   assert.equal(store.activePracticeSession.usefulOutcome,'Say the request clearly');
+  }
+ }
  assert.ok([...disk.values()].some(v=>v.includes(store.activePracticeSession.id)),'actual owner-scoped durable handoff');
 }
-assert.equal(scenarioBuilds,1,'authored branches do not invoke the custom builder');
+assert.equal(scenarioBuilds,selectedBranches.some(branch=>branch.id==='real_conversation')?1:0,'authored branches do not invoke the custom builder');
+if(process.env.BYSI_ONBOARDING_HANDOFF_ONLY==='1'){
+ assert.equal(unexpectedNetworkCalls,0);await act(async()=>root.unmount());client.clear();
+ console.log('PASS onboarding matrix recovery handoff '+matrixTrack);process.exit(0);
+}
 const guestRunId=store.activePracticeSession.id;
 const rehearsalParams={...route.params};
 if(durableMode){await act(async()=>root.unmount());root=null;await mount(Onboarding);assert.equal(store.activePracticeSession.id,guestRunId);}
@@ -185,6 +242,7 @@ assert.equal(store.activePracticeSession.sharedResult,undefined);assert.equal(st
 params={id:guestRunId};await mount(Debrief);
 assert.ok(text().includes(producedTerminal?.analysis.insufficient_evidence.headline??'Synthetic insufficient evidence'));
 if(producedTerminal){assert.ok(text().includes(producedTerminal.analysis.insufficient_evidence.note));assert.equal(store.scoredPracticeHistory.length,0);}
+if(matrixTrack)await verifyResultRemount();
 await press('Practice this conversation again');assert.equal(route.pathname,'/rehearse/[id]');
 assert.equal(route.params.practiceSessionId,guestRunId,'retry preserves the actual guest run identity');
 }else{
@@ -200,6 +258,13 @@ assert.equal(route.params.practiceSessionId,guestRunId,'retry preserves the actu
  assert.deepEqual(store.activePracticeSession.sharedResult,exact);
  await mount(Paywall);await press('Log in before purchasing');assert.equal(route,'/continue-from-web');
  assert.deepEqual(store.activePracticeSession.sharedResult,exact);
+}
+if(matrixTrack){
+ if(positive)await verifyResultRemount();
+ assert.equal(store.activePracticeSession.id,guestRunId);
+ assert.equal(analysisCalls,1);assert.equal(anonymousCalls,1);assert.equal(unexpectedNetworkCalls,0);
+ await act(async()=>root.unmount());client.clear();
+ console.log('PASS onboarding matrix '+matrixTrack+' '+contextLabel+' '+(positive?'positive':'insufficient')+'; simulated services/native hosts, typed rehearsal, result remount; no network');process.exit(0);
 }
 // A cold process loses the ephemeral creation capability: persisted IDs alone
 // never promote historical bytes into eligible content.

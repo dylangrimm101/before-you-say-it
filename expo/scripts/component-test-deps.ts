@@ -33,7 +33,7 @@ export function setupComponentTestDeps(prefix = componentTestPrefix()) {
   // Refuse symlinked parents that point inside the application tree.
   externalPrefix(realpathSync(prefix));
   for (const file of ['package.json', 'package-lock.json']) copyFileSync(join(spec, file), join(prefix, file));
-  const result = spawnSync('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], {cwd:prefix, stdio:'inherit'});
+  const result = spawnSync('bun', ['install', '--ignore-scripts'], {cwd:prefix, stdio:'inherit'});
   if (result.status !== 0) throw new Error('Locked component test dependency installation failed');
   rmSync(join(prefix, 'node_modules/react'), {recursive:true, force:true});
   symlinkSync(realpathSync(join(root, 'node_modules/react')), join(prefix, 'node_modules/react'), 'dir');
