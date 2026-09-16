@@ -41,7 +41,8 @@ describe("TestFlight foundation", () => {
   test("privacy reset is owner-local, not account or backend erasure", async () => {
     const privacy = await text("app/privacy.tsx");
     expect(privacy).toContain("current guest or signed-in owner");
-    expect(privacy).toContain("does not delete other owners' local data, your web account, server-held results, or provider records, and does not cancel a subscription");
+    expect(privacy).toContain("does not delete other owners' local data, your web account, server-held saved results, or provider records, and does not cancel a subscription");
+    expect(privacy).toContain("Saved-result deletion is separate");
     expect(privacy).not.toContain("Everything is removed:");
     expect(privacy).not.toContain("Removes everything and returns the app to a fresh install.");
   });

@@ -170,7 +170,7 @@ async function postBysi<T>(payload: Record<string, unknown>, paidPractice: boole
   return result;
 }
 
-function bysiContract(
+export function bysiContract(
   scenario: Scenario,
   reaction?: ReactionPattern,
   outcome?: string,
@@ -202,7 +202,7 @@ function bysiContract(
   };
 }
 
-function bysiTranscript(turns: Turn[], scenario: Scenario): BysiTranscript {
+export function bysiTranscript(turns: Turn[], scenario: Scenario): BysiTranscript {
   const userTurns = turns.filter((turn) => turn.role === "user").map((turn) => turn.text);
   const counterpartTurns = turns
     .filter((turn) => turn.role === "them")
@@ -492,6 +492,7 @@ export async function nextCounterpartTurn(
   persona?: PersonaVoice,
   entryRoute: BysiEntryRoute = "real_conversation",
   paidPractice: boolean = false,
+  contractOverride?: Record<string, unknown>,
 ): Promise<CounterpartTurn> {
   const turn: AcquisitionCounterpartTurn = turns.filter((item) => item.role === "user").length >= 2 ? "close" : "pushback";
   const avoidRepeating = turns
@@ -505,7 +506,7 @@ export async function nextCounterpartTurn(
       const result = await postBysi<BysiTurnResponse>({
         type: "rehearsal_turn",
         turn,
-        contract: bysiContract(scenario, reaction, outcome, entryRoute, difficulty),
+        contract: contractOverride ?? bysiContract(scenario, reaction, outcome, entryRoute, difficulty),
         transcript: bysiTranscript(turns, scenario),
         avoid_repeating: avoidRepeating,
         variation_seed: `${scenario.id}-${turn}-${Date.now().toString(36)}-${attempt}`,
@@ -532,6 +533,7 @@ export async function generateDebrief(
   outcome?: string,
   entryRoute: BysiEntryRoute = "real_conversation",
   paidPractice: boolean = false,
+  contractOverride?: Record<string, unknown>,
 ): Promise<GeneratedDebrief> {
   void difficulty;
   const transcript = bysiTranscript(turns, scenario);
@@ -550,7 +552,7 @@ export async function generateDebrief(
     type: "free_rehearsal_result",
     // Hosted acquisition signs the exact briefing across both turns and result.
     // Preserve historical non-staging/paid payloads; no production contract change.
-    contract: bysiContract(scenario, reaction, outcome, entryRoute,
+    contract: contractOverride ?? bysiContract(scenario, reaction, outcome, entryRoute,
       !paidPractice && (process.env.EXPO_PUBLIC_BYSI_BUILD_MODE === "staging-account" || !!process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN) ? difficulty : undefined),
     transcript,
     rewrite_requirement: {

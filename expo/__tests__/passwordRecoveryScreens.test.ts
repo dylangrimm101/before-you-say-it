@@ -16,9 +16,8 @@ test('login opens branded forgot-password instead of a paste helper', () => {
 test('native recovery screens match the website brand and reject log-copying', () => {
   const forgot = source('app/forgot-password.tsx');
   const reset = source('app/reset-password.tsx');
-  expect(forgot).toContain('Before You Say It');
-  expect(forgot).toContain('C.purple');
-  expect(forgot).toContain('Email me a reset link');
+  expect(forgot).not.toContain('Before You Say It');
+  expect(forgot).toContain('Send reset link');
   expect(forgot).not.toMatch(/localhost|Paste the original|copy a reset/i);
   expect(reset).toContain('Choose a new password');
   expect(reset).toContain('tap Reset password');

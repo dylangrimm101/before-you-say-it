@@ -55,7 +55,11 @@ import {
 } from "@/constants/personas";
 import { expectedReactionLabel } from "@/constants/onboardingScenarios";
 import { C, GUTTER, eyebrow, font, radius, T } from "@/constants/theme";
-import { generateDebrief, nextCounterpartTurn } from "@/lib/ai";
+import { bysiContract, generateDebrief, nextCounterpartTurn } from "@/lib/ai";
+import {normalFreeRecoveryEnabled,requestNormalFree} from '@/lib/normalFreeRuntime';
+import {normalFreeRecoveryContract,normalFreeRecoveryTranscript} from '@/lib/normalFreeRecoveryPayload';
+import {applyRecovery,mayRequestRestart,recoveryMessage,type RecoveryState} from '@/lib/phaseRecovery';
+import {authoritativeNormalFreeContract,recoveredNormalFreePractice} from "@/lib/normalFreeCheckpoint";
 import { FreeAcquisitionRequestError, FreeAcquisitionSafetyError } from "@/lib/freeAcquisitionOutcome";
 import { FREE_REHEARSAL_USER_TURNS, rehearsalTurnCap } from "@/lib/access";
 import {
@@ -68,7 +72,7 @@ import {
 import { conversionEvidence, selectFocusSkill } from "@/lib/conversion";
 import { approvedUserTurn, buildFreeJourneyResult, recognizerEndState, shouldGeneratePushback } from "@/lib/freeJourney";
 import { setLiveSessionContent } from "@/lib/ephemeral";
-import { preserveFreeRehearsalArtifact, type ActivePracticeSession } from "@/lib/practiceSession";
+import { createOnboardingPracticeSession, preserveFreeRehearsalArtifact, type ActivePracticeSession } from "@/lib/practiceSession";
 import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
 import { errorShape, safeLog } from "@/lib/redact";
 import { createScoredPracticeRecord } from "@/lib/scoredPracticeHistory";
@@ -97,13 +101,30 @@ import {
   useSpeech,
 } from "@/lib/voice";
 import { useStore } from "@/providers/store";
-import type { Difficulty, PersonaVoice, ReactionPattern, Turn } from "@/types/convo";
+import type { Difficulty, PersonaVoice, ReactionPattern, Scenario, Turn } from "@/types/convo";
 import { SESSION_SCHEMA_VERSION, type SessionRecord } from "@/types/privacy";
 
 let seq = 0;
 function uid(): string {
   seq += 1;
   return `${Date.now().toString(36)}-${seq}`;
+}
+
+function onboardingScenarioFromSession(session: ActivePracticeSession, id: string): Scenario {
+  const counterpart = session.counterpartDisplayLabel || session.counterpart || "Conversation partner";
+  return {
+    id,
+    category: session.category,
+    title: session.scenarioTitle || "Your conversation",
+    counterpart,
+    situation: session.topic || session.scenarioTitle || "Private custom scenario",
+    persona: session.persona || DEFAULT_PERSONA,
+    goal: session.behavioralGoal || session.usefulOutcome || "Practice this conversation",
+    opensWith: "user",
+    openingLine: "",
+    minutes: 5,
+    isCustom: session.scenarioSource === "user_supplied",
+  };
 }
 
 /**
@@ -159,10 +180,25 @@ function LegacyRehearse() {
     saveActivePracticeSession,
     saveScoredPracticeRecord,
     saveCurrentGuestAssessment,
+    anonymousUserId,
   } = useStore();
   const challengeDay = params.challengeDay ? Number(params.challengeDay) : null;
 
-  const scenario = findScenario(String(params.id));
+  const routeScenario = findScenario(String(params.id));
+  const matchingOnboardingSession = params.entry === "onboarding" && activePracticeSession?.id === params.practiceSessionId
+    ? activePracticeSession
+    : null;
+  const synthesizedActiveScenario = Boolean(
+    routeScenario && matchingOnboardingSession
+      && routeScenario.id === matchingOnboardingSession.scenarioId
+      && routeScenario.counterpart === matchingOnboardingSession.counterpart
+      && routeScenario.situation === matchingOnboardingSession.topic
+      && routeScenario.goal === matchingOnboardingSession.usefulOutcome,
+  );
+  const hasAuthoritativeFreeContract = Boolean(authoritativeNormalFreeContract(matchingOnboardingSession));
+  const redactedCustomSession = matchingOnboardingSession?.scenarioSource === "user_supplied" && !hasAuthoritativeFreeContract;
+  const verifiableRouteScenario = synthesizedActiveScenario || redactedCustomSession ? null : routeScenario;
+  const scenario = routeScenario ?? (matchingOnboardingSession ? onboardingScenarioFromSession(matchingOnboardingSession, String(params.id)) : null);
   const onboardingPersona: PersonaVoice | undefined =
     params.entry === "onboarding" && isPersonaVoice(params.persona)
       ? params.persona
@@ -197,6 +233,14 @@ function LegacyRehearse() {
       : [],
   );
   const [stream, setStream] = useState<string>("");
+  const recoveryRequired=normalFreeRecoveryEnabled&&params.entry==='onboarding';
+  const [recoveryReady,setRecoveryReady]=useState(!recoveryRequired);
+  const [recoveryState,setRecoveryState]=useState<RecoveryState>({status:'checking'});
+  const [recoveryBusy,setRecoveryBusy]=useState(false);
+  const [contextMissing,setContextMissing]=useState(false);
+  const [contextDraft,setContextDraft]=useState({title:'',counterpart:'',situation:'',goal:'',persona:'',openingLine:''});
+  const recoverySerial=useRef(0);
+  const recoveryCheckRef=useRef<()=>Promise<boolean>>(async()=>!recoveryRequired);
 
   useEffect(() => {
     const currentSession = activePracticeSession;
@@ -234,6 +278,8 @@ function LegacyRehearse() {
   voiceOnRef.current = voiceOn;
   const dictation = useDictation();
   const cancelDictation = dictation.cancel;
+  const cancelDictationRef = useRef(cancelDictation);
+  cancelDictationRef.current = cancelDictation;
   const [rehearsalStage, setRehearsalStage] = useState<RehearsalStage>(() => {
     if (params.entry !== "onboarding" || turns.length > 0) return "practice";
     const checkpoint = activePracticeSession?.freeJourneyCheckpoint;
@@ -244,7 +290,9 @@ function LegacyRehearse() {
   const isReduced = useReducedMotion();
   const audioBusy = speech.phase === "speaking" || speech.phase === "generating";
   /** While the counterpart's voice is generating or playing the mic is inert. */
-  const micDisabled = micLocked(speech.phase);
+  const recordingLimitedHere = recoveryState.recordingLimited===true &&
+    (recoveryState.phase==='start'?turns.length<2:recoveryState.phase==='pushback'?turns.length<4:false);
+  const micDisabled = micLocked(speech.phase) || recordingLimitedHere;
   const speakerState = speakerControl(!voiceOn, speech.phase, speech.canReplay);
 
   // Hope or Adam is the stable rehearsal identity. The scenario describes the
@@ -348,7 +396,7 @@ function LegacyRehearse() {
   // partner line. User-initiated scenarios start with an empty transcript and
   // wait for the user's opening.
   useEffect(() => {
-    if (opened.current || !scenario) return;
+    if (opened.current || !scenario || !recoveryReady || turns.length>0) return;
     const line = initialRehearsalState(scenario).initialCounterpartLine;
     if (!line) return;
     opened.current = true;
@@ -368,17 +416,18 @@ function LegacyRehearse() {
         });
     }, 550);
     return () => clearTimeout(t);
-  }, [scenario, reveal, persona, themName]);
+  }, [scenario, reveal, persona, themName, recoveryReady, turns.length]);
 
   // Leaving the screen must stop playback and drop the staged line, so nothing
-  // can be heard after the rehearsal is over.
+  // can be heard after the rehearsal is over. Do not depend on cancelDictation:
+  // recorder updates recreate that function and would abort an in-flight transcribe.
   useEffect(() => {
     return () => {
       if (revealTimer.current) clearInterval(revealTimer.current);
-      cancelDictation().catch(() => {});
+      cancelDictationRef.current().catch(() => {});
       resetSpeech().catch(() => {});
     };
-  }, [cancelDictation]);
+  }, []);
 
   /**
    * Produce exactly one counterpart reply for the given transcript. The user
@@ -400,6 +449,8 @@ function LegacyRehearse() {
           outcome,
           persona,
           activePracticeSession?.entryRoute,
+          false,
+          authoritativeNormalFreeContract(activePracticeSession),
         );
         const userTurnCount = history.filter((turn) => turn.role === "user").length;
         safeLog("[evidence] native counterpart accepted", {
@@ -434,7 +485,7 @@ function LegacyRehearse() {
         busy.current = false;
       }
     },
-    [scenario, difficulty, reaction, outcome, reveal, persona, themName, activePracticeSession?.entryRoute, activePracticeSession?.id, router],
+    [scenario, difficulty, reaction, outcome, reveal, persona, themName, activePracticeSession, router],
   );
 
   /** Commit the user's reviewed line. Only an explicit submit advances a turn. */
@@ -492,6 +543,7 @@ function LegacyRehearse() {
 
   const onMicTap = useCallback(async () => {
     if (thinking || closing) return;
+    if(dictation.status!=="recording"&&!(await recoveryCheckRef.current()))return;
     // The microphone stays disabled while the counterpart is talking, so a tap
     // here is inert. Stopping playback belongs to the speaker control, which
     // keeps one deliberate mic tap always meaning "start recording".
@@ -561,7 +613,7 @@ function LegacyRehearse() {
   const retryMicrophone = useCallback((): void => {
     if (thinking || closing || micLocked(speech.phase)) return;
     tap("light");
-    void dictation.reset().then(() => dictation.start()).catch((caught: unknown) => safeLog("[rehearse] microphone retry cleanup pending", errorShape(caught)));
+    void dictation.reset().then(async () => {if(await recoveryCheckRef.current())await dictation.start();}).catch((caught: unknown) => safeLog("[rehearse] microphone retry cleanup pending", errorShape(caught)));
   }, [closing, dictation, speech.phase, thinking]);
 
   const openMicrophoneSettings = useCallback((): void => {
@@ -633,6 +685,8 @@ function LegacyRehearse() {
         reaction,
         outcome,
         activePracticeSession?.entryRoute,
+        false,
+        authoritativeNormalFreeContract(activePracticeSession),
       );
       const { analysis, debrief } = generated;
       if (!isConversionBuildActive(id)) return;
@@ -846,6 +900,103 @@ function LegacyRehearse() {
         : dictation.status === "denied" || dictation.status === "error"
           ? "error"
           : "ready";
+
+  const checkRecovery=async():Promise<boolean>=>{
+    if(!recoveryRequired)return true;
+    const localSession=matchingOnboardingSession;
+    const serial=++recoverySerial.current;setRecoveryBusy(true);
+    try{
+      const localContract=authoritativeNormalFreeContract(localSession);
+      const hasLocalWords=Boolean(localSession&&turns.some(turn=>turn.text.trim().length>0));
+      const recoveryPayloadScenario=localContract?scenario:verifiableRouteScenario;
+      const response=await requestNormalFree('recover',hasLocalWords&&recoveryPayloadScenario?{contract:localContract??normalFreeRecoveryContract(recoveryPayloadScenario,reaction,outcome,localSession!.entryRoute,difficulty),transcript:normalFreeRecoveryTranscript(turns,recoveryPayloadScenario)}:{});
+      if(serial!==recoverySerial.current)return false;
+      if(!response.ok)throw Error('Practice check failed');
+      const state:RecoveryState=await response.json();const localTurns=localSession?turns:[];const restored=applyRecovery(state,localTurns);
+      setRecoveryState(state);
+      if(!restored.ready){setRecoveryReady(false);return false;}
+      // Privacy placeholders are display-only, including storage written by older clients.
+      // Ask the server first: a committed checkpoint can restore the exact original.
+      if(!state.checkpoint && !localContract && (!scenario || scenario.situation==='Private custom scenario')){
+        setContextMissing(true);setRecoveryReady(false);return false;
+      }
+      setContextMissing(false);
+      const changed=JSON.stringify(restored.turns)!==JSON.stringify(localTurns);
+      const recovered=!verifiableRouteScenario||!localSession?recoveredNormalFreePractice(state,anonymousUserId,String(params.practiceSessionId??sessionId.current),Date.now(),localTurns):null;
+      const recoveryScenario=recovered?.scenario??routeScenario??(localSession?onboardingScenarioFromSession(localSession,String(params.id)):null);
+      if(!recoveryScenario){setRecoveryReady(false);return false;}
+      if(changed||!localSession||(recovered&&!verifiableRouteScenario)){
+        const session=recovered?.session??localSession??createOnboardingPracticeSession(String(params.practiceSessionId??sessionId.current),anonymousUserId,recoveryScenario,outcome??recoveryScenario.goal,reaction??'not-sure',Date.now(),{
+          entryRoute:'real_conversation',
+          scenarioSource:recoveryScenario.isCustom?'user_supplied':'approved_authored',
+          scenarioTitle:recoveryScenario.title,
+          counterpartRelationship:recoveryScenario.persona??'Conversation partner',
+          counterpartDisplayLabel:themName,
+          behavioralGoal:recoveryScenario.goal,
+          persona,
+        });
+        await saveActivePracticeSession({...session,freeRehearsalTurns:restored.turns,freeJourneyCheckpoint:'rehearsal',normalFreeContract:authoritativeNormalFreeContract(session)??(state.checkpoint?.contract as Record<string,unknown>|undefined),normalFreeCheckpointRevision:state.checkpoint?.revision,normalFreeCheckpointPhase:state.phase,updatedAt:Date.now()});
+        if(serial!==recoverySerial.current)return false;
+        persistedTurnsRef.current=JSON.stringify(restored.turns);setTurns(restored.turns);
+      }
+      setCanRetry(restored.turns[restored.turns.length-1]?.role==='user');setRecoveryReady(true);
+      // The recovered line uses the existing approved ElevenLabs path, never device TTS.
+      if(changed&&restored.audio)void speak(speechTextFor(restored.audio.text,themName),persona,{muted:!voiceOnRef.current}).catch(()=>{});
+      return !changed;
+    }catch{if(serial===recoverySerial.current){setRecoveryState({status:'unavailable'});setRecoveryReady(false);}return false;}
+    finally{if(serial===recoverySerial.current)setRecoveryBusy(false);}
+  };
+  recoveryCheckRef.current=checkRecovery;
+  useEffect(()=>{const serialRef=recoverySerial;void recoveryCheckRef.current();return ()=>{serialRef.current++;};},[params.practiceSessionId,hasAuthoritativeFreeContract]);
+  const restartRecovery=async()=>{
+    if(recoveryBusy||!mayRequestRestart(recoveryState))return;
+    setRecoveryBusy(true);
+    try{
+      const response=await requestNormalFree('restart',{sessionId:recoveryState.sessionId,generation:recoveryState.generation});
+      if(!response.ok){const result=await response.json();setRecoveryState({...recoveryState,status:result.code});return;}
+      await resetSpeech();router.replace('/onboarding');
+    }catch{setRecoveryState({...recoveryState,status:'unavailable'});}
+    finally{setRecoveryBusy(false);}
+  };
+  const contextDraftComplete=Object.entries(contextDraft).every(([key,value])=>key==='openingLine'||value.trim().length>0);
+  const confirmContext=async()=>{
+    if(!contextMissing||!contextDraftComplete||recoveryBusy||!matchingOnboardingSession)return;
+    const session=matchingOnboardingSession;
+    const restoredScenario:Scenario={id:session.scenarioId,category:session.category,...contextDraft,opensWith:'user',minutes:5,isCustom:true};
+    setRecoveryBusy(true);
+    try{
+      // This is an explicit user restoration, not reconstruction from approved words or a hash.
+      // The store's existing consent boundary still strips these fields on disk when saving is off.
+      await saveActivePracticeSession({...session,topic:contextDraft.situation,counterpart:contextDraft.counterpart,
+        counterpartDisplayLabel:contextDraft.counterpart,scenarioTitle:contextDraft.title,usefulOutcome:contextDraft.goal,
+        behavioralGoal:contextDraft.goal,normalFreeContract:{...bysiContract(restoredScenario,reaction,contextDraft.goal,session.entryRoute,difficulty)},updatedAt:Date.now()});
+    }catch{setRecoveryState({status:'unavailable'});}
+    finally{setRecoveryBusy(false);}
+  };
+  if(recoveryRequired&&!recoveryReady&&contextMissing){
+    return <View style={styles.root}><Backdrop/><ScrollView contentContainerStyle={{padding:GUTTER,paddingTop:insets.top+24}} keyboardShouldPersistTaps="handled">
+      <Text style={T.title}>Restore your conversation context</Text>
+      <Text style={T.support}>Your approved words are safe. Custom context was not saved on this device, and no server conversation checkpoint is available. Re-enter and confirm the context you want to use before sending. This does not enable custom-text saving or reset recording limits.</Text>
+      {turns.map(turn=><Text key={turn.id} style={T.support}>{turn.text}</Text>)}
+      {([
+        ['title','Restore conversation title'],['counterpart','Restore counterpart'],['situation','Restore situation'],
+        ['goal','Restore goal'],['persona','Restore counterpart behavior'],['openingLine','Restore opening line'],
+      ] as const).map(([key,label])=><View key={key}><Text style={T.support}>{label}{key==='openingLine'?' (optional; you open this conversation)':''}</Text><TextInput accessibilityLabel={label} value={contextDraft[key]} onChangeText={value=>setContextDraft(current=>({...current,[key]:value}))} multiline maxLength={2000} style={styles.reviewInput}/></View>)}
+      <Text style={T.support}>Confirming uses this context with your existing approved opener. It does not claim that missing details were recovered automatically.</Text>
+      <PrimaryButton label="Confirm restored context" disabled={!contextDraftComplete||recoveryBusy} onPress={()=>void confirmContext()}/>
+      <GhostButton label="Check for saved context again" disabled={recoveryBusy} onPress={()=>void checkRecovery()}/>
+      <GhostButton label="Back" onPress={()=>router.replace('/account-practice')}/>
+    </ScrollView></View>;
+  }
+  if(recoveryRequired&&!recoveryReady){
+    return <View style={[styles.root,styles.center]}><Backdrop/>
+      <Text style={T.title}>{recoveryState.status==='checking'?'Checking your rehearsal':'Continue your practice'}</Text>
+      <Text style={T.support}>{recoveryState.status==='checking'?'Checking the saved conversation before recording.':recoveryMessage(recoveryState.recordingLimited?'recording_limit':recoveryState.status)}</Text>
+      {recoveryState.status==='recording_limit'||recoveryState.recordingLimited?<ScrollView>{applyRecovery(recoveryState,turns).turns.map(turn=><Text key={turn.id} style={T.support}>{turn.text}</Text>)}</ScrollView>:<PrimaryButton label="Check again" disabled={recoveryBusy} onPress={()=>void checkRecovery()}/>}
+      {mayRequestRestart(recoveryState)?<><Text style={T.support}>A new rehearsal starts only after the server confirms the current practice can move forward without reusing stale work.</Text><PrimaryButton label="Start new rehearsal" disabled={recoveryBusy} onPress={()=>void restartRecovery()}/></>:null}
+      <PrimaryButton label="Back" onPress={()=>router.replace('/account-practice')}/>
+    </View>;
+  }
 
   if (!scenario) {
     return (
@@ -1422,7 +1573,7 @@ const DOCK_COPY: Record<
   "mic-error": (_them, _counterpart, h) => ({
     label: h.dictation?.startsWith("Voice transcription")
       ? "Transcription unavailable"
-      : "Microphone unavailable",
+      : (h.dictation || "Microphone unavailable"),
     help: h.dictation ?? "Try the microphone again, or type this turn instead.",
   }),
   "playback-failed": (_them, counterpart) => ({

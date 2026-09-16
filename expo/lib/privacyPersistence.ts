@@ -23,8 +23,9 @@ export function sanitizeActivePracticeSessionForPersistence(
 ): ActivePracticeSession {
   const userAuthored = value.scenarioSource === "user_supplied" || isCustomScenarioId(value.scenarioId);
   if (consent.saveCustomScenarioText || !userAuthored) return value;
+  const { normalFreeContract: _normalFreeContract, ...safeValue } = value;
   return {
-    ...value,
+    ...safeValue,
     counterpart: PRIVATE_CONTEXT.counterpartLabel,
     topic: PRIVATE_CONTEXT.situation,
     usefulOutcome: PRIVATE_CONTEXT.objective,

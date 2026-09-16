@@ -29,6 +29,11 @@ test('fixture-only exact config accepts embedded Release and rejects endpoint/st
   process.env.EXPO_PUBLIC_PROJECT_ROOT='/tmp/expo-cli-inject';
   expect(configure({config} as any).updates?.enabled).toBe(false);
   delete process.env.EXPO_PUBLIC_PROJECT_ROOT;
+  process.env.EXPO_PUBLIC_NATIVE_RESULTS='normal-results-v1';
+  expect(configure({config} as any).updates?.enabled).toBe(false);
+  process.env.EXPO_PUBLIC_NATIVE_RESULTS='unknown';
+  expect(()=>configure({config} as any)).toThrow('TestFlight');
+  delete process.env.EXPO_PUBLIC_NATIVE_RESULTS;
   for(const [name,value] of Object.entries({EXPO_PUBLIC_SUPABASE_ANON_KEY:'not-a-publishable-key',EXPO_PUBLIC_STAGING_PAID_GENERATE_ENDPOINT:'https://bysi-signup-staging.vercel.app/api/practice/generate',EXPO_PUBLIC_REVENUECAT_TEST_API_KEY:'test_fixture',EXPO_PUBLIC_BYSI_BUILD_MODE:'staging-account',EXPO_PUBLIC_NATIVE_BILLING_ORIGIN:'https://beforeyousayit.app?bypass=1',EXPO_PUBLIC_GENERATE_ENDPOINT:'https://wrong.example/api/generate'})){
    const original=process.env[name];process.env[name]=value;
    expect(()=>configure({config} as any)).toThrow('TestFlight');

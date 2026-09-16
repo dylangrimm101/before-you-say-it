@@ -1,0 +1,12 @@
+import {mock} from 'bun:test';import assert from 'node:assert/strict';
+process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN='https://beforeyousayit.app';delete process.env.EXPO_PUBLIC_BYSI_BUILD_MODE;
+const input=Uint8Array.from([73,68,51,4,0,255,128,1,2,3,4]);const writes:{uri:string,value:string}[]=[];let played=0,blobReads=0;
+mock.module('react-native',()=>({Platform:{OS:'ios'}}));
+mock.module('../lib/supabase',()=>({supabase:{auth:{getSession:async()=>({data:{session:{user:{id:'synthetic-owner'}}}})}},authEnvironment:{url:'https://spvksnddzyvycfoefrcf.supabase.co'}}));
+mock.module('../lib/normalFreeRuntime',()=>({requestNormalFree:async()=>({ok:true,status:200,headers:new Headers({'content-type':'audio/mpeg'}),arrayBuffer:async()=>input.buffer,blob:async()=>{blobReads++;throw Error("Creating blobs from 'ArrayBuffer' and 'ArrayBufferView' are not supported");}})}));
+mock.module('expo-file-system/legacy',()=>({cacheDirectory:'file:///synthetic/',EncodingType:{Base64:'base64'},makeDirectoryAsync:async()=>{},writeAsStringAsync:async(uri:string,value:string)=>{writes.push({uri,value});},getInfoAsync:async()=>({exists:false}),deleteAsync:async()=>{},readDirectoryAsync:async()=>[]}));
+mock.module('expo-audio',()=>({setAudioModeAsync:async()=>{},createAudioPlayer:({uri}:{uri:string})=>{assert.equal(uri,writes[0]?.uri);return {isLoaded:true,currentStatus:{isLoaded:true},volume:1,muted:false,addListener:()=>({remove(){}}),play(){played++;},pause(){},remove(){}};}}));
+const {speak,resetSpeech}=await import('../lib/voice');
+const outcome=await speak('Synthetic approved reply.','woman-hope');await resetSpeech();
+assert.equal(outcome,'played','native TTS should reach player instead of unsupported Blob conversion');assert.equal(blobReads,0);assert.equal(played,1);assert.equal(writes.length,1);assert.deepEqual(Buffer.from(writes[0].value,'base64'),Buffer.from(input));assert(writes[0].uri.includes('synthetic-owner'));
+console.log('PASS actual speak -> native byte conversion -> owner cache -> modeled player. No on-device playback claim.');

@@ -95,12 +95,14 @@ function SharedScenarioPaidPractice({ scenario, lessonTitle, lessonMove, request
   const dictation = useDictation({ paidPractice: true });
   const speech = useSpeech();
   const cancelDictation = dictation.cancel;
+  const cancelDictationRef = useRef(cancelDictation);
+  cancelDictationRef.current = cancelDictation;
   const isLessonPractice = Boolean(convertedLesson || approvedRehearsal);
 
   useEffect(() => () => {
-    cancelDictation().catch(() => {});
+    cancelDictationRef.current().catch(() => {});
     resetSpeech().catch(() => {});
-  }, [cancelDictation]);
+  }, []);
 
   const persist = useCallback(async (next: PersistedScenarioPracticeRun): Promise<void> => {
     await replaceActiveScenarioRunStrict(next, activeRunRevision(valueRef.current));

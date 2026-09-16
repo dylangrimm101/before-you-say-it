@@ -1,7 +1,7 @@
 import {createNativeBilling} from './nativeBilling';
 import {restorePrivateWebResult} from './privateWebResult';
 export type OriginalBenefit = {mode:'repair_plan'|'safety';[key:string]:unknown};
-export type BenefitItem = {id:string;createdAt:string;source:'original_purchase'|'reviewed_original';status:'saved'|'delivery_pending'|'recovery_required'};
+export type BenefitItem = {id:string;createdAt:string;source:'original_purchase'|'reviewed_original';status:'saved'|'checkout_pending'|'delivery_pending'|'recovery_required'};
 export type BenefitRecovery = {status:'not_requested'|'review_needed'|'restored';requestId?:string};
 export type BenefitListing = {ok:true;items:BenefitItem[];recovery:BenefitRecovery;hasMore:boolean};
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
@@ -12,8 +12,8 @@ export function createNormalResults(config:Parameters<typeof createNativeBilling
  const transport=createNativeBilling(config);if(!transport)return null;
  let blocked=false,revision=0;
  const metadata=(v:any)=>{
-  if(!v||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(v.sessionId)||v.source!=='normal-native-free'||!Number.isFinite(Date.parse(v.capturedAt))||!Number.isFinite(Date.parse(v.expiresAt))||Date.parse(v.expiresAt)<=Date.now())throw Error('Saved result unavailable');
-  return {sessionId:v.sessionId as string,source:'normal-native-free' as const,capturedAt:v.capturedAt as string,expiresAt:v.expiresAt as string};
+  if(!v||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(v.sessionId)||v.source!=='normal-native-free'||!Number.isFinite(Date.parse(v.capturedAt))||(v.expiresAt!==null&&(!Number.isFinite(Date.parse(v.expiresAt))||Date.parse(v.expiresAt)<=Date.now())))throw Error('Saved result unavailable');
+  return {sessionId:v.sessionId as string,source:'normal-native-free' as const,capturedAt:v.capturedAt as string,expiresAt:v.expiresAt as string|null};
  };
  const benefitRequest=async(operation:'follow-through/discover'|'follow-through/restore'|'follow-through/recovery',body:Record<string,unknown>,signal?:AbortSignal)=>{
   const before=revision;const current=()=>{if(blocked||before!==revision||signal?.aborted)throw Error('Account changed');};current();
@@ -26,7 +26,7 @@ export function createNormalResults(config:Parameters<typeof createNativeBilling
  return {
  async discoverBenefit(signal?:AbortSignal):Promise<BenefitListing>{
   const v=await benefitRequest('follow-through/discover',{},signal);
-  if(!Array.isArray(v.items)||v.items.length>100||typeof v.hasMore!=='boolean'||!validRecovery(v.recovery)||v.items.some((i:any)=>!UUID.test(i?.id)||!Number.isFinite(Date.parse(i.createdAt))||!['original_purchase','reviewed_original'].includes(i.source)||!['saved','delivery_pending','recovery_required'].includes(i.status)))throw Error('Original benefit unavailable');
+  if(!Array.isArray(v.items)||v.items.length>100||typeof v.hasMore!=='boolean'||!validRecovery(v.recovery)||v.items.some((i:any)=>!UUID.test(i?.id)||!Number.isFinite(Date.parse(i.createdAt))||!['original_purchase','reviewed_original'].includes(i.source)||!['saved','checkout_pending','delivery_pending','recovery_required'].includes(i.status)))throw Error('Original benefit unavailable');
   return v;
  },
  async recoverBenefit(action:'request'|'status',signal?:AbortSignal,receiptReference?:string):Promise<BenefitRecovery>{
@@ -41,11 +41,57 @@ export function createNormalResults(config:Parameters<typeof createNativeBilling
   if(v.id!==id||!v.result||typeof v.result!=='object'||Array.isArray(v.result)||!['repair_plan','safety'].includes(v.result.mode))throw Error('Original benefit unavailable');
   return v.result;
  },
+ async delete(sessionId:string,signal?:AbortSignal):Promise<{deleted:number}>{
+  if(!UUID.test(sessionId))throw Error('Saved result unavailable');
+  const before=revision;const current=()=>{if(blocked||before!==revision||signal?.aborted)throw Error('Account changed');};current();
+  const response=await transport.request('results/delete',{sessionId},15000,signal);current();
+  const value=await response.json();current();
+  if(!response.ok||value?.ok!==true||value.deleted!==1||Object.keys(value).some(k=>!['ok','deleted'].includes(k)))throw Error('Saved result unavailable');
+  return {deleted:value.deleted};
+ },
+ async deleteAll(signal?:AbortSignal):Promise<{deleted:number}>{
+  const before=revision;const current=()=>{if(blocked||before!==revision||signal?.aborted)throw Error('Account changed');};current();
+  const response=await transport.request('results/delete',{all:true},15000,signal);current();
+  const value=await response.json();current();
+  if(!response.ok||value?.ok!==true||!Number.isInteger(value.deleted)||value.deleted<0||Object.keys(value).some(k=>!['ok','deleted'].includes(k)))throw Error('Saved result unavailable');
+  return {deleted:value.deleted};
+ },
+ async claimGuest(sessionId:string,sourceAccessToken:string,signal?:AbortSignal):Promise<string>{
+  if(!UUID.test(sessionId)||!/^[^\s]+$/.test(sourceAccessToken)||sourceAccessToken.length>8192)throw Error('Saved result unavailable');
+  const before=revision;const current=()=>{if(blocked||before!==revision||signal?.aborted)throw Error('Account changed');};current();
+  const response=await transport.request('results/claim',{sessionId,sourceAuthorization:'Bearer '+sourceAccessToken},15000,signal);current();
+  const value=await response.json();current();
+  if(!response.ok||value?.ok!==true||value.sessionId!==sessionId||Object.keys(value).some(k=>!['ok','sessionId'].includes(k)))throw Error('Saved result unavailable');
+  return value.sessionId as string;
+ },
+ async restore(sessionId:string,signal?:AbortSignal){
+  if(!UUID.test(sessionId))throw Error('Saved result unavailable');
+  const before=revision;const current=()=>{if(blocked||before!==revision||signal?.aborted)throw Error('Account changed');};current();
+  const response=await transport.request('results/restore',{sessionId},15000,signal);current();
+  const restored=await response.json();current();
+  if(!response.ok||Object.keys(restored).some(k=>!['sessionId','source','capturedAt','expiresAt','privateResult'].includes(k)))throw Error('Saved result unavailable');
+  const item=metadata(restored);
+  const privateResult=restorePrivateWebResult(restored.privateResult);
+  if(privateResult.provenance.generated_at!==item.capturedAt)throw Error('Saved result changed');
+  return {...item,privateResult};
+ },
+ async history(signal?:AbortSignal){
+  const before=revision;const current=()=>{if(blocked||before!==revision||signal?.aborted)throw Error('Account changed');};current();
+  const items:any[]=[];let cursor:string|null=null;
+  do{
+   const response=await transport.request('results/discover',{limit:20,cursor},15000,signal);current();
+   const listing=await response.json();current();
+   if(!response.ok||!Array.isArray(listing.items)||listing.items.length>20||(listing.nextCursor!==null&&typeof listing.nextCursor!=='string')||Object.keys(listing).some(k=>!['items','nextCursor'].includes(k)))throw Error('Saved result unavailable');
+   items.push(...listing.items.map(metadata));cursor=listing.nextCursor;
+  }while(cursor&&items.length<=500);
+  if(cursor)throw Error('Saved result unavailable');
+  return items;
+ },
  suspend(){blocked=true;revision++;transport.invalidate();},resume(){blocked=false;},invalidate(){revision++;transport.invalidate();},dispose:transport.dispose,async latest(signal?:AbortSignal){
   const before=revision;const current=()=>{if(blocked||before!==revision||signal?.aborted)throw Error('Account changed');};current();
   const r=await transport.request('results/discover',{limit:1,cursor:null},15000,signal);current();
   const listing=await r.json();current();
-  if(!r.ok||!Array.isArray(listing.items)||listing.items.length>1||listing.nextCursor!==null||Object.keys(listing).some(k=>!['items','nextCursor'].includes(k)))throw Error('Saved result unavailable');
+  if(!r.ok||!Array.isArray(listing.items)||listing.items.length>1||(listing.nextCursor!==null&&typeof listing.nextCursor!=='string')||Object.keys(listing).some(k=>!['items','nextCursor'].includes(k)))throw Error('Saved result unavailable');
   if(!listing.items.length)return null;
   const item=metadata(listing.items[0]);
   const response=await transport.request('results/restore',{sessionId:item.sessionId},15000,signal);current();

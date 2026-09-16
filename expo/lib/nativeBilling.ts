@@ -8,19 +8,23 @@ export function createNativeBilling(config:{enabled:boolean;authUrl?:string;orig
  let revision=0,disposed=false,suspended=false,owner:string|null=null;
  const pending=new Set<AbortController>();
  const invalidate=()=>{revision++;for(const control of pending)control.abort();};
- const subscription=auth.onAuthStateChange((event,session)=>{const next=session?.user.id??null;if(next!==owner||!['INITIAL_SESSION','TOKEN_REFRESHED'].includes(event))invalidate();owner=next;}).data.subscription;
- async function request(operation:'identify'|'access'|'generate'|'tts'|'transcribe'|'results/discover'|'results/restore'|'follow-through/discover'|'follow-through/restore'|'follow-through/recovery',payload:Record<string,unknown>|FormData={},timeoutMs=operation==='generate'?75000:operation==='transcribe'?45000:15000,externalSignal?:AbortSignal){
+ const subscription=auth.onAuthStateChange((event,session)=>{const next=session?.user.id??null;if(event==='SIGNED_OUT'||(next!==owner&&owner!==null))invalidate();owner=next;}).data.subscription;
+ async function request(operation:'identify'|'access'|'generate'|'tts'|'transcribe'|'results/discover'|'results/restore'|'results/delete'|'results/claim'|'follow-through/discover'|'follow-through/restore'|'follow-through/recovery',payload:Record<string,unknown>|FormData={},timeoutMs=operation==='generate'?75000:operation==='transcribe'?45000:15000,externalSignal?:AbortSignal){
   const before=revision,control=new AbortController();pending.add(control);
   const abort=()=>control.abort();externalSignal?.addEventListener("abort",abort,{once:true});if(externalSignal?.aborted)abort();
   const current=()=>{if(disposed||(suspended&&operation!=='identify')||before!==revision||control.signal.aborted)throw Error('Account changed');};
   try{return await withRequestDeadline(async signal=>{
    current();const s=await auth.getSession();current();const session=s.data.session;
    if(s.error||!session)throw Error('Sign in to verify your purchase');
+   // Bind the request owner before the awaited server verification. This does not
+   // grant access; it makes an account switch during getUser cancel this request.
+   if(owner!==null&&owner!==session.user.id)throw Error('Account changed');
+   owner=session.user.id;
    const verified=await auth.getUser(session.access_token);current();const user=verified.data.user;
    if(verified.error||!user||user.id!==session.user.id||user.is_anonymous!==false||!user.email_confirmed_at)throw Error('Confirmed account required');
    owner=user.id;
    const response=await send(origin+(operation.startsWith('follow-through/')?'/api/':'/api/native/')+operation,{method:'POST',headers:{...(payload instanceof FormData?{}:{'Content-Type':'application/json'}),Authorization:'Bearer '+session.access_token},body:payload instanceof FormData?payload:JSON.stringify(payload),signal,redirect:'error',credentials:'omit',cache:'no-store'});current();
-   const bytes=await response.arrayBuffer();current();signal.throwIfAborted();
+   const bytes=await response.arrayBuffer();current();if(signal.aborted)throw Error('Request aborted');
    if(bytes.byteLength>(operation==='tts'?2097152:131072)||response.redirected)throw Error('Billing response invalid');
    return new Response(bytes,{status:response.status,headers:response.headers});
   },timeoutMs,control.signal);}finally{pending.delete(control);externalSignal?.removeEventListener("abort",abort);}

@@ -13,10 +13,11 @@ describe("remaining native acquisition and paid experience", () => {
     expect(layout).toContain('router.replace("/entry")');
     expect(layout).toContain("!hasLocalJourney");
     expect(entry).toContain("Build the qualities of world-class communicators.");
-    expect(entry).toContain('label="Sign up now"');
-    expect(entry).toContain('label="Log in"');
+    expect(entry).toContain('label="Get started"');
+    expect(entry).toContain('label="I already have an account"');
     expect(entry).toContain("await beginNativeJourney()");
     expect(entry).toContain('router.replace("/onboarding")');
+    expect(entry).not.toContain('mode: "signup"');
     expect(onboarding).toContain("useState<number>(0)");
   });
 
@@ -109,7 +110,7 @@ describe("remaining native acquisition and paid experience", () => {
     expect(layout).toContain("user || profile || activePracticeSession || nativeJourneyStarted");
     expect(layout).toContain("activePracticeSession?.sharedResult");
     expect(layout).toContain("<AuthProvider>");
-    expect(continuation).toContain("Use the same account you used on the web");
+    expect(continuation).toContain("Enter your email");
     expect(continuation).toContain("await login(email, password, hasCurrentGuestPractice)");
     expect(auth).toContain("supabase.auth.signInWithPassword");
     expect(auth).toContain("identifyPurchasesUser");

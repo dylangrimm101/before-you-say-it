@@ -15,7 +15,8 @@ const sdk=createClient(authOrigin,'synthetic-public',{global:{fetch:authFetch},a
 // Real complete source schemas, same DB for result and paid authority.
 const {createServerClients}=await import(web+'/server/revenuecat/http.mjs');const verify=createServerClients({authOrigin,publicKey:'synthetic-public',revenueCatKey:'unused',fetch:authFetch});
 const {createFreeRuntime}=await import(web+'/server/native-free/runtime.mjs');
-const runtime=createFreeRuntime({database:contentDatabase,fetch:authFetch,env:{BYSI_NATIVE_FREE:'registered-v1',BYSI_NATIVE_FREE_PROVENANCE_KEY:'a'.repeat(64),BYSI_NATIVE_SERVICE:'account-v1',BYSI_NATIVE_SERVICE_DATABASE_URL:'postgres://bysi_native_service:fixture@db.spvksnddzyvycfoefrcf.supabase.co:5432/postgres?sslmode=verify-full',BYSI_NATIVE_ORIGIN:origin,BYSI_NATIVE_AUTH_ORIGIN:authOrigin,BYSI_NATIVE_PUBLISHABLE_KEY:'synthetic-public',BYSI_REVENUECAT_SERVER_KEY:'synthetic-server',BYSI_REVENUECAT_WEBHOOK_AUTHORIZATION:'synthetic-webhook-authorization-not-live'}});
+const providerCosts=JSON.stringify({pushback:1,close:1,result:1,tts_pushback:1,tts_close:1,transcribe_opener:1,transcribe_reply:1});
+const runtime=createFreeRuntime({database:contentDatabase,fetch:authFetch,env:{BYSI_NATIVE_FREE:'registered-v1',BYSI_NATIVE_FREE_PROVENANCE_KEY:'a'.repeat(64),BYSI_NATIVE_FREE_DAILY_SPEND_CENTS:'500',BYSI_NATIVE_FREE_PROVIDER_COST_CENTS:providerCosts,BYSI_NATIVE_SERVICE:'account-v1',BYSI_NATIVE_SERVICE_DATABASE_URL:'postgres://bysi_native_service:fixture@db.spvksnddzyvycfoefrcf.supabase.co:5432/postgres?sslmode=verify-full',BYSI_NATIVE_ORIGIN:origin,BYSI_NATIVE_AUTH_ORIGIN:authOrigin,BYSI_NATIVE_PUBLISHABLE_KEY:'synthetic-public',BYSI_REVENUECAT_SERVER_KEY:'synthetic-server',BYSI_REVENUECAT_WEBHOOK_AUTHORIZATION:'synthetic-webhook-authorization-not-live'}});
 mock.module(web+'/server/native-free/runtime.mjs',()=>({createFreeRuntime,getFreeRuntime:()=>runtime}));
 const mounts:Record<string,any>={};for(const op of ['session','generate','tts','transcribe'])mounts[op]=(await import(web+'/app/api/native/free/'+op+'/route.js')).POST;
 const {NextRequest}=await import(web+'/node_modules/next/server.js');
@@ -43,7 +44,7 @@ const paidRoutes:any={};for(const op of ['identify','access','generate','tts','t
 const {createResultsRuntime}=await import(web+'/server/normal-results/runtime.mjs');
 const content=createResultsRuntime({database:contentDatabase,env:{BYSI_NATIVE_RESULTS:'normal-results-v1',BYSI_NATIVE_ORIGIN:origin,BYSI_NATIVE_AUTH_ORIGIN:authOrigin,BYSI_NATIVE_SERVICE_DATABASE_URL:'postgres://bysi_native_service:fixture@db.spvksnddzyvycfoefrcf.supabase.co:5432/postgres?sslmode=verify-full',BYSI_NATIVE_PUBLISHABLE_KEY:'synthetic-public'},fetch:authFetch});
 mock.module(web+'/server/normal-results/runtime.mjs',()=>({createResultsRuntime,getResultsRuntime:()=>content}));
-const contentRoutes:any={};for(const op of ['discover','restore'])contentRoutes[op]=(await import(web+'/app/api/native/results/'+op+'/route.js')).POST;
+const contentRoutes:any={};for(const op of ['discover','restore','delete','claim'])contentRoutes[op]=(await import(web+'/app/api/native/results/'+op+'/route.js')).POST;
 async function billingEvent(type='INITIAL_PURCHASE'){
  const r=await paid.authority.webhook(new NextRequest(origin+'/api/native/webhook',{method:'POST',headers:{authorization:secret,'content-type':'application/json'},body:JSON.stringify({api_version:'1.0',event:{id:'fixture-'+(++sequence),type,app_id:'appab45402f36',event_timestamp_ms:now+sequence,app_user_id:rcId,original_app_user_id:rcId,aliases:[rcId],environment:'PRODUCTION',store:'APP_STORE',product_id:'byis_pro_monthly_5',entitlement_ids:['pro'],transaction_id:'fixture-tx',is_family_share:false}})}));assert.equal(r.status,200);
 }
@@ -143,13 +144,9 @@ async function input(value:string){assert.equal(root.root.findAllByType('input')
 try{
  await act(async()=>{root=create(React.createElement(Harness));});await flush();await flush();
  assert.equal(routePath(),'/entry');assert.equal(account.user,null);
- if(outputMode==='saved'){await capture(db);await press('Log in');await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});await press('Log in');assert.equal(routePath(),'/saved-result');}
+ if(outputMode==='saved'){await capture(db);await press('I already have an account');await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});await press('Log in');assert.equal(routePath(),'/saved-result');}
  else {
- await press('Sign up now');assert.equal(routePath(),'/continue-from-web');
- await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});
- await press('Create account');assert.ok(text().includes('Check your email'));assert.equal(account.user,null);
- await press('I confirmed my email — log in');await flush();assert.equal(account.user.id,owner);assert.equal(routePath(),'/account-practice');
- await press('Start a new account rehearsal');assert.equal(routePath(),'/onboarding');
+ await press('Get started');assert.equal(routePath(),'/onboarding');
  await press('I know what I want to get better at');await press(DESIRED_SKILLS[0].label);await press(PRESSURE_CONDITIONS[0].label);await press('Work');
  assert.equal(route.pathname,'/rehearse/[id]');const runId=store.activePracticeSession.id;
  assert.equal(routePath(),'/rehearse/[id]');await press('Start my rehearsal');await press('Type this turn instead');
@@ -261,10 +258,10 @@ await go('/saved-result');await flush();await flush();await press('Continue to n
   const oldOwner=account.practiceOwner;await go('/entry');await press('Sign out');await flush();
   assert.equal(account.user,null);assert.equal(store.convertedLessonProgress.length,0);assert.equal(store.activeScenarioRun,null);assert.equal(oldOwner.storage.isActive(),false);
   transportUser={...user,id:'22222222-2222-4222-8222-222222222222',email:'second@invalid'};
-  await press('Log in');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(transportUser.email);fields[1].props.onChangeText('synthetic-only-password');});
+  await press('I already have an account');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(transportUser.email);fields[1].props.onChangeText('synthetic-only-password');});
   await press('Log in');await flush();assert.ok(account.user,'second login: '+text());assert.equal(account.user.id,transportUser.id);assert.equal(routePath(),'/saved-result');await flush();assert.ok(text().includes('We couldn’t find a saved result linked to this account.'));assert.ok(text().includes('Don’t buy the same plan again.'));assert.equal(store.convertedLessonProgress.length,0);assert.equal(store.activePracticeSession,null);
   await restart();assert.equal(store.convertedLessonProgress.length,0);assert.equal(store.activePracticeSession,null);
-  await go('/entry');await press('Sign out');transportUser=user;await press('Log in');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(user.email);fields[1].props.onChangeText('synthetic-only-password');});await press('Log in');await flush();
+  await go('/entry');await press('Sign out');transportUser=user;await press('I already have an account');await act(async()=>{const fields=root.root.findAllByType('input');fields[0].props.onChangeText(user.email);fields[1].props.onChangeText('synthetic-only-password');});await press('Log in');await flush();
   assert.deepEqual(store.convertedLessonProgress,progress);assert.equal(store.activeScenarioRun,null);
   console.log('PASS joined first lesson: library control → approved transcripts → counterpart → retry/comparison → completion → root cold owner hydration; synthetic paid admission/replies only');
 

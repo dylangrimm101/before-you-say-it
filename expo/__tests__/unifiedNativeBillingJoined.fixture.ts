@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {plugin} from 'bun';
 // Counterfactual RED uses exact untouched baseline component bytes, no source rollback.
 if(process.env.BYSI_BASE_GATE==='1')plugin({name:'baseline-gate-proof',setup(build){build.onLoad({filter:/NativeBillingGate\.tsx$/},()=>({contents:readFileSync('/Users/donaldgrimm/bysi-native-release-tools/account-deletion-build/testflight-integration-20260911/web-access-approved-run/snapshot/Users/donaldgrimm/bysi-testflight-foundation/expo/components/NativeBillingGate.tsx','utf8'),loader:'tsx'}));}});
@@ -47,6 +48,9 @@ mock.module('@/lib/supabase',()=>({supabase:{auth},isAuthConfigured:true,authEnv
 const host=(p:any)=>React.createElement('host',p,p.children);
 mock.module('react-native',()=>({Platform:{OS:'ios',select:(v:any)=>v.ios},AppState:{addEventListener:()=>({remove(){}})},View:host,Text:host}));
 mock.module('expo-constants',()=>({ExecutionEnvironment:{StoreClient:'go'},default:{executionEnvironment:'standalone'}}));
+mock.module('expo-application',()=>({applicationId:'fixture.app'}));
+mock.module('expo-secure-store',()=>({AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY:1,isAvailableAsync:async()=>true,getItemAsync:async()=>null,setItemAsync:async()=>{},deleteItemAsync:async()=>{}}));
+mock.module('expo-crypto',()=>({CryptoDigestAlgorithm:{SHA256:'sha256'},digestStringAsync:async(_:string,value:string)=>createHash('sha256').update(value).digest('hex')}));
 const disk=new Map();mock.module('@react-native-async-storage/async-storage',()=>({default:{getItem:async(k:any)=>disk.get(k)??null,setItem:async(k:any,v:any)=>{disk.set(k,v);},getAllKeys:async()=>[...disk.keys()],multiRemove:async()=>{}}}));
 mock.module('@/lib/guestContinuationRuntime',()=>({createGuestContinuationRuntime:()=>({durable:false,dispose(){},pending:()=>false,available:()=>false,invalidate:async()=>{},restore:async()=>{}})}));
 let rcId='anonymous',sdkPro=false,sequence=0;

@@ -430,7 +430,8 @@ const [OwnerStoreProvider, useStore] = createContextHook(() => {
     // Do not carry an opt-in custom-context retention setting into another account.
     if (JSON.stringify(sanitizeActivePracticeSessionForPersistence(persisted, { ...normalizeConsent(null), saveCustomScenarioText: false })) !== raw) return;
     await auth.sealCurrentGuestPractice(AsyncStorage, session.id);
-  }), [auth.sealCurrentGuestPractice, commitActivePracticeSession, AsyncStorage]);
+    await auth.stageCurrentGuestResultClaim?.(AsyncStorage);
+  }), [auth.sealCurrentGuestPractice, auth.stageCurrentGuestResultClaim, commitActivePracticeSession, AsyncStorage]);
 
   const attachCurrentGuestPractice = useCallback(() => serializeStoreOperation(AsyncStorage, async () => {
     if (activePracticeSessionRef.current) throw new Error("Account already has a rehearsal");
@@ -651,10 +652,10 @@ const [OwnerStoreProvider, useStore] = createContextHook(() => {
         title: "Your conversation",
         counterpart: activePracticeSession.counterpart,
         situation: activePracticeSession.topic,
-        persona: `Respond as ${activePracticeSession.counterpart} in this private rehearsal.`,
+        persona: typeof activePracticeSession.normalFreeContract?.counterpart_persona === "string" ? activePracticeSession.normalFreeContract.counterpart_persona : `Respond as ${activePracticeSession.counterpart} in this private rehearsal.`,
         goal: activePracticeSession.usefulOutcome,
-        openingLine: "",
-        opensWith: "user",
+        openingLine: typeof activePracticeSession.normalFreeContract?.opening_line === "string" ? activePracticeSession.normalFreeContract.opening_line : "",
+        opensWith: activePracticeSession.normalFreeContract?.opens_with === "counterpart" ? "counterpart" : "user",
         minutes: 5,
         isCustom: true,
       };

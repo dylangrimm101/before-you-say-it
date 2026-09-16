@@ -49,6 +49,10 @@ assert.deepEqual(await visit('safety'),[]);
 store={...store,profile:null,activePracticeSession:null,nativeJourneyStarted:false};
 account={...account,user:{id:'registered-A'}};
 for(const path of ['(tabs)','(tabs)/library','(tabs)/progress','settings','delete-account','path','privacy'])assert.deepEqual(await visit(path),[],`returning account: ${path}`);
+// Release routing must not depend on an optional saved-content endpoint.
+store={...store,profile:{persona:'woman-hope'},activePracticeSession:{id:'saved',sharedResult:{},freeJourneyCheckpoint:'result'}};
+for(const path of ['saved-result','approved-lesson/m1-l1','approved-rehearsal/m1-l1','quick-rep/m1-l1','path','settings','(tabs)','paywall'])assert.deepEqual(await visit(path),[],`registered result must not intercept ${path} when normalResults is absent`);
+store={...store,profile:null,activePracticeSession:null};
 let acknowledged='';
 account={...account,restoredGuestContinuationId:'device-run',acknowledgeGuestContinuation:async(id:string)=>{acknowledged=id;}};
 store={...store,activePracticeSession:{id:'device-run',sharedResult:{},freeJourneyCheckpoint:'complete'}};

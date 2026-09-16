@@ -17,6 +17,7 @@ import { accountDeletionAvailable, cleanupDeletedAccountOwner, quarantineDeleted
 import {createReceiptlessDeletionCoordinator} from "@/lib/receiptlessDeletionJournal";
 import { authEnvironment, isAuthConfigured, supabase } from "@/lib/supabase";
 import { createStagingWebBridge, REVIEWED_STAGING_BRIDGE, type StagingWebBridge } from "@/lib/stagingWebBridge";
+import { clearNormalResultClaimRetry, isValidNormalResultSessionId, readNormalResultClaimRetry, saveNormalResultClaimRetry } from "@/lib/normalResultClaimRetry";
 declare const require: ((name: string) => unknown) | undefined;
 
 interface LoginResult {
@@ -26,6 +27,9 @@ interface LoginResult {
   continuationId?: string;
   continuationProblem?: boolean;
 }
+
+const NATIVE_JOURNEY_STARTED_KEY = "cc.nativeJourneyStarted.v1";
+type PendingGuestResultClaim = { ownerId: string; sessionId: string };
 
 function loginMessage(message: string): string {
   const normalized = message.toLowerCase();
@@ -59,12 +63,15 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const loginVerified = useRef(false);
   const loginCancelled = useRef(false);
   const authRevision = useRef(0);
+  const authInvalidationRevision = useRef(0);
   const [practiceOwner, setPracticeOwner] = useState<{ key: string; storage: OwnerPracticeStorage } | null>(null);
   const ownerRef = useRef<{ identity: string | null; guest: boolean; key: string; storage: OwnerPracticeStorage } | null>(null);
   const continuation = useMemo(() => createGuestContinuationRuntime(AsyncStorage, Platform.OS, JSON.stringify([authEnvironment?.url ?? "local", authEnvironment?.keychainService ?? "beforeyousayit.supabase"])), []);
   const [, setContinuationRevision] = useState(0);
   const [continuationIssue, setContinuationIssue] = useState("");
   const [restoredGuestContinuationId, setRestoredGuestContinuationId] = useState<string | null>(null);
+  const [pendingGuestResultClaim, setPendingGuestResultClaim] = useState<PendingGuestResultClaim | null>(null);
+  const pendingGuestResultClaimRef = useRef<PendingGuestResultClaim | null>(null);
   const presentationPending = useRef(false);
   const ownerGeneration = useRef(0);
   const logoutPending = useRef(false);
@@ -88,9 +95,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     const guest = next?.user.is_anonymous === true;
     if (!ownerRef.current || !ownerRef.current.storage.isActive() || ownerRef.current.identity !== identity || ownerRef.current.guest !== guest) {
       if (ownerRef.current && !verifiedGuestSource && !preserveContinuation) void Promise.resolve(continuation.invalidate()).catch(() => setContinuationIssue("Device handoff could not be cleared. Keep this device locked and retry sign out."));
+      if (ownerRef.current && !ownerRef.current.guest) void clearNormalResultClaimRetry(ownerRef.current.identity);
       setContinuationIssue("");
       ownerRef.current?.storage.invalidate();
       setRestoredGuestContinuationId(null);
+      pendingGuestResultClaimRef.current = null;
+      setPendingGuestResultClaim(null);
       clearLiveSessionContent();
       void queryClient.cancelQueries();
       queryClient.clear();
@@ -104,7 +114,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     }
     if (!deferPublication) setSession(next);
   }, [queryClient, continuation, ownerBlocked]);
-  const ensureNativeSession = useMemo(() => createNativeSessionStarter(supabase?.auth ?? null), []);
+  const ensureNativeSession = useMemo(() => createNativeSessionStarter(supabase?.auth ?? null, undefined, {
+    snapshot: () => ({ revision: authRevision.current, ownerId: ownerRef.current?.identity ?? null, logoutPending: logoutPending.current, invalidationRevision: authInvalidationRevision.current }),
+  }), []);
 
   const syncPurchases = useCallback(async (nextSession: Session | null): Promise<void> => {
     const generation = ++purchasesGeneration.current;
@@ -239,6 +251,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       if(ownerBlocked(nextSession?.user.id??null)){
         setTimeout(()=>{void checkAccountStatus();},0);return;
       }
+      const previousOwner = ownerRef.current?.identity ?? null;
+      const nextOwner = nextSession?.user.id ?? null;
+      if (previousOwner !== null && nextOwner !== previousOwner) ++authInvalidationRevision.current;
       ++authRevision.current;
       if (loginPending.current && !loginVerified.current) return;
       applySession(nextSession);setIsAuthLoading(false);
@@ -267,10 +282,35 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, [coordinator,checkAccountStatus]);
 
   const startNativeSession = useCallback(async () => {
+    const changed = { success: false as const, message: "Account changed while starting practice. Please try again." };
     const before = authRevision.current;
     const result = await ensureNativeSession();
-    if (logoutPending.current || before !== authRevision.current) return { success: false as const, message: "Account changed while starting practice. Please try again." };
-    if (result.success) applySession(result.session);
+    let acceptedRevision = authRevision.current;
+    if (logoutPending.current) return changed;
+    if (before !== acceptedRevision) {
+      if (!result.success || !supabase) return changed;
+      const live = await supabase.auth.getSession();
+      if (logoutPending.current || acceptedRevision !== authRevision.current) return changed;
+      if (live.error || live.data.session?.user.id !== result.session.user.id || live.data.session.access_token !== result.session.access_token) {
+        return changed;
+      }
+      acceptedRevision = authRevision.current;
+    }
+    if (result.success) {
+      applySession(result.session);
+      const owner = ownerRef.current;
+      if (!owner || owner.identity !== result.session.user.id || !owner.storage.isActive()) {
+        return changed;
+      }
+      try {
+        await owner.storage.setItem(NATIVE_JOURNEY_STARTED_KEY, "1");
+        if (logoutPending.current || acceptedRevision !== authRevision.current || ownerRef.current?.storage !== owner.storage || ownerRef.current.identity !== result.session.user.id || !owner.storage.isActive()) {
+          return changed;
+        }
+      } catch {
+        return { success: false as const, message: "We couldn’t start your practice. Please try again." };
+      }
+    }
     return result;
   }, [applySession, ensureNativeSession]);
 
@@ -287,9 +327,13 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     loginCancelled.current = false;
     try {
       const consentSource = saveCurrentResult && ownerRef.current?.guest ? ownerRef.current.storage : undefined;
+      const localGuestContinuation = Boolean(consentSource && continuation.pending(consentSource));
+      const claimedGuestResult = pendingGuestResultClaimRef.current;
       if (saveCurrentResult) {
-        if (!consentSource || !continuation.pending(consentSource)) return { success: false, message: "This current rehearsal is no longer available to save. No account data was changed." };
-        await continuation.prepare(consentSource, normalizedEmail);
+        if (!localGuestContinuation && !claimedGuestResult) return { success: false, message: "This current rehearsal is no longer available to save. No account data was changed." };
+        if (localGuestContinuation && consentSource) {
+          await continuation.prepare(consentSource, normalizedEmail);
+        }
       }
       let current = await supabase.auth.getSession();
       if (current.error) return { success: false, message: "We couldn’t verify the current account. Please try again." };
@@ -302,6 +346,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         return { success: false, message: "This device has another account’s practice. Switching accounts isn’t available yet; continue with the current account." };
       }
       if (loginCancelled.current) return { success: false, message: "Login cancelled. Your rehearsal was not attached." };
+      const guestServerClaim = saveCurrentResult && current.data.session?.user.is_anonymous === true && current.data.session.access_token
+        ? { accessToken: current.data.session.access_token, sessionId: claimedGuestResult?.ownerId === current.data.session.user.id ? claimedGuestResult.sessionId : await import("@/lib/normalFreeRuntime").then(module => module.currentNormalFreeSessionId(current.data.session)).catch(() => null) }
+        : null;
       const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (loginCancelled.current) return { success: false, message: "Login cancelled. Your rehearsal was not attached." };
       if (error || !data.session) return { success: false, message: loginMessage(error?.message ?? "Login failed") };
@@ -337,13 +384,54 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       let continuationId: string | undefined;
       let continuationProblem = false;
       if (saveCurrentResult && verifiedLease) {
-        try {
+        if (guestServerClaim?.sessionId && normalResults) {
+          const claimRevision = authRevision.current;
+          const claimDestinationOwnerId = owner.id;
+          const claimDestinationAccessToken = data.session.access_token;
+          const claimStillCurrent = () => authRevision.current === claimRevision
+            && !logoutPending.current
+            && ownerRef.current?.storage === verifiedLease
+            && ownerRef.current.identity === claimDestinationOwnerId
+            && verifiedLease.isActive();
+          const retry = {
+            schemaVersion: 1 as const,
+            sourceOwnerId: claimedGuestResult?.ownerId ?? current.data.session!.user.id,
+            destinationOwnerId: claimDestinationOwnerId,
+            sessionId: guestServerClaim.sessionId,
+            sourceAccessToken: guestServerClaim.accessToken,
+            createdAt: Date.now(),
+          };
+          try { await saveNormalResultClaimRetry(retry); } catch { continuationProblem = true; }
+          const claimReadback = await supabase.auth.getSession();
+          if (!claimStillCurrent()
+            || claimReadback.error
+            || claimReadback.data.session?.user.id !== claimDestinationOwnerId
+            || claimReadback.data.session?.access_token !== claimDestinationAccessToken) {
+            await clearNormalResultClaimRetry(claimDestinationOwnerId);
+            continuationProblem = true;
+            setContinuationIssue("Account changed while saving this result. Server ownership was not transferred; log in again before retrying.");
+          } else {
+            try {
+              if (!claimStillCurrent()) throw new Error("Account changed before claim");
+              await normalResults.claimGuest(guestServerClaim.sessionId, guestServerClaim.accessToken);
+              await clearNormalResultClaimRetry(claimDestinationOwnerId);
+            } catch {
+              continuationProblem = true;
+              setContinuationIssue("You are signed in, but server ownership of the guest saved result was not confirmed. Existing account results were not overwritten. Retry from saved results if it appears locally; do not repeat or repurchase.");
+            }
+          }
+        }
+        if (localGuestContinuation) try {
           const raw = await continuation.claim(verifiedLease);
           continuationId = (JSON.parse(raw) as { id: string }).id;
           if (continuation.durable) setRestoredGuestContinuationId(continuationId);
         } catch {
           continuationProblem = true;
           setContinuationIssue("You are signed in, but saving this rehearsal was not confirmed. Existing account practice was not overwritten. Retry if offered, or continue the saved rehearsal if it is present. This save did not restart the assessment; an unconfirmed write cannot be retried safely.");
+        }
+        if (!continuationProblem && guestServerClaim?.sessionId === pendingGuestResultClaimRef.current?.sessionId) {
+          pendingGuestResultClaimRef.current = null;
+          setPendingGuestResultClaim(null);
         }
         if (revision !== authRevision.current || ownerRef.current?.storage !== verifiedLease || !verifiedLease.isActive()) {
           await continuation.invalidate();
@@ -363,6 +451,32 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     }
     });
   }, [applySession, syncPurchases, continuation, initializeJournal, serializeMutation, ownerBlocked, checkAccountStatus]);
+
+  const retryCurrentGuestResultClaim = useCallback(async (): Promise<boolean> => {
+    if (!session || session.user.is_anonymous === true || !normalResults || logoutPending.current || ownerBlocked(session.user.id)) return false;
+    const owner = ownerRef.current;
+    if (!owner || owner.identity !== session.user.id || owner.guest || !owner.storage.isActive()) return false;
+    const before = authRevision.current;
+    const retry = await readNormalResultClaimRetry(session.user.id);
+    if (!retry) return false;
+    if (before !== authRevision.current || ownerRef.current !== owner || !owner.storage.isActive() || logoutPending.current || loginPending.current) return false;
+    try {
+      await normalResults.claimGuest(retry.sessionId, retry.sourceAccessToken);
+      if (before !== authRevision.current || ownerRef.current !== owner || !owner.storage.isActive() || logoutPending.current) return false;
+      await clearNormalResultClaimRetry(session.user.id);
+      if (pendingGuestResultClaimRef.current?.sessionId === retry.sessionId) {
+        pendingGuestResultClaimRef.current = null;
+        setPendingGuestResultClaim(null);
+      }
+      setContinuationIssue("");
+      return true;
+    } catch {
+      if (before === authRevision.current && ownerRef.current === owner && owner.storage.isActive()) {
+        setContinuationIssue("Server ownership of the guest saved result is still unconfirmed. Existing account results were not overwritten. Retry again before generating anything new.");
+      }
+      return false;
+    }
+  }, [normalResults, ownerBlocked, session]);
 
   const cancelLogin = useCallback(() => {
     if (!loginPending.current) return;
@@ -413,6 +527,19 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     await continuation.seal(source, id);
     setContinuationRevision(value => value + 1);
   }, [continuation]);
+  const stageCurrentGuestResultClaim = useCallback(async (source: OwnerPracticeStorage) => {
+    if (!ownerRef.current?.guest || ownerRef.current.storage !== source || !source.isActive() || !supabase) return;
+    const owner = ownerRef.current;
+    const before = authRevision.current;
+    const current = await supabase.auth.getSession();
+    if (before !== authRevision.current || !owner.storage.isActive() || ownerRef.current !== owner || current.error || current.data.session?.user.id !== owner.identity || current.data.session.user.is_anonymous !== true) return;
+    const sessionId = await import("@/lib/normalFreeRuntime").then(module => module.currentNormalFreeSessionId(current.data.session)).catch(() => null);
+    if (before !== authRevision.current || !owner.storage.isActive() || ownerRef.current !== owner || !isValidNormalResultSessionId(sessionId)) return;
+    const claim = { ownerId: owner.identity!, sessionId };
+    pendingGuestResultClaimRef.current = claim;
+    setPendingGuestResultClaim(claim);
+    setContinuationRevision(value => value + 1);
+  }, []);
   const acknowledgeGuestContinuation = useCallback(async (id: string) => {
     const lease=ownerRef.current?.storage;
     if (!lease || ownerRef.current?.guest || presentationPending.current || id !== restoredGuestContinuationId) return;
@@ -460,9 +587,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     acknowledgeGuestContinuation,
     beginCurrentGuestPractice,
     sealCurrentGuestPractice,
+    stageCurrentGuestResultClaim,
     stageCurrentGuestAssessment,
     attachCurrentGuestPractice,
-    hasCurrentGuestPractice: Boolean(practiceOwner && continuation.pending(practiceOwner.storage)),
+    hasCurrentGuestPractice: Boolean(practiceOwner && (continuation.pending(practiceOwner.storage) || (pendingGuestResultClaim && ownerRef.current?.storage === practiceOwner.storage && pendingGuestResultClaim.ownerId === ownerRef.current.identity))),
     canAttachCurrentGuestPractice: Boolean(practiceOwner && continuation.available(practiceOwner.storage)),
     practiceOwner,
     stagingPracticeAccess,
@@ -474,6 +602,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     isLoggingOut,
     stagingWebBridge,
     normalResults,
+    retryCurrentGuestResultClaim,
     isAuthConfigured,
     isAuthLoading,
     session,

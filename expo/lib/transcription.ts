@@ -62,18 +62,18 @@ export async function transcribeRecording(
       const body = new FormData();
       body.append("turn", turn);
 
-      if (Platform.OS === "web") {
+      if (Platform.OS === 'web') {
         const audioResponse = await fetch(uri, { signal });
         if (!audioResponse.ok) throw new Error("Recorded audio could not be read");
         const audioBlob = await audioResponse.blob();
-        body.append("audio", audioBlob, fileNameFor(mediaType || audioBlob.type));
+        body.append("audio", audioBlob, fileNameFor(mediaType || audioBlob.type || "audio/mp4"));
       } else {
-        const nativeAudio = {
+        // RN multipart needs a native file reference, not a browser-style Blob.
+        body.append("audio", {
           uri,
-          name: fileNameFor(mediaType),
-          type: mediaType,
-        };
-        body.append("audio", nativeAudio as unknown as Blob);
+          name: fileNameFor(mediaType || "audio/mp4"),
+          type: mediaType || "audio/mp4",
+        } as unknown as Blob);
       }
 
       safeLog("[evidence] native transcription request", {
@@ -102,6 +102,11 @@ export async function transcribeRecording(
       });
 
       if (!response.ok) {
+        if(normalFree){
+          const result=await response.clone().json().catch(()=>({}));
+          const message=(await import('./phaseRecovery')).reservationRecoveryMessage(result.code);
+          if(message)throw new Error(message);
+        }
         if (response.status === 402 || response.status === 429 || response.status >= 500) {
           throw new TranscriptionUnavailableError(response.status);
         }

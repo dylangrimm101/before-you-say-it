@@ -9,12 +9,14 @@ import {createMigratingSecureSessionStorage} from './secureSessionStorage';
 import {createReceiptlessDeletionJournal} from './receiptlessDeletionJournal';
 import {invalidateOwnerPracticeLeases} from './ownerPracticeStorage';
 import {serializeStoreOperation} from './storePersistence';
-import {STAGING_ACCOUNT_DELETION_REVIEW_FLAG,checkAccountDeletionStatus as checkDeletionStatus,checkReceiptlessDeletionNotice,ensureReceiptlessDeletionCapability,requestAccountDeletion,reviewedAccountDeletionEndpoint,reviewedDeletionEndpoint,type AccountDeletionBilling,type AccountDeletionReceipt} from './accountDeletion';
+import {candidateAccountDeletionEndpoint,STAGING_ACCOUNT_DELETION_REVIEW_FLAG,checkAccountDeletionStatus as checkDeletionStatus,checkReceiptlessDeletionNotice,ensureReceiptlessDeletionCapability,requestAccountDeletion,reviewedAccountDeletionEndpoint,reviewedDeletionEndpoint,type AccountDeletionBilling,type AccountDeletionReceipt} from './accountDeletion';
 // Source-reviewed rollout only: preserve the exact four-public-input Release
 // contract. Remains OFF pending privacy policy and deployed acceptance.
 const REVIEWED_DELETION_ENABLED=false;
 const STAGING_DELETION_ENABLED=process.env.EXPO_PUBLIC_STAGING_ACCOUNT_DELETION_ENABLED===STAGING_ACCOUNT_DELETION_REVIEW_FLAG;
-const REVIEWED_DELETION_ENDPOINT=authEnvironment?.staging
+const REVIEWED_DELETION_ENDPOINT=process.env.EXPO_PUBLIC_NATIVE_ACCOUNT_DELETION!==undefined
+ ? candidateAccountDeletionEndpoint({authUrl:authEnvironment?.url??null,flag:process.env.EXPO_PUBLIC_NATIVE_ACCOUNT_DELETION,development:typeof __DEV__!=='undefined'&&__DEV__,staging:authEnvironment?.staging,buildMode:process.env.EXPO_PUBLIC_BYSI_BUILD_MODE})
+ : authEnvironment?.staging
  ? reviewedAccountDeletionEndpoint({authUrl:authEnvironment.url,enabled:STAGING_DELETION_ENABLED,staging:true,buildMode:process.env.EXPO_PUBLIC_BYSI_BUILD_MODE,applicationId:authEnvironment.applicationId,projectId:authEnvironment.projectId,reviewFlag:process.env.EXPO_PUBLIC_STAGING_ACCOUNT_DELETION_ENABLED})
  : reviewedDeletionEndpoint(authEnvironment?.url??null,REVIEWED_DELETION_ENABLED);
 export const accountDeletionAvailable=Boolean(REVIEWED_DELETION_ENDPOINT && authEnvironment);
@@ -58,8 +60,10 @@ export async function checkReceiptlessAccountDeletionNotice(owner:string,signal?
  if(!accountDeletionAvailable || !REVIEWED_DELETION_ENDPOINT)return {deleted:false,uncertain:true,ownerId:owner};
  return checkReceiptlessDeletionNotice(REVIEWED_DELETION_ENDPOINT,owner,receiptlessDeletionCapabilityStore,fetch,{signal});
 }
-const receiptKey=(owner:string)=>`bysi.accountDeletion.receipt.v1.${owner}`;
-const receiptIndexKey='bysi.accountDeletion.receipt.index.v1';
+const deletionBackend=typeof REVIEWED_DELETION_ENDPOINT==='object'&&REVIEWED_DELETION_ENDPOINT?'normal-results-local-v1':'legacy';
+const receiptPrefix=deletionBackend==='legacy'?'bysi.accountDeletion.receipt':`bysi.accountDeletion.${deletionBackend}.receipt`;
+const receiptKey=(owner:string)=>`${receiptPrefix}.v1.${owner}`;
+const receiptIndexKey=`${receiptPrefix}.index.v1`;
 const practiceKeys=['cc.profile.v1','cc.sessions.v1','cc.sessions.v2','cc.custom.v1','cc.drills.v1','cc.reminder.v1','cc.challenge.v1','cc.freeze.v1','cc.consent.v1','cc.pilotProgress.v1','cc.scoredPracticeHistory.v1','cc.anonymousUserId.v1','cc.activePracticeSession.v1','cc.activeScenarioRun.v1','cc.archivedScenarioRuns.v1','cc.quarantinedScenarioRun.v1','cc.convertedLessonProgress.v1','cc.moduleCloseProgress.v1','cc.convertedCompletionPending.v1','cc.nativeJourneyStarted.v1','cc.devpro.v1','cc.devForceUnpaid.v1'];
 const baselineReferenceKeys=['cc.sessions.v1','cc.sessions.v2','cc.activePracticeSession.v1','cc.activeScenarioRun.v1','cc.archivedScenarioRuns.v1','cc.quarantinedScenarioRun.v1','cc.convertedCompletionPending.v1'];
 const ownerStorageKey=(owner:string)=>`${authEnvironment?.url??'local'}:${owner}`;
@@ -281,7 +285,7 @@ export function createRuntimeDeletionJournal(){
   if(storage)return storage;
   const [secure,crypto]=await Promise.all([secureStore(),import('expo-crypto')]);
   if(!await secure.isAvailableAsync())throw new Error('Device secure storage unavailable');
-  const scope=await crypto.digestStringAsync(crypto.CryptoDigestAlgorithm.SHA256,JSON.stringify(['receiptless-journal-v1',authEnvironment?.url??'local',authEnvironment?.keychainService??'beforeyousayit.supabase']));
+  const scope=await crypto.digestStringAsync(crypto.CryptoDigestAlgorithm.SHA256,JSON.stringify(['receiptless-journal-v1',authEnvironment?.url??'local',authEnvironment?.keychainService??'beforeyousayit.supabase',...(deletionBackend==='legacy'?[]:[deletionBackend]) ]));
   const options={...receiptOptions(secure),keychainService:`bysi.deletion.journal.${scope}`};
   storage=createMigratingSecureSessionStorage({
    secure:{getItem:key=>secure.getItemAsync(key,options),setItem:(key,value)=>secure.setItemAsync(key,value,options),removeItem:key=>secure.deleteItemAsync(key,options)},

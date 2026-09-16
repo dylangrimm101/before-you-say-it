@@ -25,7 +25,7 @@ let hasPresentedLaunch = false;
 
 function RootLayoutNav() {
   const { hydrated, profile, activePracticeSession, nativeJourneyStarted, migrationNotice, dismissMigrationNotice } = useStore();
-  const { isAuthLoading, user, normalResults, restoredGuestContinuationId, acknowledgeGuestContinuation } = useAuth();
+  const { isAuthLoading, user, session, normalResults, restoredGuestContinuationId, acknowledgeGuestContinuation } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const routeParams = useGlobalSearchParams<{ id?: string }>();
@@ -48,7 +48,7 @@ function RootLayoutNav() {
     const entry = firstSegment === "entry";
     const stagingResult = firstSegment === "staging-web-result";
     const deletionStatus = firstSegment === "delete-account";
-    const normalContinuation = Boolean(user && normalResults && ["saved-result", "approved-lesson", "approved-rehearsal", "paywall", "(tabs)"].includes(firstSegment));
+    const normalContinuation = Boolean(user && ["saved-result", "approved-lesson", "approved-rehearsal", "quick-rep", "path", "settings", "paywall", "(tabs)"].includes(firstSegment));
     // Registered owners may leave an existing result without forging completion.
     // These destinations retain their own paid operation/screen gates; guest and
     // public route exceptions are unchanged.
@@ -63,7 +63,7 @@ function RootLayoutNav() {
       } else router.replace(`/debrief/${restoredGuestContinuationId}`);
       return;
     }
-    const hasLocalJourney = Boolean(user || profile || activePracticeSession || nativeJourneyStarted);
+    const hasLocalJourney = Boolean(user || session?.user.is_anonymous === true || profile || activePracticeSession || nativeJourneyStarted);
     if (!hasLocalJourney && !entry && !continuation) {
       router.replace("/entry");
       return;
@@ -91,7 +91,7 @@ function RootLayoutNav() {
       };
       router.replace({ pathname: "/rehearse/[id]", params: sharedParams });
     }
-  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user, normalResults, restoredGuestContinuationId, routeParams.id, acknowledgeGuestContinuation]);
+  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user, session, normalResults, restoredGuestContinuationId, routeParams.id, acknowledgeGuestContinuation]);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
 

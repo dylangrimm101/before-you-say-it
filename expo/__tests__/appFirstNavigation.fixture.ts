@@ -34,7 +34,7 @@ if(restartFile&&process.env.BYSI_GUEST_RESUME==='1'){
  const saved=JSON.parse(readFileSync(restartFile,'utf8'));for(const [k,v] of saved.disk)disk.set(k,v);for(const [k,v] of saved.secure)secureDisk.set(k,v);session=saved.session;
 }
 let coldRefreshSent=false;
-const auth={getSession:async()=>{if(process.env.BYSI_GUEST_COLD_REFRESH==='1'&&!coldRefreshSent){coldRefreshSent=true;await Promise.resolve();for(const cb of listeners)cb('TOKEN_REFRESHED',session);}return {data:{session},error:null};},getUser:async()=>({data:{user:process.env.BYSI_GUEST_DENIAL==="wrong-owner"?{...session?.user,id:"wrong-owner"}:process.env.BYSI_GUEST_DENIAL==="expired"?null:session?.user??null},error:process.env.BYSI_GUEST_DENIAL==="expired"?Error("synthetic expired access"):null}),onAuthStateChange:(cb:any)=>{listeners.add(cb);return {data:{subscription:{unsubscribe(){listeners.delete(cb);}}}};},signInAnonymously:async()=>{anonymousCalls++;throw Error('anonymous rollout must remain disabled');},signInWithPassword:async()=>{if(process.env.BYSI_GUEST_DENIAL==='cancel')await loginGate;if(process.env.BYSI_GUEST_DENIAL==='login-retry'&&!failedLogin){failedLogin=true;return {data:{session:null},error:Error('synthetic network failure')};}abrupt('consent');session={user:{id:'registered-A',email:'a@invalid',is_anonymous:false},access_token:'fixture-A'};for(const cb of listeners)cb('SIGNED_IN',session);abrupt('auth');return {data:{session},error:null};},signOut:async()=>{session=null;for(const cb of listeners)cb('SIGNED_OUT',null);return {error:null};}};
+const auth={getSession:async()=>{if(process.env.BYSI_GUEST_COLD_REFRESH==='1'&&!coldRefreshSent){coldRefreshSent=true;await Promise.resolve();for(const cb of listeners)cb('TOKEN_REFRESHED',session);}return {data:{session},error:null};},getUser:async()=>({data:{user:process.env.BYSI_GUEST_DENIAL==="wrong-owner"?{...session?.user,id:"wrong-owner"}:process.env.BYSI_GUEST_DENIAL==="expired"?null:session?.user??null},error:process.env.BYSI_GUEST_DENIAL==="expired"?Error("synthetic expired access"):null}),onAuthStateChange:(cb:any)=>{listeners.add(cb);return {data:{subscription:{unsubscribe(){listeners.delete(cb);}}}};},signInAnonymously:async()=>{anonymousCalls++;session={user:{id:'synthetic-guest',is_anonymous:true},access_token:'synthetic-guest-token'};for(const cb of listeners)cb('SIGNED_IN',session);return {data:{session},error:null};},signInWithPassword:async()=>{if(process.env.BYSI_GUEST_DENIAL==='cancel')await loginGate;if(process.env.BYSI_GUEST_DENIAL==='login-retry'&&!failedLogin){failedLogin=true;return {data:{session:null},error:Error('synthetic network failure')};}abrupt('consent');session={user:{id:'registered-A',email:'a@invalid',is_anonymous:false},access_token:'fixture-A'};for(const cb of listeners)cb('SIGNED_IN',session);abrupt('auth');return {data:{session},error:null};},signOut:async()=>{session=null;for(const cb of listeners)cb('SIGNED_OUT',null);return {error:null};}};
 mock.module('@/lib/supabase',()=>({supabase:{auth},authEnvironment:{url:'https://production.invalid',staging:false},isAuthConfigured:true}));
 mock.module('@/lib/purchases',()=>({PRO_ENTITLEMENT:'pro',identifyPurchasesUser:async(id:string|null)=>{if(id==='registered-A'&&process.env.BYSI_GUEST_DENIAL==='late-switch'){session={user:{id:'registered-B',email:'b@invalid',is_anonymous:false},access_token:'fixture-B'};for(const cb of listeners)cb('SIGNED_IN',session);}return null;},clearPurchasesIdentity:async()=>{},useIsPro:()=>false,useCustomerInfo:()=>({data:null,isLoading:false}),useOfferings:()=>({data:null,isLoading:false}),usePurchasePackage:()=>({isPending:false,mutateAsync:async()=>{throw Error('no purchase in navigation fixture');}}),useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
 mock.module('@/lib/reminders',()=>({cancelChallengeNudge:async()=>{},cancelDailyReminder:async()=>{},syncChallengeNudge:async()=>{}}));
@@ -109,11 +109,11 @@ if(restartFile&&process.env.BYSI_GUEST_RESUME==='1'){
  await act(async()=>root.unmount());client.clear();process.exit(0);
 }
 assert.equal(store.profile,null);assert.equal(store.activePracticeSession,null);
-await press('Sign up now');
-assert.deepEqual(route,{pathname:'/continue-from-web',params:{mode:'signup'}});assert.equal(anonymousCalls,0);
+await press('Get started');
+assert.equal(route,'/onboarding');assert.equal(anonymousCalls,1);
 // Explicit existing guest fixture, not a claim that fresh signup is enabled.
 await act(async()=>{session={user:{id:'synthetic-guest',is_anonymous:true},access_token:'synthetic-guest-token'};for(const cb of listeners)cb('SIGNED_IN',session);});
-await press('Sign up now');assert.equal(route,'/onboarding');assert.equal(store.nativeJourneyStarted,true);
+await press('Get started');assert.equal(route,'/onboarding');assert.equal(store.nativeJourneyStarted,true);
 const branches=[
  {id:'real_conversation',entry:'I have a conversation I need to prepare for'},
  {id:'recurring_problem',entry:'The same communication problem keeps happening'},
@@ -211,8 +211,7 @@ const exactGuestAttempt=structuredClone(store.activePracticeSession.attemptOne);
 if(positive&&!continuation){await act(async()=>root.unmount());root=null;}
 if(durableMode){await act(async()=>root.unmount());root=null;await mount(Login);assert.equal(account.hasCurrentGuestPractice,true,'secure new-run proof restored after assessment process death');}
 await mount(Login);
-assert.ok(text().includes(continuation?'current rehearsal':'Guest practice cannot be transferred'),'login must disclose the actual continuation boundary');
-if(continuation)assert.ok(text().includes(durableMode?'24 hours':'Keep this browser session open'),'platform-accurate durable continuation support');
+assert.ok(text().includes(continuation?'Save this current rehearsal':'Enter your email'),'login stays sparse and only names a live rehearsal when one can actually continue');
 if(durableMode){
  const isolated=createNativeGuestRuntime(raw,'ios','different-environment');assert.equal(await isolated.restore(account.practiceOwner.storage),false);isolated.dispose();
  secureAvailable=false;const unavailable=createNativeGuestRuntime(raw,'ios','unavailable');await assert.rejects(unavailable.restore(account.practiceOwner.storage));unavailable.dispose();secureAvailable=true;
@@ -321,7 +320,7 @@ await mount(Progress);assert.ok(text().includes('No Index history yet'));assert.
 await press('How the Communication Index works');assert.equal(route,'/progress/how-it-works');await press('Open Settings');assert.equal(route,'/settings');
 await mount(Settings);assert.ok(text().includes('a@invalid'));await press('Privacy & data. See what is stored, shared, retained, and deleted');assert.equal(route,'/privacy');
 await press('Sign out');assert.equal(account.user,null);assert.equal(store.activePracticeSession,null);assert.equal(store.scoredPracticeHistory.length,0);
-await mount(Entry);assert.ok(text().includes('Sign up now'));
+await mount(Entry);assert.ok(text().includes('Get started'));
 await act(async()=>root.unmount());client.clear();
 const {approvedRehearsalConfig}=await import('../lib/approvedRehearsals');
 console.log('Launch inventory',JSON.stringify(LAUNCH_DECK_IDS.map((id:string)=>({id,title:approvedLessonDeck(id as any)?.shortName,kind:id.endsWith('close')?'module-close':'lesson',rehearsal:id==='m1-l1'||Boolean(approvedRehearsalConfig(id))}))));

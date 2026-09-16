@@ -127,6 +127,10 @@ export interface ActivePracticeSession {
   insufficientEvidence?: InsufficientEvidenceResult;
   /** Evidence-linked v1 result built only from the completely approved transcript. */
   sharedResult?: SharedResultContractV1;
+  /** Server-authoritative normal-free contract restored from the verified checkpoint. */
+  normalFreeContract?: Record<string, unknown>;
+  normalFreeCheckpointRevision?: number;
+  normalFreeCheckpointPhase?: string;
   attemptOne?: ImmutablePracticeAttempt;
   originalAdamResponse?: OriginalAdamResponse;
   dayThirtyBaseline?: DayThirtyBaselineReference;
@@ -467,6 +471,9 @@ export function protectImmutablePracticeRecords(existing: ActivePracticeSession,
     ...(existing.dayThirtyBaseline ? { dayThirtyBaseline: existing.dayThirtyBaseline } : {}),
     ...(existing.attemptTwo ? { attemptTwo: existing.attemptTwo } : {}),
     ...(existing.sharedResult ? { sharedResult: existing.sharedResult } : {}),
+    ...(!incoming.normalFreeContract && existing.normalFreeContract ? { normalFreeContract: existing.normalFreeContract } : {}),
+    ...(!incoming.normalFreeCheckpointRevision && existing.normalFreeCheckpointRevision ? { normalFreeCheckpointRevision: existing.normalFreeCheckpointRevision } : {}),
+    ...(!incoming.normalFreeCheckpointPhase && existing.normalFreeCheckpointPhase ? { normalFreeCheckpointPhase: existing.normalFreeCheckpointPhase } : {}),
   };
 }
 
