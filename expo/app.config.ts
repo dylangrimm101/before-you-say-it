@@ -2,7 +2,9 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 
 export default function configure({ config }: ConfigContext): ExpoConfig {
   const mode = process.env.EXPO_PUBLIC_BYSI_BUILD_MODE;
-  if (process.env.EAS_BUILD_PROFILE === "testflight") {
+  // Rork's native release runner need not set an EAS profile.
+  // Apply the same reviewed checks to non-staging production exports.
+  if (process.env.EAS_BUILD_PROFILE === "testflight" || (process.env.NODE_ENV === "production" && !mode)) {
     if (mode || Object.keys(process.env).some(name => name.startsWith("EXPO_PUBLIC_STAGING_") && process.env[name])
       || process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY) throw new Error("TestFlight rejects staging and Test Store inputs");
     if (config.ios?.bundleIdentifier !== "app.rork.8fc4qwsqaurkxk0pimyvx"
