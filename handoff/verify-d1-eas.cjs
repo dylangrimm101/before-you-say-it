@@ -11,7 +11,11 @@ const { createRequire } = require("node:module");
 const { createHash } = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 
-const PIN = "c504d722cb05bfb6af57d3d947ff48ce741a6202";
+const MANAGED_PIN = "c504d722cb05bfb6af57d3d947ff48ce741a6202";
+// Verified through GitHub's commit/tree API and all 529 app entries, not main.
+const GITHUB_PIN = "d6ebd779dd0922d631b774dd64cd1f8438ced6b3";
+const GITHUB_REPOSITORY = "dylangrimm101/before-you-say-it";
+const CANDIDATE_RECORD_BLOB = "75435d266e25bd2df87f667c00c241beb3ef296d";
 const TREE = "43570d287d4d19ca003cf423bdd6f7df769f2ce1";
 const APP_ID = "app.rork.8fc4qwsqaurkxk0pimyvx";
 const PROJECT_ID = "1b655360-557d-4dba-ad69-fbf26120e852";
@@ -35,22 +39,41 @@ function git(root, args) {
   check(result.status === 0, "GIT_READ_FAILED");
   return result.stdout.trim();
 }
-function verifySource(root, allowRestoredWorktree) {
-  check(git(root, ["rev-parse", `${PIN}:expo`]) === TREE, "PINNED_APP_TREE_MISMATCH");
+// readGit is injectable for offline regression tests only; the CLI always uses git.
+function verifyRepository(root, allowRestoredWorktree, readGit = git) {
+  const head = readGit(root, ["rev-parse", "HEAD"]);
+  // The legacy workspace-only option never approves another GitHub commit.
+  const pin = allowRestoredWorktree ? MANAGED_PIN : head;
+  check(pin === MANAGED_PIN || pin === GITHUB_PIN, "CHECKOUT_NOT_AT_VERIFIED_CANDIDATE");
+  check(readGit(root, ["rev-parse", `${pin}:expo`]) === TREE, "PINNED_APP_TREE_MISMATCH");
+  const recordPath = `${pin}:handoff/testflight24-candidate.json`;
+  check(readGit(root, ["rev-parse", recordPath]) === CANDIDATE_RECORD_BLOB, "CANDIDATE_RECORD_BLOB_MISMATCH");
   for (const [file, blob] of Object.entries(approvedBlobs)) {
-    check(git(root, ["rev-parse", `${PIN}:expo/${file}`]) === blob, "COMMITTED_CRITICAL_BLOB_MISMATCH");
-    check(git(root, ["hash-object", file]) === blob, "WORKING_CRITICAL_BLOB_MISMATCH");
+    check(readGit(root, ["rev-parse", `${pin}:expo/${file}`]) === blob, "COMMITTED_CRITICAL_BLOB_MISMATCH");
+    check(readGit(root, ["hash-object", file]) === blob, "WORKING_CRITICAL_BLOB_MISMATCH");
   }
-  const recorded = JSON.parse(git(root, ["show", `${PIN}:handoff/testflight24-candidate.json`]));
-  for (const [file, blob] of Object.entries(recorded.fileGitBlobHashes)) {
-    check(git(root, ["rev-parse", `${PIN}:${file}`]) === blob, "RECORDED_CANDIDATE_COMMITTED_BLOB_MISMATCH");
+  const recorded = JSON.parse(readGit(root, ["show", recordPath]));
+  const entries = Object.entries(recorded.fileGitBlobHashes);
+  check(entries.length === 14, "RECORDED_CANDIDATE_HASH_COUNT_MISMATCH");
+  for (const [file, blob] of entries) {
+    check(file.startsWith("expo/") && !file.split("/").includes(".."), "RECORDED_CANDIDATE_PATH_MISMATCH");
+    check(readGit(root, ["rev-parse", `${pin}:${file}`]) === blob, "RECORDED_CANDIDATE_COMMITTED_BLOB_MISMATCH");
+    check(readGit(root, ["hash-object", file.slice(5)]) === blob, "RECORDED_CANDIDATE_WORKING_BLOB_MISMATCH");
   }
-  const diff = spawnSync("git", ["diff", "--quiet", PIN, "--", "."], { cwd: root });
-  check(diff.status === 0, "APP_DIRECTORY_DIFFERS_FROM_PIN");
-  check(!git(root, ["ls-files", "--others", "--exclude-standard"]), "UNTRACKED_APP_FILES");
+  check(!readGit(root, ["diff", "--name-only", "--no-ext-diff", pin, "--", "."]), "APP_DIRECTORY_DIFFERS_FROM_PIN");
+  check(!readGit(root, ["ls-files", "--others", "--exclude-standard"]), "UNTRACKED_APP_FILES");
+  if (!allowRestoredWorktree) check(!readGit(root, ["status", "--porcelain"]), "CHECKOUT_NOT_CLEAN");
+  return { pinnedCommit: pin, managedCandidateCommit: MANAGED_PIN, githubCandidateCommit: GITHUB_PIN,
+    githubRepository: GITHUB_REPOSITORY, checkoutCommit: head,
+    candidateIdentity: pin === GITHUB_PIN ? "verified-github-candidate" : "managed-candidate",
+    appTree: TREE, committedCriticalBlobsVerified: true, candidateRecordBlobVerified: true,
+    recordedCandidateBlobsVerified: entries.length, recordedWorkingBlobsVerified: entries.length,
+    workingAppMatchesPinnedTree: true, exactCheckout: !allowRestoredWorktree,
+    remoteAvailabilityCheckedDuringThisRun: false };
+}
+function verifySource(root, allowRestoredWorktree) {
+  const provenance = verifyRepository(root, allowRestoredWorktree);
   if (!allowRestoredWorktree) {
-    check(git(root, ["rev-parse", "HEAD"]) === PIN, "CHECKOUT_NOT_AT_PIN");
-    check(!git(root, ["status", "--porcelain"]), "CHECKOUT_NOT_CLEAN");
     check(!fs.existsSync(path.join(root, "ios")) && !fs.existsSync(path.join(root, "android")), "UNREVIEWED_NATIVE_DIRECTORY");
     check(!fs.existsSync(path.join(root, ".easignore")), "UNREVIEWED_EAS_IGNORE");
   }
@@ -63,9 +86,7 @@ function verifySource(root, allowRestoredWorktree) {
   check(eas.cli.requireCommit === true && eas.cli.appVersionSource === "local"
     && eas.build.testflight.environment === "production" && eas.build.testflight.autoIncrement === false
     && eas.build.testflight.ios.buildConfiguration === "Release", "EAS_PROFILE_MISMATCH");
-  return { pinnedCommit: PIN, appTree: TREE, committedCriticalBlobsVerified: true,
-    recordedCandidateBlobsVerified: Object.keys(recorded.fileGitBlobHashes).length,
-    workingAppMatchesPinnedTree: true, exactCheckout: !allowRestoredWorktree };
+  return provenance;
 }
 function dotenvSnapshot(root) {
   return Object.fromEntries(fs.readdirSync(root).filter(name => name === ".env" || name.startsWith(".env.")).map(name => [name, sha256(fs.readFileSync(path.join(root, name)))]));
@@ -272,4 +293,4 @@ if (require.main === module) main().catch(error => {
   console.error(JSON.stringify({ passed: false, reason: error instanceof VerificationError ? error.message : "VERIFICATION_FAILED_RAW_ERROR_WITHHELD" }));
   process.exitCode = 1;
 });
-module.exports = { verifySource, releaseEnvironment, verifyApprovedAuthInputs, verifyResolvedConfig, inspectBundle };
+module.exports = { verifyRepository, verifySource, releaseEnvironment, verifyApprovedAuthInputs, verifyResolvedConfig, inspectBundle };

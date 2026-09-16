@@ -2,15 +2,51 @@
 
 Prepared 2026-09-16. **Preparation only: no EAS native build, Rork publishing retry, TestFlight upload, or public App Store submission was started.**
 
+## Verified managed-Rork-to-GitHub mapping — corrected 2026-09-16
+
+The candidate **did sync to GitHub under a different commit ID**. The earlier instructions incorrectly treated a managed-Rork commit as a GitHub commit. GitHub returned HTTP 422 for both original managed IDs; those IDs must not be used as GitHub refs.
+
+Repository: **https://github.com/dylangrimm101/before-you-say-it**. Direct unauthenticated GitHub API and Git access succeeded. GitHub reports this existing repository as public; no repository visibility change was made.
+
+- **App candidate on GitHub:** [`d6ebd779dd0922d631b774dd64cd1f8438ced6b3`](https://github.com/dylangrimm101/before-you-say-it/commit/d6ebd779dd0922d631b774dd64cd1f8438ced6b3).
+- Corresponding managed candidate: `c504d722cb05bfb6af57d3d947ff48ce741a6202`.
+- Complete app tree, identical in both: **`43570d287d4d19ca003cf423bdd6f7df769f2ce1`**.
+- **Historical handoff on GitHub:** [`eeddbb43af837f72e244f4740017228953fa502b`](https://github.com/dylangrimm101/before-you-say-it/commit/eeddbb43af837f72e244f4740017228953fa502b).
+- Corresponding managed handoff: `8452aec627657c938559cd24210ec8cc57c3acfa`.
+- Complete historical handoff tree, identical in both: `b5e8900d5c5727cbbf919950b454359553a69f8d`.
+
+### Evidence, not a commit-message guess
+
+Both GitHub commit pages returned HTTP 200. GitHub commit objects associate the candidate with root tree `263a7e53bc4c62b99830491f759b7df36f9108c6`, and the historical handoff with root tree `99ebe5d732025f8040cf04bdec685a3eef4c307f`.
+
+Non-truncated recursive GitHub trees were inspected. **All 529 app file entries (paths, modes and blob IDs)** matched the managed candidate, as did the complete app subtree and all **14** recorded candidate blob hashes. The candidate record itself matched blob `75435d266e25bd2df87f667c00c241beb3ef296d`.
+
+For both mapped snapshots, the GitHub root entries equal the managed root entries **excluding `.rork/`**. Recomputing those GitHub root-tree object hashes also matched. The histories therefore contain different commit objects; the app content is preserved. This is a content mapping, not proof of identical whole repositories or a GitHub verified-signature claim.
+
+The observed GitHub `main` at `d380f50bebc91b88793636156bdf283e2f314205` has app tree **`e89dddc4813e691a697bed1b70c0da8687519a3c`**, not the candidate tree. The current managed workspace also has Babel/Metro drift. **Neither is a substitute. No app files were restored or changed during this mapping correction.**
+
+### Historical handoff bytes verified directly from GitHub
+
+These exact historical files were downloaded from `eeddbb43af837f72e244f4740017228953fa502b` and their SHA-256 hashes matched the previously recorded values:
+
+```text
+2868c1c85d9efd76734acc2b60250ff3e58a3c2381f135fdabd715cbbd1651da  D1-EAS-HANDOFF.md
+62de5bcca72fdd20847effa607b118a3c5d93029dc54696d56b3e7394c5e835d  verify-d1-eas.cjs
+7f8d16a8ed37ca120800100247c79beed2f31d48afee16037935d18c70c6275f  verify-d1-eas.test.cjs
+db1ee9229daba2eb32e1d5c429f83883a21e9e2d8020cbd30b98f65ceee716c3  d1-eas-candidate.json
+```
+
+Browse those files: https://github.com/dylangrimm101/before-you-say-it/tree/eeddbb43af837f72e244f4740017228953fa502b/handoff
+
+**Those hashes describe the historical handoff, not this corrected revision.** Its old verifier still assumes managed objects exist. Use the corrected companion verifier for a GitHub checkout. This correction is delivered in the workspace; its new GitHub commit has not yet been read back, and must not be represented as the historical handoff commit. Do not download a moving `main` file by assumption.
+
 ## Immutable candidate and branch status
 
 - App: Before You Say It **1.0.0 (24)**.
-- Exact existing commit: **`c504d722cb05bfb6af57d3d947ff48ce741a6202`**.
+- Exact GitHub candidate: **`d6ebd779dd0922d631b774dd64cd1f8438ced6b3`**.
 - Entire committed `expo` tree: **`43570d287d4d19ca003cf423bdd6f7df769f2ce1`**.
-- Dedicated branch to create: **`release/d1-eas-24`**.
-- **The GitHub branch has not been created or remotely verified here.** This environment cannot directly create/push Git branches. The Mac steps below create the branch at the already-existing exact commit; no new app commit is needed.
-- All **14** file hashes in the candidate's committed `handoff/testflight24-candidate.json` were verified against Git objects at that commit. This is stronger than relying on the working directory or the earlier record's base-commit field.
-- Current workspace Babel/Metro were restored byte-for-byte to that commit, and the **entire tracked app directory** was compared against it with no remaining difference. No D1, auth/session, selector, app identity, EAS profile, lesson, package, or lockfile changes were made.
+- Dedicated preservation branch, not yet created: **`release/d1-eas-24`**.
+- Read-only GitHub refs showed no such branch. The candidate is already reachable in GitHub history; no recovery from the drifting workspace or new app commit is needed.
 
 The pinned commit already contains the intended configurations:
 
@@ -19,7 +55,7 @@ The pinned commit already contains the intended configurations:
 - Both invoke `runClientEnvPreflight(__dirname)`; Metro retains HTML assets and the existing isolated dotenv-module block rule. No toolkit Metro wrapper. The inert toolkit dependency remains exactly `0.3.0`.
 - D1 remains configuration-failure-only, credential-free, and a snapshot of the inputs actually consumed at startup. No fallback or bypass.
 
-**Do not build the moving main branch, a current workspace ZIP, or an older D1 base commit by assumption. Use the exact commit above.** If your GitHub repository does not contain that object, stop and resolve repository synchronization before building.
+**Do not build the moving main branch, a current workspace ZIP, the historical handoff commit, or an older D1 base commit by assumption. Use only the verified GitHub candidate above.** A fresh checkout must pass the strict gate. If that GitHub object later becomes unavailable, stop rather than substituting source.
 
 ## Existing identity and build profile
 
@@ -65,7 +101,11 @@ Rork/editor values and Mac shell values do **not** automatically reach EAS cloud
 
 Download `handoff/verify-d1-eas.cjs` from this handoff to **`$HOME/bysi-d1-handoff/verify-d1-eas.cjs`**, outside the fresh checkout. Also retain this document and `handoff/d1-eas-candidate.json`. These are companion handoff files, **not files in the historical candidate commit**. Do not add them to the pinned branch merely to run them.
 
-Verifier SHA-256: **`62de5bcca72fdd20847effa607b118a3c5d93029dc54696d56b3e7394c5e835d`**.
+Corrected verifier SHA-256: **`8f104e4b5b4c1fbeef5c198c904b5873e17178314a31cbe56352a86b66a16437`**.
+
+Corrected companion tests SHA-256: **`5fd6af6418b9ab476c9f8e4647c2878b8e0c809f1affff3342accacf439ab1a0`**.
+
+The default strict gate accepts exactly the mapped GitHub candidate or the original managed candidate, never an arbitrary commit with a similar tree. It reads Git objects from the selected identity, so a GitHub clone does not need the unavailable managed commits. No custom commit override or tree-only acceptance option was added. It also pins the candidate record blob and checks all 14 recorded working-file hashes, in addition to the existing full app diff and critical checks.
 
 The verifier:
 
@@ -81,23 +121,25 @@ The verifier:
 
 Expected successful export report includes `normalAuthSelected: true`, `embeddedInputsMatch: true`, `approvedPublicAuthInputFingerprintMatched: true`, one client creation, zero network/storage calls, and `signedAppVerified: false`.
 
-Local preparation used a restored app tree matching the pin, not a checkout with HEAD moved to it; its report honestly says `exactCheckout: false`. **On the Mac, omit `--allow-restored-worktree`; `exactCheckout` must be true.** The local workspace flag is not acceptable for the final fresh-checkout gate.
+The earlier local export used a restored app tree matching the managed pin, not a checkout with HEAD moved to it; its report honestly says `exactCheckout: false`. This remains historical evidence, not a statement about today's drifted workspace. **On the Mac, omit `--allow-restored-worktree`; `exactCheckout` must be true and `pinnedCommit` must equal the GitHub candidate.** The legacy workspace flag only targets the original managed candidate; it does not approve a different GitHub commit or waive any content checks.
+
+Mapping-revision checks: 16 offline companion tests passed; two optional integrations were skipped (fresh GitHub checkout and actual export). Live GitHub API/tree/blob comparisons above are separate evidence. No fresh dependency install or export was repeated during this correction.
 
 ## Mac mini — fresh checkout and dedicated GitHub branch
 
-Use the existing GitHub repository, with its history. Do not create a public copy. Install Git, Node **22.22.0** and Bun **1.3.9** (the versions used for local validation). EAS CLI **24.6.0** is explicitly selected below. Its package metadata and `env:exec` command syntax were checked; the EAS CLI itself was not run in this workspace. An Expo cloud build does not require Xcode on the Mac; local native compilation is not covered here.
+Use the verified existing GitHub repository, with its history. Do not create another repository or change its visibility. Install Git, Node **22.22.0** and Bun **1.3.9** (the versions used for local validation). EAS CLI **24.6.0** is explicitly selected below. Its package metadata and `env:exec` command syntax were checked; the EAS CLI itself was not run in this workspace. An Expo cloud build does not require Xcode on the Mac; local native compilation is not covered here.
 
-Create `~/bysi-d1-handoff` and download the companion files there first. Replace the repository URL placeholder below. Run each section only after the preceding one succeeds.
+Create `~/bysi-d1-handoff` and save the corrected companion files there first, outside the checkout. Verify their corrected hashes above. The historical handoff link is evidence, not the updated verifier download. Run each section only after the preceding one succeeds. These are local source checkout/preservation steps, not build commands.
 
 ```sh
-REPOSITORY_URL='YOUR_EXISTING_GITHUB_REPOSITORY_URL'
-PIN='c504d722cb05bfb6af57d3d947ff48ce741a6202'
+REPOSITORY_URL='https://github.com/dylangrimm101/before-you-say-it.git'
+PIN='d6ebd779dd0922d631b774dd64cd1f8438ced6b3'
 BRANCH='release/d1-eas-24'
 
 git clone "$REPOSITORY_URL" "$HOME/bysi-d1-eas"
 cd "$HOME/bysi-d1-eas"
 git cat-file -e "${PIN}^{commit}"
-git switch -c "$BRANCH" "$PIN"
+git switch --detach "$PIN"
 test "$(git rev-parse HEAD)" = "$PIN"
 test "$(git rev-parse HEAD:expo)" = '43570d287d4d19ca003cf423bdd6f7df769f2ce1'
 git diff --exit-code "$PIN" -- expo
@@ -106,14 +148,15 @@ git status --short
 
 `git status --short` must be empty. If any command fails, stop. If the branch already exists, inspect its exact remote commit rather than force-pushing it. Do not cherry-pick from the drifting main branch or create a replacement commit without reviewing it.
 
-Now preserve the existing commit on the dedicated remote branch:
+The candidate already exists on GitHub. An optional dedicated branch is a separate GitHub mutation, not part of this read-only mapping task. First inspect `git ls-remote --heads origin refs/heads/release/d1-eas-24` and check connected automation: a push must not trigger a build/upload. If the branch points elsewhere, stop; never force-push. If absent and you separately authorize preservation:
 
 ```sh
+git switch -c "$BRANCH" "$PIN"
 git push --set-upstream origin "$BRANCH"
 git ls-remote --exit-code --heads origin "refs/heads/$BRANCH"
 ```
 
-The returned first field **must equal** `c504d722cb05bfb6af57d3d947ff48ce741a6202`. Save that readback as the missing remote-preservation evidence. Branch creation does not require a new commit: the restored configurations and D1 already exist in the exact target commit. Do not force-update the branch after pinning; protect it from later edits/build automation.
+The returned first field **must equal** `d6ebd779dd0922d631b774dd64cd1f8438ced6b3`. Save that readback as the missing remote-preservation evidence. Branch creation does not require a new commit: the restored configurations and D1 already exist in the exact target commit. Do not force-update the branch after pinning; protect it from later edits/build automation.
 
 ## Install and verify without starting a native build
 
@@ -169,13 +212,7 @@ Before queuing anything, verify:
 - No equivalent EAS or Rork build is queued/running. The last known Apple result was build 23; independently confirm **24 has not since been uploaded or reserved by another attempt**. No live Apple/EAS status check was made for this handoff.
 - EAS is using the existing normal project and existing Apple team/bundle identity. Do not create a new app/project, rotate signing assets, or use staging credentials to make a prompt disappear. If EAS lacks access to existing signing assets, resolve that explicitly first.
 
-When you deliberately choose to start **one Expo cloud build from the Mac**, this command repeats the strict export gate immediately before dispatch. It uses no Rork publishing service:
-
-```sh
-env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" TERM="${TERM:-xterm-256color}" bunx eas-cli@24.6.0 env:exec production 'node "$HOME/bysi-d1-handoff/verify-d1-eas.cjs" export "$PWD" && bunx eas-cli@24.6.0 build --platform ios --profile testflight --clear-cache'
-```
-
-Do not add `--auto-submit`, `--local`, or change the profile. Record the returned EAS build ID/URL instead of rerunning the command after a slow response. This command creates a signed store-distribution archive; **it does not upload it to TestFlight or submit it for App Store review**. An App Store-distribution IPA is not directly installable by arbitrary sideloading.
+**Build and upload remain paused.** This mapping correction intentionally omits dispatch commands. The resolved GitHub identity fixes source provenance only; it does not establish environment/signing readiness or authorize any build. Preserve the original `testflight` profile, build 24 and all existing guards. If 24 is unavailable, a different number requires a separately reviewed candidate, not auto-increment or a verifier bypass. Any eventual signed build and TestFlight-only upload are separate deliberate actions.
 
 ## What still requires the actual signed app
 
