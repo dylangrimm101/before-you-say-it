@@ -1096,7 +1096,7 @@ function LegacyRehearse() {
           </ScrollView>
           <StateDock bottomInset={insets.bottom}>
             <PrimaryButton label="Approve transcript" onPress={approveTranscript} disabled={!reviewDrafts.opening.trim() || !reviewDrafts.response.trim() || closing} />
-            <GhostButton label="Record again" onPress={() => setReviewingTranscript(false)} />
+            <GhostButton label="Back to conversation" onPress={() => setReviewingTranscript(false)} />
           </StateDock>
         </KeyboardAvoidingView>
       </View>

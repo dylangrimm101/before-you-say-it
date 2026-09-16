@@ -215,6 +215,12 @@ for(const line of ['Synthetic opener: can we agree who owns the handoff?','Synth
 assert.equal(counterpartCalls,2,'exercise the counterpart pushback and closing reply');
 assert.equal(analysisCalls,0,'no analysis before explicit approval');
 await press('Review complete transcript');assert.ok(text().includes('Synthetic counterpart close'));
+assert.equal(root.root.findAllByType('button').some((button:any)=>button.props.label==='Record again'),false,'final review must not promise unsupported re-recording');
+await press('Back to conversation');
+assert.ok(text().includes('Synthetic counterpart close'),'return preserves the completed exchange');
+assert.equal(counterpartCalls,2,'return must not generate another reply');
+assert.equal(analysisCalls,0,'return must not approve the transcript');
+await press('Review complete transcript');
 await press('Approve transcript');
 if(process.env.BYSI_FREE_TERMINAL_UI==='result'){
  assert.equal((route as any)?.pathname,'/safety');assert.equal(analysisCalls,1);assert.equal(store.scoredPracticeHistory.length,0);
