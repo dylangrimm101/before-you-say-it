@@ -4,6 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import configure from "../app.config";
 import app from "../app.json";
+import { runInNewContext } from "node:vm";
+import { createHash, randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
+import { selectAuthEnvironment } from "../lib/authEnvironment";
+import { createMigratingSecureSessionStorage } from "../lib/secureSessionStorage";
+import { createNativeSessionStarter } from "../lib/nativeAuth";
 
 const root = join(import.meta.dir, "..");
 const exportDirectory = process.env.BYSI_RELEASE_EXPORT_DIR;
@@ -132,17 +138,81 @@ test("release gate catches restored wrapper, missing preflight, HTML support, an
   } finally { rmSync(temp, { recursive: true, force: true }); }
 });
 
+test("Metro and Babel reject missing release inputs even after app configuration passed", () => {
+  const { runClientEnvPreflight } = require("../scripts/client-env-preflight.cjs");
+  for (const name of ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY"]) {
+    configure({ config: app.expo } as any);
+    const value = process.env[name];
+    delete process.env[name];
+    expect(() => runClientEnvPreflight(root)).toThrow("requires reviewed normal Auth");
+    expect(() => require("../babel.config.js")({ cache: () => {} })).toThrow("requires reviewed normal Auth");
+    process.env[name] = value;
+  }
+});
+
+test("compiled production Supabase module starts guest setup with no device environment variables", async () => {
+  configure({ config: app.expo } as any);
+  const source = readFileSync(join(root, "lib/supabase.ts"), "utf8");
+  const compiled = require("@babel/core").transformSync(source, {
+    filename: join(root, "lib/supabase.ts"), configFile: join(root, "babel.config.js"), babelrc: false,
+    caller: { name: "metro", bundler: "metro", platform: "ios", isDev: false, supportsStaticESM: false },
+  }).code as string;
+  expect(compiled).not.toMatch(/process\.env\.EXPO_PUBLIC_/);
+  const disk = new Map<string, string>();
+  let requests = 0;
+  const dependencies: Record<string, unknown> = {
+    "@react-native-async-storage/async-storage": { getItem: async () => null, setItem: async () => {}, removeItem: async () => {} },
+    "@supabase/supabase-js": { createClient: (url: string, key: string, options: any) => createClient(url, key, {
+      ...options, global: { fetch: async (url: string | URL | Request) => {
+        requests++;
+        expect(String(url)).toBe("https://spvksnddzyvycfoefrcf.supabase.co/auth/v1/signup");
+        return new Response(JSON.stringify({ access_token: "synthetic-session", refresh_token: "synthetic-refresh", token_type: "bearer", expires_in: 3600, user: { id: "synthetic-guest", is_anonymous: true } }), { status: 200, headers: { "Content-Type": "application/json" } });
+      } },
+    }) },
+    "expo-crypto": { CryptoDigestAlgorithm: { SHA256: "sha256" }, randomUUID, digestStringAsync: async (_: string, value: string) => createHash("sha256").update(value).digest("hex") },
+    "expo-constants": { executionEnvironment: "bare" },
+    "expo-application": { applicationId: app.expo.ios.bundleIdentifier },
+    "./authEnvironment": { selectAuthEnvironment },
+    "expo-secure-store": { AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 1, getItemAsync: async (key: string) => disk.get(key) ?? null, setItemAsync: async (key: string, value: string) => { disk.set(key, value); }, deleteItemAsync: async (key: string) => { disk.delete(key); } },
+    "react-native": { Platform: { OS: "ios" } },
+    "react-native-url-polyfill/auto": {},
+    "@/lib/secureSessionStorage": { createMigratingSecureSessionStorage },
+  };
+  const output: Record<string, any> = {};
+  runInNewContext(compiled, { exports: output, __DEV__: false, process: { env: {} }, require: (id: string) => {
+    if (Object.hasOwn(dependencies, id)) return dependencies[id];
+    if (id.startsWith("@babel/runtime/")) return require(id);
+    throw new Error(`Unexpected compiled dependency: ${id}`);
+  } });
+  expect(output.isAuthConfigured).toBe(true);
+  expect(output.authEnvironment?.staging).toBe(false);
+  expect(output.supabase).not.toBeNull();
+  try {
+    expect((await output.supabase.auth.getSession()).data.session).toBeNull();
+    expect(requests).toBe(0);
+    const result = await createNativeSessionStarter(output.supabase.auth)();
+    expect(result.success).toBe(true);
+    expect(requests).toBe(1);
+    expect(disk.size).toBeGreaterThan(0);
+  } finally { await output.supabase.auth.stopAutoRefresh(); }
+});
+
 test("Babel worker filters inherited inputs before inlining production client code", () => {
   for (const name of excluded) process.env[name] = "excluded-babel-canary";
-  const source = `export const env = [process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY, process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY, process.env.EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY, process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN];`;
-  const result = require("@babel/core").transformSync(source, {
-    filename: join(root, "release-environment-fixture.ts"),
-    configFile: join(root, "babel.config.js"),
-    babelrc: false,
-    caller: { name: "metro", bundler: "metro", platform: "ios", isDev: false, supportsStaticESM: true },
-  });
-  expect(result.code).not.toContain("excluded-babel-canary");
-  expect(result.code).toContain("appl_fixtureonly");
-  expect(result.code).toContain("https://beforeyousayit.app");
-  expect(process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY).toBeUndefined();
+  // A fresh worker must not reuse Babel's cached config from another test's environment.
+  const child = Bun.spawnSync([process.execPath, "--no-env-file", "-e", `
+    const assert = require("node:assert/strict");
+    const path = require("node:path");
+    const source = "export const env = [process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY, process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY, process.env.EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY, process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN];";
+    const result = require("@babel/core").transformSync(source, {
+      filename: path.join(process.cwd(), "release-environment-fixture.ts"),
+      configFile: path.join(process.cwd(), "babel.config.js"), babelrc: false,
+      caller: { name: "metro", bundler: "metro", platform: "ios", isDev: false, supportsStaticESM: true },
+    });
+    assert.ok(!result.code.includes("excluded-babel-canary"));
+    assert.ok(result.code.includes("appl_fixtureonly"));
+    assert.ok(result.code.includes("https://beforeyousayit.app"));
+    assert.equal(process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY, undefined);
+  `], { cwd: root, env: { ...process.env, EXPO_NO_DOTENV: "1" }, stdout: "pipe", stderr: "pipe", timeout: 15000 });
+  expect({ code: child.exitCode, error: child.stderr.toString() }).toEqual({ code: 0, error: "" });
 });

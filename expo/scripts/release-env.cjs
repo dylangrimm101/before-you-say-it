@@ -33,6 +33,24 @@ function prepareReleaseEnvironment(env = process.env) {
   return true;
 }
 
+/** Check the consuming Metro/Babel process as well as the app-config process. */
+function assertReleaseClientInputs(env = process.env) {
+  if (env.EXPO_PUBLIC_BYSI_BUILD_MODE
+    || Object.keys(env).some(name => name.startsWith("EXPO_PUBLIC_STAGING_") && env[name])
+    || env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY) throw new Error("TestFlight rejects staging and Test Store inputs");
+  const allowed = new Set(["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY", "EXPO_PUBLIC_NATIVE_BILLING_ORIGIN", "EXPO_PUBLIC_NATIVE_RESULTS", "EXPO_PUBLIC_PROJECT_ROOT"]);
+  if (env.EXPO_PUBLIC_NATIVE_RESULTS && env.EXPO_PUBLIC_NATIVE_RESULTS !== "normal-results-v1") throw new Error("TestFlight rejects unknown saved-result capability");
+  if (Object.keys(env).some(name => name.startsWith("EXPO_PUBLIC_") && env[name] && !allowed.has(name))) {
+    throw new Error("TestFlight rejects unreviewed public inputs and legacy public-funnel endpoint overrides");
+  }
+  if (env.EXPO_PUBLIC_SUPABASE_URL !== "https://spvksnddzyvycfoefrcf.supabase.co"
+    || !/^sb_publishable_[A-Za-z0-9_-]+$/.test(env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "")
+    || !/^appl_[A-Za-z0-9]+$/.test(env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? "")
+    || env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN !== "https://beforeyousayit.app") {
+    throw new Error("TestFlight requires reviewed normal Auth, iOS RevenueCat, billing and free-service inputs; no fallback");
+  }
+}
+
 /** Fail before archiving if managed configuration drift restores injection. */
 function assertReleaseToolchain(rootDirectory) {
   const metro = fs.readFileSync(path.join(rootDirectory, "metro.config.js"), "utf8");
@@ -47,4 +65,4 @@ function assertReleaseToolchain(rootDirectory) {
   }
 }
 
-module.exports = { isNormalRelease, prepareReleaseEnvironment, assertReleaseToolchain };
+module.exports = { isNormalRelease, prepareReleaseEnvironment, assertReleaseClientInputs, assertReleaseToolchain };
