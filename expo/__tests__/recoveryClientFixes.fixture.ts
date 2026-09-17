@@ -46,8 +46,14 @@ if (testCase === 'final-read-only') {
   turns[0] = { ...turns[0], text: '  Can we agree on one priority?\n' };
   turns[2] = { ...turns[2], text: '\tWhich task can wait until Friday?  ' };
 }
-const isFinal = ['duplicate-approval', 'approval-setup-retry', 'approval-back', 'final-read-only', 'final-record-again'].includes(testCase);
-const protectedFinal = ['approval-back', 'final-read-only'].includes(testCase);
+if (testCase === 'approval-invalid-count') {
+  // Deliberately violate today's two-turn invariant to exercise defensive setup
+  // failure handling. This is not a claim the normal UI can create a third turn.
+  turns.push({ id: 'u3', role: 'user', text: 'Unexpected extra turn.' }, { id: 'h3', role: 'them', text: 'Unexpected extra response.' });
+}
+if (testCase === 'final-invalid-stored') turns[0] = { ...turns[0], text: ' \t\n ' };
+const isFinal = ['duplicate-approval', 'approval-setup-retry', 'approval-back', 'approval-invalid-count', 'final-read-only', 'final-empty-drafts', 'final-invalid-stored', 'legacy-empty-draft', 'final-record-again'].includes(testCase);
+const protectedFinal = ['approval-back', 'final-read-only', 'final-empty-drafts', 'final-invalid-stored'].includes(testCase);
 const session = { id: 'fixture-session', scenarioId: scenario.id, category: 'work', topic: scenario.situation, usefulOutcome: scenario.goal, counterpart: 'Hope', counterpartDisplayLabel: 'Hope', persona: 'woman-hope', entryRoute: 'real_conversation', freeJourneyCheckpoint: 'rehearsal', freeRehearsalTurns: isFinal ? turns : testCase === 'recovered-playback' ? [turns[0]] : [] };
 const events: string[] = [];
 let added: any = null;
@@ -91,11 +97,27 @@ mock.module('@/lib/ai', () => ({
   },
   generateDebrief: async (_scenario: Scenario, _difficulty: string, approvedTurns: Turn[]) => { analysisCalls++; analysisTurns = approvedTurns; throw Error('Synthetic unavailable result'); },
 }));
-mock.module('@/lib/conversionBuild', () => ({ beginConversionBuild: () => { events.push('build'); }, cancelConversionBuild() {}, emitConversionEvent() {}, failConversionBuild() {}, isConversionBuildActive: () => true }));
+mock.module('@/lib/conversionBuild', () => ({ beginConversionBuild: () => { events.push('build'); }, cancelConversionBuild() { events.push('cancel-build'); }, emitConversionEvent() {}, failConversionBuild() {}, isConversionBuildActive: () => true }));
 const speech = { phase: 'idle', canReplay: false };
 mock.module('@/lib/voice', () => ({ useSpeech: () => speech, unlockAudioPlayback: async () => {}, resetSpeech: async () => {}, stopSpeech: async () => {}, replaySpeech: async () => {}, speak: async (text: string) => { spoken.push(text); return 'played'; } }));
 const dictation = { status: 'recording', error: '', cancel: async () => {}, start: async () => { dictation.status = 'recording'; }, stop: async () => { dictation.status = 'idle'; return 'Can we agree on one priority?'; } };
 mock.module('@/lib/useDictation', () => ({ useDictation: () => dictation }));
+
+if (['final-empty-drafts', 'final-invalid-stored'].includes(testCase)) {
+  // Fault-inject only the edit-draft state, without relying on hook indices or
+  // changing production code. Protected approval must use stored turns even if
+  // a future change leaves drafts empty or stale. All other hooks remain real.
+  const actualReact = React;
+  const useState: typeof React.useState = ((initial: any) => {
+    const state = actualReact.useState(initial);
+    if (initial && typeof initial === 'object' && Object.keys(initial).length === 2
+      && initial.opening === '' && initial.response === '') {
+      return [testCase === 'final-empty-drafts' ? initial : { opening: 'Stale draft opening.', response: 'Stale draft reply.' }, () => {}];
+    }
+    return state;
+  }) as typeof React.useState;
+  mock.module('react', () => ({ ...actualReact, default: actualReact, useState }));
+}
 
 const Component = testCase === 'custom' ? (await import('../app/onboarding')).default : (await import('../app/rehearse/[id]')).default;
 let root: any;
@@ -129,7 +151,7 @@ if (testCase === 'custom') {
     assert.ok(input('Edit your opening'));
     assert.ok(input('Edit your response under pressure'));
     assert.ok(button('Back to rehearsal'));
-  } else if (testCase === 'final-read-only') {
+  } else if (['final-read-only', 'final-empty-drafts'].includes(testCase)) {
     assert.equal(root.root.findAllByType('input').length, 0, 'Protected final review must expose no editing controls');
     const opening = root.root.findAllByType('host').find((n: any) => n.props.accessibilityLabel === 'Approved opening');
     const response = root.root.findAllByType('host').find((n: any) => n.props.accessibilityLabel === 'Approved response under pressure');
@@ -139,6 +161,31 @@ if (testCase === 'custom') {
     await press('Approve transcript');
     assert.deepEqual(analysisTurns, turns, 'Debrief receives the exact stored exchange, with no trimming or draft reconstruction');
     assert.deepEqual(routes, ['/debrief/fixture-session']);
+  } else if (testCase === 'final-invalid-stored') {
+    assert.ok(button('Approve transcript').props.disabled, 'Non-empty stale drafts cannot authorize blank stored words');
+    // Defense in depth: even a stale/direct callback must reject invalid words.
+    await act(async () => { button('Approve transcript').props.onPress(); });
+    assert.equal(analysisCalls, 0);
+    assert.ok(!events.includes('build'));
+    assert.equal(routes.length, 0);
+  } else if (testCase === 'legacy-empty-draft') {
+    await act(async () => { input('Edit your opening').props.onChangeText(' \t '); });
+    assert.ok(button('Approve transcript').props.disabled, 'Editable legacy review still validates its draft');
+    await act(async () => { button('Approve transcript').props.onPress(); });
+    assert.equal(analysisCalls, 0);
+    await act(async () => { input('Edit your opening').props.onChangeText('Corrected legacy opening.'); });
+    await press('Approve transcript');
+    assert.equal(analysisTurns[0].text, 'Corrected legacy opening.');
+  } else if (testCase === 'approval-invalid-count') {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await press('Approve transcript');
+      assert.ok(JSON.stringify(root.toJSON()).includes("We couldn't prepare your debrief"));
+      assert.ok(button('Approve transcript'), 'Invalid setup returns to review rather than silently closing it');
+      assert.equal(events.filter(x => x === 'cancel-build').length, attempt, 'Every retry must enter failure handling: the approval guard was released');
+      assert.equal(analysisCalls, 0);
+      assert.equal(routes.length, 0);
+      assert.ok(!events.includes('build'), 'Invalid setup starts no conversion work');
+    }
   } else if (testCase === 'approval-back') {
     await press('Approve transcript');
     assert.ok(JSON.stringify(root.toJSON()).includes("We couldn't prepare your debrief"));

@@ -654,10 +654,11 @@ function LegacyRehearse() {
   }, [activatePractice, dictation, permissionBusy]);
 
   const analyzeApprovedTranscript = useCallback(async (approvedTurns: Turn[]) => {
-    if (!scenario) return;
     const turns = approvedTurns;
     const mine = turns.filter((turn) => turn.role === "user");
-    if (mine.length !== 2) return;
+    // Reject invalid setup so the approval caller releases its synchronous guard
+    // and restores review. A silent return would leave approval permanently armed.
+    if (!scenario || mine.length !== 2) throw new Error("Transcript approval requires a scenario and two learner turns");
     setClosing(true);
     tap("medium");
     await resetSpeech().catch(() => {});
@@ -826,8 +827,13 @@ function LegacyRehearse() {
     }
   }, [activePracticeSession, params.entry, params.practiceSessionId, saveActivePracticeSession, turns]);
 
+  const storedLearnerTurns = turns.filter((turn) => turn.role === "user");
+  const canApproveTranscript = finalTranscriptReadOnly
+    ? storedLearnerTurns.length === 2 && storedLearnerTurns.every((turn) => turn.text.trim().length > 0)
+    : Boolean(reviewDrafts.opening.trim() && reviewDrafts.response.trim());
+
   const approveTranscript = useCallback((): void => {
-    if (finalApprovalStarted.current || !reviewDrafts.opening.trim() || !reviewDrafts.response.trim()) return;
+    if (finalApprovalStarted.current || !canApproveTranscript) return;
     finalApprovalStarted.current = true;
     setApprovalError("");
     let userIndex = 0;
@@ -842,7 +848,7 @@ function LegacyRehearse() {
       setReviewingTranscript(true);
       setApprovalError("We couldn't prepare your debrief. Please try approving again.");
     });
-  }, [analyzeApprovedTranscript, finalTranscriptReadOnly, reviewDrafts, turns]);
+  }, [analyzeApprovedTranscript, canApproveTranscript, finalTranscriptReadOnly, reviewDrafts, turns]);
 
   const exitRehearsal = useCallback(async (): Promise<void> => {
     await cancelDictation();
@@ -1121,7 +1127,7 @@ function LegacyRehearse() {
             {approvalError ? <Text accessibilityRole="alert" style={styles.reviewPrivacy}>{approvalError}</Text> : null}
           </ScrollView>
           <StateDock bottomInset={insets.bottom}>
-            <PrimaryButton label="Approve transcript" onPress={approveTranscript} disabled={!reviewDrafts.opening.trim() || !reviewDrafts.response.trim() || closing} />
+            <PrimaryButton label="Approve transcript" onPress={approveTranscript} disabled={!canApproveTranscript || closing} />
           </StateDock>
         </KeyboardAvoidingView>
       </View>
