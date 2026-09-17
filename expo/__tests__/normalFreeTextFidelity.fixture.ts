@@ -10,8 +10,11 @@ process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN = 'https://beforeyousayit.app';
 delete process.env.EXPO_PUBLIC_BYSI_BUILD_MODE;
 // Quotes survive the pinned server normalizer and quality gate. Display formatting
 // strips them, but the server's audio authorization and exchange proof do not.
-const approved = '"The client added those. Everyone is stretched right now."';
-const close = '"The client still expects the original deadline."';
+const whitespace = process.argv[2] === 'whitespace';
+// This extra variant tests the client's exact-text invariant at its response
+// boundary. The pinned producer normalizes whitespace; no deployed output claim.
+const approved = whitespace ? '  The client added those.\nEveryone\tis stretched right now.  ' : '"The client added those. Everyone is stretched right now."';
+const close = whitespace ? '\tThe client  still expects the original deadline.\n' : '"The client still expects the original deadline."';
 const user = { id: '11111111-1111-4111-8111-111111111111', is_anonymous: true };
 const auth = { getSession: async () => ({ data: { session: { access_token: 'synthetic', user } }, error: null }),
   getUser: async () => ({ data: { user }, error: null }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) };
