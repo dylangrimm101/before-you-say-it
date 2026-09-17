@@ -4,6 +4,8 @@
 
 **Later correction checkpoint:** the addendum at the end supersedes this initial checkpoint's final-edit decision and BE-EDIT-01 disposition. Earlier observations and test results below are retained as history, not relabeled as current results. Release access/configuration findings are in `RELEASE-READINESS-PREFLIGHT.md`.
 
+**Latest follow-up:** the final approval-hardening addendum records the optional changes approved after Claude's acceptance, plus fresh default-deadline checks. It does not erase the earlier timeout failures or resolve hosted release gates.
+
 ## Provenance and independent verification
 
 - Existing branch: `codex/recovery-aug28-journey`; starting commit: `f93d42c8c01815c96b5af9b11bd926968273cf10`.
@@ -159,3 +161,41 @@ These three runs were sequential, on the final code/test tree, with no test/chec
 No additional defect was identified in the corrected approval/final-review scope. The existing default-timeout offline-deck test instability remains a validation issue, not a reason to mask assertions. TF-AUTH-CONFIG-01, BE-RPC-01 and on-device acceptance remain unresolved. STT-RETRY-01 remains an explicitly deferred UX/protocol design; no retained-capture retry was implemented.
 
 See `RELEASE-READINESS-PREFLIGHT.md` for verified source configuration, inaccessible hosted settings, historical deployment boundaries, required access, build-number prerequisite and the exact approval-gated candidate procedure. `main` remains `e0dcdc07d816f05b341e2bb19e0100a20ab47585`; nothing was pushed or merged.
+
+## Approval-hardening addendum — 2026-09-17
+
+User-approved follow-up after Claude accepted the earlier correction diff. Starting branch `codex/recovery-aug28-journey` was clean at `f95b8031c94e28931d7e0c74f65843468b134041`; `main` remained unchanged. Read-only release checks were attempted first; no newly authenticated access was available. The separate staging investigation and exact evidence gaps are recorded in the preflight follow-up.
+
+### Reviewable change
+
+Code/test commit: **`a6a2d894d0bc08719b19d54119157a3a757a1fe9`**. Expo tree: **`6fc40846a4d1913127ff27673a4e17eec17fa496`**. Review only `git diff f95b8031c94e28931d7e0c74f65843468b134041..a6a2d894d0bc08719b19d54119157a3a757a1fe9 -- expo/`. The subsequent evidence-only commit leaves that Expo tree unchanged; its repository SHA is recorded in the delivery message.
+
+Only production file: `expo/app/rehearse/[id].tsx`. Only test files: `expo/__tests__/recoveryClientFixes.test.ts` and `.fixture.ts`.
+
+1. **Unexpected setup rejection releases approval.** Missing scenario or an invalid learner-turn count now rejects analysis setup instead of returning silently. The existing approval catch releases the synchronous guard, restores review and shows the fixed approval error before any conversion build, persistence or generation dispatch. This hardens a currently unreachable normal-flow condition; it is not a newly discovered user-facing failure.
+2. **Protected approval validates stored words.** A shared predicate used by both button disabled state and its callback requires exactly two nonblank stored learner turns for read-only final review. It does not depend on edit drafts. Trimming is only a nonblank check: the approved exchange is still submitted unchanged. Editable legacy review continues to validate and apply its drafts; per-turn editing is unchanged.
+
+### Regression evidence
+
+- A deliberately invalid three-learner-turn fixture verifies two consecutive failed approvals each restore review and enter cancellation/error handling, proving the guard is released and no build/navigation/generation starts. This is a defensive invariant test, not evidence the ordinary UI creates a third turn.
+- Test-only draft-state fault injection verifies valid stored words can be approved with empty drafts, and blank stored words cannot be approved using non-empty stale drafts, including direct callback invocation. The fixture identifies the opening/response state shape rather than relying on hook indices, forwards all other React hooks, and adds no production test hook.
+- Legacy blank draft disables approval; correcting it allows approval with the edited words. Prior tests still cover duplicate taps, setup retry/Back, both editable pre-submission turns, exact final exchange, independent counterpart errors and both playback points.
+- Before the production change: **11 pass / 3 fail** in the 14 mounted cases. Failures were the invalid-count recovery and the two protected draft-drift cases. Log: `handoff-local-results/approval-hardening-red-kqMxPt/tests.log`, SHA-256 `d8a587815f2c8f334e713426739affa1381b619131b0ebc697220feae5109867`. The unchanged assertions then passed **14/14** after implementation.
+
+### Fresh final gates — all ordinary deadlines
+
+| Gate | Result | Log SHA-256 |
+| --- | --- | --- |
+| Existing 21-file focused mobile suite | **124 pass, 0 fail; 1,871 Bun assertions** | `274fa81b253b9d93c9e9d125c27af75cd46751ed1ea3755f9d3237713e1dcd6f` |
+| Expanded 11-file targeted suite | **199 pass, 0 fail; 1,266 assertions** | `3379677e6103651a7436bc48d70cbb922eb36f8d0165e334874844b41b111d96` |
+| Combined 32-file suite | **323 pass, 0 fail; 3,137 assertions** | `a02f690bc7c16759891d8515145fa9eaac637823e0bf751ea94794a50dec6deb` |
+| TypeScript `tsc --noEmit` | **exit 0** | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| Canonical `bun run check` | **exit 0, same four inherited warnings; no errors** | `2d3dfbee6785ee3179b4e88014a1f2030eebc72c8eae69ee46b2066f845f7723` |
+
+Exact commands, counts, durations and hashes: ignored local `handoff-local-results/approval-hardening-final-MTKdu3/results.json`. All groups ran sequentially under network denial, the existing isolated Bun 1.4.2, the existing locked dependencies and external renderer prefix, with service environment scrubbed. No timeout override was needed or used in these final runs. Assertions and existing deadline declarations were not weakened. The earlier default-timeout failures are preserved above; they did not reproduce in this follow-up, which does not independently establish their root cause. No private-composed/backend or physical-device acceptance is claimed.
+
+### Boundaries and remaining work
+
+No staging behavior, authentication timing, provider, intake, layout, backend, recording retention, transport/recovery ordering, SecureStore, owner isolation, D1 diagnostics, app/build identity, environment guard or OTA behavior changed. No tool/dependency installation occurred. The app lockfile and main branch remain unchanged.
+
+Read-only hosted preflight is still access-blocked; **TF-AUTH-CONFIG-01 and BE-RPC-01 remain unresolved**. **STAGING-EDIT-01** is separately tracked as an unconfirmed compatibility risk requiring missing staging handler/provenance and deployment evidence, not a reason to impose a blanket editing restriction. The used build number and physical iPhone checks remain release prerequisites. These two client hardenings do not fix TestFlight Auth configuration. No push, merge, production setting change, migration, build, export, upload, submission or OTA occurred.

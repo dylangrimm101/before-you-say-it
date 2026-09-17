@@ -99,3 +99,18 @@ No normally configured EAS/Supabase/Vercel CLI or relevant token was available i
 - Separately verify retained-session/cold-resume and owner-isolated recovery without deleting journals, resetting allowance, creating replacement identities or making production configuration changes as a troubleshooting shortcut.
 
 **Decision:** reviewable client corrections are not release readiness. TestFlight Auth configuration, hosted backend compatibility and physical recording/playback/debrief acceptance remain open gates.
+
+## Follow-up after Claude acceptance — 2026-09-17
+
+The user supplied Claude's acceptance of `291f5e4..6a8ddfd`, including reported passing default-deadline checks. Those are independent reviewer results, not a replacement for the retained earlier failures. Two optional approval hardenings are now tracked in the latest addendum to `RECOVERY-TARGETED-REVIEW.md`; neither is an authentication fix or authorization to build.
+
+**Read-only access recheck:** the checkout was still clean at `f95b8031c94e28931d7e0c74f65843468b134041` before edits. No EAS/Supabase/Vercel executable or relevant token was available; required public inputs were still absent locally. Expo again redirected the project environment page to login. Supabase browser inspection and opening Vercel timed out without a usable settings readback; no Apple build inventory was freshly obtained. These failures establish no new fact about remote configuration. The normal sign-in/access steps above remain required, as do TF-AUTH-CONFIG-01, BE-RPC-01, build-number and device gates. No credential search in unrelated apps, new tool installation or production mutation was attempted.
+
+### Staging final editing — investigation only
+
+- Verified client facts: staging free generation dispatches through `requestFreeBysiGeneration`, not the normal native-free runtime. `createFreeAcquisitionTransport` requires `developmentBuild=true`, staging Auth, the exact staging Auth origin and an explicit matching free endpoint. It is development-only even before normal TestFlight's staging-input rejection. Protected final-review selection still excludes this flow; it was not changed.
+- The local `freeAcquisition.test.ts` contains an assertion rejecting a forged **counterpart pushback before close**. That is evidence of intended exchange authorization, not a direct test of editing a learner line after the close. Its harness imports `web-signup/hosted-provenance.mjs` and `web-signup/handler.mjs` from an external private checkout; both referenced files are unavailable locally.
+- Normally configured GitHub access worked, but the exact private pin `d0a068a1ee849144caf65811f4bf0c457056515a` does not contain those files at `server/server/web-signup/`. Read-only directory listing (tree `5a95f64e242061de73e2e8f610e090c01e9072eb`) contains only `paid-capability.mjs`. The known native-free provenance is not a substitute for the absent staging implementation. No backend code/dependencies were copied or installed and the dependency-incomplete staging integration suite was not represented as runnable or passing.
+- **STAGING-EDIT-01 remains an unconfirmed compatibility risk.** Need the exact staging handler/provenance source and its deployment identity, then a disconnected contract test of post-close learner edits. Only after that evidence should a separately scoped staging change be selected. Do not generalize the normal native-free read-only restriction to all legacy flows or claim that staging final editing is supported.
+
+Build profile, number, identity, environment guards, Auth/storage, transport and staging configuration remain unchanged. No build/export/upload/submission or production setting change occurred in this follow-up.
