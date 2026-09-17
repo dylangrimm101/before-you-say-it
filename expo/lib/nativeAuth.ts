@@ -13,7 +13,7 @@ export type NativeAuthLifetime = {
   snapshot: () => NativeAuthSnapshot;
 };
 
-// Deliberately off: see nativeAuth.setup.md. This is a rollout gate, not authorization.
+// This client rollout gate does not replace server authorization.
 export const NATIVE_ANONYMOUS_AUTH_ENABLED = true;
 export const NATIVE_AUTH_UNAVAILABLE = "Private practice setup isn’t available in this build yet. Please try again later or log in to an existing account.";
 
@@ -35,8 +35,14 @@ export function accountLoginAllowed(current: AuthIdentity | null, email: string)
 export function createNativeSessionStarter(auth: NativeAuthClient | null, enabled = NATIVE_ANONYMOUS_AUTH_ENABLED, lifetime?: NativeAuthLifetime) {
   let pending: Promise<NativeSessionResult> | null = null;
   const run = async (): Promise<NativeSessionResult> => {
-    const unavailable: NativeSessionResult = { success: false, message: NATIVE_AUTH_UNAVAILABLE };
-    if (!auth) return unavailable;
+    let stage = "configuration";
+    const unavailable = (reason = "unavailable", error?: unknown): NativeSessionResult => {
+      // Only fixed categories reach the screen; never include server messages, tokens or identities.
+      const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+      const category = typeof code === "string" && ["anonymous_provider_disabled", "over_request_rate_limit", "over_email_send_rate_limit", "captcha_failed", "bad_jwt", "session_not_found"].includes(code) ? code : reason;
+      return { success: false, message: `We couldn’t set up private practice. Please try again or log in to an existing account. Setup code: ${stage}/${category}.` };
+    };
+    if (!auth) return unavailable();
     const start = lifetime?.snapshot();
     const active = (expectedOwnerId: string | null, baseline = start): boolean => {
       if (!lifetime || !baseline) return true;
@@ -49,18 +55,20 @@ export function createNativeSessionStarter(auth: NativeAuthClient | null, enable
       return now.ownerId === expectedOwnerId;
     };
     try {
+      stage = "session-read";
       const existing = await auth.getSession();
-      if (!active(start?.ownerId ?? null)) return unavailable;
-      if (existing.error) return unavailable;
+      if (!active(start?.ownerId ?? null)) return unavailable();
+      if (existing.error) return unavailable("rejected", existing.error);
       const current = existing.data.session;
       if (current?.access_token && current.user?.id) {
         const identity = current.user as { id: string; is_anonymous?: boolean };
-        if (!active(identity.id)) return unavailable;
+        if (!active(identity.id)) return unavailable();
         let live = identity;
         if (auth.getUser) {
-          if (!active(identity.id)) return unavailable;
+          if (!active(identity.id)) return unavailable();
+          stage = "session-verify";
           const verified = await auth.getUser(current.access_token);
-          if (!active(identity.id)) return unavailable;
+          if (!active(identity.id)) return unavailable();
           if (verified.error || !verified.data.user?.id || verified.data.user.id !== current.user.id) {
             live = { id: "", is_anonymous: undefined };
           } else {
@@ -70,24 +78,28 @@ export function createNativeSessionStarter(auth: NativeAuthClient | null, enable
         if (sessionCanTalk({ ...current.user, ...live })) {
           return { success: true, session: current };
         }
-        if (!enabled) return unavailable;
-        if (!active(identity.id)) return unavailable;
+        if (!enabled) return unavailable();
+        if (!active(identity.id)) return unavailable();
+        stage = "session-clear";
         await auth.signOut?.();
         const afterSignOut = lifetime?.snapshot();
-        if (afterSignOut?.logoutPending || (afterSignOut && afterSignOut.ownerId !== null)) return unavailable;
-        if (afterSignOut && !active(null, afterSignOut)) return unavailable;
+        if (afterSignOut?.logoutPending || (afterSignOut && afterSignOut.ownerId !== null)) return unavailable();
+        if (afterSignOut && !active(null, afterSignOut)) return unavailable();
       } else if (!enabled) {
-        return unavailable;
+        return unavailable();
       }
-      if (!enabled) return unavailable;
+      if (!enabled) return unavailable();
       const anonymousStart = lifetime?.snapshot();
-      if (anonymousStart && !active(null, anonymousStart)) return unavailable;
+      if (anonymousStart && !active(null, anonymousStart)) return unavailable();
+      stage = "guest-signin";
       const { data, error } = await auth.signInAnonymously();
-      if (error || !data.session?.access_token || !data.session.user?.id) return unavailable;
-      if (!active(data.session.user.id, anonymousStart)) return unavailable;
+      if (error) return unavailable("rejected", error);
+      if (!data.session?.access_token || !data.session.user?.id) return unavailable("empty-session");
+      stage = "session-owner";
+      if (!active(data.session.user.id, anonymousStart)) return unavailable("changed");
       return { success: true, session: data.session };
-    } catch {
-      return unavailable;
+    } catch (error) {
+      return unavailable("exception", error);
     }
   };
   return (): Promise<NativeSessionResult> => {

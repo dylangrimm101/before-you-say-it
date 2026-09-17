@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useCallback, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
@@ -9,6 +9,8 @@ import { C, GUTTER, T, font } from "@/constants/theme";
 import { useStore } from "@/providers/store";
 import { useAuth } from "@/providers/auth";
 import { AccountLogout } from "@/components/AccountLogout";
+
+const SetupDiagnosticDetails = lazy(() => import("@/components/SetupDiagnosticDetails"));
 
 function ConversationMark(): React.JSX.Element {
   return (
@@ -71,6 +73,11 @@ export default function EntryScreen(): React.JSX.Element {
             {isStarting ? <Text style={styles.accountNote} accessibilityLiveRegion="polite">Setting up…</Text> : null}
             <GhostButton label="I already have an account" disabled={isStarting} onPress={() => router.push("/continue-from-web")} />
             {authError ? <Text style={styles.accountNote} accessibilityRole="alert" accessibilityLiveRegion="polite">{authError}</Text> : null}
+            {authError?.endsWith("Setup code: configuration/unavailable.") ? (
+              <Suspense fallback={<Text style={styles.accountNote}>Loading setup details…</Text>}>
+                <SetupDiagnosticDetails />
+              </Suspense>
+            ) : null}
             <AccountLogout />
           </View>
         </Reveal>

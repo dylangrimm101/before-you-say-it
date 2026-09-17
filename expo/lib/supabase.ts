@@ -4,13 +4,14 @@ import * as Crypto from "expo-crypto";
 import Constants from "expo-constants";
 import * as Application from "expo-application";
 import { selectAuthEnvironment } from "./authEnvironment";
+import { describeAuthConfiguration } from "./authConfigurationDiagnostic";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import "react-native-url-polyfill/auto";
 
 import { createMigratingSecureSessionStorage } from "@/lib/secureSessionStorage";
 
-export const authEnvironment = selectAuthEnvironment({
+const authEnvironmentInputs: Parameters<typeof selectAuthEnvironment>[0] = {
   developmentBuild: __DEV__,
   nativeStagingBuild: Platform.OS !== "web" && Constants.executionEnvironment !== "storeClient"
     && Application.applicationId === "app.bysi.staging.account",
@@ -22,6 +23,13 @@ export const authEnvironment = selectAuthEnvironment({
   stagingAccountRelease: process.env.EXPO_PUBLIC_BYSI_STAGING_ACCOUNT_RELEASE === "1",
   applicationId: Application.applicationId,
   projectId: Constants.expoConfig?.extra?.eas?.projectId as string | undefined,
+};
+export const authEnvironment = selectAuthEnvironment(authEnvironmentInputs);
+
+/** Credential-free startup snapshot; never re-read potentially changed runtime env on a tap. */
+export const authConfigurationDiagnostic: string = describeAuthConfiguration(authEnvironmentInputs, authEnvironment, {
+  version: Application.nativeApplicationVersion,
+  build: Application.nativeBuildVersion,
 });
 const supabaseUrl = authEnvironment?.url ?? "";
 const supabaseAnonKey = authEnvironment?.key ?? "";
