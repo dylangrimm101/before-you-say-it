@@ -2,6 +2,8 @@
 
 2026-09-17. This supersedes the proposed August journey transplant, not the historical handoff receipts. No delayed authentication, layout-gate changes, new intake provider, or August source transplant was implemented. The current onboarding questions and authentication-before-navigation structure remain.
 
+**Later correction checkpoint:** the addendum at the end supersedes this initial checkpoint's final-edit decision and BE-EDIT-01 disposition. Earlier observations and test results below are retained as history, not relabeled as current results. Release access/configuration findings are in `RELEASE-READINESS-PREFLIGHT.md`.
+
 ## Provenance and independent verification
 
 - Existing branch: `codex/recovery-aug28-journey`; starting commit: `f93d42c8c01815c96b5af9b11bd926968273cf10`.
@@ -109,3 +111,51 @@ Unchanged sensitive boundaries include `expo/app/_layout.tsx`, `expo/providers/a
 To reproduce: use the isolated Bun directory on PATH; run `python3 handoff/check.py` without `--install` or `--private-source`. For the additional tests, set `BYSI_COMPONENT_TEST_DEPS` to the prepared external renderer prefix and run `bun test --no-env-file` on these files: `normalFreeTextFidelity`, `recoveryClientFixes`, `normalFreeRetryOrdering`, `authConfigurationDiagnostic`, `setupDiagnosticDetails`, `rehearsal`, `speech`, `freeJourney`, `personas`, `secureSessionStorage`, `ownerVoiceCache` (each `__tests__/<name>.test.ts` from `expo/`). Scrub provider/auth environment variables; set `EXPO_NO_DOTENV=1`, `EXPO_NO_TELEMETRY=1`, `EXPO_OFFLINE=1`, `CI=1`; retain network denial. Do not run the historical full suite expecting absent private backend dependencies to work.
 
 Local completion means reviewable source fixes and passing offline checks, not TestFlight readiness. Authentication configuration, deployed backend compatibility, final-edit semantics, physical recording and audible playback remain separate acceptance gates.
+
+## Correction addendum — 2026-09-17, after reviewed `291f5e4`
+
+The requested starting SHA was confirmed as `291f5e4deed39729fa8f64c605ab8fb8c0a975fd`, with a clean worktree on `codex/recovery-aug28-journey`. The current attachment contained the user's correction request, but no separate full independent review; its findings were independently checked against source, mounted regressions and freshly retrieved pinned backend provenance.
+
+### Local review units
+
+- `544106c2d51719679c02e7d6441634207cb1b410` — separate approval-setup errors from counterpart errors; read-only protected final review and exact stored debrief exchange; mounted regressions. Only production change: `expo/app/rehearse/[id].tsx`. Tests: `recoveryClientFixes.test.ts` and `.fixture.ts`.
+- `6a8ddfd2192f331f20706da412c0b6a9036a944a` — quoted/whitespace TTS fidelity variants, explicitly client invariants; only `normalFreeTextFidelity.test.ts` and `.fixture.ts`.
+- Final code/test SHA: **`6a8ddfd2192f331f20706da412c0b6a9036a944a`**; Expo tree **`899d6d16d0bb167a01ed5ccde1dfa90f4854c600`**. The following handoff-only commit does not change this tree; its final repository SHA is recorded in the delivery message.
+
+Claude's correction-only review range: `git diff 291f5e4deed39729fa8f64c605ab8fb8c0a975fd..6a8ddfd2192f331f20706da412c0b6a9036a944a -- expo/`. Do not include earlier D1/journey commits in this correction review.
+
+### Verified findings and scope
+
+1. **Approval Back defect fixed.** An initial persistence/setup rejection formerly wrote the generic counterpart `error`; Back then selected the “Response unavailable” dock. A dedicated `approvalError` is cleared on approval retry and Back. Genuine counterpart errors are neither cleared nor hidden. Mounted tests reproduce failure → Back → complete-transcript review, no “Back to today”, reopen without stale setup text, and successful retry dispatch.
+2. **BE-EDIT-01 source conflict resolved for protected normal free.** The re-read `provenance.mjs` blob `2a65d67d46456d023e36e27ad0ac19cb2cb06a39` verifies an HMAC over the already approved exchange. Final editing cannot preserve that proof. Protected review now shows stored learner turns as selectable text, gives the requested explanation, and passes `turns` unchanged rather than reconstructing them from drafts. No normalization, proof bypass, regeneration or restart was added. Hosted compatibility remains BE-RPC-01, not a claim of deployed acceptance.
+3. **Applicability was traced, not inferred from a name.** `normalFreeRuntime.ts` exports `normalFreeRecoveryEnabled=!!transport`, where transport requires the normal origin, selected non-staging Supabase client/environment and `createNormalFreeSession` validation. This is not `BYSI_NATIVE_FREE_RPC`. In this screen, `recoveryRequired` additionally requires `entry=onboarding`. `RehearseRoute` routes non-onboarding known scenarios to the separate paid component; free debrief generation selects `requestNormalFree` under the normal origin/non-staging configuration. Missing transport under a malformed normal setup fails closed; it is not a supported alternate authenticated final-edit path. The proof requirement is independent of legacy/v2 RPC selection. The separate staging transport and unrelated paid flow were not changed or declared backend-accepted here.
+4. **Editing preserved at its authorized point.** Mounted tests edit both learner transcripts before their respective submissions, retain those words through both responses/playback points, then verify exact debrief turns. Legacy final-edit coverage still exercises both editable fields and corrected text. Protected synthetic whitespace additionally proves final approval does not trim/reconstruct the stored exchange.
+5. **Text-fidelity evidence bounded.** Quoted and whitespace variants use the real client AI/normal-free/TTS path with synthetic authorized server responses and fake playback. The pinned producer normalizes whitespace; the whitespace variant verifies a client boundary invariant, not that a deployed server emits those bytes or that a phone audibly played them.
+
+The first correction regression run before the production edit was **9 pass / 3 fail** across the 12 screen/text tests; approval Back, read-only final review and protected final-review controls failed. After the fix, the same group passed **12/12**. A subsequent fixture strengthening also checks editing the second learner transcript; final suite evidence is recorded below.
+
+No delayed Auth, layout-gate or intake-provider change, historical transplant, same-capture retry, final Record Again, or promise of a new server-authorized rehearsal was added. D1 diagnostic files, owner isolation, SecureStore, recording/audio infrastructure, operation ordering, environment guards, bundle/project identity and disabled TestFlight OTA remain unchanged.
+
+### Newly run checks and retained failures
+
+All execution used isolated Bun `1.4.2+744846f84`, the existing locked dependencies, the external renderer prefix, scrubbed service environment and macOS network denial. No new dependency installation, backend setup or provider call occurred. `expo/bun.lock` still hashes to `ace5c55f08b8a7e6971d0ef1ed01c468bdd8b7eade6732e127642033a38928b9`.
+
+- Initial concurrent default-timeout runs: combined **316 pass / 3 fail / 2 between-test errors**, 3,089 Bun assertions across 319 tests/32 files; focused **121 pass / 3 fail / 2 errors**, 1,793 assertions. Focused log: `handoff-local-results/1789652339026814000/standalone-mobile.log`, SHA-256 `aae8a377210191db00d811ab183397654faab59537c029a047a19860bda1cf41`. The combined output is retained in the task transcript. The initial wrapper ended without recording canonical-check completion; do not treat its printed lint output as an exit-code receipt.
+- Sequential unmodified `handoff/check.py`: focused **121 pass / 3 fail / 2 errors**, 1,857 assertions; **TypeScript exit 0; canonical `bun run check` exit 0**, four inherited warnings, no errors. Receipts: `handoff-local-results/1789652606514760000/results.json`. Focused log SHA-256 `65323a8481a8d2c7b1d553990731ead88ce23c57f54e03a4926b6888df22bd27`; empty TypeScript log `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`; canonical log `2d3dfbee6785ee3179b4e88014a1f2030eebc72c8eae69ee46b2066f845f7723`.
+- Failure boundary: unchanged `bundledApprovedDeckOffline.test.ts` exceeded Bun's default five-second deadline in “bundled lessons preserve authorized review…” and “native reads only the requested packaged asset…”. Still-running async work then encountered another test's modified manifest/read counters, causing between-test errors and the Android URI assertion failure. This is directly supported by the stacks/shared fixture state; host contention may exacerbate duration but was not proved as the sole cause. Neither that suite nor its loader was edited.
+
+These default commands are **not green**; a longer-deadline diagnostic run does not erase them. No assertions, test fixtures in that suite, application timing, canonical gate script or timeout declarations were weakened. Final sequential diagnostic/targeted results are recorded below.
+
+| Newly run final command group | Result | Log SHA-256 |
+| --- | --- | --- |
+| Additional 11-file targeted suite, ordinary declared deadlines | **195 pass, 0 fail; 1,262 Bun assertions** | `4d9847d6b446ce0d4d7d2c5b4eb8016a46cc90cf54938aadc533aecdb76b9400` |
+| Existing 21-file focused suite, diagnostic CLI `--timeout 30000` | **124 pass, 0 fail; 1,871 assertions** | `1e9a22248a5c23fcc7618d8f84299533cafe11cd4473f3dac4dd1aae108cbf91` |
+| Combined 32-file suite, diagnostic CLI `--timeout 30000` | **319 pass, 0 fail; 3,133 assertions** | `3b6fe28f790d5ccddbdedaa90127f4d6df3530ee888eb5b8e3770f234adf1c6b` |
+
+These three runs were sequential, on the final code/test tree, with no test/check assertions changed between the failed default runs and passing diagnostic runs. Exact commands, timings, counts and hashes are in ignored local `handoff-local-results/correction-sequential-lrZjxp/results.json`; logs are `targeted-default.log`, `focused-timeout30s.log`, and `combined-timeout30s.log`. Mounted fixtures additionally use Node assertions not counted by Bun. TypeScript and canonical lint above ran on the same final code/test content; only handoff documents changed afterward. No full private-composed/backend or native/device suite was executed.
+
+### Remaining gates
+
+No additional defect was identified in the corrected approval/final-review scope. The existing default-timeout offline-deck test instability remains a validation issue, not a reason to mask assertions. TF-AUTH-CONFIG-01, BE-RPC-01 and on-device acceptance remain unresolved. STT-RETRY-01 remains an explicitly deferred UX/protocol design; no retained-capture retry was implemented.
+
+See `RELEASE-READINESS-PREFLIGHT.md` for verified source configuration, inaccessible hosted settings, historical deployment boundaries, required access, build-number prerequisite and the exact approval-gated candidate procedure. `main` remains `e0dcdc07d816f05b341e2bb19e0100a20ab47585`; nothing was pushed or merged.
