@@ -234,6 +234,10 @@ function LegacyRehearse() {
   );
   const [stream, setStream] = useState<string>("");
   const recoveryRequired=normalFreeRecoveryEnabled&&params.entry==='onboarding';
+  // This flag identifies the instantiated normal /api/native/free transport on
+  // this onboarding route, not the server's RPC selector. Its exchange proof
+  // binds already-approved turns. Other routes/legacy transports keep editing.
+  const finalTranscriptReadOnly = recoveryRequired;
   const [recoveryReady,setRecoveryReady]=useState(!recoveryRequired);
   const [recoveryState,setRecoveryState]=useState<RecoveryState>({status:'checking'});
   const [recoveryBusy,setRecoveryBusy]=useState(false);
@@ -274,6 +278,7 @@ function LegacyRehearse() {
   const finalApprovalStarted = useRef<boolean>(false);
   const [closing, setClosing] = useState<boolean>(false);
   const [reviewingTranscript, setReviewingTranscript] = useState<boolean>(false);
+  const [approvalError, setApprovalError] = useState<string>("");
   const [reviewDrafts, setReviewDrafts] = useState<{ opening: string; response: string }>({ opening: "", response: "" });
   const [mode, setMode] = useState<"voice" | "text">("voice");
   const [voiceOn, setVoiceOn] = useState<boolean>(true);
@@ -824,8 +829,9 @@ function LegacyRehearse() {
   const approveTranscript = useCallback((): void => {
     if (finalApprovalStarted.current || !reviewDrafts.opening.trim() || !reviewDrafts.response.trim()) return;
     finalApprovalStarted.current = true;
+    setApprovalError("");
     let userIndex = 0;
-    const approvedTurns = turns.map((turn): Turn => turn.role !== "user" ? turn : { ...turn, text: (userIndex++ === 0 ? reviewDrafts.opening : reviewDrafts.response).trim() });
+    const approvedTurns = finalTranscriptReadOnly ? turns : turns.map((turn): Turn => turn.role !== "user" ? turn : { ...turn, text: (userIndex++ === 0 ? reviewDrafts.opening : reviewDrafts.response).trim() });
     setTurns(approvedTurns);
     setReviewingTranscript(false);
     void analyzeApprovedTranscript(approvedTurns).catch(() => {
@@ -834,9 +840,9 @@ function LegacyRehearse() {
       cancelConversionBuild(sessionId.current);
       setClosing(false);
       setReviewingTranscript(true);
-      setError("We couldn't prepare your debrief. Please try approving again.");
+      setApprovalError("We couldn't prepare your debrief. Please try approving again.");
     });
-  }, [analyzeApprovedTranscript, reviewDrafts, turns]);
+  }, [analyzeApprovedTranscript, finalTranscriptReadOnly, reviewDrafts, turns]);
 
   const exitRehearsal = useCallback(async (): Promise<void> => {
     await cancelDictation();
@@ -1092,21 +1098,27 @@ function LegacyRehearse() {
         <Backdrop />
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <ScrollView contentContainerStyle={[styles.reviewScroll, { paddingTop: insets.top + 8, paddingBottom: 28 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Pressable onPress={() => setReviewingTranscript(false)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back to rehearsal">
+            <Pressable onPress={() => { setApprovalError(""); setReviewingTranscript(false); }} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back to rehearsal">
               <Text style={styles.reviewBackTop}>Back</Text>
             </Pressable>
-            <Text style={styles.reviewEyebrow}>REVIEW AND CORRECT</Text>
-            <Text style={styles.reviewTitle}>Check what we heard.</Text>
+            <Text style={styles.reviewEyebrow}>{finalTranscriptReadOnly ? "REVIEW" : "REVIEW AND CORRECT"}</Text>
+            <Text style={styles.reviewTitle}>{finalTranscriptReadOnly ? "Review your conversation." : "Check what we heard."}</Text>
+            {finalTranscriptReadOnly ? <Text style={styles.reviewPrivacy}>To keep this result matched to the conversation, previously approved lines can’t be edited here.</Text> : null}
             <Text style={styles.reviewLabel}>YOU · TURN 1</Text>
-            <TextInput value={reviewDrafts.opening} onChangeText={(opening) => setReviewDrafts((current) => ({ ...current, opening }))} multiline style={styles.reviewInput} accessibilityLabel="Edit your opening" />
+            {finalTranscriptReadOnly
+              ? <Text selectable style={styles.reviewInput} accessibilityLabel="Approved opening">{turns.find((turn) => turn.role === "user")?.text ?? ""}</Text>
+              : <TextInput value={reviewDrafts.opening} onChangeText={(opening) => setReviewDrafts((current) => ({ ...current, opening }))} multiline style={styles.reviewInput} accessibilityLabel="Edit your opening" />}
             <Text style={[styles.reviewLabel, styles.counterpartLabel]}>{themName.toUpperCase()}</Text>
             <View style={styles.counterpartReview}><Text style={styles.counterpartReviewText}>{counterpartTurns[0]?.text ?? ""}</Text></View>
             <Text style={styles.reviewLabel}>YOU · TURN 2</Text>
-            <TextInput value={reviewDrafts.response} onChangeText={(response) => setReviewDrafts((current) => ({ ...current, response }))} multiline style={styles.reviewInput} accessibilityLabel="Edit your response under pressure" />
+            {finalTranscriptReadOnly
+              ? <Text selectable style={styles.reviewInput} accessibilityLabel="Approved response under pressure">{turns.filter((turn) => turn.role === "user")[1]?.text ?? ""}</Text>
+              : <TextInput value={reviewDrafts.response} onChangeText={(response) => setReviewDrafts((current) => ({ ...current, response }))} multiline style={styles.reviewInput} accessibilityLabel="Edit your response under pressure" />}
             <Text style={[styles.reviewLabel, styles.counterpartLabel]}>{themName.toUpperCase()} · CLOSE</Text>
             <View style={styles.counterpartReview}><Text style={styles.counterpartReviewText}>{counterpartTurns[1]?.text ?? ""}</Text></View>
             <Text style={styles.reviewPrivacy}>Nothing gets analyzed until you approve it.</Text>
             {error ? <Text accessibilityRole="alert" style={styles.reviewPrivacy}>{error}</Text> : null}
+            {approvalError ? <Text accessibilityRole="alert" style={styles.reviewPrivacy}>{approvalError}</Text> : null}
           </ScrollView>
           <StateDock bottomInset={insets.bottom}>
             <PrimaryButton label="Approve transcript" onPress={approveTranscript} disabled={!reviewDrafts.opening.trim() || !reviewDrafts.response.trim() || closing} />

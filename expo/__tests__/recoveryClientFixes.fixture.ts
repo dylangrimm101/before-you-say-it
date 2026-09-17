@@ -40,7 +40,14 @@ const turns: Turn[] = [
   { id: 'u1', role: 'user', text: 'Can we agree on one priority?' }, { id: 'h1', role: 'them', text: approvedReply },
   { id: 'u2', role: 'user', text: 'Which task can wait until Friday?' }, { id: 'h2', role: 'them', text: 'The client still expects all of it.' },
 ];
-const isFinal = ['duplicate-approval', 'approval-setup-retry', 'final-record-again'].includes(testCase);
+// Synthetic whitespace proves final approval does not reconstruct/trim the stored
+// exchange. It is not a claim about the server's normal transcription formatting.
+if (testCase === 'final-read-only') {
+  turns[0] = { ...turns[0], text: '  Can we agree on one priority?\n' };
+  turns[2] = { ...turns[2], text: '\tWhich task can wait until Friday?  ' };
+}
+const isFinal = ['duplicate-approval', 'approval-setup-retry', 'approval-back', 'final-read-only', 'final-record-again'].includes(testCase);
+const protectedFinal = ['approval-back', 'final-read-only'].includes(testCase);
 const session = { id: 'fixture-session', scenarioId: scenario.id, category: 'work', topic: scenario.situation, usefulOutcome: scenario.goal, counterpart: 'Hope', counterpartDisplayLabel: 'Hope', persona: 'woman-hope', entryRoute: 'real_conversation', freeJourneyCheckpoint: 'rehearsal', freeRehearsalTurns: isFinal ? turns : testCase === 'recovered-playback' ? [turns[0]] : [] };
 const events: string[] = [];
 let added: any = null;
@@ -48,7 +55,7 @@ let buildCalls = 0;
 let generationCalls = 0;
 let analysisCalls = 0;
 let analysisTurns: Turn[] = [];
-let failSetup = testCase === 'approval-setup-retry';
+let failSetup = ['approval-setup-retry', 'approval-back'].includes(testCase);
 const spoken: string[] = [];
 const routes: any[] = [];
 const router = { replace: (route: any) => { routes.push(route); }, push() {}, back() {}, canGoBack: () => false };
@@ -67,8 +74,9 @@ mock.module('@/providers/store', () => ({ useStore: () => store }));
 mock.module('@/providers/auth', () => ({ useAuth: () => ({ startNativeSession: async () => { events.push('auth'); return { success: true }; } }) }));
 mock.module('expo-router', () => ({ useRouter: () => router, useLocalSearchParams: () => ({ id: scenario.id, entry: 'onboarding', practiceSessionId: session.id, persona: 'woman-hope' }) }));
 // This fixture isolates UI behavior. Real transport ordering/digests have separate tests.
-mock.module('@/lib/normalFreeRuntime', () => ({ normalFreeRecoveryEnabled: ['exact-playback', 'recovered-playback'].includes(testCase), requestNormalFree: async (op: string) => {
+mock.module('@/lib/normalFreeRuntime', () => ({ normalFreeRecoveryEnabled: protectedFinal || ['exact-playback', 'recovered-playback'].includes(testCase), requestNormalFree: async (op: string) => {
   assert.equal(op, 'recover');
+  if (protectedFinal) return Response.json({ status: 'resume', phase: 'close', sessionId: session.id, generation: 0, audio: { text: turns[3].text, role: 'hope', turn: 'close' } });
   return Response.json(generationCalls || testCase === 'recovered-playback'
     ? { status: 'resume', phase: 'pushback', sessionId: session.id, generation: 0, audio: { text: approvedReply, role: 'hope', turn: 'pushback' } }
     : { status: 'new' });
@@ -76,7 +84,11 @@ mock.module('@/lib/normalFreeRuntime', () => ({ normalFreeRecoveryEnabled: ['exa
 mock.module('@/lib/ai', () => ({
   buildCustomScenario: async () => { buildCalls++; return { ...scenario }; },
   fallbackCustomScenario: (situation: string, category: string, form: any) => ({ ...scenario, situation, category, persona: form.persona, goal: form.outcome }),
-  bysiContract: () => ({}), nextCounterpartTurn: async () => { generationCalls++; return { reply: approvedReply, tension: 50, nudge: '' }; },
+  bysiContract: () => ({}), nextCounterpartTurn: async () => {
+    generationCalls++;
+    if (testCase === 'counterpart-failure') throw Error('Synthetic counterpart failure');
+    return { reply: approvedReply, tension: 50, nudge: '' };
+  },
   generateDebrief: async (_scenario: Scenario, _difficulty: string, approvedTurns: Turn[]) => { analysisCalls++; analysisTurns = approvedTurns; throw Error('Synthetic unavailable result'); },
 }));
 mock.module('@/lib/conversionBuild', () => ({ beginConversionBuild: () => { events.push('build'); }, cancelConversionBuild() {}, emitConversionEvent() {}, failConversionBuild() {}, isConversionBuildActive: () => true }));
@@ -117,6 +129,28 @@ if (testCase === 'custom') {
     assert.ok(input('Edit your opening'));
     assert.ok(input('Edit your response under pressure'));
     assert.ok(button('Back to rehearsal'));
+  } else if (testCase === 'final-read-only') {
+    assert.equal(root.root.findAllByType('input').length, 0, 'Protected final review must expose no editing controls');
+    const opening = root.root.findAllByType('host').find((n: any) => n.props.accessibilityLabel === 'Approved opening');
+    const response = root.root.findAllByType('host').find((n: any) => n.props.accessibilityLabel === 'Approved response under pressure');
+    assert.equal(childText(opening), turns[0].text);
+    assert.equal(childText(response), turns[2].text);
+    assert.ok(JSON.stringify(root.toJSON()).includes('previously approved lines can’t be edited here'));
+    await press('Approve transcript');
+    assert.deepEqual(analysisTurns, turns, 'Debrief receives the exact stored exchange, with no trimming or draft reconstruction');
+    assert.deepEqual(routes, ['/debrief/fixture-session']);
+  } else if (testCase === 'approval-back') {
+    await press('Approve transcript');
+    assert.ok(JSON.stringify(root.toJSON()).includes("We couldn't prepare your debrief"));
+    await press('Back to rehearsal');
+    assert.ok(button('Review complete transcript'), 'Approval setup failure must not replace the complete dock with a counterpart error');
+    assert.ok(!button('Back to today'), 'Do not offer a misleading error exit after Back');
+    assert.ok(!JSON.stringify(root.toJSON()).includes('Response unavailable'));
+    await press('Review complete transcript');
+    assert.ok(!JSON.stringify(root.toJSON()).includes("We couldn't prepare your debrief"));
+    await press('Approve transcript');
+    assert.equal(analysisCalls, 1);
+    assert.deepEqual(analysisTurns, turns);
   } else if (testCase === 'approval-setup-retry') {
     await press('Approve transcript');
     assert.equal(analysisCalls, 0);
@@ -154,18 +188,26 @@ if (testCase === 'custom') {
     await press('Re-record');
     assert.equal(input('Your line, ready to send'), undefined);
     assert.equal(generationCalls, 0);
+  } else if (testCase === 'counterpart-failure') {
+    await press('Use this opener');
+    assert.equal(generationCalls, 1);
+    assert.ok(JSON.stringify(root.toJSON()).includes('Response unavailable'), 'Unrelated counterpart failures remain visible');
   } else {
+    await act(async () => { input('Your line, ready to send').props.onChangeText('Edited before first approval.'); });
     await press('Use this opener');
     assert.deepEqual(spoken, [approvedReply], 'Playback must receive the exact approved counterpart text, not display formatting');
     await press('Record your line');
     await press('Stop and review your line');
     assert.equal(generationCalls, 1, 'The second recording also waits for explicit approval');
+    await act(async () => { input('Your line, ready to send').props.onChangeText('Edited before second approval.'); });
     await press('Use this reply');
     assert.equal(generationCalls, 2);
     assert.deepEqual(spoken, [approvedReply, approvedReply], 'Both playback points retain authorized text');
     await press('Review complete transcript');
-    assert.ok(input('Edit your opening'));
-    assert.ok(input('Edit your response under pressure'));
+    assert.equal(root.root.findAllByType('input').length, 0, 'Protected final review is read-only after editable per-turn approval');
+    await press('Approve transcript');
+    assert.equal(analysisTurns[0].text, 'Edited before first approval.', 'Pre-submission edits are the approved stored words');
+    assert.equal(analysisTurns[2].text, 'Edited before second approval.');
   }
 }
 await act(async () => { root.unmount(); });
