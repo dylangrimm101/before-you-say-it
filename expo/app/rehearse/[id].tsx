@@ -112,16 +112,19 @@ function uid(): string {
 
 function onboardingScenarioFromSession(session: ActivePracticeSession, id: string): Scenario {
   const counterpart = session.counterpartDisplayLabel || session.counterpart || "Conversation partner";
+  const contract = authoritativeNormalFreeContract(session);
   return {
     id,
     category: session.category,
     title: session.scenarioTitle || "Your conversation",
     counterpart,
     situation: session.topic || session.scenarioTitle || "Private custom scenario",
-    persona: session.persona || DEFAULT_PERSONA,
+    // Recovery can change scenarioId while this route keeps its original ID.
+    // Keep the quality gate grounded in the contract, not the voice-selection ID.
+    persona: typeof contract?.counterpart_persona === "string" ? contract.counterpart_persona : session.persona || DEFAULT_PERSONA,
     goal: session.behavioralGoal || session.usefulOutcome || "Practice this conversation",
     opensWith: "user",
-    openingLine: "",
+    openingLine: typeof contract?.opening_line === "string" ? contract.opening_line : "",
     minutes: 5,
     isCustom: session.scenarioSource === "user_supplied",
   };
