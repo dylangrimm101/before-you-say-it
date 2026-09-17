@@ -130,13 +130,17 @@ export async function requestBysiGeneration(payload: Record<string, unknown>, ti
   }, timeoutMs, signal);
 }
 
+function usesNormalFreeTransport(paidPractice: boolean): boolean {
+  return !paidPractice && process.env.EXPO_PUBLIC_BYSI_BUILD_MODE !== "staging-account" && !!process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN;
+}
+
 async function postBysi<T>(payload: Record<string, unknown>, paidPractice: boolean = true): Promise<T> {
   // Normal registered free acquisition is separate from paid entitlement authority.
   const staged = process.env.EXPO_PUBLIC_BYSI_BUILD_MODE === "staging-account";
   const normalPaid = paidPractice && !staged && !!process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN;
   const stagedPaid = paidPractice && staged;
   const stagedFree = !paidPractice && staged;
-  const normalFree = !paidPractice && !staged && !!process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN;
+  const normalFree = usesNormalFreeTransport(paidPractice);
   const endpoint = normalPaid ? "https://beforeyousayit.app/api/native/generate" : stagedPaid ? "https://bysi-signup-staging.vercel.app/api/practice/generate"
     : stagedFree ? "https://bysi-signup-staging.vercel.app/api/web-signup/generate" : normalFree ? "https://beforeyousayit.app/api/native/free/generate" : configuredGenerateEndpoint();
   const type = typeof payload.type === "string" ? payload.type : "unknown";
@@ -202,11 +206,12 @@ export function bysiContract(
   };
 }
 
-export function bysiTranscript(turns: Turn[], scenario: Scenario): BysiTranscript {
+export function bysiTranscript(turns: Turn[], scenario: Scenario, preserveCounterpartText: boolean = false): BysiTranscript {
   const userTurns = turns.filter((turn) => turn.role === "user").map((turn) => turn.text);
   const counterpartTurns = turns
     .filter((turn) => turn.role === "them")
-    .map((turn) => renderCounterpartMessage(turn.text, scenario.counterpart).body);
+    // Normal native free proofs bind the original generated text, not its display form.
+    .map((turn) => preserveCounterpartText ? turn.text : renderCounterpartMessage(turn.text, scenario.counterpart).body);
   const authoredOpening = scenario.opensWith === "counterpart" ? scenario.openingLine : "";
   return {
     user_turn_1: userTurns[0] ?? "",
@@ -507,13 +512,14 @@ export async function nextCounterpartTurn(
         type: "rehearsal_turn",
         turn,
         contract: contractOverride ?? bysiContract(scenario, reaction, outcome, entryRoute, difficulty),
-        transcript: bysiTranscript(turns, scenario),
+        transcript: bysiTranscript(turns, scenario, usesNormalFreeTransport(paidPractice)),
         avoid_repeating: avoidRepeating,
         variation_seed: `${scenario.id}-${turn}-${Date.now().toString(36)}-${attempt}`,
       }, paidPractice);
       if (!paidPractice && result.mode === 'safety') throw new FreeAcquisitionSafetyError();
-      const reply = result.mode === "safety" ? "" : result.text?.trim() ?? "";
-      if (reply && counterpartLinePassesQuality(reply, turn, groundingContext)) return { reply, tension: 50, nudge: "" };
+      const text = result.text ?? "";
+      const reply = result.mode === "safety" ? "" : usesNormalFreeTransport(paidPractice) ? text : text.trim();
+      if (reply.trim() && counterpartLinePassesQuality(reply, turn, groundingContext)) return { reply, tension: 50, nudge: "" };
       safeLog("[ai] BYSI counterpart quality gate rejected line", { attempt, turn });
     } catch (error) {
       if (error instanceof FreeAcquisitionSafetyError || error instanceof FreeAcquisitionRequestError) throw error;
@@ -536,7 +542,7 @@ export async function generateDebrief(
   contractOverride?: Record<string, unknown>,
 ): Promise<GeneratedDebrief> {
   void difficulty;
-  const transcript = bysiTranscript(turns, scenario);
+  const transcript = bysiTranscript(turns, scenario, usesNormalFreeTransport(paidPractice));
   safeLog("[evidence] BYSI complete transcript payload", {
     count: Object.values(transcript).filter((value) => value.trim().length > 0).length,
     step: "four-fields-present",

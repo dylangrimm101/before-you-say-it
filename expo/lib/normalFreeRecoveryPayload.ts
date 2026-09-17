@@ -1,5 +1,4 @@
 import { DIFFICULTY } from "@/constants/scenarios";
-import { renderCounterpartMessage } from "@/lib/rehearsal";
 import type { Difficulty, ReactionPattern, Scenario, Turn } from "@/types/convo";
 
 type BysiEntryRoute = "real_conversation" | "recurring_problem" | "desired_skill";
@@ -59,7 +58,7 @@ export function normalFreeRecoveryTranscript(turns: Turn[], scenario: Scenario) 
   const userTurns = turns.filter((turn) => turn.role === "user").map((turn) => turn.text);
   const counterpartTurns = turns
     .filter((turn) => turn.role === "them")
-    .map((turn) => renderCounterpartMessage(turn.text, scenario.counterpart).body);
+    .map((turn) => turn.text);
   const authoredOpening = scenario.opensWith === "counterpart" ? scenario.openingLine : "";
   return {
     user_turn_1: userTurns[0] ?? "",

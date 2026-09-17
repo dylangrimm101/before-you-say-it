@@ -265,10 +265,13 @@ function LegacyRehearse() {
   const [error, setError] = useState<string>("");
   /** A transcribed line waiting for the user to review, edit and submit it. */
   const [pending, setPending] = useState<string>("");
+  const [reviewingPendingTranscript, setReviewingPendingTranscript] = useState<boolean>(false);
   /** Set when a counterpart turn could not be produced and can be retried. */
   const [canRetry, setCanRetry] = useState<boolean>(false);
   /** Guards against a second submission while one turn is in flight. */
   const busy = useRef<boolean>(false);
+  /** Synchronous guard: two taps can precede the disabled-button render. */
+  const finalApprovalStarted = useRef<boolean>(false);
   const [closing, setClosing] = useState<boolean>(false);
   const [reviewingTranscript, setReviewingTranscript] = useState<boolean>(false);
   const [reviewDrafts, setReviewDrafts] = useState<{ opening: string; response: string }>({ opening: "", response: "" });
@@ -461,7 +464,7 @@ function LegacyRehearse() {
         });
         setTension(res.tension);
         setThinking(false);
-        const spoken = speechTextFor(res.reply, themName);
+        const spoken = recoveryRequired ? res.reply : speechTextFor(res.reply, themName);
         // Match the web flow: the generated counterpart text is visible immediately,
         // then that exact Hope/Adam line is sent to BYSI TTS. The learner's own
         // transcript never enters the playback path.
@@ -485,7 +488,7 @@ function LegacyRehearse() {
         busy.current = false;
       }
     },
-    [scenario, difficulty, reaction, outcome, reveal, persona, themName, activePracticeSession, router],
+    [scenario, difficulty, reaction, outcome, reveal, persona, themName, activePracticeSession, router, recoveryRequired],
   );
 
   /** Commit the user's reviewed line. Only an explicit submit advances a turn. */
@@ -500,6 +503,7 @@ function LegacyRehearse() {
       // is the only chance to satisfy the browser's autoplay policy.
       await unlockAudioPlayback();
       setPending("");
+      setReviewingPendingTranscript(false);
       setDraft("");
       const mine: Turn = approvedUserTurn(uid(), clean);
       const next = [...turns, mine];
@@ -557,6 +561,7 @@ function LegacyRehearse() {
       if (text && text.trim().length > 0) {
         tap("success");
         setPending(recognizerEndState(text).pendingText);
+        setReviewingPendingTranscript(true);
         safeLog("[evidence] confirm transcript shown in native UI", {
           entryRoute: activePracticeSession?.entryRoute ?? "unknown",
           platform: Platform.OS,
@@ -817,12 +822,20 @@ function LegacyRehearse() {
   }, [activePracticeSession, params.entry, params.practiceSessionId, saveActivePracticeSession, turns]);
 
   const approveTranscript = useCallback((): void => {
-    if (!reviewDrafts.opening.trim() || !reviewDrafts.response.trim()) return;
+    if (finalApprovalStarted.current || !reviewDrafts.opening.trim() || !reviewDrafts.response.trim()) return;
+    finalApprovalStarted.current = true;
     let userIndex = 0;
     const approvedTurns = turns.map((turn): Turn => turn.role !== "user" ? turn : { ...turn, text: (userIndex++ === 0 ? reviewDrafts.opening : reviewDrafts.response).trim() });
     setTurns(approvedTurns);
     setReviewingTranscript(false);
-    void analyzeApprovedTranscript(approvedTurns);
+    void analyzeApprovedTranscript(approvedTurns).catch(() => {
+      // Setup/persistence failed before the debrief's own retry handling took over.
+      finalApprovalStarted.current = false;
+      cancelConversionBuild(sessionId.current);
+      setClosing(false);
+      setReviewingTranscript(true);
+      setError("We couldn't prepare your debrief. Please try approving again.");
+    });
   }, [analyzeApprovedTranscript, reviewDrafts, turns]);
 
   const exitRehearsal = useCallback(async (): Promise<void> => {
@@ -860,7 +873,7 @@ function LegacyRehearse() {
   }, [exitRehearsal, turns]);
 
   const dockState: DockState = useMemo(() => {
-    if (pending.length > 0) return "composing";
+    if (reviewingPendingTranscript) return "composing";
     if (thinking) return "waiting";
     if (audioBusy) return "speaking";
     if (canRetry || error.length > 0) return "response-unavailable";
@@ -875,7 +888,7 @@ function LegacyRehearse() {
     }
     return "ready";
   }, [
-    pending,
+    reviewingPendingTranscript,
     thinking,
     audioBusy,
     canRetry,
@@ -941,7 +954,7 @@ function LegacyRehearse() {
       }
       setCanRetry(restored.turns[restored.turns.length-1]?.role==='user');setRecoveryReady(true);
       // The recovered line uses the existing approved ElevenLabs path, never device TTS.
-      if(changed&&restored.audio)void speak(speechTextFor(restored.audio.text,themName),persona,{muted:!voiceOnRef.current}).catch(()=>{});
+      if(changed&&restored.audio)void speak(restored.audio.text,persona,{muted:!voiceOnRef.current}).catch(()=>{});
       return !changed;
     }catch{if(serial===recoverySerial.current){setRecoveryState({status:'unavailable'});setRecoveryReady(false);}return false;}
     finally{if(serial===recoverySerial.current)setRecoveryBusy(false);}
@@ -1093,10 +1106,10 @@ function LegacyRehearse() {
             <Text style={[styles.reviewLabel, styles.counterpartLabel]}>{themName.toUpperCase()} · CLOSE</Text>
             <View style={styles.counterpartReview}><Text style={styles.counterpartReviewText}>{counterpartTurns[1]?.text ?? ""}</Text></View>
             <Text style={styles.reviewPrivacy}>Nothing gets analyzed until you approve it.</Text>
+            {error ? <Text accessibilityRole="alert" style={styles.reviewPrivacy}>{error}</Text> : null}
           </ScrollView>
           <StateDock bottomInset={insets.bottom}>
             <PrimaryButton label="Approve transcript" onPress={approveTranscript} disabled={!reviewDrafts.opening.trim() || !reviewDrafts.response.trim() || closing} />
-            <GhostButton label="Record again" onPress={() => setReviewingTranscript(false)} />
           </StateDock>
         </KeyboardAvoidingView>
       </View>
@@ -1348,6 +1361,7 @@ function LegacyRehearse() {
                   onPress={() => {
                     tap("light");
                     setPending("");
+                    setReviewingPendingTranscript(false);
                   }}
                   containerStyle={styles.flexOne}
                 >

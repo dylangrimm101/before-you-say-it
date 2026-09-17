@@ -543,11 +543,11 @@ export async function speak(
   persona: PersonaVoice,
   options: { muted?: boolean } = {},
 ): Promise<SpeakOutcome> {
-  const clean = text.trim();
-  if (clean.length === 0) return "empty";
+  if (text.trim().length === 0) return "empty";
 
   // Staged so the speaker control can play it later even when muted now.
-  lastUtterance = { text: clean, persona, source: null };
+  // Do not transform server-authorized text after its digest has been recorded.
+  lastUtterance = { text, persona, source: null };
   publish({ canReplay: true });
   if (options.muted === true) {
     publish({ phase: "idle" });

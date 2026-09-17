@@ -7,7 +7,7 @@ import { Backdrop, PressCard, PrimaryButton, tap, useReducedMotion } from "@/com
 import { DESIRED_SHIFTS, DESIRED_SKILLS, PRESSURE_CONDITIONS, RECURRING_PROBLEMS, type ModuleId, type OnboardingEntryRoute } from "@/constants/modules";
 import { approvedScenarioForContext, behavioralGoal, personaForContext, scenarioFromApproved } from "@/constants/onboardingScenarios";
 import { C, GUTTER, T, eyebrow, font } from "@/constants/theme";
-import { buildCustomScenario, fallbackCustomScenario } from "@/lib/ai";
+import { fallbackCustomScenario } from "@/lib/ai";
 import { createOnboardingPracticeSession, createPracticeSessionId } from "@/lib/practiceSession";
 import { errorShape, safeLog } from "@/lib/redact";
 import { useStore } from "@/providers/store";
@@ -163,13 +163,8 @@ export default function Onboarding(): React.JSX.Element {
         scenario = scenarioFromApproved(approved, persona);
       } else {
         const form = { focus: selectedFocus, persona, reaction: selectedReaction, outcome: selectedOutcome, difficulty: DIFFICULTY };
-        let draft: Omit<Scenario, "id" | "isCustom">;
-        try {
-          draft = await buildCustomScenario(situation.trim(), selectedFocus, form);
-        } catch (caught) {
-          safeLog("[onboarding] using rehearsal fallback", errorShape(caught));
-          draft = fallbackCustomScenario(situation.trim(), selectedFocus, form);
-        }
+        // Intake is local context, not a paid generation or a completed rehearsal.
+        const draft = fallbackCustomScenario(situation.trim(), selectedFocus, form);
         scenario = { ...draft, id: `onboarding-${Date.now().toString(36)}`, category: selectedFocus, title: "Your conversation", counterpart, situation: situation.trim(), goal: selectedOutcome, opensWith: "user", isCustom: true };
       }
       await addCustomScenario(scenario);
