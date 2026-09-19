@@ -2,10 +2,10 @@ import {expect, test} from 'bun:test';
 import {createGuestVisit, GUEST_VISIT_BACKGROUND_MS, createMemoryPracticeHost} from '../lib/guestVisit';
 import {canRetryGuestVisit,guestVisitMessage} from '../lib/guestVisitMessage';
 
-test('visit expiry explains inherited practice windows without promising renewed limits',()=>{
-  for(const status of ['visit_ended','expired']){
-    expect(guestVisitMessage(status)).toContain('even during a conversation');
-    expect(guestVisitMessage(status)).toContain('usage limits still apply');
+test('visit expiry and spent attempts offer a new rehearsal instead of an inherited allowance trap',()=>{
+  for(const status of ['visit_ended','expired','visit_limit','recording_limit','exhausted']){
+    expect(guestVisitMessage(status)).toContain('Get Started for a new rehearsal');
+    expect(guestVisitMessage(status)).not.toContain('does not reset');
     expect(canRetryGuestVisit(status)).toBe(false);
   }
 });

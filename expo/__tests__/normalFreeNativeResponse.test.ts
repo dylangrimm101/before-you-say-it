@@ -10,5 +10,5 @@ test('entry omits the long retention paragraph while privacy retains disclosures
  const entry=await Bun.file(import.meta.dir+'/../app/entry.tsx').text();
  const privacy=await Bun.file(import.meta.dir+'/../app/privacy.tsx').text();
  expect(entry).not.toContain('Guest practice lasts for this visit');
- expect(privacy).toContain('starting fresh does not reset usage limits');
+ expect(privacy).toContain('each new guest rehearsal has its own recording attempts');
 });

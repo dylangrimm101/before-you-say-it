@@ -126,6 +126,11 @@ if(rootGate){
  assert.equal(route,'/onboarding','actual root must not bounce Get Started back to entry');
  assert.equal(store.nativeJourneyStarted,true,'successful auth publishes current-owner journey intent');
  assert.deepEqual(redirects,['/onboarding']);
+ const firstOwner=account.practiceOwner.key;
+ assert.equal(store.activePracticeSession,null);
+ await press('Get started');
+ assert.notEqual(account.practiceOwner.key,firstOwner,'explicit restart after failed setup gets a new visit even without a local practice object');
+ assert.equal(route,'/onboarding');assert.equal(store.nativeJourneyStarted,true);
  await act(async()=>account.endGuestVisit());
  assert.equal(store.nativeJourneyStarted,false,'ending a visit cannot carry its intent to the next owner mount');
  assert.equal(route,'/entry','cold/new visit guard remains enabled');

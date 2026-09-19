@@ -12,7 +12,8 @@ const load=(path:string)=>import(pathToFileURL(backend+'/'+path).href);
 const {createGuestFixture,guestOwner}=await load('tests/fixtures/guest-visit.mjs');
 const {createFreeRoute}=await load('server/native-free/routes.mjs');
 const {fixture,input}=await load('tests/fixtures/generation-output.mjs');
-const f=await createGuestFixture(),originalFetch=globalThis.fetch;
+const freshSessions=process.env.BYSI_FRESH_SESSIONS==='1';
+const f=await createGuestFixture({freshSessions}),originalFetch=globalThis.fetch;
 const random=()=>randomBytes(32).toString('hex'),visit=createGuestVisit({now:Date.now,random});visit.activate(guestOwner);
 const user={id:guestOwner,is_anonymous:true},disk=new Map<string,string>(),requests:any[]=[],providerCalls:string[]=[];
 process.env.ANTHROPIC_API_KEY='synthetic';process.env.OPENAI_API_KEY='synthetic';process.env.ELEVENLABS_API_KEY='synthetic';
@@ -56,11 +57,16 @@ async function journey(){
  return start.sessionId;
 }
 try{
+ if(freshSessions){
+  const legacy=await f.call({action:'issue',nonce:'f'.repeat(64)},'bysi_native_free_v2');
+  for(const seed of ['1','2'])await f.db.query("insert into bysi_native_free.operation(session_id,id,kind,digest,status) values($1,$2,'transcribe_opener',$3,'failed')",[legacy.sessionId,seed.repeat(64),'d'.repeat(64)]);
+  await f.db.exec('insert into bysi_native_free.spend_day(spend_date,spent_cents) values(current_date,5)');
+ }
  const first=await journey(),firstVisit=visit.current(guestOwner);
  assert.equal((await json('endVisit',{})).status,'ended');visit.end();
  const second=await journey();assert.notEqual(second,first);assert.notEqual(visit.current(guestOwner),firstVisit);
- assert.equal((await f.db.query('select count(*)::int n from bysi_native_free.operation')).rows[0].n,14,'two complete journeys, seven operations each');
- assert.equal((await f.db.query('select sum(spent_cents)::int n from bysi_native_free.spend_day')).rows[0].n,14,'replays do not spend twice');
+ assert.equal((await f.db.query('select count(*)::int n from bysi_native_free.operation')).rows[0].n,14+(freshSessions?2:0),'two complete journeys plus unchanged historical attempts');
+ assert.equal((await f.db.query('select sum(spent_cents)::int n from bysi_native_free.spend_day')).rows[0].n,14+(freshSessions?5:0),'replays do not spend twice; prior spend stays recorded');
  assert.ok([...disk.values()].every(v=>!v.includes(input.transcript.user_turn_1)&&!v.includes(input.transcript.counterpart_pushback)),'journal remains content-free');
  assert.ok(requests.every(r=>/^[a-f0-9]{64}$/.test(r.visit)));
  console.log('PASS joined guest transport → real routes → SQL: two recordings, approved edits, both Hope/TTS points, result replay, explicit new visit, second journey, exact text authorization and retained spend');

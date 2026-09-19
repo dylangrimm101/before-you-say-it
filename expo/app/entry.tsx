@@ -30,7 +30,7 @@ function ConversationMark(): React.JSX.Element {
 export default function EntryScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { activePracticeSession } = useStore();
+  const { activePracticeSession, nativeJourneyStarted } = useStore();
   const { startNativeSession, isAuthLoading, session, isGuestVisit, endGuestVisit } = useAuth();
   const [isStarting, setIsStarting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -47,8 +47,9 @@ export default function EntryScreen(): React.JSX.Element {
         return;
       }
       // Get Started is explicit new-journey intent, not recovery of the result
-      // still held by this guest visit. Retain authentication and server limits.
-      if (isGuestVisit && activePracticeSession) await endGuestVisit();
+      // still held by this guest visit, including a failed setup with no local
+      // practice object. The first untouched visit is already fresh.
+      if (isGuestVisit && (activePracticeSession || nativeJourneyStarted)) await endGuestVisit();
       const result = await startNativeSession();
       if (!result.success) {
         setAuthError(result.message);
@@ -61,7 +62,7 @@ export default function EntryScreen(): React.JSX.Element {
       starting.current = false;
       setIsStarting(false);
     }
-  }, [router, startNativeSession, isAuthLoading, activePracticeSession, session, isGuestVisit, endGuestVisit]);
+  }, [router, startNativeSession, isAuthLoading, activePracticeSession, nativeJourneyStarted, session, isGuestVisit, endGuestVisit]);
 
   return (
     <View style={styles.root}>
