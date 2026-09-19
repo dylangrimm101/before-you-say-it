@@ -55,7 +55,7 @@ mock.module('@/components/ScenarioPaidPractice',()=>({ScenarioPaidPractice:()=>{
 mock.module('@/lib/voice',()=>({deleteGeneratedVoiceCacheStrict:async()=>{},replaySpeech:async()=>{},resetSpeech:async()=>{},speak:async()=>{},stopSpeech:async()=>{},unlockAudioPlayback:async()=>{},useSpeech:()=>({phase:'idle',canReplay:false})}));
 const producedTerminal=process.env.BYSI_TERMINAL_RESULT_FILE?JSON.parse(readFileSync(process.env.BYSI_TERMINAL_RESULT_FILE,'utf8')):null;
 const continuation=process.env.BYSI_CURRENT_GUEST_CONTINUATION==='1';
-const positive=process.env.BYSI_APP_FIRST_POSITIVE==='1'||continuation;
+const positive=process.env.BYSI_APP_FIRST_POSITIVE==='1'||continuation||process.argv.includes('repeat');
 const syntheticGenerated={analysis:{mode:'result',starting_index:{overall:process.env.BYSI_GUEST_DENIAL==='nullable'?null:0,observed_dimensions:[{name:'Clarity',score:process.env.BYSI_GUEST_DENIAL==='nullable'?12.75:0,evidence:'Synthetic exact observed evidence.'}],unobserved_dimensions:['Specificity','Steadiness','Listening','Boundaries','Repair']},practice_shift:{headline:'Synthetic exact practice target',practice_target:['Name the owner','Ask for confirmation'],goal_line:'Synthetic exact goal'}},debrief:{headline:'Synthetic exact headline',scores:{clarity:0,empathy:0,assertiveness:0,composure:0},wins:['Synthetic exact observation'],flags:[],script:['Can we name one owner for the handoff?'],nextRep:'Synthetic exact next rep'}};
 let scenarioBuilds=0;let counterpartCalls=0;let analysisCalls=0;
 mock.module('@/lib/ai',()=>({nextCounterpartTurn:async()=>{counterpartCalls++;if(process.env.BYSI_FREE_TERMINAL_UI==='turn')throw new FreeAcquisitionSafetyError();return {reply:counterpartCalls===1?'Synthetic counterpart: I still need the current handoff.':'Synthetic counterpart close: I can try, but the deadline remains.',tension:40};},generateDebrief:async()=>{analysisCalls++;if(process.env.BYSI_FREE_TERMINAL_UI==='result')throw new FreeAcquisitionSafetyError();if(process.env.BYSI_GUEST_DENIAL==='secure-full-result')rejectSecureWrites=true;if(positive)return structuredClone(syntheticGenerated);if(producedTerminal)return structuredClone(producedTerminal);return {analysis:{mode:'insufficient_evidence',insufficient_evidence:{headline:'Synthetic insufficient evidence',note:'Synthetic local transport fixture, not a model judgment.',next_step:'Try the rehearsal again.'}},debrief:null};},buildCustomScenario:async()=>{scenarioBuilds++;return {title:'Synthetic builder output',counterpart:'Hope',situation:'Synthetic',goal:'Synthetic',category:'work',opensWith:'user',difficulty:'steady'};},bysiContract,fallbackCustomScenario:localScenario}));
@@ -118,6 +118,20 @@ for(const line of ['Synthetic opener, let us choose a task.','Synthetic reply, w
 }
 assert.equal(counterpartCalls,2,'both learner turns reach actual screen generation');
 assert.ok(!text().includes('Continue your practice'),'no cross-visit recovery maze during second turn');
+if(process.argv.includes('repeat')){
+ await press('Review complete transcript');await press('Approve transcript');
+ for(let i=0;i<30&&!store.activePracticeSession.sharedResult;i++)await act(async()=>{await new Promise(r=>setTimeout(r,5));});
+ assert.ok(store.activePracticeSession.sharedResult);
+ params={id};await mount(Debrief);
+ await mount(Entry);await press('Get started');
+ assert.equal(store.activePracticeSession,null,'explicit Get Started clears the completed visit');
+ assert.ok(requests.some(r=>r.op==='endVisit'));assert.equal(session.user.id,'synthetic-guest');
+ await chooseTrack();assert.notEqual(store.activePracticeSession.id,id);
+ params={...route.params};await mount(Rehearse);await press('Start my rehearsal');
+ assert.ok(!text().includes('Practice unavailable'));
+ await act(async()=>root.unmount());client.clear();Date.now=originalNow;
+ console.log('PASS actual completed visit → Get Started → new guest journey, same authentication');process.exit(0);
+}
 await act(async()=>{appStateListener('background');now+=5*60*1000;appStateListener('active');});
 assert.equal(store.activePracticeSession.id,id,'brief interruption retains the visit');
 await act(async()=>{appStateListener('background');now+=30*60*1000;appStateListener('active');});

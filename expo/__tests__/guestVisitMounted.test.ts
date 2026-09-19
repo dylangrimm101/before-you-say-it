@@ -5,3 +5,8 @@ for(const mode of ['fresh','cold'])for(const track of ['real','recurring','skill
  expect({code:result.status,stderr:result.status?result.stderr:''}).toEqual({code:0,stderr:''});
  expect(result.stdout).toContain('PASS actual Auth/Store/Onboarding/Rehearse');
 },30000);
+test('actual completed guest result can start a second journey within the same app process',()=>{
+ const result=spawnSync(process.execPath,['__tests__/guestVisitMounted.fixture.ts','fresh','skill','repeat'],{cwd:import.meta.dir+'/..',encoding:'utf8'});
+ expect({code:result.status,stderr:result.status?result.stderr:''}).toEqual({code:0,stderr:''});
+ expect(result.stdout).toContain('PASS actual completed visit');
+},30000);

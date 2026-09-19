@@ -1,5 +1,13 @@
 import {expect, test} from 'bun:test';
 import {createGuestVisit, GUEST_VISIT_BACKGROUND_MS, createMemoryPracticeHost} from '../lib/guestVisit';
+import {canRetryGuestVisit,guestVisitMessage} from '../lib/guestVisitMessage';
+
+test('completed visits and stale conflicts offer an exit, not an endless retry',()=>{
+  expect(canRetryGuestVisit('visit_complete')).toBe(false);
+  expect(canRetryGuestVisit('conflict')).toBe(false);
+  expect(guestVisitMessage('visit_complete')).toContain('Get Started');
+  expect(canRetryGuestVisit('pending')).toBe(true);
+});
 
 test('same guest keeps a visit across refresh and brief backgrounding; 30 minutes expires it', () => {
   let now=0, sequence=0, changes=0;

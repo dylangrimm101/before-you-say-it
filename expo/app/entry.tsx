@@ -31,7 +31,7 @@ export default function EntryScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activePracticeSession } = useStore();
-  const { startNativeSession, isAuthLoading, session } = useAuth();
+  const { startNativeSession, isAuthLoading, session, isGuestVisit, endGuestVisit } = useAuth();
   const [isStarting, setIsStarting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const starting = useRef(false);
@@ -46,6 +46,9 @@ export default function EntryScreen(): React.JSX.Element {
         setAuthError("This device has account-owned practice. Log in to that account to continue.");
         return;
       }
+      // Get Started is explicit new-journey intent, not recovery of the result
+      // still held by this guest visit. Retain authentication and server limits.
+      if (isGuestVisit && activePracticeSession) await endGuestVisit();
       const result = await startNativeSession();
       if (!result.success) {
         setAuthError(result.message);
@@ -58,7 +61,7 @@ export default function EntryScreen(): React.JSX.Element {
       starting.current = false;
       setIsStarting(false);
     }
-  }, [router, startNativeSession, isAuthLoading, activePracticeSession, session]);
+  }, [router, startNativeSession, isAuthLoading, activePracticeSession, session, isGuestVisit, endGuestVisit]);
 
   return (
     <View style={styles.root}>
