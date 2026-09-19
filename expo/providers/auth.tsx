@@ -262,7 +262,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         if (verifiedOwner) {
           try {
             const recovered = await continuation.resumeVerified(lease, verifiedOwner.email!.trim().toLowerCase());
-            if (recovered && isMounted && authRevision.current === restoreRevision && lease.isActive()) setRestoredGuestContinuationId(JSON.parse(recovered).id);
+            if (recovered && isMounted && authRevision.current === restoreRevision && lease.isActive()) {
+              setRestoredGuestContinuationId(JSON.parse(recovered).id);
+              // A device handoff receipt proves local ownership only. A crash
+              // may predate the protected server-claim retry record entirely.
+              if (normalResults) setContinuationIssue("Your local rehearsal was recovered on this device. Saving it to your account on the server has not been confirmed. Check saved results; an expired guest result may no longer be available to save.");
+            }
           } catch {
             if (isMounted && authRevision.current === restoreRevision) setContinuationIssue("Device continuation could not be verified. No rehearsal was restarted or account practice overwritten. Continue an existing saved rehearsal if present. Original guest records remain separate; this screen cannot recover an unconfirmed save. An uncertain save is never retried automatically.");
           }
@@ -421,6 +426,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       let continuationId: string | undefined;
       let continuationProblem = false;
       if (saveCurrentResult && verifiedLease) {
+        if (normalResults && !guestServerClaim?.sessionId) {
+          continuationProblem = true;
+          setContinuationIssue("Your local rehearsal can continue on this device, but its server save could not be identified or confirmed. Check saved results; no server ownership was transferred by this local handoff.");
+        }
         if (guestServerClaim?.sessionId && normalResults) {
           const claimRevision = authRevision.current;
           const claimDestinationOwnerId = owner.id;
@@ -438,7 +447,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
             sourceAccessToken: guestServerClaim.accessToken,
             createdAt: Date.now(),
           };
-          try { await saveNormalResultClaimRetry(retry); } catch { continuationProblem = true; }
+          try { await saveNormalResultClaimRetry(retry); } catch {
+            continuationProblem = true;
+            setContinuationIssue("The protected retry record could not be saved on this device. Check saved results to confirm the account save before leaving this screen.");
+          }
           const claimReadback = await supabase.auth.getSession();
           if (!claimStillCurrent()
             || claimReadback.error
