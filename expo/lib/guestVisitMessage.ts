@@ -5,7 +5,7 @@ export function guestVisitMessage(status: string): string {
   if(status==='pending')return 'Your last request is still finishing. You can retry shortly or leave this practice.';
   if(status==='saved_result')return 'This result was saved to an account. Sign in to that account to continue.';
   if(status==='visit_complete')return 'This practice is complete. Return to Get Started for another conversation.';
-  if(status==='visit_ended'||status==='expired')return 'This guest visit has ended. Return to Get Started to begin again.';
+  if(status==='visit_ended'||status==='expired')return 'This guest visit has ended. Your existing practice window may have expired, even during a conversation. Return to Get Started; usage limits still apply.';
   return 'We couldn’t continue this practice. You can leave and return to Get Started.';
 }
 export const canRetryGuestVisit = (status: string) => ['pending','unavailable','proof_expired'].includes(status);

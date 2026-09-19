@@ -2,6 +2,14 @@ import {expect, test} from 'bun:test';
 import {createGuestVisit, GUEST_VISIT_BACKGROUND_MS, createMemoryPracticeHost} from '../lib/guestVisit';
 import {canRetryGuestVisit,guestVisitMessage} from '../lib/guestVisitMessage';
 
+test('visit expiry explains inherited practice windows without promising renewed limits',()=>{
+  for(const status of ['visit_ended','expired']){
+    expect(guestVisitMessage(status)).toContain('even during a conversation');
+    expect(guestVisitMessage(status)).toContain('usage limits still apply');
+    expect(canRetryGuestVisit(status)).toBe(false);
+  }
+});
+
 test('completed visits and stale conflicts offer an exit, not an endless retry',()=>{
   expect(canRetryGuestVisit('visit_complete')).toBe(false);
   expect(canRetryGuestVisit('conflict')).toBe(false);
