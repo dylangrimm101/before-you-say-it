@@ -13,6 +13,7 @@
     "verify:buyer-tests": "bun scripts/component-test-deps.ts",
     "test:buyer": "bun run verify:buyer-tests && bun test __tests__/buyerComponents.test.ts __tests__/componentTestSetup.test.ts __tests__/ownerPracticeStorage.test.ts __tests__/stagingPracticeAccess.test.ts",
     "test": "bun scripts/run-client-command.ts test",
+    "test:spoken": "bun scripts/run-client-command.ts test-spoken",
     "check": "bun scripts/run-client-command.ts check",
     "export": "bun scripts/run-client-command.ts export"
   },
