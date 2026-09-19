@@ -71,11 +71,24 @@ mock.module('expo-blur',()=>({BlurView:Host}));
 mock.module('expo-constants',()=>({default:{expoConfig:{version:'synthetic'}}}));
 mock.module('react-native-safe-area-context',()=>({useSafeAreaInsets:()=>({top:0,bottom:0})}));
 mock.module('@/components/ui',()=>({Backdrop:()=>null,HeroSurface:Host,MicControl:Host,Thinking:Host,Waveform:Host,Eyebrow:Host,Reveal:Host,Meter:Host,StateDock:Host,GlassCard:Host,PressCard:(p:any)=>React.createElement('button',p,p.children),GhostButton:(p:any)=>React.createElement('button',p,p.label),PrimaryButton:(p:any)=>React.createElement('button',p,p.label),tap(){},useReducedMotion:()=>true}));
-let route:any=null;let params:any={};const router={replace:(r:any)=>{route=r;},push:(r:any)=>{route=r;},back(){route='BACK';},canGoBack:()=>true,setParams:(p:any)=>{params={...params,...p};}};
-mock.module('expo-router',()=>({useRouter:()=>router,useLocalSearchParams:()=>params}));
+const rootGate=process.argv.includes('root-gate');
+let route:any=rootGate?'/entry':null;let params:any={};
+const routeListeners=new Set<()=>void>();const redirects:any[]=[];
+const navigate=(r:any)=>{route=r;redirects.push(r);for(const notify of routeListeners)notify();};
+const router={replace:navigate,push:navigate,back(){navigate('BACK');},canGoBack:()=>true,setParams:(p:any)=>{params={...params,...p};}};
+mock.module('expo-router',()=>({useRouter:()=>router,useLocalSearchParams:()=>params,useGlobalSearchParams:()=>params,
+ useSegments:()=>[React.useSyncExternalStore(fn=>{routeListeners.add(fn);return()=>{routeListeners.delete(fn);};},()=>String(route)).replace(/^\//,'').split('/')[0]],
+ Stack:Object.assign(()=>React.createElement(Probe),{Screen:()=>null})}));
+mock.module('expo-font',()=>({useFonts:()=>[true,null]}));
+mock.module('expo-splash-screen',()=>({preventAutoHideAsync:async()=>{},hideAsync:async()=>{}}));
+mock.module('expo-status-bar',()=>({StatusBar:()=>null}));
+mock.module('react-native-gesture-handler',()=>({GestureHandlerRootView:Host}));
+mock.module('@/components/LaunchExperience',()=>({LaunchExperience:()=>null}));
+mock.module('@/components/MigrationNotice',()=>({MigrationNotice:()=>null}));
 const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
 const {AuthProvider,useAuth}=await import('../providers/auth');
 const {StoreProvider,useStore}=await import('../providers/store');
+const {default:RootLayout}=await import('../app/_layout');
 const {default:Entry}=await import('../app/entry');
 const {default:Onboarding}=await import('../app/onboarding');
 const {default:Login}=await import('../app/continue-from-web');
@@ -91,8 +104,8 @@ const {LAUNCH_DECK_IDS}=await import('../lib/launchCurriculum');
 let Screen:any=Entry;let screenKey=0;let account:any,store:any;let root:any;
 const Probe=()=>{account=useAuth();store=useStore();return React.createElement(Screen,{key:screenKey});};
 const client=new QueryClient();
-const tree=()=>React.createElement(QueryClientProvider,{client},React.createElement(AuthProvider,null,React.createElement(StoreProvider,null,React.createElement(Probe))));
-async function mount(next:any){Screen=next;screenKey++;route=null;await act(async()=>{if(root)root.update(tree());else root=create(tree());});}
+const tree=()=>rootGate?React.createElement(RootLayout):React.createElement(QueryClientProvider,{client},React.createElement(AuthProvider,null,React.createElement(StoreProvider,null,React.createElement(Probe))));
+async function mount(next:any){Screen=next;screenKey++;if(!rootGate)route=null;await act(async()=>{if(root)root.update(tree());else root=create(tree());});}
 const text=()=>JSON.stringify(root.toJSON());
 async function press(label:string){const b=root.root.findAllByType('button').find((n:any)=>(n.props.label===label||n.props.accessibilityLabel===label)&&!n.props.disabled);assert.ok(b,`enabled control: ${label}`);await act(async()=>{await b.props.onPress();});await act(async()=>{await new Promise(r=>setTimeout(r,5));});}
 
@@ -106,7 +119,41 @@ async function chooseTrack(){
   await press('The same communication problem keeps happening');await press(RECURRING_PROBLEMS[0].label);await press(DESIRED_SHIFTS[0].label);await press('Work');
  }else{await press('I know what I want to get better at');await press(DESIRED_SKILLS[0].label);await press(PRESSURE_CONDITIONS[0].label);await press('Work');}
 }
-await mount(Entry);await press('Get started');assert.equal(account.isGuestVisit,true);assert.equal(route,'/onboarding');
+await mount(Entry);
+if(rootGate){
+ assert.equal(store.nativeJourneyStarted,false);
+ await press('Get started');
+ assert.equal(route,'/onboarding','actual root must not bounce Get Started back to entry');
+ assert.equal(store.nativeJourneyStarted,true,'successful auth publishes current-owner journey intent');
+ assert.deepEqual(redirects,['/onboarding']);
+ await act(async()=>account.endGuestVisit());
+ assert.equal(store.nativeJourneyStarted,false,'ending a visit cannot carry its intent to the next owner mount');
+ assert.equal(route,'/entry','cold/new visit guard remains enabled');
+ const currentStorage=account.practiceOwner.storage;const originalSet=currentStorage.setItem;
+ currentStorage.setItem=async(key:string,value:string)=>{if(key==='cc.nativeJourneyStarted.v1')throw Error('synthetic marker write failure');return originalSet(key,value);};
+ await press('Get started');
+ assert.equal(route,'/entry','failed marker write cannot authorize navigation');
+ assert.equal(store.nativeJourneyStarted,false);
+ assert.ok(text().includes('We couldn’t start your practice'));
+ currentStorage.setItem=originalSet;
+ await press('Get started');assert.equal(route,'/onboarding');assert.equal(store.nativeJourneyStarted,true);
+ await act(async()=>account.endGuestVisit());
+ const staleStorage=account.practiceOwner.storage;const staleSet=staleStorage.setItem;
+ let releaseWrite!:()=>void;let enteredWrite!:()=>void;
+ const writeHeld=new Promise<void>(resolve=>{releaseWrite=resolve;});
+ const writeEntered=new Promise<void>(resolve=>{enteredWrite=resolve;});
+ staleStorage.setItem=async(key:string,value:string)=>{if(key==='cc.nativeJourneyStarted.v1'){enteredWrite();await writeHeld;}return staleSet(key,value);};
+ let pendingStart:any;
+ await act(async()=>{pendingStart=account.startNativeSession();await writeEntered;});
+ await act(async()=>account.endGuestVisit());
+ let staleResult:any;await act(async()=>{releaseWrite();staleResult=await pendingStart;});
+ assert.equal(staleResult.success,false,'late completion on an ended owner cannot start the next visit');
+ assert.equal(store.nativeJourneyStarted,false);assert.equal(route,'/entry');
+ assert.equal(session.user.id,'synthetic-guest');assert.equal(anonymousCalls,cold?0:1);
+ await act(async()=>root.unmount());client.clear();Date.now=originalNow;
+ console.log('PASS integrated Entry/Auth/Store/Root: start, no bounce, visit reset, second start');process.exit(0);
+}
+await press('Get started');assert.equal(account.isGuestVisit,true);assert.equal(route,'/onboarding');
 await chooseTrack();
 assert.equal(route.pathname,'/rehearse/[id]');params={...route.params};
 const id=store.activePracticeSession.id;

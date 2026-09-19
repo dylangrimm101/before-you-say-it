@@ -69,6 +69,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const authRevision = useRef(0);
   const authInvalidationRevision = useRef(0);
   const [practiceOwner, setPracticeOwner] = useState<{ key: string; storage: OwnerPracticeStorage } | null>(null);
+  const [startedJourneyOwnerKey, setStartedJourneyOwnerKey] = useState<string | null>(null);
   const ownerRef = useRef<{ identity: string | null; guest: boolean; visitId?: string; key: string; storage: OwnerPracticeStorage } | null>(null);
   const currentSessionRef=useRef<Session|null>(null);
   const continuation = useMemo(() => {
@@ -121,6 +122,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       const key = `${authEnvironment?.url ?? "local"}:${identity ?? `unclaimed-${Date.now()}-${Math.random()}`}${visitId?`:visit:${visitId}`:''}`;
       const owner = { identity, guest, visitId, key: `${key}:mount-${++ownerGeneration.current}`, storage: createOwnerPracticeStorage(visitId?createMemoryPracticeHost():AsyncStorage, key) };
       ownerRef.current = owner;
+      setStartedJourneyOwnerKey(null);
       if (verifiedGuestSource) continuation.bind(verifiedGuestSource, owner.storage);
       if (!deferPublication) setPracticeOwner(owner);
     }
@@ -348,6 +350,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         if (logoutPending.current || acceptedRevision !== authRevision.current || ownerRef.current?.storage !== owner.storage || ownerRef.current.identity !== result.session.user.id || !owner.storage.isActive()) {
           return changed;
         }
+        // Storage writes do not notify the mounted StoreProvider. Publish only
+        // after the write and owner checks; a new visit/owner clears this signal.
+        setStartedJourneyOwnerKey(owner.key);
       } catch {
         return { success: false as const, message: "We couldn’t start your practice. Please try again." };
       }
@@ -662,5 +667,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     user: (session?.user.is_anonymous === true ? null : session?.user ?? null) as User | null,
     login,
     startNativeSession,
+    startedJourneyOwnerKey,
   };
 });
