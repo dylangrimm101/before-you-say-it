@@ -70,6 +70,7 @@ export default function EntryScreen(): React.JSX.Element {
           <Text style={styles.body}>Learn to communicate with Obama’s clarity, Oprah’s connection, Jobs’ storytelling, and Voss’s calm under pressure.</Text>
           <View style={styles.actions}>
             <PrimaryButton label="Get started" onPress={signUp} disabled={isAuthLoading || isStarting} />
+            {!session||session.user.is_anonymous?<Text style={styles.accountNote}>Guest practice lasts for this visit. You can choose to save your result to an account.</Text>:null}
             {isStarting ? <Text style={styles.accountNote} accessibilityLiveRegion="polite">Setting up…</Text> : null}
             <GhostButton label="I already have an account" disabled={isStarting} onPress={() => router.push("/continue-from-web")} />
             {authError ? <Text style={styles.accountNote} accessibilityRole="alert" accessibilityLiveRegion="polite">{authError}</Text> : null}

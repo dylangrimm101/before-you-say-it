@@ -159,7 +159,7 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="How it is stored"
-            body="Practice data stays in this app's local storage, separated by guest or signed-in owner; it does not automatically sync between devices. On iPhone and Android, account credentials use protected device storage. A newly created guest rehearsal can also keep a protected handoff copy, including approved conversation content and its result. The option to consent to save that copy to your signed-in local account expires 24 hours after creation; expiry does not promise immediate physical erasure while the app is closed. Browser handoff is limited to the current browser session. Other local app data is not separately encrypted by BYSI; protection is whatever your device applies to app data."
+            body="In the normal mobile app, guest conversation content stays in memory for the current visit. A cold relaunch, leaving the visit, or returning after 30 minutes in the background starts fresh. Brief interruptions keep the current practice. Authentication and content-free request identifiers remain protected on the device; starting fresh does not reset usage limits. Generated voice uses temporary owner-and-visit-scoped cache files; cleanup is attempted on leaving the visit and before the next visit's playback, not guaranteed while the app is closed. Choosing to save a result to an account creates a protected handoff copy, valid for 24 hours from that consent step. Expiry does not promise immediate physical erasure. Signed-in practice and older local records remain owner-separated; old records are not automatically imported into a new guest visit. Browser handoff remains limited to the browser session. Other local app data is not separately encrypted by BYSI."
             tone={C.amber}
           />
         </Section>
@@ -167,7 +167,7 @@ export default function PrivacyScreen() {
         <Section title="Sent off this device">
           <Bullet
             head="Free-session recovery"
-            body="BYSI keeps approved conversation content, transcribed text, generated results and generated speech audio for up to 30 days of inactivity so interrupted requests can recover without generating them again. Uploaded recording bytes are processed, not saved in this recovery store. If execution expiry or failed voice capacity blocks an eligible owner, the session can be renewed for ordinary practice without deleting historical spend accounting or duplicating pending work. A scheduled cleanup runs every minute in bounded batches to remove expired recovery content; delays or outages mean this is not an immediate erasure guarantee. Content-free operation and spend records can remain for abuse and cost protection. This is separate from local handoff expiry, local deletion controls, backup retention and provider retention."
+            body="The new mobile guest-visit protocol uses short-lived server content to safely finish and retry current requests, not to offer cross-visit history. Guest conversation checkpoints, response audio and unclaimed results expire no later than 24 hours after the visit begins. Explicitly ending a visit, or beginning its replacement after pending work has finished, retires that visit's unclaimed content sooner when the server confirms it. A phone closing or losing connectivity cannot guarantee immediate server deletion. Older clients and registered-account practice can retain recovery content for up to 30 days of inactivity. Uploaded recording bytes are processed, not saved in this recovery store. The existing scheduled cleanup runs every minute in bounded batches; delays or outages are not an immediate erasure guarantee. Content-free operation and spend records remain for abuse and cost protection. Local handoff, backups and providers have separate retention."
           />
           <Bullet
             head="Your account"
@@ -175,7 +175,7 @@ export default function PrivacyScreen() {
           />
           <Bullet
             head="Saved results"
-            body="A signed-in saved result is kept as account-owned content until you delete it or delete all saved results from the saved-result screen. Unclaimed guest saved results expire after thirty days. Opening or browsing a guest result does not extend that clock."
+            body="A signed-in saved result is kept as account-owned content until you delete it or delete all saved results from the saved-result screen. Unclaimed results from the new guest-visit protocol expire with that visit's server content; older guest saved results expire after thirty days. Opening or browsing a guest result does not extend that clock."
           />
           <Bullet
             head="Recorded audio"

@@ -62,6 +62,12 @@ export function isConversionBuildActive(id: string): boolean {
   return current?.id === id;
 }
 
+/** Owner/visit boundary: late pipeline callbacks cannot revive prior content. */
+export function clearConversionBuild(): void {
+  current = null;
+  listeners.forEach((listener) => listener());
+}
+
 export function failConversionBuild(id: string, recovery?: {message:string;retry?:()=>Promise<void>}): void {
   if (current?.id !== id) return;
   publish({ ...current, error: recovery?.message ?? "We couldn't finish your starting point. Your rehearsal is still safe.", retry:recovery?.retry });

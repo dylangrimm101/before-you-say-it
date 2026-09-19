@@ -8,6 +8,7 @@ import {
   beginConversionBuild,
   emitConversionEvent,
   getConversionBuild,
+  clearConversionBuild,
 } from "@/lib/conversionBuild";
 import type { Debrief, Turn } from "@/types/convo";
 
@@ -53,6 +54,11 @@ describe("post-rehearsal conversion evidence", () => {
 });
 
 describe("event-driven plan build", () => {
+  test("ending an owner or guest visit fences late debrief completion",()=>{
+    beginConversionBuild({id:'old-visit',scenarioTitle:'Synthetic',counterpartName:'Hope',turns});
+    clearConversionBuild();emitConversionEvent('old-visit','transcript.confirmed',debrief);
+    expect(getConversionBuild('old-visit')).toBeNull();
+  });
   test("opens with no completed artifacts and advances on named events", () => {
     beginConversionBuild({ id: "reh-test", scenarioTitle: "A hard ask", counterpartName: "Adam", turns });
     expect(getConversionBuild("reh-test")?.events).toEqual([]);

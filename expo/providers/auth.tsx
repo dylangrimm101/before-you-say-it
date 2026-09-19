@@ -4,8 +4,12 @@ import createContextHook from "@nkzw/create-context-hook";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createOwnerPracticeStorage, type OwnerPracticeStorage } from "@/lib/ownerPracticeStorage";
 import { createGuestContinuationRuntime } from "@/lib/guestContinuationRuntime";
+import {consentOnlyGuestContinuation} from '@/lib/consentOnlyGuestContinuation';
+import {createMemoryPracticeHost} from '@/lib/guestVisit';
+import {guestVisit, guestVisitsEnabled} from '@/lib/guestVisitRuntime';
 import { Platform } from "react-native";
 import { clearLiveSessionContent } from "@/lib/ephemeral";
+import { clearConversionBuild } from "@/lib/conversionBuild";
 import { createStagingPracticeAccess, type StagingPracticeAccess } from "@/lib/stagingPracticeAccess";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Session, User } from "@supabase/supabase-js";
@@ -65,8 +69,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const authRevision = useRef(0);
   const authInvalidationRevision = useRef(0);
   const [practiceOwner, setPracticeOwner] = useState<{ key: string; storage: OwnerPracticeStorage } | null>(null);
-  const ownerRef = useRef<{ identity: string | null; guest: boolean; key: string; storage: OwnerPracticeStorage } | null>(null);
-  const continuation = useMemo(() => createGuestContinuationRuntime(AsyncStorage, Platform.OS, JSON.stringify([authEnvironment?.url ?? "local", authEnvironment?.keychainService ?? "beforeyousayit.supabase"])), []);
+  const ownerRef = useRef<{ identity: string | null; guest: boolean; visitId?: string; key: string; storage: OwnerPracticeStorage } | null>(null);
+  const currentSessionRef=useRef<Session|null>(null);
+  const continuation = useMemo(() => {
+    const existing=createGuestContinuationRuntime(AsyncStorage, Platform.OS, JSON.stringify([authEnvironment?.url ?? "local", authEnvironment?.keychainService ?? "beforeyousayit.supabase"]));
+    return guestVisitsEnabled?consentOnlyGuestContinuation(existing,AsyncStorage):existing;
+  }, []);
   const [, setContinuationRevision] = useState(0);
   const [continuationIssue, setContinuationIssue] = useState("");
   const [restoredGuestContinuationId, setRestoredGuestContinuationId] = useState<string | null>(null);
@@ -89,11 +97,14 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     if (logoutPending.current && next) return;
     if(next && !journalReady.current)return;
     const identity = next?.user.id ?? null;
+    currentSessionRef.current=next;
     if (next && !next.user.is_anonymous) normalResults?.resume();
     else normalResults?.suspend();
     if (identity && ownerBlocked(identity)) return;
     const guest = next?.user.is_anonymous === true;
-    if (!ownerRef.current || !ownerRef.current.storage.isActive() || ownerRef.current.identity !== identity || ownerRef.current.guest !== guest) {
+    const visitId=guestVisitsEnabled&&guest?guestVisit.activate(identity)??undefined:undefined;
+    if(guestVisitsEnabled&&!guest)guestVisit.activate(null);
+    if (!ownerRef.current || !ownerRef.current.storage.isActive() || ownerRef.current.identity !== identity || ownerRef.current.guest !== guest || ownerRef.current.visitId!==visitId) {
       if (ownerRef.current && !verifiedGuestSource && !preserveContinuation) void Promise.resolve(continuation.invalidate()).catch(() => setContinuationIssue("Device handoff could not be cleared. Keep this device locked and retry sign out."));
       if (ownerRef.current && !ownerRef.current.guest) void clearNormalResultClaimRetry(ownerRef.current.identity);
       setContinuationIssue("");
@@ -102,18 +113,43 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       pendingGuestResultClaimRef.current = null;
       setPendingGuestResultClaim(null);
       clearLiveSessionContent();
+      clearConversionBuild();
       void queryClient.cancelQueries();
       queryClient.clear();
       // Signed-out practice is deliberately a new, unclaimed namespace. Old guest
       // and legacy shared records are quarantined, not relabeled as the next buyer.
-      const key = `${authEnvironment?.url ?? "local"}:${identity ?? `unclaimed-${Date.now()}-${Math.random()}`}`;
-      const owner = { identity, guest, key: `${key}:mount-${++ownerGeneration.current}`, storage: createOwnerPracticeStorage(AsyncStorage, key) };
+      const key = `${authEnvironment?.url ?? "local"}:${identity ?? `unclaimed-${Date.now()}-${Math.random()}`}${visitId?`:visit:${visitId}`:''}`;
+      const owner = { identity, guest, visitId, key: `${key}:mount-${++ownerGeneration.current}`, storage: createOwnerPracticeStorage(visitId?createMemoryPracticeHost():AsyncStorage, key) };
       ownerRef.current = owner;
       if (verifiedGuestSource) continuation.bind(verifiedGuestSource, owner.storage);
       if (!deferPublication) setPracticeOwner(owner);
     }
     if (!deferPublication) setSession(next);
   }, [queryClient, continuation, ownerBlocked]);
+
+  useEffect(()=>{
+    if(!guestVisitsEnabled)return;
+    const unsubscribe=guestVisit.subscribe(()=>{
+      const owner=ownerRef.current;
+      if(!owner?.guest||!owner.identity||!guestVisit.current(owner.identity)||owner.visitId===guestVisit.current(owner.identity))return;
+      ++authInvalidationRevision.current;
+      applySession(currentSessionRef.current);
+    });
+    let appState: {addEventListener?:(event:string,listener:(state:string)=>void)=>{remove():void}}|undefined;
+    try {appState=typeof require==='function'?(require('react-native') as {AppState?:typeof appState}).AppState:undefined;}catch{}
+    const subscription=appState?.addEventListener?.('change',state=>guestVisit.appState(state));
+    return ()=>{unsubscribe();subscription?.remove();};
+  },[applySession]);
+
+  const endGuestVisit=useCallback(async()=>{
+    if(!guestVisitsEnabled||!ownerRef.current?.guest)return;
+    const owner=ownerRef.current;
+    const controller=new AbortController();let timer:ReturnType<typeof setTimeout>;
+    const timeout=new Promise<void>(resolve=>{timer=setTimeout(()=>{controller.abort();resolve();},3000);});
+    try {await Promise.race([timeout,import('@/lib/normalFreeRuntime').then(runtime=>runtime.requestNormalFree('endVisit',{},controller.signal))]);}
+    catch { /* No false deletion receipt: next begin retires it, or server expiry does. */ }
+    finally {clearTimeout(timer!);if(ownerRef.current===owner)guestVisit.end();}
+  },[]);
   const ensureNativeSession = useMemo(() => createNativeSessionStarter(supabase?.auth ?? null, undefined, {
     snapshot: () => ({ revision: authRevision.current, ownerId: ownerRef.current?.identity ?? null, logoutPending: logoutPending.current, invalidationRevision: authInvalidationRevision.current }),
   }), []);
@@ -324,6 +360,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     if(!supabase)return {success:false,message:"Account login isn’t configured for this build."};
     if (loginPending.current) return { success: false, message: "A login is already in progress." };
     loginPending.current = true;
+    const releaseVisit=guestVisitsEnabled?guestVisit.hold():()=>{};
     loginCancelled.current = false;
     try {
       const consentSource = saveCurrentResult && ownerRef.current?.guest ? ownerRef.current.storage : undefined;
@@ -448,6 +485,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     } finally {
       loginVerified.current = false;
       loginPending.current = false;
+      releaseVisit();
     }
     });
   }, [applySession, syncPurchases, continuation, initializeJournal, serializeMutation, ownerBlocked, checkAccountStatus]);
@@ -577,6 +615,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, [continuation]);
 
   return {
+    isGuestVisit:guestVisitsEnabled&&session?.user.is_anonymous===true,
+    endGuestVisit,
     deletionNotice,
     checkAccountStatus,
     accountStatusAvailable: accountDeletionAvailable,

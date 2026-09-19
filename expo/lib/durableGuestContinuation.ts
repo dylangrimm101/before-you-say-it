@@ -180,6 +180,9 @@ export function createDurableGuestContinuation(options: DeviceGuestOptions) {
       if (p.state !== 'committed' || p.target !== target.owner || p.id !== id || !target.isActive()) throw new Error('Presentation owner changed');
       const receipt=await target.deviceReceipt(p.receipt!);
       if (!receipt?.sourceSnapshot || await options.digest(receipt.sourceSnapshot) !== p.receiptDigest || !target.isActive()) throw new Error('Presentation receipt changed');
+      // New visit-scoped sources are temporary explicit-consent handoff copies.
+      // Legacy sources and registered-account records are never removed here.
+      if (/:visit:[a-f0-9]{64}$/.test(p.source)) await options.host.removeItem(`bysi.owner.v1:${encodeURIComponent(p.source)}:${SLOT}`);
       await api.invalidate(); // retire only the handoff journal, never the owner record
     },
     async cancelConsent() {
@@ -188,7 +191,15 @@ export function createDurableGuestContinuation(options: DeviceGuestOptions) {
       if (p?.approved && !p.target && p.state !== 'issued') await persist({...p,state:'approved',consent:undefined,email:undefined});
       else await api.invalidate();
     },
-    invalidate() {++epoch;activeNonce=null;source=null;destination=null;proof=null;unwatch();unwatchTarget();return save(null);},
+    invalidate() {
+      const retired=proof;
+      ++epoch;activeNonce=null;source=null;destination=null;proof=null;unwatch();unwatchTarget();
+      return save(null).then(async()=>{
+        // Only a proof already created/verified by this controller can name a
+        // temporary visit copy. Never scan or delete legacy/account namespaces.
+        if(retired&&/:visit:[a-f0-9]{64}$/.test(retired.source))await options.host.removeItem(`bysi.owner.v1:${encodeURIComponent(retired.source)}:${SLOT}`);
+      });
+    },
     dispose() {++epoch;activeNonce=null;stopped=true;source=null;destination=null;unwatch();unwatchTarget();},
   };
   return api;

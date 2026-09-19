@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Backdrop, PressCard, PrimaryButton, tap, useReducedMotion } from "@/components/ui";
+import { Backdrop, GhostButton, PressCard, PrimaryButton, tap, useReducedMotion } from "@/components/ui";
 import { DESIRED_SHIFTS, DESIRED_SKILLS, PRESSURE_CONDITIONS, RECURRING_PROBLEMS, type ModuleId, type OnboardingEntryRoute } from "@/constants/modules";
 import { approvedScenarioForContext, behavioralGoal, personaForContext, scenarioFromApproved } from "@/constants/onboardingScenarios";
 import { C, GUTTER, T, eyebrow, font } from "@/constants/theme";
@@ -15,6 +15,7 @@ import { useAuth } from "@/providers/auth";
 import {normalFreeRecoveryEnabled, requestNormalFree} from '@/lib/normalFreeRuntime';
 import {startNormalFreeConversation} from '@/lib/normalFreeConversation';
 import {mayRequestRestart,recoveryMessage,type RecoveryState} from '@/lib/phaseRecovery';
+import {guestVisitMessage} from '@/lib/guestVisitMessage';
 import {recoveredNormalFreePractice} from "@/lib/normalFreeCheckpoint";
 import type { CategoryId, Difficulty, ReactionPattern, Scenario } from "@/types/convo";
 
@@ -60,7 +61,7 @@ export default function Onboarding(): React.JSX.Element {
   const { height: screenHeight } = useWindowDimensions();
   const isReduced = useReducedMotion();
   const { saveProfile, addCustomScenario, anonymousUserId, createCurrentOnboardingPractice, activePracticeSession, saveActivePracticeSession } = useStore();
-  const { startNativeSession } = useAuth();
+  const { startNativeSession,isGuestVisit,endGuestVisit } = useAuth();
   const [step, setStep] = useState<number>(0);
   const [entryRoute, setEntryRoute] = useState<OnboardingEntryRoute | null>(null);
   const [moduleId, setModuleId] = useState<ModuleId | null>(null);
@@ -153,7 +154,7 @@ export default function Onboarding(): React.JSX.Element {
           }
         }
         if(state.status!=='new'&&!(state.status==='start'&&!state.used)){
-          setRecovery(state);setError(recoveryMessage(state.status));setBuilding(false);return;
+          setRecovery(state);setError(isGuestVisit?guestVisitMessage(state.status):recoveryMessage(state.status));setBuilding(false);return;
         }
         setRecovery(null);
       }
@@ -187,7 +188,7 @@ export default function Onboarding(): React.JSX.Element {
       setBuilding(false);
       setError("We couldn't set up your rehearsal. Check your connection and try again.");
     }
-  }, [addCustomScenario, anonymousUserId, building, entryRoute, isReal, moduleId, outcome, router, createCurrentOnboardingPractice, saveActivePracticeSession, saveProfile, selectionLabel, situation, startNativeSession]);
+  }, [addCustomScenario, anonymousUserId, building, entryRoute, isReal, moduleId, outcome, router, createCurrentOnboardingPractice, saveActivePracticeSession, saveProfile, selectionLabel, situation, startNativeSession,isGuestVisit]);
 
   const restartPractice = async ():Promise<void> => {
     if(!recovery||!mayRequestRestart(recovery)||building)return;
@@ -247,7 +248,7 @@ export default function Onboarding(): React.JSX.Element {
   const goBack = (): void => {
     if (isAdvancing) return;
     Keyboard.dismiss();
-    if (step === 0) { router.replace("/entry"); return; }
+    if (step === 0) { if(isGuestVisit)void endGuestVisit().then(()=>router.replace('/entry'));else router.replace("/entry"); return; }
     setIsAdvancing(true);
     animateTo(Math.max(0, step - 1), "back");
   };
@@ -275,7 +276,8 @@ export default function Onboarding(): React.JSX.Element {
       {!isReal && cardStep === 2 && entryRoute === "desired_skill" ? <Question title="What usually makes that hardest?" lede="Choose the pressure that most often changes what you say.">{PRESSURE_CONDITIONS.map((item) => <Choice key={item.label} title={item.label} selected={selectionLabel === item.label} disabled={disabled} onPress={() => chooseSecondary(null, item.reaction as ReactionPattern, item.label)} />)}</Question> : null}
       {!isReal && cardStep === 3 ? <Question title="Where would this skill help most?" lede="We’ll choose the matching authored situation automatically.">{contextChoices}</Question> : null}
       {cardStep === step && error ? <Text style={styles.error}>{error}</Text> : null}
-      {cardStep===step&&recovery ? <View style={{gap:12,marginTop:12}}>
+      {cardStep===step&&recovery&&isGuestVisit?<GhostButton label="Back to Get Started" onPress={()=>{void endGuestVisit().then(()=>router.replace('/entry'));}}/>:null}
+      {cardStep===step&&recovery&&!isGuestVisit ? <View style={{gap:12,marginTop:12}}>
         {activePracticeSession ? <PrimaryButton label="Resume saved rehearsal" onPress={resumePractice} disabled={building}/> : null}
         {mayRequestRestart(recovery) ? <><Text style={styles.error}>Starting another conversation requires a fresh server check so stale work cannot overwrite the saved practice.</Text><PrimaryButton label="Start new rehearsal" onPress={()=>void restartPractice()} disabled={building}/></> : null}
       </View> : null}

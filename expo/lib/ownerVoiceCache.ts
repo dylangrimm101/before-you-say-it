@@ -29,5 +29,20 @@ export function createOwnerVoiceCache(fs:FileHost){
     if((await fs.getInfoAsync(root())).exists){const entries=await fs.readDirectoryAsync(root());if(entries.some(name=>name!=='owners'))throw new Error('Unattributed historical voice cache requires scoped cleanup');}
    });
   },
+  async eraseOtherVisits(owner:string,keep:string){
+   const base=root()+'owners/';
+   if(!(await fs.getInfoAsync(base)).exists)return;
+   for(const entry of await fs.readDirectoryAsync(base)){
+    let candidate:string;try{candidate=decodeURIComponent(entry);}catch{continue;}
+    const prefix=owner+':visit:';
+    if(!candidate.startsWith(prefix)||! /^[a-f0-9]{64}$/.test(candidate.slice(prefix.length))||candidate===keep||entry!==encodeURIComponent(candidate))continue;
+    quarantinedOwners.add(candidate);
+    const key=directory(candidate);epochs.set(key,(epochs.get(key)??0)+1);
+    await run(candidate,async()=>{
+     if((await fs.getInfoAsync(key)).exists)await fs.deleteAsync(key,{idempotent:true});
+     if((await fs.getInfoAsync(key)).exists)throw Error('Visit voice cleanup not confirmed');
+    });
+   }
+  },
  };
 }

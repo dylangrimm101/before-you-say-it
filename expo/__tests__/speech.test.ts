@@ -464,8 +464,9 @@ describe("data URIs are never handed to native playback", () => {
     expect(voice).not.toContain("EXPO_PUBLIC_TOOLKIT_URL");
     expect(voice).not.toContain("EXPO_PUBLIC_RORK_TOOLKIT_SECRET_KEY");
     expect(voice).not.toContain("elevenlabs");
-    expect(rehearsal).toContain("reveal(res.reply, res.nudge)");
+    expect(rehearsal).toContain("reveal(res.reply,res.nudge)");
     expect(rehearsal).toContain("await speak(spoken, persona");
-    expect(rehearsal.indexOf("reveal(res.reply, res.nudge)")).toBeLessThan(rehearsal.indexOf("await speak(spoken, persona"));
+    expect(rehearsal).toContain("onPlaybackStart:present, onPlaybackUnavailable:present");
+    expect(rehearsal).toContain('if(outcome!=="played")present()');
   });
 });

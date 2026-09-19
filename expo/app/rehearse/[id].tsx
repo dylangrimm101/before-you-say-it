@@ -57,6 +57,8 @@ import { expectedReactionLabel } from "@/constants/onboardingScenarios";
 import { C, GUTTER, eyebrow, font, radius, T } from "@/constants/theme";
 import { bysiContract, generateDebrief, nextCounterpartTurn } from "@/lib/ai";
 import {normalFreeRecoveryEnabled,requestNormalFree} from '@/lib/normalFreeRuntime';
+import {useAuth} from '@/providers/auth';
+import {guestVisitMessage,canRetryGuestVisit} from '@/lib/guestVisitMessage';
 import {normalFreeRecoveryContract,normalFreeRecoveryTranscript} from '@/lib/normalFreeRecoveryPayload';
 import {applyRecovery,mayRequestRestart,recoveryMessage,type RecoveryState} from '@/lib/phaseRecovery';
 import {authoritativeNormalFreeContract,recoveredNormalFreePractice} from "@/lib/normalFreeCheckpoint";
@@ -162,6 +164,7 @@ export default function RehearseRoute() {
 }
 
 function LegacyRehearse() {
+  const {isGuestVisit,endGuestVisit}=useAuth();
   const params = useLocalSearchParams<{
     id: string;
     difficulty?: Difficulty;
@@ -403,6 +406,8 @@ function LegacyRehearse() {
     }, 42);
   }, [isReduced]);
 
+  const screenLive=useRef(true);
+
   // Only a scenario explicitly configured as counterpart-first opens with a
   // partner line. User-initiated scenarios start with an empty transcript and
   // wait for the user's opening.
@@ -413,17 +418,19 @@ function LegacyRehearse() {
     opened.current = true;
     const spoken = speechTextFor(line, themName);
     const t = setTimeout(() => {
+      let presented=false;
+      const present=()=>{if(!presented&&screenLive.current){presented=true;reveal(line,"");}};
       if (spoken.length === 0) {
-        reveal(line, "");
+        present();
         return;
       }
       // Keep the transcript staged while the voice is generated. The words begin
       // appearing only once playback starts (or immediately if audio is muted).
-      speak(spoken, persona, { muted: !voiceOnRef.current })
-        .then(() => reveal(line, ""))
+      speak(spoken, persona, { muted: !voiceOnRef.current, onPlaybackStart:present, onPlaybackUnavailable:present })
+        .then(outcome => {if(outcome!=="played")present();})
         .catch((e) => {
           safeLog("[rehearse] opening speech failed", errorShape(e));
-          reveal(line, "");
+          present();
         });
     }, 550);
     return () => clearTimeout(t);
@@ -433,7 +440,9 @@ function LegacyRehearse() {
   // can be heard after the rehearsal is over. Do not depend on cancelDictation:
   // recorder updates recreate that function and would abort an in-flight transcribe.
   useEffect(() => {
+    screenLive.current=true;
     return () => {
+      screenLive.current=false;
       if (revealTimer.current) clearInterval(revealTimer.current);
       cancelDictationRef.current().catch(() => {});
       resetSpeech().catch(() => {});
@@ -463,6 +472,7 @@ function LegacyRehearse() {
           false,
           authoritativeNormalFreeContract(activePracticeSession),
         );
+        if(!screenLive.current)return;
         const userTurnCount = history.filter((turn) => turn.role === "user").length;
         safeLog("[evidence] native counterpart accepted", {
           entryRoute: activePracticeSession?.entryRoute ?? "unknown",
@@ -473,14 +483,16 @@ function LegacyRehearse() {
         setTension(res.tension);
         setThinking(false);
         const spoken = recoveryRequired ? res.reply : speechTextFor(res.reply, themName);
-        // Match the web flow: the generated counterpart text is visible immediately,
-        // then that exact Hope/Adam line is sent to BYSI TTS. The learner's own
-        // transcript never enters the playback path.
-        reveal(res.reply, res.nudge);
+        // Begin the readable line at actual playback, not at TTS request time.
+        // Muting, stopping or unavailable audio must still leave a usable transcript.
+        let presented=false;
+        const present=()=>{if(!presented&&screenLive.current){presented=true;reveal(res.reply,res.nudge);}};
         if (spoken.length > 0) {
-          await speak(spoken, persona, { muted: !voiceOnRef.current });
-        }
+          const outcome=await speak(spoken, persona, { muted: !voiceOnRef.current, onPlaybackStart:present, onPlaybackUnavailable:present });
+          if(outcome!=="played")present();
+        } else present();
       } catch (e) {
+        if(!screenLive.current)return;
         if (e instanceof FreeAcquisitionSafetyError) {
           setThinking(false);setCanRetry(false);
           await resetSpeech().catch(() => {});
@@ -856,6 +868,7 @@ function LegacyRehearse() {
   const exitRehearsal = useCallback(async (): Promise<void> => {
     await cancelDictation();
     await resetSpeech();
+    if(isGuestVisit){await endGuestVisit();router.replace('/entry');return;}
     if (params.entry === "onboarding") {
       if (activePracticeSession?.id === params.practiceSessionId) {
         await saveActivePracticeSession(null);
@@ -868,7 +881,7 @@ function LegacyRehearse() {
     }
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)");
-  }, [activePracticeSession?.id, cancelDictation, params.entry, params.practiceSessionId, router, saveActivePracticeSession]);
+  }, [activePracticeSession?.id, cancelDictation, params.entry, params.practiceSessionId, router, saveActivePracticeSession,isGuestVisit,endGuestVisit]);
 
   const leave = useCallback(() => {
     const act = (): void => {
@@ -939,7 +952,7 @@ function LegacyRehearse() {
       const recoveryPayloadScenario=localContract?scenario:verifiableRouteScenario;
       const response=await requestNormalFree('recover',hasLocalWords&&recoveryPayloadScenario?{contract:localContract??normalFreeRecoveryContract(recoveryPayloadScenario,reaction,outcome,localSession!.entryRoute,difficulty),transcript:normalFreeRecoveryTranscript(turns,recoveryPayloadScenario)}:{});
       if(serial!==recoverySerial.current)return false;
-      if(!response.ok)throw Error('Practice check failed');
+      if(!response.ok){const failure=await response.json().catch(()=>({}));setRecoveryState({status:typeof failure.code==='string'?failure.code:'unavailable'});setRecoveryReady(false);return false;}
       const state:RecoveryState=await response.json();const localTurns=localSession?turns:[];const restored=applyRecovery(state,localTurns);
       setRecoveryState(state);
       if(!restored.ready){setRecoveryReady(false);return false;}
@@ -1001,6 +1014,15 @@ function LegacyRehearse() {
     }catch{setRecoveryState({status:'unavailable'});}
     finally{setRecoveryBusy(false);}
   };
+  if(isGuestVisit&&recoveryRequired&&!recoveryReady){
+    return <View style={[styles.root,styles.center]}><Backdrop/>
+      <Text style={T.title}>{recoveryBusy?'Preparing your practice':'Practice unavailable'}</Text>
+      <Text style={T.support}>{recoveryBusy?'Checking this visit before recording.':guestVisitMessage(recoveryState.status)}</Text>
+      {!recoveryBusy&&canRetryGuestVisit(recoveryState.status)?<PrimaryButton label="Retry" onPress={()=>void checkRecovery()}/>:null}
+      <PrimaryButton label="Back to Get Started" onPress={leave}/>
+      {error?<Text accessibilityRole="alert" style={T.support}>{error}</Text>:null}
+    </View>;
+  }
   if(recoveryRequired&&!recoveryReady&&contextMissing){
     return <View style={styles.root}><Backdrop/><ScrollView contentContainerStyle={{padding:GUTTER,paddingTop:insets.top+24}} keyboardShouldPersistTaps="handled">
       <Text style={T.title}>Restore your conversation context</Text>

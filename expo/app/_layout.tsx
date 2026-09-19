@@ -25,7 +25,7 @@ let hasPresentedLaunch = false;
 
 function RootLayoutNav() {
   const { hydrated, profile, activePracticeSession, nativeJourneyStarted, migrationNotice, dismissMigrationNotice } = useStore();
-  const { isAuthLoading, user, session, normalResults, restoredGuestContinuationId, acknowledgeGuestContinuation } = useAuth();
+  const { isAuthLoading, user, session, normalResults, restoredGuestContinuationId, acknowledgeGuestContinuation,isGuestVisit } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const routeParams = useGlobalSearchParams<{ id?: string }>();
@@ -56,6 +56,12 @@ function RootLayoutNav() {
     if (stagingResult) return; // This route renders its own fail-closed build/auth gate.
     // Public disclosures, safety help, and deletion receipt status must remain readable before signup.
     if (firstSegment === "privacy" || firstSegment === "safety" || firstSegment === "forgot-password" || firstSegment === "reset-password" || deletionStatus) return;
+    // A new guest lease has no journey marker. Do not restore a navigation stack
+    // into yesterday's onboarding/recovery UI; account sign-in stays reachable.
+    if(isGuestVisit&&!profile&&!activePracticeSession&&!entry&&firstSegment!=="continue-from-web"
+      &&(!nativeJourneyStarted||firstSegment==="account-practice")){
+      router.replace('/entry');return;
+    }
     if (user && restoredGuestContinuationId && activePracticeSession?.id === restoredGuestContinuationId && activePracticeSession.sharedResult
       && firstSegment !== "settings") {
       if (firstSegment === "debrief" && routeParams.id === restoredGuestContinuationId) {
@@ -69,7 +75,7 @@ function RootLayoutNav() {
       return;
     }
     if (!user && hasLocalJourney && !profile && !activePracticeSession && !onboarding && !entry && !continuation) {
-      router.replace("/onboarding");
+      router.replace(isGuestVisit?"/entry":"/onboarding");
       return;
     }
     const isFreeJourney = onboarding || firstSegment === "rehearse" || firstSegment === "debrief";
@@ -91,7 +97,7 @@ function RootLayoutNav() {
       };
       router.replace({ pathname: "/rehearse/[id]", params: sharedParams });
     }
-  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user, session, normalResults, restoredGuestContinuationId, routeParams.id, acknowledgeGuestContinuation]);
+  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user, session, normalResults, restoredGuestContinuationId, routeParams.id, acknowledgeGuestContinuation,isGuestVisit]);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
 
