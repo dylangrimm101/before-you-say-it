@@ -1,5 +1,17 @@
 # Local checks and test seams
 
+## Required spoken-flow gate (added September 19, 2026)
+
+Use [SPOKEN-RELEASE-CHECKLIST.md](SPOKEN-RELEASE-CHECKLIST.md) for new candidates.
+From `expo/`, run `bun run test:spoken` with the pinned component-test dependencies,
+then `bun run check` and the applicable broader regression/integration suites.
+The spoken command uses the existing environment-sanitizing launcher. It exercises
+both screen Record handlers across all three tracks; it is not physical microphone
+or audible-playback evidence. A typed journey cannot substitute for it or for the
+separate, build-specific iPhone acceptance checklist.
+
+The results below are historical receipts, not results for the current candidate.
+
 ## Reproduction
 
 From repository root, `python3 handoff/check.py --install` installs exact mobile dependencies with scripts disabled, installs the pinned React 19.1.0 renderer sharing this checkout's React, then runs the selected 21-file offline matrix, explicit TypeScript noEmit and canonical `bun run check`. No build or export is called. Environment/provider inputs are scrubbed and dotenv is disabled. Setup may download packages, but these tests do not call real providers.
