@@ -5,6 +5,9 @@ type Auth=NonNullable<Parameters<typeof createNativeBilling>[0]['auth']>;
 export type RecordingIdentity={turn:'opener'|'reply';identity:string};
 type Journal={nonce:string;visitId?:string;visitCanStart?:boolean;generation?:number;restart?:{id:string;generation:number};sessionId?:string;operations:Record<string,{id:string;digest:string}>;audio?:{digest:string;turn:string;role:string}};
 const canonical=(v:unknown):unknown=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b)).map(([k,x])=>[k,canonical(x)])):v;
+// React Native's locked whatwg-fetch Response has instance json(), but not the
+// newer static Response.json(). Preserve local refusal bodies/status on device.
+const localJson=(body:Record<string,unknown>,status=200):Response=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 export function createNormalFreeSession(config:{origin:string;authUrl:string;auth:Auth;storage:{getItem(k:string):Promise<string|null>;setItem(k:string,v:string):Promise<unknown>};random():string;hash(s:string):Promise<string>;onInvalidate?():void;guestVisit?:{current(owner:string):string|null;subscribe(listener:()=>void):()=>void};fetch?:(url:string,init:RequestInit)=>Promise<Response>}){
  if(config.origin!=='https://beforeyousayit.app'||config.authUrl!=='https://spvksnddzyvycfoefrcf.supabase.co')throw Error('Normal free configuration invalid');
  let revision=0,owner:string|null=null,disposed=false,queue=Promise.resolve();const pending=new Set<AbortController>();
@@ -39,7 +42,7 @@ export function createNormalFreeSession(config:{origin:string;authUrl:string;aut
     current();const bytes=await r.arrayBuffer();current();if(signal.aborted)throw Error('Request aborted');if(r.redirected||bytes.byteLength>(op==='tts'?2097152:131072))throw Error('Invalid free response');return new Response(bytes,{status:r.status,headers:r.headers});
    };
    if(operation==='endVisit'){
-    if(!visitId||journal.visitId!==visitId)return Response.json({status:'not_started'});
+    if(!visitId||journal.visitId!==visitId)return localJson({status:'not_started'});
     return send('session',{visit:'end'});
    }
    if(visitId&&journal.visitId!==visitId){
@@ -54,9 +57,9 @@ export function createNormalFreeSession(config:{origin:string;authUrl:string;aut
     journal.operations={};delete journal.audio;delete journal.restart;await save();
    }
    if(visitId&&journal.visitCanStart===false)return operation==='recover'
-    ?Response.json({status:'visit_limit',sessionId:journal.sessionId,generation:journal.generation})
-    :Response.json({code:'visit_limit'},{status:429});
-   if(visitId&&operation==='restart')return Response.json({code:'visit_ended'},{status:409});
+    ?localJson({status:'visit_limit',sessionId:journal.sessionId,generation:journal.generation})
+    :localJson({code:'visit_limit'},429);
+   if(visitId&&operation==='restart')return localJson({code:'visit_ended'},409);
    const issue=async(clear:boolean)=>{
     if(clear){journal.operations={};delete journal.audio;delete journal.sessionId;}
     await save();const issued=await send('session',{nonce:journal.nonce});if(!issued.ok)return issued;
