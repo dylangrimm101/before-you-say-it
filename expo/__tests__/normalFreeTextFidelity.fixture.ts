@@ -11,10 +11,20 @@ delete process.env.EXPO_PUBLIC_BYSI_BUILD_MODE;
 // Quotes survive the pinned server normalizer and quality gate. Display formatting
 // strips them, but the server's audio authorization and exchange proof do not.
 const whitespace = process.argv[2] === 'whitespace';
+const nativeUtf8 = process.argv[2] === 'native-utf8';
+const WireResponse = Response;
+// Use the locked React Native fetch implementation, not Bun's UTF-8-aware
+// Response, at the client reconstruction boundary. Network bytes stay synthetic.
+if (nativeUtf8) globalThis.Response = require('whatwg-fetch').Response;
+const received=(response:Response):Response=>nativeUtf8?{
+  status:response.status,ok:response.ok,redirected:false,
+  headers:new (require('whatwg-fetch').Headers)(Array.from(response.headers.entries())),
+  arrayBuffer:()=>response.arrayBuffer(),
+} as Response:response;
 // This extra variant tests the client's exact-text invariant at its response
 // boundary. The pinned producer normalizes whitespace; no deployed output claim.
-const approved = whitespace ? '  The client added those.\nEveryone\tis stretched right now.  ' : '"The client added those. Everyone is stretched right now."';
-const close = whitespace ? '\tThe client  still expects the original deadline.\n' : '"The client still expects the original deadline."';
+const approved = nativeUtf8 ? '"I’m already helping—let’s agree on a task."' : whitespace ? '  The client added those.\nEveryone\tis stretched right now.  ' : '"The client added those. Everyone is stretched right now."';
+const close = nativeUtf8 ? '"It goes both ways—I’ve helped too. Café ☕."' : whitespace ? '\tThe client  still expects the original deadline.\n' : '"The client still expects the original deadline."';
 const user = { id: '11111111-1111-4111-8111-111111111111', is_anonymous: true };
 const auth = { getSession: async () => ({ data: { session: { access_token: 'synthetic', user } }, error: null }),
   getUser: async () => ({ data: { user }, error: null }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) };
@@ -28,15 +38,15 @@ const client = createNormalFreeSession({ auth, origin: process.env.EXPO_PUBLIC_N
     const operation = url.split('/').at(-1)!;
     const body = JSON.parse(String(init.body));
     sent.push({ operation, body });
-    if (operation === 'session') return Response.json({ sessionId: user.id, generation: 0, phase: 'start' });
+    if (operation === 'session') return received(WireResponse.json({ sessionId: user.id, generation: 0, phase: 'start' }));
     if (operation === 'generate') {
-      if (body.type === 'free_rehearsal_result') return Response.json({ code: 'failed' }, { status: 503 });
+      if (body.type === 'free_rehearsal_result') return received(WireResponse.json({ code: 'failed' }, { status: 503 }));
       audio = { text: body.turn === 'close' ? close : approved, role: 'hope', turn: body.turn };
-      return Response.json({ mode: 'turn', ...audio });
+      return received(WireResponse.json({ mode: 'turn', ...audio }));
     }
     assert.equal(operation, 'tts');
     assert.deepEqual(body, audio, 'Pinned backend contract: exact text, role and turn');
-    return new Response(Uint8Array.from([73, 68, 51, 4, 0, 255]), { headers: { 'content-type': 'audio/mpeg' } });
+    return received(new WireResponse(Uint8Array.from([73, 68, 51, 4, 0, 255]), { headers: { 'content-type': 'audio/mpeg' } }));
   },
 });
 let plays = 0;

@@ -305,7 +305,11 @@ async function teardownSound(): Promise<void> {
   const cleanup = currentPlaybackCleanup;
   currentPlayer = null;
   currentPlaybackCleanup = null;
-  cleanup?.();
+  try {
+    cleanup?.();
+  } catch {
+    safeLog("[voice] listener cleanup failed", { category: "cleanup" });
+  }
   if (!player) return;
   try {
     player.pause();
@@ -353,8 +357,11 @@ export async function stopSpeech(): Promise<void> {
   pendingSpeech?.abort();
   pendingSpeech = null;
   stopWeb();
-  await teardownSound();
-  publish({ phase: "idle" });
+  try {
+    await teardownSound();
+  } finally {
+    publish({ phase: "idle" });
+  }
 }
 
 /**

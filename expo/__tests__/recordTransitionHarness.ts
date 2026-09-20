@@ -71,5 +71,30 @@ export function recordTransitionSource(source:string):string {
       await act(async()=>root.unmount());client.clear();Date.now=originalNow;
       console.log('PASS Record transition');process.exit(0);
     `);
+    if(process.argv.includes('voice-failure')){
+      replace("mock.module('@/lib/voice',()=>({",`let voicePhase='idle';const voiceListeners=new Set<()=>void>();
+        const publishVoice=(phase:string)=>{voicePhase=phase;for(const notify of voiceListeners)notify();};
+        mock.module('@/lib/voice',()=>({`);
+      replace("useSpeech:()=>({phase:'idle',canReplay:false})",`useSpeech:()=>({phase:React.useSyncExternalStore((notify:any)=>{voiceListeners.add(notify);return()=>voiceListeners.delete(notify);},()=>voicePhase),canReplay:true})`);
+      replace("playbackCount++;options?.onPlaybackStart?.();return 'played';",`playbackCount++;
+        if(playbackCount===2){publishVoice('failed');options?.onPlaybackUnavailable?.();return 'failed';}
+        options?.onPlaybackStart?.();return 'played';`);
+      replace("stopSpeech:async()=>{}", "stopSpeech:async()=>{throw Error('Synthetic native cleanup failure');}");
+      replace("replaySpeech:async()=>{}", "replaySpeech:async()=>{playbackCount++;publishVoice('idle');return 'played';}");
+      replace("await press('Review complete transcript');await press('Approve transcript');",`
+        assert.ok(hasText('Keep reading'),'second audio failure has a reading escape');
+        const pressVoice=async(label:string)=>{
+          const button=root.root.findAllByType('button').find((n:any)=>n.findAll((c:any)=>c.type==='host'&&c.children.includes(label)).length>0);
+          assert.ok(button);await act(async()=>{await button.props.onPress();});
+        };
+        if(process.argv.includes('voice-retry')){
+          await pressVoice('Try voice again');assert.equal(playbackCount,3);
+          await press('Review complete transcript');
+        }else{
+          await pressVoice('Keep reading');
+        }
+        assert.equal(counterpartCalls,2,'audio recovery never regenerates the conversation');
+        await press('Approve transcript');`);
+    }
     return source;
 }

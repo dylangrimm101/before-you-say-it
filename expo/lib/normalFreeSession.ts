@@ -1,5 +1,6 @@
 import {withRequestDeadline} from './requestDeadline';
 import {sessionCanTalk} from './nativeAuth';
+import {nativeResponseText} from './nativeResponseText';
 import type {createNativeBilling} from './nativeBilling';
 type Auth=NonNullable<Parameters<typeof createNativeBilling>[0]['auth']>;
 export type RecordingIdentity={turn:'opener'|'reply';identity:string};
@@ -39,7 +40,11 @@ export function createNormalFreeSession(config:{origin:string;authUrl:string;aut
    const save=async()=>{current();await config.storage.setItem(key,JSON.stringify(journal));current();};
    const send=async(op:string,body:Record<string,unknown>|FormData,extra:Record<string,string>={})=>{
     current();const r=await (config.fetch??fetch)(config.origin+'/api/native/free/'+op,{method:'POST',headers:{...(body instanceof FormData?{}:{'Content-Type':'application/json'}),Authorization:'Bearer '+session.access_token,...(visitId?{'x-bysi-guest-visit':visitId}:{}),...extra},body:body instanceof FormData?body:JSON.stringify(body),signal,redirect:'error',credentials:'omit',cache:'no-store'});
-    current();const bytes=await r.arrayBuffer();current();if(signal.aborted)throw Error('Request aborted');if(r.redirected||bytes.byteLength>(op==='tts'?2097152:131072))throw Error('Invalid free response');return new Response(bytes,{status:r.status,headers:r.headers});
+    current();const bytes=await r.arrayBuffer();current();if(signal.aborted)throw Error('Request aborted');if(r.redirected||bytes.byteLength>(op==='tts'?2097152:131072))throw Error('Invalid free response');
+    // JSON must be UTF-8 decoded before constructing the native Response.
+    // Preserve successful MPEG audio as bytes, including non-text byte values.
+    const responseBody=op==='tts'&&r.ok?bytes:nativeResponseText(bytes);
+    return new Response(responseBody,{status:r.status,headers:r.headers});
    };
    if(operation==='endVisit'){
     if(!visitId||journal.visitId!==visitId)return localJson({status:'not_started'});

@@ -685,12 +685,6 @@ function LegacyRehearse() {
     stopSpeech().catch(() => {});
   }, []);
 
-  const continueWithoutAudio = useCallback(() => {
-    tap("light");
-    setVoiceOn(false);
-    stopSpeech().catch(() => {});
-  }, []);
-
   const switchToText = useCallback(() => {
     tap("light");
     void dictation.reset().then(() => setMode("text")).catch((caught: unknown) => safeLog("[rehearse] recording cleanup pending", errorShape(caught)));
@@ -902,6 +896,15 @@ function LegacyRehearse() {
       }).catch(() => {});
     }
   }, [activePracticeSession, params.entry, params.practiceSessionId, saveActivePracticeSession, turns]);
+
+  const continueWithoutAudio = useCallback(() => {
+    tap("light");
+    setVoiceOn(false);
+    // A complete readable exchange can be reviewed even if native audio
+    // cleanup fails. Audio is optional; transcript approval is still explicit.
+    if (isRepReadyForAnalysis) openTranscriptReview();
+    void stopSpeech().catch(() => safeLog("[rehearse] audio cleanup failed", { category: "cleanup" }));
+  }, [isRepReadyForAnalysis, openTranscriptReview]);
 
   const storedLearnerTurns = turns.filter((turn) => turn.role === "user");
   const canApproveTranscript = finalTranscriptReadOnly
@@ -1408,13 +1411,13 @@ function LegacyRehearse() {
             </View>
           ) : dockState === "autoplay-blocked" || dockState === "playback-failed" ? (
             <View style={styles.row}>
-              <PressCard onPress={continueWithoutAudio} containerStyle={styles.flexOne}>
+              <PressCard onPress={continueWithoutAudio} containerStyle={styles.flexOne} accessibilityLabel="Keep reading">
                 <View style={styles.secondaryBtn}>
                   <VolumeX size={18} color={C.textSoft} strokeWidth={1.7} />
                   <Text style={styles.secondaryText}>Keep reading</Text>
                 </View>
               </PressCard>
-              <PressCard onPress={onReplay} containerStyle={styles.flexWide}>
+              <PressCard onPress={onReplay} containerStyle={styles.flexWide} accessibilityLabel={dockState === "autoplay-blocked" ? tapToHearLabel(themName) : "Try voice again"}>
                 <View style={styles.analyzeBtn}>
                   <Volume2 size={18} color={C.onAccent} strokeWidth={1.7} />
                   <Text style={styles.analyzeText}>
