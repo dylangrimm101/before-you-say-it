@@ -84,3 +84,17 @@ on the new candidate.
 
 Do not close the historic TestFlight authentication issue merely because these
 local checks pass. Record device authentication observations independently.
+## Connected screen/backend regression
+
+Run `bun run test:spoken-joined` with `BYSI_GUEST_BACKEND` pointing to the reviewed local backend, `BYSI_COMPONENT_TEST_DEPS` to the pinned React renderer dependencies, and the existing locked backend test dependencies available. Run with network denied. Do not install or copy backend code into Expo to satisfy this test.
+
+This test mounts Entry/Auth/Store/Onboarding/Rehearse, presses both Record/Stop/approval handlers, and sends the screen's real AI payloads through the mobile transport, local backend routes, proof checks, and SQL fixture. All three tracks must reach both TTS points and debrief. An injected contract mismatch must be rejected, preserve the new reply, show its verification-specific error, and leave a reachable Check and retry action. A failed server recheck must dispatch no generation; an expired proof may be renewed only by the existing server protocol against the unchanged exchange. Auth, microphone bytes, provider responses, and native playback remain simulated; this is not physical iPhone acceptance.
+
+Also run all three tracks with animated transcript reveal and a progressing clock.
+Change the in-memory briefing after the second Record check, before approving the
+reply: the original proof-bound JSON contract must remain identical at pushback,
+close, and result. This models the diagnosed context-drift failure class, not a
+claim that the exact phone-side mutation has been identified. A synthetic wire
+mismatch must STILL be rejected; never make this test pass by relaxing server
+verification. Test helpers must wait for enabled controls and navigation, not
+assume reduced-motion transitions or synchronous storage.
