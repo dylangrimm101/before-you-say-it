@@ -12,15 +12,22 @@ result), build number, test commands, results and known limitations.
 From `expo/`, with the checkout's pinned Bun and locked dependencies:
 
 ```sh
-# Set BYSI_COMPONENT_TEST_DEPS to the previously installed, pinned renderer directory.
-bun run verify:buyer-tests
-bun run test:spoken
-bun run check
+# Set BYSI_COMPONENT_TEST_DEPS and BYSI_GUEST_BACKEND to the existing,
+# pinned external fixtures. Run in the established network-denied environment.
+bun run test:release
 ```
 
 Run the applicable broader mobile and joined backend regression suites as well.
 Do not silently install different dependencies, weaken assertions, or count a
 missing/private-backend harness as a pass.
+
+The command verifies test dependencies, the gate's own fail-fast tests, spoken
+regressions, joined backend/SQL journeys and canonical TypeScript/lint. It records
+the starting source fingerprint/build and fails if Expo source changes during
+the run. It installs nothing, calls no build/deploy command, and does not claim
+provider or device acceptance. Network denial must be supplied by the caller.
+Use `RELEASE-EVIDENCE-TEMPLATE.md` for source/artifact binding and the three separate
+acceptance layers. Keep the reported bug's before/after reproduction receipts.
 
 The mounted spoken tests must use the screen's Record and Stop handlers for BOTH
 learner turns, verify explicit transcript approval, both Hope playback callbacks,
@@ -29,6 +36,15 @@ that a rejected continuation cannot leave recording active behind an error scree
 Recorder/player hardware and provider responses are simulated. Separate native
 audio-byte/playback tests and joined transport tests complement this coverage;
 none establishes physical-device success.
+
+For voice-failure fixes, inject second-response TTS failure and press BOTH recovery
+paths in separate runs on every track: Keep reading through explicit transcript
+approval/debrief, and Try voice again through playback/review/debrief. Include a
+native cleanup exception; an always-idle mocked speech hook cannot cover this.
+Run Unicode text through the checkout's locked `whatwg-fetch` Response/Headers,
+not just Bun/Node Response: curly quotes, em dashes, and multibyte characters must
+survive generation, TTS authorization, recovery and final-result payloads exactly.
+Keep binary audio byte assertions and wrong-text/role/stale-turn rejection checks.
 
 Passing this gate establishes automated coverage only, not real-provider or
 release acceptance. Complete gate 2 before claiming provider readiness.

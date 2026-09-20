@@ -2,6 +2,29 @@
 
 ## Required spoken-flow gate (added September 19, 2026)
 
+The consolidated command is now `bun run test:release` from `expo/`, using the
+existing pinned fixture paths and a network-denied environment. It fails on
+missing prerequisites, any unsuccessful stage, or an Expo source change mid-run.
+Its successful output means automated coverage only. Complete a candidate copy of
+`RELEASE-EVIDENCE-TEMPLATE.md` before release claims; provider and physical-device
+results cannot be inferred from this command. No dependency installation, build,
+upload or production mutation is part of this command.
+
+Workflow validation, September 20, 2026: the final consolidated run completed at
+15:46:28Z with 6 gate tests, 35 spoken regressions and 12 connected regressions
+passing, plus TypeScript/canonical lint (four existing warnings). Network was
+denied. Source remained unchanged throughout the run: working tree based on
+`69ff4d72ca7d8ccaccdbec2a7e401cdff3ae3116`, Expo fingerprint
+`23b220130ee82efc90ea68ec351a495c2e7aaf648a504165c6914c956ccef069`.
+This is an uncommitted source receipt, not a shipped build. Provider/device
+acceptance was correctly reported as not assessed.
+
+Negative checks: missing fixtures exited 1; each failed stage stops subsequent
+stages. Earlier runner attempts are not passes: the first exposed a URL typing
+incompatibility, and an intermediate run passed every stage but still exited 1
+because source changed mid-run. The final stable run above supersedes neither
+those failure records nor the separate provider/device gates.
+
 Use [SPOKEN-RELEASE-CHECKLIST.md](SPOKEN-RELEASE-CHECKLIST.md) for new candidates.
 It now requires separate automated failure/retry, real-provider candidate, and
 physical-iPhone gates. Preselected successful AI replies cannot satisfy the

@@ -5,13 +5,14 @@ import path from "node:path";
 
 import { guardClientProcessEnv, sanitizeClientEnv } from "../lib/clientEnvGuard";
 
-type LifecycleName = "start" | "start-web" | "start-web-dev" | "test" | "test-spoken" | "test-spoken-joined" | "lint" | "check" | "export" | "probe";
+type LifecycleName = "start" | "start-web" | "start-web-dev" | "test" | "test-spoken" | "test-spoken-joined" | "test-release-policy" | "lint" | "check" | "export" | "probe";
 
 const commands: Record<LifecycleName, readonly string[]> = {
   start: ["bunx", "expo", "start"],
   "start-web": ["bunx", "expo", "start", "--web"],
   "start-web-dev": ["bunx", "expo", "start", "--web"],
   test: ["bun", "test"],
+  "test-release-policy": ["bun", "test", "__tests__/releaseChecks.test.ts"],
   "test-spoken-joined": ["bun", "test", "./__tests__/recordExchange.check.ts"],
   "test-spoken": ["bun", "test",
     "__tests__/recordTransition.test.ts",

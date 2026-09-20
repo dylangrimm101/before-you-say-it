@@ -19,3 +19,13 @@ Before rehearsal/onboarding work or a release-readiness claim, read
   to contain every token required by the implementation under test.
 - Testing policy does not grant deployment, live spending, production data access,
   or configuration-change authority. Obtain applicable approval first.
+- Run `bun run test:release` for rehearsal candidates, with the pinned external
+  renderer/backend fixtures and network denied. Missing prerequisites fail the
+  gate. Use `handoff/RELEASE-EVIDENCE-TEMPLATE.md` for every candidate; never turn
+  its pending provider/device entries green from an automated pass.
+- Reproduce each reported defect before fixing it, record the failing assertion
+  and passing rerun, then repeat the full three-track journey. If reproduction is
+  unavailable, label the proposed cause unverified. Keep unrelated edits out.
+- Bind the tested source to the uploaded artifact and confirm the installed
+  TestFlight build before asking the user to retest. A candidate may be uploaded
+  for device acceptance with approval; it is not fully accepted until that passes.

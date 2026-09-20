@@ -15,6 +15,8 @@
     "test": "bun scripts/run-client-command.ts test",
     "test:spoken": "bun scripts/run-client-command.ts test-spoken",
     "test:spoken-joined": "bun scripts/run-client-command.ts test-spoken-joined",
+    "test:release-policy": "bun scripts/run-client-command.ts test-release-policy",
+    "test:release": "bun scripts/run-release-checks.ts",
     "check": "bun scripts/run-client-command.ts check",
     "export": "bun scripts/run-client-command.ts export"
   },
