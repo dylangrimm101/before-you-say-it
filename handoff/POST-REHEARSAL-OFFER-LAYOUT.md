@@ -1,5 +1,36 @@
 # Post-rehearsal offer presentation — September 20, 2026
 
+## Build 31 submitted
+
+Uploaded source: `ef08a07c3760805d6a1e7bd9e22567d6ec1ef274`.
+EAS build `0f11238e-6a10-492f-b5d1-86935425f2c5` finished successfully at
+2026-09-20T12:48:00.950Z. Submission `c03d3e65-0e2d-48f4-835a-11b4a8fa1d2e`
+to existing App Store Connect app `6811494369` finished at
+2026-09-20T12:52:43.370Z. Apple processing/tester availability and physical-device
+acceptance are not independently confirmed.
+
+Committed-source validation: 102 selected tests passed (stack 1, billing/navigation
+19, spoken 27, connected spoken SQL 12, Auth/guest/privacy/owner isolation 43).
+Dependency verification and TypeScript/canonical lint passed; four pre-existing
+lint warnings remain. The three broader pre-existing assertion failures described
+below are not counted as passing.
+
+Archive: all 587 tracked files, 568 Expo files, exact source-byte comparison and
+zero extras. Manifest SHA-256:
+`39513037bdd845fc5cc5cac6823f7eb797fafa0ff62f130f54215252631a22d2`.
+IPA SHA-256: `ef1c709103a1c3d405db25e7b8ac33e342586acac5fc616098d97f1c4a69b0cd`.
+Deep/strict signature verification passed, same existing signing certificate and
+profile, version 1.0.0 / build 31, OTA disabled, all expected production public
+inputs present. New result-card-stack and offer-copy markers exist in the bundle.
+Static checks do not establish runtime phone behavior or StoreKit acceptance.
+
+Private release receipts:
+`/Users/dylangrimm/.local/share/bysi-recovery/build31-release-76QFZ1`.
+No backend deployment, production settings, new credentials, tester-group change,
+public App Store review, Git push or merge. Review was by Codex, not Claude.
+
+## Candidate preparation and earlier local checks
+
 Candidate on `codex/recovery-aug28-journey`, based on
 `897c00857b792a39db29d4a9c2989bb30700f389`. Not in the installed Build 30.
 Implementation: `feca2ccf9d073fa8d111074d1dfc36c9e3c6af0b`.
