@@ -5,6 +5,12 @@ import {spawnSync} from 'node:child_process';
 // ordinary mobile-only test discovery must not require private backend source.
 // Do not silently
 // skip the connected regression or download backend code into the mobile repo.
+for(const track of ['real','recurring','skill'])test(`provider failure retries through actual controls without duplicate work: ${track}`,()=>{
+  expect(process.env.BYSI_GUEST_BACKEND?.startsWith('/')).toBe(true);
+  const result=spawnSync(process.execPath,['--no-env-file','__tests__/recordExchange.fixture.ts','fresh',track,'continue',...(track==='real'?[]:['partner']),'native-timing','provider-failure'],{cwd:import.meta.dir+'/..',encoding:'utf8',timeout:120000});
+  expect({code:result.status,output:result.status?result.stdout+result.stderr:''}).toEqual({code:0,output:''});
+  expect(result.stdout).toContain('PASS connected Record exchange');
+},130000);
 for(const track of ['real','recurring','skill']){
   test(`connected spoken screen → transport → route → proof → SQL: ${track}`,()=>{
     expect(process.env.BYSI_GUEST_BACKEND?.startsWith('/')).toBe(true);

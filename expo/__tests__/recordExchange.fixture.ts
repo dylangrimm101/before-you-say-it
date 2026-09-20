@@ -69,7 +69,23 @@ plugin({name:'joined-record-exchange',setup(build){
     replace("return turn==='opener'?'Synthetic spoken opener, let us choose a task.':'Synthetic spoken reply, which one comes first?';", "return bridge.recording(turn);");
     replace("playbackCount++;options?.onPlaybackStart?.();", "await bridge.play(_text);playbackCount++;options?.onPlaybackStart?.();");
     replace("assert.equal(counterpartCalls,2);assert.equal(playbackCount,2);", `
-      if(process.argv.includes('mismatch')){
+      if(process.argv.includes('provider-failure')){
+        assert.equal(bridge.responses.at(-1).status,502);
+        assert.equal(bridge.responses.at(-1).code,'failed');
+        assert.equal(playbackCount,1);
+        assert.equal(bridge.transcriptionCount,2);
+        assert.ok(text().includes('502'));
+        assert.equal(store.activePracticeSession.freeRehearsalTurns[2].text,'Synthetic approved reply, can we choose the first task?');
+        const retry=root.root.findAllByType('button').find((n:any)=>n.props.accessibilityLabel==='Retry sending');
+        assert.ok(retry);
+        // Two taps before a render must admit only one provider retry.
+        await act(async()=>{await Promise.all([retry.props.onPress(),retry.props.onPress()]);});
+        await act(async()=>{await new Promise(r=>setTimeout(r,1800));});
+        assert.equal(counterpartCalls,3);
+        assert.equal(bridge.closeProviderCalls,2);
+        assert.equal(bridge.transcriptionCount,2,'retry must not require rerecording');
+        assert.equal(store.activePracticeSession.freeRehearsalTurns[2].text,'Synthetic approved reply, can we choose the first task?');
+      }else if(process.argv.includes('mismatch')){
         assert.equal(bridge.responses.at(-1).status,422);
         assert.equal(bridge.responses.at(-1).code,'unverified_exchange');
         assert.equal(playbackCount,1);

@@ -25,6 +25,7 @@ export async function recordExchangeBackend(){
   let audio:{text:string;role:string;turn:string}|null=null;
   let transcriptions=0;const responses:{operation:string;status:number;code?:string}[]=[];
   let injectedMismatch=false;
+  let closeProviderCalls=0;
   let firstContract:Record<string,unknown>|null=null;
   const previousFetch=globalThis.fetch;
   process.env.ANTHROPIC_API_KEY='synthetic';process.env.OPENAI_API_KEY='synthetic';process.env.ELEVENLABS_API_KEY='synthetic';
@@ -34,7 +35,12 @@ export async function recordExchangeBackend(){
     if(address.startsWith('https://api.elevenlabs.io/v1/text-to-speech/'))return new Response(new Uint8Array([73,68,51,1,2,3]),{headers:{'content-type':'audio/mpeg'}});
     assert.equal(address,'https://api.anthropic.com/v1/messages','Live network forbidden');
     const payload=JSON.parse(JSON.parse(String(init.body)).messages[0].content);
+    if(payload.turn==='close'){
+      closeProviderCalls++;
+      if(process.argv.includes('provider-failure')&&closeProviderCalls===1)return Response.json({error:{type:'overloaded_error'}},{status:503});
+    }
     const output=payload.turn?{mode:'turn',turn:payload.turn,role:'hope',text:payload.turn==='pushback'?'I still have my own tasks to finish. Which priority should wait?':'I already feel this is a one-sided problem. I am stretched with the client plan, but not now; I am not promising a whole system.',safety:null}:fixture();
+    if(process.argv.includes('provider-failure')&&payload.turn==='close')output.text='You make it sound like every chore falls on you, but I do plenty around here without being asked.';
     if(!payload.turn){
       output.pressure_moment.ask_quote=payload.transcript.user_turn_1;
       output.pressure_moment.pushback_quote=payload.transcript.counterpart_pushback;
@@ -79,7 +85,7 @@ export async function recordExchangeBackend(){
       if(op==='generate'&&response.ok&&body?.mode==='turn')audio={text:body.text,role:body.role,turn:body.turn};
       return response;
     }});
-  return {request:transport.request,responses,
+  return {request:transport.request,responses,get closeProviderCalls(){return closeProviderCalls;},get transcriptionCount(){return transcriptions;},
     async recording(turn:string){const form=new FormData();form.append('turn',turn);form.append('audio',new Blob([new Uint8Array([0,0,0,24,102,116,121,112,77,52,65,32,0,0,0,0])],{type:'audio/mp4'}),'synthetic.m4a');const r=await transport.request('transcribe',form);assert.equal(r.status,200);return (await r.json()).text;},
     async play(text:string){assert.ok(audio);assert.equal(text,audio.text);const r=await transport.request('tts',{text,role:audio.role});assert.equal(r.status,200);await r.arrayBuffer();},
     async close(){transport.dispose();globalThis.fetch=previousFetch;await db.close();}

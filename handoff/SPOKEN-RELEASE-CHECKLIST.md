@@ -1,7 +1,7 @@
 # Spoken-first release acceptance
 
 Speaking is the primary journey. Typing is a separately tested fallback, never a
-substitute for either gate below. An automated pass must not be described as a
+substitute for any gate below. An automated pass must not be described as a
 verified iPhone experience.
 
 ## 1. Automated gate — before an authorized TestFlight candidate
@@ -30,12 +30,38 @@ Recorder/player hardware and provider responses are simulated. Separate native
 audio-byte/playback tests and joined transport tests complement this coverage;
 none establishes physical-device success.
 
-Passing this gate means **candidate ready for authorized device testing**, not
-release accepted. Building/uploading still requires user authorization. A new
-TestFlight candidate may be needed to carry out gate 2; label it unverified until
+Passing this gate establishes automated coverage only, not real-provider or
+release acceptance. Complete gate 2 before claiming provider readiness.
+Building/uploading still requires user authorization. A new
+TestFlight candidate may be needed to carry out gate 3; label it unverified until
 those observations are complete.
 
-## 2. Real-iPhone gate — on the exact installed candidate
+## 2. Real-provider candidate gate — no preselected successful replies
+
+Required for changes affecting onboarding, rehearsal generation, transport,
+validation, recovery, playback, or result generation. Get authorization for
+bounded live provider usage first. Without access/approval, mark this gate pending;
+do not replace it with mocks or describe the release as fully verified.
+
+- Pin the mobile source/build, backend source manifest and configuration source.
+  Use an isolated database and synthetic conversations, never copied customer
+  content. Keep real provider credentials in the backend process, out of Expo,
+  reports, logs, and source control. Declare request/spend bounds and stop on them.
+- Complete each entry track through both real AI responses, both real audio
+  generations, approved final transcript and structured debrief. Decode the audio;
+  distinguish decodability from audible playback. Include the reported context and
+  varied natural wording, not only strings selected to satisfy validation regexes.
+- Record each step's status, failed stage, bounded diagnostic category, actual
+  request counts, and repairs/retries. Do not hide a failure by rerunning until green.
+- Label the environment precisely: local candidate with real providers is not
+  hosted Vercel, production Auth/SQL, physical recording, or iPhone playback.
+  List tested track/context combinations and limits; three routes in one context
+  do not cover every scenario. Never infer the old incident's cause from a pass.
+- For future rehearsals, retain reusable live-check tools in the private backend
+  test environment with pinned inputs and content-free receipts. Never put backend
+  credentials or private backend code in this mobile repository.
+
+## 3. Real-iPhone gate — on the exact installed candidate
 
 Record installed version/build, source/artifact binding, iPhone model, iOS version,
 tester, date/time with timezone, network, selected track and context. Do not collect
@@ -78,6 +104,8 @@ on the new candidate.
 ## Acceptance wording
 
 - Automated only: “Automated spoken-flow checks passed; iPhone acceptance pending.”
+- Real providers in isolation: explicitly name the candidate, tested track/context
+  combinations, generation/audio/result steps, and remaining hosted/device gaps.
 - Phone partially tested: list exactly which tracks/steps passed; keep the rest pending.
 - Accepted: all three complete spoken journeys and interruption checks passed on
   the identified candidate, with remaining issues explicitly recorded.
@@ -98,3 +126,26 @@ claim that the exact phone-side mutation has been identified. A synthetic wire
 mismatch must STILL be rejected; never make this test pass by relaxing server
 verification. Test helpers must wait for enabled controls and navigation, not
 assume reduced-motion transitions or synchronous storage.
+
+## Failure, retry, and evidence requirements
+
+The connected suite must also force a provider failure at the second response,
+assert the actual error/Retry control, press Retry twice before a rerender, and
+verify one retry, unchanged approved reply, no extra recording/transcription,
+both playback points, final approval and debrief on every track. A retry returning
+200 alone is insufficient. Backend tests additionally cover timeout, malformed
+provider output, validation rejection, unchanged checkpoints, and replay without
+another provider charge. Keep proof/owner rejection tests intact.
+
+For every release, attach a compact matrix with columns: failure or journey,
+source/build/backend pin, test layer, mocked boundaries, result, evidence, and
+remaining acceptance. Keep automatic success fixtures, failure injection, real
+provider output, hosted runtime, and physical-device results separate. All green
+local tests cannot close an untested hosted/device step. If diagnostics cannot
+distinguish causes, improve allowlisted diagnostics before claiming a root cause;
+do not log conversations, keys, tokens, proofs, or account identifiers.
+
+September 2026 lesson: success-only generated replies concealed a mandatory-word
+validation defect. The 422 context mismatch and later 502 were separate observed
+failures; correcting one was not evidence that the complete flow worked. Treat
+newly reached downstream failures as unresolved, not as acceptance of the release.

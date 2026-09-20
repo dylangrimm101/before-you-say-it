@@ -3,6 +3,11 @@
 ## Required spoken-flow gate (added September 19, 2026)
 
 Use [SPOKEN-RELEASE-CHECKLIST.md](SPOKEN-RELEASE-CHECKLIST.md) for new candidates.
+It now requires separate automated failure/retry, real-provider candidate, and
+physical-iPhone gates. Preselected successful AI replies cannot satisfy the
+real-provider gate. Run `bun run test:spoken-joined` against the pinned reviewed
+backend for all-track second-response failure, duplicate-tap retry, and completion
+regressions. Live provider runs require explicit authorization and bounded usage.
 From `expo/`, run `bun run test:spoken` with the pinned component-test dependencies,
 then `bun run check` and the applicable broader regression/integration suites.
 The spoken command uses the existing environment-sanitizing launcher. It exercises
