@@ -165,7 +165,7 @@ export default function RehearseRoute() {
 }
 
 function LegacyRehearse() {
-  const {isGuestVisit,endGuestVisit}=useAuth();
+  const {isGuestVisit,endGuestVisit,practiceOwner}=useAuth();
   const params = useLocalSearchParams<{
     id: string;
     difficulty?: Difficulty;
@@ -241,6 +241,22 @@ function LegacyRehearse() {
   );
   const [stream, setStream] = useState<string>("");
   const recoveryRequired=normalFreeRecoveryEnabled&&params.entry==='onboarding';
+  // The server signs the original briefing, not a later reconstruction from UI
+  // state. Keep its exact JSON value in memory for this owner + rehearsal only.
+  const contractBinding = `${practiceOwner?.key ?? 'unbound'}:${params.practiceSessionId ?? ''}`;
+  const pinnedContract = useRef<{binding:string;value:Record<string,unknown>} | null>(null);
+  const readProofContract = useCallback(() =>
+    pinnedContract.current?.binding === contractBinding
+      ? pinnedContract.current.value
+      : authoritativeNormalFreeContract(matchingOnboardingSession),
+  [contractBinding, matchingOnboardingSession]);
+  const pinProofContract = useCallback((contract:Record<string,unknown>) => {
+    if (pinnedContract.current?.binding !== contractBinding) {
+      // Same JSON snapshot as transport; no trimming, normalization or persistence.
+      pinnedContract.current = {binding:contractBinding,value:JSON.parse(JSON.stringify(contract))};
+    }
+    return pinnedContract.current.value;
+  }, [contractBinding]);
   // This flag identifies the instantiated normal /api/native/free transport on
   // this onboarding route, not the server's RPC selector. Its exchange proof
   // binds already-approved turns. Other routes/legacy transports keep editing.
@@ -282,6 +298,7 @@ function LegacyRehearse() {
   const [reviewingPendingTranscript, setReviewingPendingTranscript] = useState<boolean>(false);
   /** Set when a counterpart turn could not be produced and can be retried. */
   const [canRetry, setCanRetry] = useState<boolean>(false);
+  const [verifyBeforeRetry, setVerifyBeforeRetry] = useState(false);
   /** Guards against a second submission while one turn is in flight. */
   const busy = useRef<boolean>(false);
   /** Synchronous guard: two taps can precede the disabled-button render. */
@@ -472,6 +489,7 @@ function LegacyRehearse() {
       if (!scenario) return;
       setError("");
       setCanRetry(false);
+      setVerifyBeforeRetry(false);
       setThinking(true);
       try {
         const res = await nextCounterpartTurn(
@@ -483,7 +501,9 @@ function LegacyRehearse() {
           persona,
           activePracticeSession?.entryRoute,
           false,
-          authoritativeNormalFreeContract(activePracticeSession),
+          recoveryRequired
+            ? pinProofContract(readProofContract() ?? {...bysiContract(scenario,reaction,outcome,activePracticeSession?.entryRoute,difficulty)})
+            : authoritativeNormalFreeContract(activePracticeSession),
         );
         if(!screenLive.current)return;
         const userTurnCount = history.filter((turn) => turn.role === "user").length;
@@ -517,11 +537,12 @@ function LegacyRehearse() {
         // Never invent a reply on the client — offer the turn again instead.
         setError(e instanceof FreeAcquisitionRequestError ? e.message : turnFailureMessage(themName));
         setCanRetry(e instanceof FreeAcquisitionRequestError ? e.retryable : true);
+        setVerifyBeforeRetry(recoveryRequired && e instanceof FreeAcquisitionRequestError && e.code === 'unverified_exchange');
       } finally {
         busy.current = false;
       }
     },
-    [scenario, difficulty, reaction, outcome, reveal, persona, themName, activePracticeSession, router, recoveryRequired],
+    [scenario, difficulty, reaction, outcome, reveal, persona, themName, activePracticeSession, router, recoveryRequired, pinProofContract, readProofContract],
   );
 
   /** Commit the user's reviewed line. Only an explicit submit advances a turn. */
@@ -554,12 +575,39 @@ function LegacyRehearse() {
     [scenario, thinking, turns, generateCounterpart, hasReachedTurnCap, activePracticeSession, params.entry, params.practiceSessionId, saveActivePracticeSession],
   );
 
-  const retryTurn = useCallback(() => {
+  const retryTurn = useCallback(async () => {
     if (busy.current || thinking) return;
     busy.current = true;
     tap("light");
-    generateCounterpart(turns);
-  }, [thinking, turns, generateCounterpart]);
+    const recoveryEpoch = recoverySerial.current;
+    try {
+      if (verifyBeforeRetry) {
+        setThinking(true);
+        // A 422 is not a provider outage. Verify the exact earlier exchange and
+        // refresh an expired proof through the existing server protocol before
+        // spending another generation attempt. Never replace the user's reply.
+        if (!scenario || turns.length !== 3) return;
+        const response = await requestNormalFree('recover', {
+          contract: readProofContract() ?? normalFreeRecoveryContract(scenario, reaction, outcome, activePracticeSession?.entryRoute, difficulty),
+          transcript: normalFreeRecoveryTranscript(turns, scenario),
+        });
+        if (!screenLive.current) return;
+        const state: RecoveryState = await response.json();
+        if (!screenLive.current || recoveryEpoch !== recoverySerial.current) return;
+        const restored = applyRecovery(state, turns);
+        if (!response.ok || state.status !== 'resume' || state.phase !== 'pushback' || state.proofFresh !== true || !restored.ready || JSON.stringify(restored.turns) !== JSON.stringify(turns)) {
+          setError('Your reply is still here, but the earlier conversation could not be verified. [R-EXCHANGE]');
+          return;
+        }
+      }
+      await generateCounterpart(turns);
+    } catch {
+      if (screenLive.current) setError('Your reply is still here. The conversation check could not finish; try again. [R-CHECK]');
+    } finally {
+      busy.current = false;
+      if (screenLive.current) setThinking(false);
+    }
+  }, [thinking, turns, generateCounterpart, verifyBeforeRetry, scenario, activePracticeSession, reaction, outcome, difficulty, readProofContract]);
 
   const send = useCallback(() => {
     const text = draft.trim();
@@ -725,7 +773,7 @@ function LegacyRehearse() {
         outcome,
         activePracticeSession?.entryRoute,
         false,
-        authoritativeNormalFreeContract(activePracticeSession),
+        recoveryRequired ? readProofContract() : authoritativeNormalFreeContract(activePracticeSession),
       );
       const { analysis, debrief } = generated;
       if (!isConversionBuildActive(id)) return;
@@ -837,7 +885,7 @@ function LegacyRehearse() {
         retry:caught instanceof FreeAcquisitionRequestError && !caught.retryable ? undefined : async()=>{await analyzeApprovedTranscript(approvedTurns);},
       } : undefined);
     }
-  }, [scenario, difficulty, reaction, outcome, upsertSession, router, challengeDay, markChallengeDayDone, persona, themName, params.entry, activePracticeSession, saveActivePracticeSession, saveScoredPracticeRecord, saveCurrentGuestAssessment]);
+  }, [scenario, difficulty, reaction, outcome, upsertSession, router, challengeDay, markChallengeDayDone, persona, themName, params.entry, activePracticeSession, saveActivePracticeSession, saveScoredPracticeRecord, saveCurrentGuestAssessment, recoveryRequired, readProofContract]);
 
   const openTranscriptReview = useCallback((): void => {
     const userTurns = turns.filter((turn) => turn.role === "user");
@@ -960,7 +1008,7 @@ function LegacyRehearse() {
     const localSession=matchingOnboardingSession;
     const serial=++recoverySerial.current;setRecoveryBusy(true);
     try{
-      const localContract=authoritativeNormalFreeContract(localSession);
+      const localContract=readProofContract();
       const hasLocalWords=Boolean(localSession&&turns.some(turn=>turn.text.trim().length>0));
       const recoveryPayloadScenario=localContract?scenario:verifiableRouteScenario;
       const response=await requestNormalFree('recover',hasLocalWords&&recoveryPayloadScenario?{contract:localContract??normalFreeRecoveryContract(recoveryPayloadScenario,reaction,outcome,localSession!.entryRoute,difficulty),transcript:normalFreeRecoveryTranscript(turns,recoveryPayloadScenario)}:{});
@@ -969,6 +1017,10 @@ function LegacyRehearse() {
       const state:RecoveryState=await response.json();const localTurns=localSession?turns:[];const restored=applyRecovery(state,localTurns);
       setRecoveryState(state);
       if(!restored.ready){setRecoveryCode(state.recordingLimited?'R-RECORDING':state.status==='resume'?'R-TURNS':recoveryDiagnostic(state.status));setRecoveryReady(false);return false;}
+      const verifiedContract=state.checkpoint?.contract;
+      if(state.status==='resume'&&verifiedContract&&typeof verifiedContract==='object'&&!Array.isArray(verifiedContract)){
+        pinProofContract(verifiedContract as Record<string,unknown>);
+      }
       // Privacy placeholders are display-only, including storage written by older clients.
       // Ask the server first: a committed checkpoint can restore the exact original.
       if(!state.checkpoint && !localContract && (!scenario || scenario.situation==='Private custom scenario')){
@@ -989,7 +1041,7 @@ function LegacyRehearse() {
           behavioralGoal:recoveryScenario.goal,
           persona,
         });
-        const nextContract=authoritativeNormalFreeContract(session)??(state.checkpoint?.contract as Record<string,unknown>|undefined);
+        const nextContract=readProofContract()??authoritativeNormalFreeContract(session)??(state.checkpoint?.contract as Record<string,unknown>|undefined);
         recoveryPublishedContract.current=nextContract;
         await saveActivePracticeSession({...session,freeRehearsalTurns:restored.turns,freeJourneyCheckpoint:'rehearsal',normalFreeContract:nextContract,normalFreeCheckpointRevision:state.checkpoint?.revision,normalFreeCheckpointPhase:state.phase,updatedAt:Date.now()});
         if(serial!==recoverySerial.current)return false;
@@ -1195,6 +1247,7 @@ function LegacyRehearse() {
           : null,
     analyzing: audioBusy,
     generating: speech.phase === "generating",
+    responseError: error || null,
     ready: isRepReadyForAnalysis,
   });
 
@@ -1279,16 +1332,6 @@ function LegacyRehearse() {
               streaming
             />
           ) : null}
-          {(thinking || (audioBusy && stream.length === 0)) ? (
-            <View style={styles.themWrap} accessibilityLiveRegion="polite">
-              <Text style={styles.speaker}>{themName}</Text>
-              <View style={[styles.bubble, styles.themBubble, styles.activityBubble]}>
-                <Thinking />
-                <Text style={styles.activityText}>{speech.phase === "speaking" ? `${themName} is speaking…` : `${themName} is thinking…`}</Text>
-              </View>
-            </View>
-          ) : null}
-
           {error.length > 0 && !canRetry ? (
             <View style={styles.errorBox}>
               <Text style={styles.errorText}>{error}</Text>
@@ -1316,12 +1359,12 @@ function LegacyRehearse() {
             <View style={styles.recoveryRow}>
               <PressCard
                 onPress={canRetry ? retryTurn : () => router.replace('/(tabs)')}
-                containerStyle={styles.flexWide}
-                accessibilityLabel={canRetry ? 'Retry sending' : 'Back to today'}
+                containerStyle={styles.recoveryAction}
+                accessibilityLabel={canRetry ? verifyBeforeRetry ? 'Check and retry' : 'Retry sending' : 'Back to today'}
               >
                 <View style={styles.analyzeBtn}>
                   <RotateCcw size={18} color={C.onAccent} strokeWidth={1.7} />
-                  <Text style={styles.analyzeText}>{canRetry ? 'Retry sending' : 'Back to today'}</Text>
+                  <Text style={styles.analyzeText}>{canRetry ? verifyBeforeRetry ? 'Check and retry' : 'Retry sending' : 'Back to today'}</Text>
                 </View>
               </PressCard>
             </View>
@@ -1594,6 +1637,7 @@ interface DockHints {
   dictation: string | null;
   analyzing: boolean;
   generating: boolean;
+  responseError: string | null;
   /** False while the counterpart's closing response is still arriving. */
   ready: boolean;
 }
@@ -1646,7 +1690,7 @@ const DOCK_COPY: Record<
   }),
   "response-unavailable": (_them, _counterpart, h) => ({
     label: "Response unavailable",
-    help: h.dictation ?? "Your line is safe. The practice service didn't answer, so you can retry without saying it again.",
+    help: h.responseError ?? h.dictation ?? "Your line is still here. Try sending it again without recording it again.",
   }),
   "mic-blocked": () => ({
     label: "Microphone access is off.",
@@ -1892,8 +1936,6 @@ const styles = StyleSheet.create({
   mineText: { ...T.body, color: C.onAccent, lineHeight: 24 },
   beat: { ...T.caption, color: C.textDim, fontStyle: "italic", marginBottom: 5 },
   mineBeat: { color: "rgba(255,255,255,0.76)" },
-  activityBubble: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
-  activityText: { ...T.caption, color: C.textSoft },
   nudge: {
     borderLeftWidth: 2,
     borderLeftColor: C.amber,
@@ -1963,6 +2005,7 @@ const styles = StyleSheet.create({
   completeWaiting: { minHeight: 52, alignItems: "center", justifyContent: "center", marginTop: 12 },
   completeActions: { gap: 10, marginTop: 12 },
   recoveryRow: { marginTop: 12 },
+  recoveryAction: { width: "100%", minHeight: 52, flexShrink: 0 },
   composeWrap: { gap: 12, marginTop: 10 },
   composeLabel: { ...eyebrow, color: C.purple },
   composeInput: {
