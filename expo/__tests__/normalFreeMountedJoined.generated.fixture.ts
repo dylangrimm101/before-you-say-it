@@ -133,7 +133,7 @@ try{
  params={id:runId};await mount(Debrief);
  if(outputMode!=='insufficient'){
   assert.ok(text().includes('You asked for a task.'));assert.ok(store.activePracticeSession.sharedResult);
-  await press('See what changes with practice');await press('See the practice plan');await press('Review monthly subscription');assert.equal(route.pathname,'/paywall');
+  await press('See what changes with practice');await press('See the practice plan');await press('See my practice plan');assert.equal(route.pathname,'/paywall');
  }else{assert.ok(text().includes('Synthetic insufficient evidence'));assert.equal(store.activePracticeSession.sharedResult,undefined);assert.equal(store.scoredPracticeHistory.length,0);await press('Back to today');}
  await db.exec('reset role');assert.equal((await db.query('select count(*)::int n from bysi_native_free.session')).rows[0].n,1);assert.deepEqual(seenOperations,outputMode==='recovery'?['session','generate','generate','generate','generate']:['session','generate','generate','generate']);
  console.log('PASS JOINED ACTUAL Auth SDK + mounted Auth/Store/onboarding/rehearsal/debrief + Next mounts + restricted SQL + private producer; '+outputMode+'; synthetic Auth/provider/native hosts, typed-first, no live/device claims');

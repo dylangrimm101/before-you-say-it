@@ -1,10 +1,10 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Check, RefreshCw, Sparkles } from "lucide-react-native";
+import { Check, RefreshCw } from "lucide-react-native";
 import React from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Backdrop, Eyebrow, GlassCard, GhostButton, PrimaryButton, Reveal, StateDock } from "@/components/ui";
+import { Backdrop, GlassCard, GhostButton, PrimaryButton, Reveal, StateDock } from "@/components/ui";
 import { curriculumModule, type ModuleId } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { nextLaunchDeck } from "@/lib/launchCurriculum";
@@ -58,16 +58,20 @@ export default function PurchaseSuccess() {
     <View style={styles.root}>
       <Backdrop />
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 42, paddingBottom: insets.bottom + 170 }]} showsVerticalScrollIndicator={false}>
-        <Reveal><View style={styles.check}><Check size={27} color={C.onAccent} strokeWidth={2.8} /></View><Eyebrow color={C.sage} style={styles.confirmed}>Subscription active · Purchased</Eyebrow><Text style={styles.title}>{continuity.hasPersonalizedStart ? "Your first practice is ready." : "One short starting step comes next."}</Text><Text style={styles.body}>{continuity.hasPersonalizedStart ? "Your free rehearsal result, Starting Index, and first focus carried over. Nothing to redo." : "Your purchase is active and your completed free work is preserved. We need one evidence-backed focus before choosing a paid module."}</Text></Reveal>
+        <Reveal>
+          <View style={styles.check}><Check size={32} color={C.onAccent} strokeWidth={2.8} /></View>
+          <Text style={styles.title}>You’re in.</Text>
+          <Text style={styles.body}>{continuity.hasPersonalizedStart
+            ? "Your rehearsal, Starting Index, and first focus are ready. Nothing to redo."
+            : "Your subscription is active. Continue to your saved result to finish choosing your first focus."}</Text>
+        </Reveal>
         <Reveal index={1}>
           <GlassCard style={styles.continuity}>
-            <Text style={styles.cardLabel}>YOUR CARRIED-OVER START</Text>
-            <View style={styles.indexRow}><Text style={styles.indexValue}>{continuity.indexValue ?? "—"}</Text><View style={styles.indexCopy}><Text style={styles.indexLabel}>PARTIAL INDEX</Text><Text style={styles.indexMeta}>{continuity.indexValue !== null ? `${continuity.observedCount} of 6 signals observed` : "Insufficient evidence for an Index"}</Text></View></View>
-            <View style={styles.rule} />
-            <View style={styles.focusRow}><Sparkles size={18} color={C.purple} /><View style={styles.focusCopy}><Text style={styles.focusLabel}>FIRST FOCUS · Recommended starting module</Text><Text style={styles.focusValue}>{continuity.firstFocusLabel ?? "Your first focus is not available yet."}</Text></View></View>
+            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Partial Index</Text><Text style={styles.summaryValue}>{continuity.indexValue ?? "Not yet available"}</Text></View>
+            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Signals observed</Text><Text style={styles.summaryValue}>{continuity.observedCount} of 6</Text></View>
+            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>First focus</Text><Text style={styles.summaryValue}>{continuity.firstFocusLabel ?? "Complete your starting step"}</Text></View>
           </GlassCard>
         </Reveal>
-        <Reveal index={2}><View style={styles.truth}><Text style={styles.truthTitle}>{continuity.hasPersonalizedStart ? "Your free result is preserved" : "No repurchase needed"}</Text><Text style={styles.truthBody}>{continuity.hasPersonalizedStart ? "Paid-practice history begins now. No practice record was fabricated by purchase." : "Return to your existing result for the missing focus step. You will not be asked to buy again or repeat approved free work."}</Text></View></Reveal>
       </ScrollView>
       <StateDock bottomInset={insets.bottom}><PrimaryButton label={continuity.hasPersonalizedStart ? "Start my first practice" : "Complete my starting step"} disabled={params.gate !== "another-rehearsal" && !nextDeck && !continuity.recoveryDestination} onPress={openNextStep} /><Text style={styles.moduleNote}>{nextDeck ? `Continues with ${nextDeck.replace(/-/g, " ").toUpperCase()}` : module ? `Recommended focus: ${module.name}` : "Uses your preserved result to establish an evidence-backed first focus."}</Text></StateDock>
     </View>
@@ -75,10 +79,11 @@ export default function PurchaseSuccess() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg }, center: { padding: GUTTER, alignItems: "center", justifyContent: "center" }, content: { paddingHorizontal: GUTTER },
-  check: { width: 58, height: 58, borderRadius: 29, backgroundColor: C.purple, alignItems: "center", justifyContent: "center" }, confirmed: { marginTop: 22 },
+  root: { flex: 1, backgroundColor: C.bg }, center: { padding: GUTTER, alignItems: "center", justifyContent: "center" }, content: { flexGrow: 1, justifyContent: "center", paddingHorizontal: GUTTER },
+  check: { width: 64, height: 64, borderRadius: 32, backgroundColor: C.purple, alignItems: "center", justifyContent: "center" }, confirmed: { marginTop: 22 },
   title: { ...T.display, marginTop: 10 }, body: { ...T.body, color: C.textSoft, marginTop: 14 }, centerBody: { ...T.body, color: C.textSoft, textAlign: "center", marginTop: 14 }, fullButton: { width: "100%", marginTop: 26 }, secondary: { width: "100%", marginTop: 10 },
   continuity: { padding: 22, borderRadius: radius.lg, marginTop: 30 }, cardLabel: { ...eyebrow, color: C.dim }, indexRow: { flexDirection: "row", alignItems: "center", gap: 18, marginTop: 18 }, indexValue: { fontFamily: font.semi, fontSize: 48, lineHeight: 54, color: C.purple }, indexCopy: { flex: 1 }, indexLabel: { ...eyebrow, color: C.purple }, indexMeta: { ...T.caption, marginTop: 5 }, rule: { height: StyleSheet.hairlineWidth, backgroundColor: C.line, marginVertical: 20 },
   focusRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" }, focusCopy: { flex: 1 }, focusLabel: { ...eyebrow, color: C.purple }, focusValue: { ...T.title, fontSize: 18, lineHeight: 24, marginTop: 5 },
+  summaryRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 12, marginVertical: 8 }, summaryLabel: { ...T.body, color: C.textSoft }, summaryValue: { ...T.body, fontFamily: font.semi, color: C.text, flexShrink: 1, textAlign: "right" },
   truth: { marginTop: 18, paddingHorizontal: 4 }, truthTitle: { ...T.support, fontFamily: font.semi, color: C.text }, truthBody: { ...T.caption, marginTop: 4 }, moduleNote: { ...T.caption, textAlign: "center", marginTop: 8 },
 });

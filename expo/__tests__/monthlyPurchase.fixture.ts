@@ -103,7 +103,7 @@ for(const line of ['Synthetic opener: can we agree who owns the handoff?','Synth
  await act(async()=>root.root.findAllByType('input').find((i:any)=>i.props.accessibilityLabel==='Type your line').props.onChangeText(line));await press('Send your line');
 }
 await press('Review complete transcript');await press('Approve transcript');
-params={id:rehearsalId};await mount(Debrief);await press('See what changes with practice');await press('See the practice plan');await press('Review monthly subscription');
+params={id:rehearsalId};await mount(Debrief);await press('See what changes with practice');await press('See the practice plan');await press('See my practice plan');
 params={...route.params};
 const {default:Paywall}=await import('../app/paywall');
 await mount(Paywall);await act(async()=>{await new Promise(r=>setTimeout(r,30));});

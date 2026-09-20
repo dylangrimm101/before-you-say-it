@@ -14,7 +14,7 @@ mock.module('react-native', () => ({ View: Host, Text: Host, ScrollView: Host, A
 mock.module('react-native-svg', () => ({ default: Host, Circle: Host, Path: Host }));
 mock.module('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 59, bottom: 34 }) }));
 mock.module('lucide-react-native', () => Object.fromEntries(['ArrowLeft','AlertCircle','Check','ChevronDown','Clock3','RefreshCw','ShieldCheck'].map(k => [k, () => null])));
-mock.module('@/components/ui', () => ({ Backdrop: () => null, Eyebrow: Host, GlassCard: Host, PressCard: Button, PrimaryButton: Button, Reveal: Host, StateDock: Host, tap() {}, useReducedMotion: () => true }));
+mock.module('@/components/ui', () => ({ Backdrop: () => null, Eyebrow: Host, GlassCard: Host, PressCard: Button, PrimaryButton: Button, GhostButton: Button, Reveal: Host, StateDock: Host, tap() {}, useReducedMotion: () => true }));
 mock.module('@/lib/nativeBillingRuntime', () => ({ normalBillingEnabled: true }));
 mock.module('@/lib/useStagingWebBridgeState', () => ({ useStagingWebBridgeState: () => null }));
 mock.module('@/lib/stagingWebBridge', () => ({ stagingPurchasePresentation: () => null }));
@@ -24,7 +24,7 @@ const history: any[] = [];
 const route = (r: any) => { path = typeof r === 'string' ? r : r.pathname; params = typeof r === 'string' ? {} : r.params ?? {}; key++; };
 const router = { push(r: any) { history.push({ pathname: path, params }); route(r); }, replace: route, canGoBack: () => history.length > 0, back() { route(history.pop() ?? '/entry'); } };
 mock.module('expo-router', () => ({ useRouter: () => router, useLocalSearchParams: () => params }));
-const completed = () => ({ id: 'synthetic-result', freeJourneyCheckpoint: 'complete', postRehearsalState: 'pay1', sharedResult: { pressure_moment: {}, practice_shift: {}, starting_index: { focus_dimension: 'Specificity' }, first_focus: { recommended_module_id: 'make_a_clear_ask' } } });
+const completed = () => ({ id: 'synthetic-result', turns: [], freeJourneyCheckpoint: 'complete', postRehearsalState: 'pay1', sharedResult: { signals: [], pressure_moment: { headline: 'Synthetic starting point' }, practice_shift: {}, starting_index: { focus_dimension: 'Specificity', index_value: null, observed_count: 0 }, first_focus: { recommended_module_id: 'make_a_clear_ask', first_focus_label: 'Make a clear ask' } } });
 let activePracticeSession: any = completed();
 activePracticeSession.freeJourneyCheckpoint = 'practice_shift'; activePracticeSession.postRehearsalState = 'shift';
 let hasCurrentGuestPractice = true;
@@ -34,23 +34,25 @@ const login = async () => { logins++; if (loginMode === 'failed') return { succe
 mock.module('@/providers/auth', () => ({ useAuth: () => ({ user, session: user ? { user } : { user: { is_anonymous: true } }, isAuthConfigured: true, hasCurrentGuestPractice, login, cancelLogin() {} }) }));
 mock.module('@/lib/supabase', () => ({ authEnvironment: { staging: false }, supabase: { auth: { signUp: async () => { signups++; return { error: null }; } } } }));
 const saveActivePracticeSession = async (next: any) => { activePracticeSession = next; };
-mock.module('@/providers/store', () => ({ useStore: () => ({ activePracticeSession, convertedLessonProgress: [], moduleCloseProgress: [], saveActivePracticeSession }) }));
+mock.module('@/providers/store', () => ({ useStore: () => ({ activePracticeSession, convertedLessonProgress: [], moduleCloseProgress: [], sessions: [], pilotProgress: [], saveActivePracticeSession }) }));
 let catalog = true;
+let purchaseStatus = 'cancelled';
 const product = { identifier: 'byis_pro_monthly_5', priceString: '$7.49', price: 7.49, currencyCode: 'USD', subscriptionPeriod: 'P1M' };
 const offer = { identifier: '$rc_monthly', product };
 mock.module('@/lib/purchases', () => ({
   useNativeServerAccess: () => access,
   useOfferings: () => ({ data: { current: { monthly: catalog ? offer : null } }, isLoading: false }),
-  usePurchasePackage: () => ({ isPending: false, mutateAsync: async () => { assert.ok(user); purchases++; return { status: 'cancelled' }; } }),
+  usePurchasePackage: () => ({ isPending: false, mutateAsync: async () => { assert.ok(user); purchases++; if(purchaseStatus === 'purchased') access.data = true; return { status: purchaseStatus }; } }),
   useRestorePurchases: () => ({ isPending: false, mutateAsync: async () => { assert.ok(user); restores++; return false; } }),
-  useCustomerInfo: () => ({ data: null, refetch: async () => {} }), hasPro: () => false,
+  useCustomerInfo: () => ({ data: null, refetch: async () => {} }), hasPro: () => false, useIsPro: () => access.data === true,
 }));
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 const { default: Paywall } = await import('../app/paywall');
 const { default: Login } = await import('../app/continue-from-web');
+const { default: Success } = await import('../app/purchase-success');
 const { FreeJourneyResults } = await import('../components/FreeJourneyResults');
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-const app = () => <QueryClientProvider client={client}>{path === '/practice-plan' ? <FreeJourneyResults session={activePracticeSession} /> : path === '/paywall' ? <Paywall key={key} /> : path === '/continue-from-web' ? <Login key={key} /> : <Host>{path}</Host>}</QueryClientProvider>;
+const app = () => <QueryClientProvider client={client}>{path === '/practice-plan' ? <FreeJourneyResults session={activePracticeSession} /> : path === '/paywall' ? <Paywall key={key} /> : path === '/continue-from-web' ? <Login key={key} /> : path === '/purchase-success' ? <Success key={key} /> : <Host>{path}</Host>}</QueryClientProvider>;
 const render = async () => { await act(async () => { if (root) root.update(app()); else root = create(app()); }); };
 const text = () => JSON.stringify(root.toJSON());
 const button = (label: string) => root.root.findAllByType('button').find((b: any) => b.props.label === label || b.props.accessibilityLabel === label);
@@ -60,7 +62,12 @@ async function terms() { await press('Continue'); await press('Continue'); asser
 async function reset() { await act(async () => root?.unmount()); root = null; client.clear(); user = null; activePracticeSession = completed(); hasCurrentGuestPractice = true; access = { ...access, data: false, isError: false, isFetching: false, isPending: false }; params = { source: 'debrief' }; path = '/paywall'; key++; loginMode = 'success'; catalog = true; await render(); }
 
 await render();
-await press('Review monthly subscription'); assert.equal(path, '/paywall'); assert.equal(params.source, 'debrief');
+assert.ok(root.root.findAllByProps({ testID: 'result-card-stack' }).length);
+assert.ok(text().includes('Where you are now'));
+assert.ok(button('See my practice plan'));
+await press('Back'); assert.ok(text().includes('Here’s what practice is helping you say'));
+await press('See the practice plan'); assert.ok(button('See my practice plan'));
+await press('See my practice plan'); assert.equal(path, '/paywall'); assert.equal(params.source, 'debrief');
 assert.ok(!text().includes('Log in to verify purchases before viewing'));
 assert.ok(text().includes('$7.49'), 'first offer screen shows the supplied localized monthly price');
 await terms();
@@ -78,6 +85,15 @@ await press('I have not subscribed — view Apple offer');
 assert.ok(button('Subscribe monthly')); assert.equal(button('Continue'), undefined, 'return directly to terms, not onboarding');
 assert.equal(purchases, 0, 'login never auto-purchases');
 await press('Subscribe monthly'); assert.equal(purchases, 1); assert.equal(path, '/paywall', 'cancelled purchase stays on offer');
+// Synthetic owner-scoped result hydration; never copy the guest object on login.
+activePracticeSession = completed();
+activePracticeSession.sharedResult.starting_index = { index_value: 61, observed_count: 4, focus_dimension: 'specificity' };
+purchaseStatus = 'purchased';
+await press('Try again'); assert.equal(path, '/purchase-success');
+assert.ok(text().includes('You’re in.')); assert.ok(text().includes('61'));
+assert.ok(!root.root.findAllByType('view').some((n: any) => n.props.children === 64), 'reference screenshot score is not hardcoded');
+await press('Start my first practice'); assert.equal(path, '/approved-lesson/[lessonId]');
+purchaseStatus = 'cancelled';
 purchases = 0;
 
 await reset(); await terms(); await press('Restore purchases');

@@ -897,7 +897,7 @@ async function completeGuestJourney() {
   mark("result: authentic saved result finalized from approved spoken transcript");
   await press("See what changes with practice");
   await press("See the practice plan");
-  await press("Review monthly subscription");
+  await press("See my practice plan");
   assert.equal(routePath(), "/paywall");
   assert.ok(!text().includes("Log in to verify purchases before viewing an Apple offer."));
   await press("Continue");
@@ -1042,7 +1042,7 @@ async function signupFromPaywall() {
 }
 
 async function loggedInPaywall() {
-  await press("Review monthly subscription");
+  await press("See my practice plan");
   assert.equal(routePath(), "/paywall");
   await waitForControl("Restore existing Apple purchase");
 }

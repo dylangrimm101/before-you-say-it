@@ -195,7 +195,7 @@ assert.equal(route.params.practiceSessionId,guestRunId,'retry preserves the actu
  params={id:guestRunId};await mount(Debrief);
  assert.ok(text().includes(syntheticGenerated.debrief.headline),'positive result must display exact generated headline, not authored judgment');
  await press('See what changes with practice');assert.ok(text().includes(syntheticGenerated.debrief.script[0]));
- await press('See the practice plan');await press('Review monthly subscription');assert.equal((route as any).pathname,'/paywall');
+ await press('See the practice plan');await press('See my practice plan');assert.equal((route as any).pathname,'/paywall');
  params={...(route as any).params};const {default:Paywall}=await import('../app/paywall');await mount(Paywall);
  await press('Close offer. Keep my free debrief for now');assert.equal(route,'BACK');
  assert.deepEqual(store.activePracticeSession.sharedResult,exact);

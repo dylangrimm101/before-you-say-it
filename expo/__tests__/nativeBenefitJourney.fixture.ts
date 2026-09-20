@@ -206,7 +206,7 @@ try{
  await go({pathname:'/debrief/[id]',params:{id:runId}});
  assert.ok(text().includes('You asked for a task.'));assert.ok(store.activePracticeSession.sharedResult);
  assert.equal(account.session.user.id,guestUser.id);assert.equal(account.user,null);
- await press('See what changes with practice');await press('See the practice plan');await press('Review monthly subscription');
+ await press('See what changes with practice');await press('See the practice plan');await press('See my practice plan');
  await press('Continue');await press('Continue');await press('Restore purchases');
  await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});
  await press('Sign in to save this result and continue');await flush();await flush();
