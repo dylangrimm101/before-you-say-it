@@ -1,5 +1,32 @@
 # Guest subscription preview correction — local candidate
 
+## Build 30 submitted — September 20, 2026 UTC
+
+Following explicit user approval, EAS build
+`2d5fb3bf-de7e-4b84-8621-cc6322fb133d` finished at `07:59:12.545Z`.
+Uploaded source HEAD: `f42de20e66c4f4e8c282815e0e985b0bae92820d`;
+Expo tree and implementation/preparation pins below are unchanged.
+The local EAS archive matched 583 tracked files (565 Expo), zero extras, with
+private backend, environment and signing files excluded.
+
+The downloaded IPA passed deep/strict signature verification, exact existing
+profile/certificate checks, version `1.0.0` / build `30`, production public-input
+presence and disabled OTA checks. IPA SHA-256:
+`70e8b32e6ca525856d85f7556ce74bb6c4b90d1bd32f6acd6d15a9350e0ff7eb`.
+
+Exact-build submission `fe330bfa-b39c-4a8a-ac18-081cd9d0cfcb` finished successfully
+at `08:03:29.432Z` for App Store Connect app `6811494369`. No backend change,
+database migration, configuration/credential change, tester-group change,
+public App Store review, Git push or merge. Private release receipts:
+`/Users/dylangrimm/.local/share/bysi-recovery/build30-release-bJB1CC`.
+
+Apple processing and tester availability are not independently confirmed:
+the App Store Connect browser session was signed out. Real device, account
+confirmation, StoreKit purchase/restore and hosted paid-access acceptance remain
+pending. Successful submission and static configuration checks do not close the
+historical TestFlight authentication issue. The preparation section below records
+the earlier local checkpoint, not current cloud status.
+
 ## Build 30 preparation update — September 20, 2026 UTC
 
 The initial investigation below is retained as history. Its four reported legacy
