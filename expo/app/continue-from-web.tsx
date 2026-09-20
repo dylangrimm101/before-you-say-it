@@ -8,6 +8,7 @@ import { Backdrop, PressCard, PrimaryButton, Reveal } from "@/components/ui";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import { useAuth } from "@/providers/auth";
 import { authEnvironment, supabase } from "@/lib/supabase";
+import { subscriptionReturn } from "@/lib/subscriptionNavigation";
 
 
 // Confirmation is completed by Supabase in the browser. This app deliberately
@@ -20,8 +21,9 @@ const confirmationOptions = authEnvironment?.staging
 
 export default function ContinueFromWebScreen(): React.JSX.Element {
   const router = useRouter();
-  const params = useLocalSearchParams<{ mode?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; returnTo?: string; moduleId?: string; gate?: string }>();
   const [signup, setSignup] = useState(params.mode === "signup");
+  const subscriptionIntent = params.returnTo === "subscription";
   const [confirmationPending, setConfirmationPending] = useState(false);
   const busy = useRef(false);
   const insets = useSafeAreaInsets();
@@ -53,8 +55,10 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
         setError(result.message ?? "We couldn’t log you in.");
         return;
       }
-      if (result.continuationId) { router.replace(`/debrief/${result.continuationId}`); return; }
       if (result.continuationProblem) { router.replace("/account-practice"); return; }
+      const subscription = subscriptionReturn(params);
+      if (subscription && !stagingWebBridge) { router.replace(subscription); return; }
+      if (result.continuationId) { router.replace(`/debrief/${result.continuationId}`); return; }
       if (signup) { router.replace("/account-practice"); return; }
       if (stagingWebBridge) { router.replace("/staging-web-result"); return; }
       if (normalResults) { router.replace("/saved-result"); return; }
@@ -67,7 +71,7 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
       busy.current = false;
       setIsSubmitting(false);
     }
-  }, [email, login, password, router, stagingWebBridge, normalResults, session, hasCurrentGuestPractice, signup, confirmationPending]);
+  }, [email, login, password, router, stagingWebBridge, normalResults, session, hasCurrentGuestPractice, signup, confirmationPending, params]);
 
   return (
     <View style={styles.root}>
@@ -79,6 +83,7 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
             <Text style={styles.title}>{signup ? "Create your account" : "Enter your email"}</Text>
           </Reveal>
           {hasCurrentGuestPractice ? <Text style={styles.lede}>Save this current rehearsal to your account.</Text> : null}
+          {subscriptionIntent ? <Text style={styles.lede}>After verification, you’ll return to the monthly offer. Signing in does not start a subscription.</Text> : null}
           {continuationIssue ? <Text style={styles.error} accessibilityRole="alert">{continuationIssue}</Text> : null}
           <Reveal index={1} style={styles.formWrap}>
             <TextInput
@@ -127,17 +132,17 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
             {isSubmitting ? <ActivityIndicator color={C.purple} style={styles.spinner} /> : null}
           </Reveal>
 
-          {hasCurrentGuestPractice && !signup ? (
+          {(hasCurrentGuestPractice || subscriptionIntent) && !signup ? (
             <PressCard
               disabled={isSubmitting}
               onPress={() => { setSignup(true); setConfirmationPending(false); setError(""); }}
               style={styles.forgotWrap}
-              accessibilityLabel="Create an account to save this result"
+              accessibilityLabel={hasCurrentGuestPractice ? "Create an account to save this result" : "Create an account"}
             >
-              <Text style={styles.forgot}>Create an account to save this result</Text>
+              <Text style={styles.forgot}>{hasCurrentGuestPractice ? "Create an account to save this result" : "Create an account"}</Text>
             </PressCard>
           ) : null}
-          {hasCurrentGuestPractice && signup && !confirmationPending ? (
+          {(hasCurrentGuestPractice || subscriptionIntent) && signup && !confirmationPending ? (
             <PressCard
               disabled={isSubmitting}
               onPress={() => { setSignup(false); setConfirmationPending(false); setError(""); }}

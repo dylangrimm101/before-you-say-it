@@ -39,6 +39,7 @@ const SUBSCRIPTION_MANAGEMENT_URL = Platform.select({
 
 export default function Paywall() {
   const { stagingWebBridge } = useAuth();
+  const params = useLocalSearchParams<{ moduleId?: string; gate?: string }>();
   const webState = useStagingWebBridgeState(stagingWebBridge);
   const router = useRouter();
   const [, tick] = useState(0);
@@ -53,11 +54,30 @@ export default function Paywall() {
   if (__DEV__ && stagingWebBridge && (stagingWebBridge.hasKnownWebPurchase() || stagingPurchasePresentation(webState, false) === "verify-web")) {
     return <Unavailable title="Check your web purchase first." body="Web subscription access is not currently verified. Recheck your saved result before purchasing again; this screen does not grant paid access." onBack={() => router.replace("/staging-web-result")} />;
   }
-  if(normalBillingEnabled)return <NativeBillingGate onContinue={()=>router.replace("/(tabs)/library")} onLogin={()=>router.push("/continue-from-web")}><ApplePaywall /></NativeBillingGate>;
+  const verifyAccount = () => router.push({ pathname: "/continue-from-web", params: {
+    returnTo: "subscription",
+    ...(isModuleId(params.moduleId) ? { moduleId: params.moduleId } : {}),
+    ...(params.gate === "recommended-path" ? { gate: params.gate } : {}),
+  } });
+  if(normalBillingEnabled)return <NativeBillingGate
+    guestPreview={<ApplePaywall onVerifyAccount={verifyAccount} />}
+    renderStatus={content => <BillingStatus>{content}</BillingStatus>}
+    onContinue={()=>router.replace("/(tabs)/library")} onLogin={verifyAccount}
+  ><ApplePaywall /></NativeBillingGate>;
   return <ApplePaywall />;
 }
 
-function ApplePaywall() {
+function BillingStatus({ children }: { children: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24, paddingHorizontal: GUTTER, gap: 20 }}>
+    <PrimaryButton label="Back" onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} />
+    <Text style={styles.title}>Subscription access</Text>
+    {children}
+  </ScrollView></View>;
+}
+
+function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ gate?: string; source?: string; moduleId?: string }>();
@@ -71,6 +91,7 @@ function ApplePaywall() {
   const isPro = normalBillingEnabled ? false : hasPro(customer.data);
   const [offer, setOffer] = useState<OfferState<SharedResultContractV1 | undefined>>(() => {
     const opened = openOffer(activePracticeSession?.sharedResult);
+    if (params.source === "account-offer") opened.stage = 3;
     const checkpoint = activePracticeSession?.postRehearsalState;
     if (params.source === "debrief" && (checkpoint === "pay2" || checkpoint === "pay3")) {
       opened.stage = checkpoint === "pay2" ? 2 : 3;
@@ -92,7 +113,7 @@ function ApplePaywall() {
   const isApprovedStoreOffer = Boolean(
     plans.monthly && monthlyTerms?.periodLabel === "1 month" && monthlyTerms.priceString,
   );
-  const purchaseLabel = "Subscribe monthly";
+  const purchaseLabel = onVerifyAccount ? "Continue to account" : "Subscribe monthly";
   const actions = commerceActionPresentation(commerceState, isPro, purchaseLabel);
   const hasCompleteEarnedResult = Boolean(activePracticeSession?.sharedResult?.pressure_moment && activePracticeSession.sharedResult.practice_shift && activePracticeSession.sharedResult.starting_index && activePracticeSession.sharedResult.first_focus);
   const earnedOfferBlocked = params.source === "debrief" && !hasCompleteEarnedResult;
@@ -174,6 +195,7 @@ function ApplePaywall() {
   };
 
   const buy = async (): Promise<void> => {
+    if (onVerifyAccount) { onVerifyAccount(); return; }
     if (isPro) {
       router.replace({ pathname: "/purchase-success", params: purchaseSuccessParams });
       return;
@@ -202,6 +224,7 @@ function ApplePaywall() {
   };
 
   const onRestore = async (): Promise<void> => {
+    if (onVerifyAccount) { onVerifyAccount(); return; }
     if (restore.isPending || purchase.isPending || actions.isRestoreDisabled) return;
     setCommerceState(transitionRestore("ready", { type: "begin" }).state);
     try {
@@ -243,7 +266,7 @@ function ApplePaywall() {
       </View>
 
       {normalBillingEnabled && (purchase.error || restore.error) ? <Text>{purchase.error?.message || restore.error?.message}</Text> : null}
-      <PrimaryButton label="Log in before purchasing" disabled={purchase.isPending || restore.isPending} onPress={() => router.push("/continue-from-web")} />
+      {!normalBillingEnabled ? <PrimaryButton label="Log in before purchasing" disabled={purchase.isPending || restore.isPending} onPress={() => router.push("/continue-from-web")} /> : null}
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -281,6 +304,7 @@ function ApplePaywall() {
       </ScrollView>
 
       <StateDock bottomInset={insets.bottom}>
+        {stage === 3 && onVerifyAccount ? <Text style={styles.link}>Create an account or sign in before purchasing. Continuing does not charge you.</Text> : null}
         {stage < 3 ? <PrimaryButton label="Continue" onPress={() => navigateOffer("forward")} compact={stage === 1} /> : (
           <>
             <PrimaryButton

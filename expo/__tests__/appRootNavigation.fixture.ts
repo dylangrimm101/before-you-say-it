@@ -10,10 +10,10 @@ plugin({name:'app-root-assets',setup(b){b.onLoad({filter:/\.(png|ttf)$/},()=>({c
 const Host=(p:any)=>React.createElement('host',p,p.children);
 let store:any={hydrated:true,profile:null,activePracticeSession:null,nativeJourneyStarted:false,migrationNotice:false,dismissMigrationNotice(){}};
 let account:any={isAuthLoading:false,user:null};
-let segments:any[]=[];let redirects:any[]=[];
+let segments:any[]=[];let redirects:any[]=[];let routeParams:any={};
 const router={replace:(r:any)=>redirects.push(r)};
 const Stack=Object.assign(Host,{Screen:()=>null});
-mock.module('expo-router',()=>({Stack,useRouter:()=>router,useSegments:()=>segments,useGlobalSearchParams:()=>({id:segments[1]})}));
+mock.module('expo-router',()=>({Stack,useRouter:()=>router,useSegments:()=>segments,useGlobalSearchParams:()=>({id:segments[1],...routeParams})}));
 mock.module('@/providers/store',()=>({StoreProvider:Host,useStore:()=>store}));
 mock.module('@/providers/auth',()=>({AuthProvider:Host,useAuth:()=>account}));
 mock.module('@/lib/purchases',()=>({}));
@@ -58,6 +58,15 @@ account={...account,restoredGuestContinuationId:'device-run',acknowledgeGuestCon
 store={...store,activePracticeSession:{id:'device-run',sharedResult:{},freeJourneyCheckpoint:'complete'}};
 assert.deepEqual(await visit('(tabs)'),['/debrief/device-run'],'cold device handoff routes exact result without importing a guest profile');
 assert.equal(acknowledged,'','routing alone does not acknowledge presentation');
+routeParams={returnTo:'subscription'};
+assert.deepEqual(await visit('continue-from-web'),[],'verified login must retain explicit subscription intent during handoff');
+assert.equal(acknowledged,'','sign-in form alone does not finish handoff');
+routeParams={source:'account-offer'};
+assert.deepEqual(await visit('paywall'),[],'verified account can review terms without being sent back to debrief');
+assert.equal(acknowledged,'device-run','explicit return after reviewing guest debrief finishes matching owner handoff');
+acknowledged='';
+routeParams={};
+assert.deepEqual(await visit('paywall'),['/debrief/device-run'],'ordinary cold handoff behavior stays unchanged');
 assert.deepEqual(await visit('debrief/device-run'),[]);assert.equal(acknowledged,'device-run');
 account={...account,restoredGuestContinuationId:undefined};store={...store,activePracticeSession:null};
 account={...account,user:null,isAuthLoading:true};

@@ -871,22 +871,26 @@ async function completeGuestJourney() {
   await press("See the practice plan");
   await press("Review monthly subscription");
   assert.equal(routePath(), "/paywall");
-  assert.ok(text().includes("Log in to verify purchases before viewing an Apple offer."));
+  assert.ok(!text().includes("Log in to verify purchases before viewing an Apple offer."));
+  await press("Continue");
+  await press("Continue");
+  assert.ok(text().includes("Monthly subscription"));
   assert.equal(purchaseCalls, 0);
-  mark("paywall: guest result reaches existing login-before-purchase gate");
+  mark("paywall: guest reviews monthly terms before account verification");
   return runId;
 }
 
 async function loginFromPaywall() {
-  await press("Log in to verify access");
+  await press("Restore purchases");
   assert.equal(routePath(), "/continue-from-web");
   await setInput("Email address", "frontdoor@invalid");
   await setInput("Password", "synthetic-only-password");
   await press("Sign in to save this result and continue");
   await flush(8);
   assert.equal(account.user.id, owner);
-  if (routePath() === "/debrief/[id]") await press("Continue with saved result");
-  else assert.equal(routePath(), "/saved-result");
+  assert.equal(routePath(), "/paywall", "subscription login returns to the offer");
+  // Independently inspect the claimed result; this is not the login destination.
+  await go("/saved-result");
   assert.equal(routePath(), "/saved-result");
   await flush(8);
   assert.ok(text().includes("You asked for a task."));
@@ -941,7 +945,7 @@ async function fd2AbaContained() {
 
 async function runClaimRetry() {
   await completeGuestJourney();
-  await press("Log in to verify access");
+  await press("Restore purchases");
   assert.equal(routePath(), "/continue-from-web");
   await setInput("Email address", "frontdoor@invalid");
   await setInput("Password", "synthetic-only-password");
@@ -951,7 +955,7 @@ async function runClaimRetry() {
   assert.equal(claimAttempts, 1);
   const afterFirst = (await db.query("select owner_id::text owner_id,count(*)::int n from bysi_native_free.session where phase='result' group by owner_id order by owner_id")).rows;
   if (mode === "claim-retry-503") assert.deepEqual(afterFirst, [{ owner_id: guest, n: 1 }]);
-  if (routePath() === "/debrief/[id]") await press("Continue with saved result");
+  await go("/saved-result");
   await flush(8);
   assert.equal(routePath(), "/saved-result");
   await act(async () => root.unmount());
@@ -971,7 +975,7 @@ async function runClaimRetry() {
 
 async function fd3SwitchDuringFirstClaimSave() {
   await completeGuestJourney();
-  await press("Log in to verify access");
+  await press("Restore purchases");
   assert.equal(routePath(), "/continue-from-web");
   await setInput("Email address", "frontdoor@invalid");
   await setInput("Password", "synthetic-only-password");
@@ -986,7 +990,7 @@ async function fd3SwitchDuringFirstClaimSave() {
 }
 
 async function signupFromPaywall() {
-  await press("Log in to verify access");
+  await press("Restore purchases");
   assert.equal(routePath(), "/continue-from-web");
   await press("Create an account to save this result");
   await setInput("Email address", "frontdoor@invalid");
@@ -997,8 +1001,8 @@ async function signupFromPaywall() {
   await press("I confirmed my email — log in");
   await flush(8);
   assert.equal(account.user.id, owner);
-  assert.equal(routePath(), "/debrief/[id]");
-  await press("Continue with saved result");
+  assert.equal(routePath(), "/paywall", "confirmed signup returns to the offer");
+  await go("/saved-result");
   assert.equal(routePath(), "/saved-result");
   await flush(8);
   assert.ok(text().includes("You asked for a task."));
@@ -1018,6 +1022,7 @@ async function loggedInPaywall() {
 async function viewAppleOffer() {
   await waitForControl("I have not subscribed — view Apple offer");
   await press("I have not subscribed — view Apple offer");
+  if (root.root.findAllByType("button").some((node: any) => node.props.label === "Subscribe monthly")) return;
   await waitForControl("Continue");
   await press("Continue");
   await waitForControl("Continue");

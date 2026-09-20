@@ -28,7 +28,7 @@ function RootLayoutNav() {
   const { isAuthLoading, user, session, normalResults, restoredGuestContinuationId, acknowledgeGuestContinuation,isGuestVisit } = useAuth();
   const router = useRouter();
   const segments = useSegments();
-  const routeParams = useGlobalSearchParams<{ id?: string }>();
+  const routeParams = useGlobalSearchParams<{ id?: string; source?: string; returnTo?: string }>();
   const [showLaunch, setShowLaunch] = useState<boolean>(() => {
     if (hasPresentedLaunch) return false;
     hasPresentedLaunch = true;
@@ -64,6 +64,15 @@ function RootLayoutNav() {
     }
     if (user && restoredGuestContinuationId && activePracticeSession?.id === restoredGuestContinuationId && activePracticeSession.sharedResult
       && firstSegment !== "settings") {
+      // Keep the explicit subscription destination through verified login. The
+      // user already reviewed the guest result before choosing this offer. Once
+      // its matching result is in this owner's store, finish handoff cleanup
+      // without forcing a second debrief. This grants no billing/practice access.
+      if (firstSegment === "continue-from-web" && routeParams.returnTo === "subscription") return;
+      if (firstSegment === "paywall" && routeParams.source === "account-offer") {
+        void acknowledgeGuestContinuation(restoredGuestContinuationId);
+        return;
+      }
       if (firstSegment === "debrief" && routeParams.id === restoredGuestContinuationId) {
         void acknowledgeGuestContinuation(restoredGuestContinuationId);
       } else router.replace(`/debrief/${restoredGuestContinuationId}`);
@@ -97,7 +106,7 @@ function RootLayoutNav() {
       };
       router.replace({ pathname: "/rehearse/[id]", params: sharedParams });
     }
-  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user, session, normalResults, restoredGuestContinuationId, routeParams.id, acknowledgeGuestContinuation,isGuestVisit]);
+  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user, session, normalResults, restoredGuestContinuationId, routeParams.id, routeParams.source, routeParams.returnTo, acknowledgeGuestContinuation,isGuestVisit]);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
 
