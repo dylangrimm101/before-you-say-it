@@ -68,7 +68,10 @@ mock.module('expo-constants',()=>({ExecutionEnvironment:{StoreClient:'storeClien
 const monthly:any={identifier:'$rc_monthly',product:{identifier:'byis_pro_monthly_5',priceString:'$5.00',subscriptionPeriod:'P1M',introPrice:null}};
 let purchaseCalls=0,restoreCalls=0;
 let providerInfo:any={entitlements:{active:{}}};
-mock.module('react-native-purchases',()=>({default:{configure(){},isAnonymous:async()=>false,logIn:async()=>({customerInfo:providerInfo}),logOut:async()=>providerInfo,getCustomerInfo:async()=>providerInfo,getOfferings:async()=>({current:{monthly,annual:null,availablePackages:[monthly]}}),purchasePackage:async(pkg:any)=>{assert.equal(pkg,monthly);purchaseCalls++;providerInfo={entitlements:{active:{pro:{}}}};return {customerInfo:providerInfo};},restorePurchases:async()=>{restoreCalls++;providerInfo={entitlements:{active:{pro:{}}}};return providerInfo;}}}));
+let failIdentityRefresh = false;
+const reminderSnapshots: unknown[] = [];
+mock.module('@/lib/trialReminder', () => ({ syncTrialReminder: async (info: unknown) => { reminderSnapshots.push(info); return 'not-applicable'; }, trialReminderPreference: async () => 'off', enableTrialReminder: async () => 'denied' }));
+mock.module('react-native-purchases',()=>({default:{configure(){},isAnonymous:async()=>false,logIn:async()=>{if(failIdentityRefresh)throw Error('synthetic offline refresh');return {customerInfo:providerInfo};},logOut:async()=>providerInfo,getCustomerInfo:async()=>providerInfo,getOfferings:async()=>({current:{monthly,annual:null,availablePackages:[monthly]}}),purchasePackage:async(pkg:any)=>{assert.equal(pkg,monthly);purchaseCalls++;providerInfo={entitlements:{active:{pro:{}}}};return {customerInfo:providerInfo};},restorePurchases:async()=>{restoreCalls++;providerInfo={entitlements:{active:{pro:{}}}};return providerInfo;}}}));
 const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
 const {AuthProvider,useAuth}=await import('../providers/auth');
 const {StoreProvider,useStore}=await import('../providers/store');
@@ -121,4 +124,9 @@ assert.equal(account.user.id,'registered-A');assert.deepEqual(store.activePracti
 assert.equal(store.access.entitlement,'pro');
 const currentLesson=root.root.findAllByType('button').find((n:any)=>n.props.accessibilityLabel?.endsWith('. Current'));assert.ok(currentLesson);await press(currentLesson.props.accessibilityLabel);assert.equal(route.pathname,'/approved-lesson/[lessonId]');assert.equal(route.params.lessonId,'m1-l1');
 await act(async()=>root.unmount());client.clear();
+await Promise.resolve();
+const remindersBeforeOfflineRefresh = reminderSnapshots.length;
+failIdentityRefresh = true;
+assert.equal(await (await import('../lib/purchases')).identifyPurchasesUser('registered-A'), null);
+assert.equal(reminderSnapshots.length, remindersBeforeOfflineRefresh, 'failed identity refresh must not cancel an existing OS reminder');
 console.log('PASS actual RevenueCat hooks + monthly paywall purchase/restore controls with synthetic native SDK; not receipt proof');

@@ -24,7 +24,9 @@ import {
 import { nextLaunchDeck } from "@/lib/launchCurriculum";
 import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
 import { errorShape, safeLog } from "@/lib/redact";
-import { hasPro, useCustomerInfo, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
+import { hasPro, trialEligibility, useCustomerInfo, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
+import { isSevenDayTrial, type TrialReminderStatus } from '@/lib/trialOffer';
+import { enableTrialReminder, trialReminderPreference } from '@/lib/trialReminder';
 import { useStore } from "@/providers/store";
 import { useAuth } from "@/providers/auth";
 import { useStagingWebBridgeState } from "@/lib/useStagingWebBridgeState";
@@ -106,13 +108,35 @@ function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}
     return { monthly: current?.monthly?.product.identifier === "byis_pro_monthly_5" ? current.monthly : null, annual: null };
   }, [offerings]);
   const selectedPackage = billing === "annual" ? plans.annual ?? plans.monthly : plans.monthly ?? plans.annual;
+  const [eligibility, setEligibility] = useState(0);
+  const [reminder, setReminder] = useState<TrialReminderStatus>('off');
+  const [reminderPending, setReminderPending] = useState(false);
+  useEffect(() => {
+    let current = true;
+    setEligibility(0);
+    const product = plans.monthly?.product.identifier;
+    if (product) void trialEligibility(product).then(status => { if (current) setEligibility(status); });
+    return () => { current = false; };
+  }, [plans.monthly, onVerifyAccount]);
+  useEffect(() => {
+    let current = true;
+    void trialReminderPreference().then(status => { if (current) setReminder(status); });
+    return () => { current = false; };
+  }, []);
+  const sevenDayTrial = isSevenDayTrial(plans.monthly?.product, eligibility);
+  const enableReminder = async () => {
+    if (reminderPending) return;
+    setReminderPending(true);
+    setReminder(await enableTrialReminder());
+    setReminderPending(false);
+  };
   const terms = storeProductSnapshot(selectedPackage?.product);
   const monthlyTerms = storeProductSnapshot(plans.monthly?.product);
   const annualTerms = storeProductSnapshot(plans.annual?.product);
   const isApprovedStoreOffer = Boolean(
     plans.monthly && monthlyTerms?.periodLabel === "1 month" && monthlyTerms.priceString,
   );
-  const purchaseLabel = onVerifyAccount ? "Continue to account" : "Subscribe monthly";
+  const purchaseLabel = onVerifyAccount ? "Continue to account" : sevenDayTrial ? "Start my 7-day free trial" : "Subscribe monthly";
   const actions = commerceActionPresentation(commerceState, isPro, purchaseLabel);
   const hasCompleteEarnedResult = Boolean(activePracticeSession?.sharedResult?.pressure_moment && activePracticeSession.sharedResult.practice_shift && activePracticeSession.sharedResult.starting_index && activePracticeSession.sharedResult.first_focus);
   const earnedOfferBlocked = params.source === "debrief" && !hasCompleteEarnedResult;
@@ -277,6 +301,7 @@ function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}
       >
         {stage === 1 ? (
           <StageOne
+            sevenDayTrial={sevenDayTrial}
             moduleName={practiceModule?.name ?? "Make a Clear Ask"}
             modulePreview={practiceModule?.promise ?? "Practice saying it clearly, holding it through pushback, and putting it in your own words."}
             focus={practiceFocus}
@@ -284,9 +309,10 @@ function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}
             annualPrice={annualTerms?.priceString ?? null}
           />
         ) : null}
-        {stage === 2 ? <StageTwo /> : null}
+        {stage === 2 ? <StageTwo sevenDayTrial={sevenDayTrial} reminder={reminder} reminderPending={reminderPending} onEnableReminder={() => void enableReminder()} /> : null}
         {stage === 3 ? (
           <StageThree
+            sevenDayTrial={sevenDayTrial}
             plans={plans}
             billing={billing}
             onBilling={setBilling}
@@ -319,17 +345,17 @@ function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}
   );
 }
 
-function StageOne({ moduleName, modulePreview, focus, monthlyPrice }: { moduleName: string; modulePreview: string; focus: string; monthlyPrice: string | null; annualPrice: string | null }) {
+function StageOne({ moduleName, modulePreview, focus, monthlyPrice, sevenDayTrial }: { moduleName: string; modulePreview: string; focus: string; monthlyPrice: string | null; annualPrice: string | null; sevenDayTrial: boolean }) {
   const [isPlanOpen, setIsPlanOpen] = useState(false);
   return <View style={styles.offerPage}>
     <View>
-      <Eyebrow color={C.dim}>YOUR PRACTICE SUBSCRIPTION</Eyebrow>
-      <Text style={styles.title}>Build your practice, one conversation at a time.</Text>
-      <Text style={styles.lede}>{monthlyPrice ? `${monthlyPrice} monthly. Renews until cancelled.` : "Store pricing will be shown before checkout."}</Text>
+      <Eyebrow color={C.dim}>{sevenDayTrial ? 'YOUR 7-DAY FREE TRIAL' : 'YOUR PRACTICE SUBSCRIPTION'}</Eyebrow>
+      <Text style={styles.title}>{sevenDayTrial ? 'Try BYSI free for 7 days.' : 'Build your practice, one conversation at a time.'}</Text>
+      <Text style={styles.lede}>{sevenDayTrial ? `Full access. No charge today. Then ${monthlyPrice} monthly unless cancelled.` : monthlyPrice ? `${monthlyPrice} monthly. Renews until cancelled.` : "Store pricing will be shown before checkout."}</Text>
     </View>
-    <View style={styles.monthHero} accessibilityLabel="Monthly practice subscription">
-      <Text style={styles.monthNumber}>1</Text><Text style={styles.monthLabel}>month of{ "\n" }practice</Text>
-    </View>
+    <View><View style={styles.monthHero} accessibilityLabel={sevenDayTrial ? '7 days free' : 'Monthly practice subscription'}>
+      <Text style={styles.monthNumber}>{sevenDayTrial ? '7' : '1'}</Text><Text style={styles.monthLabel}>{sevenDayTrial ? 'days\nfree' : 'month of\npractice'}</Text>
+    </View>{sevenDayTrial ? <View style={styles.sevenSegments}>{Array.from({ length: 7 }, (_, i) => <View key={i} style={styles.sevenSegment} />)}</View> : null}</View>
     <View>
       <Text style={styles.trialSupport}>Ten lessons and two module closes, at your own pace.</Text>
       <PressCard onPress={() => setIsPlanOpen(value => !value)} accessibilityLabel={`${isPlanOpen ? "Hide" : "Show"} your practice plan`} style={styles.planDisclosure}>
@@ -341,7 +367,17 @@ function StageOne({ moduleName, modulePreview, focus, monthlyPrice }: { moduleNa
   </View>;
 }
 
-function StageTwo() {
+function StageTwo({ sevenDayTrial, reminder, reminderPending, onEnableReminder }: { sevenDayTrial: boolean; reminder: TrialReminderStatus; reminderPending: boolean; onEnableReminder: () => void }) {
+  if (sevenDayTrial) return <View style={styles.offerPage}>
+    <View><Eyebrow color={C.dim}>NO SURPRISE CHARGE</Eyebrow><Text style={styles.title}>{reminder === 'enabled' ? 'We’ll remind you 2 days before your free trial ends.' : 'Get a reminder 2 days before your free trial ends.'}</Text><Text style={styles.lede}>You’ll have time to decide whether you want to continue.</Text></View>
+    <View style={styles.timeline}>
+      <TimelineRow active label="After you confirm" detail="Your 7-day free trial begins." />
+      <TimelineRow label="2 days before it ends" detail={reminder === 'enabled' ? 'We’ll schedule a notification on this device after your purchase is confirmed.' : 'Enable notifications on this device for your trial reminder.'} />
+      <TimelineRow label="Trial end" detail="Your subscription renews at the store price unless you cancel before the trial ends." last />
+    </View>
+    {reminder !== 'enabled' ? <PrimaryButton label={reminderPending ? 'Enabling reminder…' : 'Enable trial reminder'} disabled={reminderPending} onPress={onEnableReminder} /> : null}
+    <Text style={styles.renewalCopy}>{reminder === 'denied' ? 'Notifications are off. Enable them in iPhone Settings, then try again. No reminder is enabled.' : reminder === 'unavailable' ? 'We couldn’t enable your reminder. Try again, or set a reminder yourself.' : 'Reminders use this device’s notifications. Delivery depends on your notification settings; deleting the app removes the reminder.'}</Text>
+  </View>;
   return <View style={styles.offerPage}>
     <View><Eyebrow color={C.dim}>NO SURPRISES</Eyebrow><Text style={styles.title}>You control whether your subscription renews.</Text><Text style={styles.lede}>Review the price before you confirm. You can manage or cancel your subscription in your store settings.</Text></View>
     <View style={styles.timeline}>
@@ -353,12 +389,12 @@ function StageTwo() {
   </View>;
 }
 
-function StageThree({ plans, billing, onBilling, terms, isLoading, unavailable, commerceState, onPrivacy, onRestore, isRestoreDisabled, onManageSubscription }: { plans: { monthly: PurchasesPackage | null; annual: PurchasesPackage | null }; billing: "monthly" | "annual"; onBilling: (value: "monthly" | "annual") => void; terms: ReturnType<typeof storeProductSnapshot>; isLoading: boolean; unavailable: boolean; commerceState: CommercePresentationState; onPrivacy: () => void; onRestore: () => void; isRestoreDisabled: boolean; onManageSubscription?: () => void }) {
+function StageThree({ plans, billing, onBilling, terms, isLoading, unavailable, commerceState, onPrivacy, onRestore, isRestoreDisabled, onManageSubscription, sevenDayTrial }: { plans: { monthly: PurchasesPackage | null; annual: PurchasesPackage | null }; billing: "monthly" | "annual"; onBilling: (value: "monthly" | "annual") => void; terms: ReturnType<typeof storeProductSnapshot>; isLoading: boolean; unavailable: boolean; commerceState: CommercePresentationState; onPrivacy: () => void; onRestore: () => void; isRestoreDisabled: boolean; onManageSubscription?: () => void; sevenDayTrial: boolean }) {
   const selectedRenewal = terms?.priceString && terms.periodLabel ? `${terms.priceString} every ${terms.periodLabel}` : "the price confirmed by the store";
-  return <View style={styles.offerPage}><View><Eyebrow color={C.dim}>Monthly subscription</Eyebrow><Text style={styles.title}>{terms ? `${selectedRenewal}.` : "Review your store offer."}</Text></View>
+  return <View style={styles.offerPage}><View><Eyebrow color={C.dim}>{sevenDayTrial ? 'START YOUR FREE TRIAL' : 'Monthly subscription'}</Eyebrow><Text style={styles.title}>{terms ? `${sevenDayTrial ? '7 days free, then ' : ''}${selectedRenewal}.` : "Review your store offer."}</Text></View>
     {isLoading ? <ActivityIndicator color={C.purple} style={styles.loading} /> : unavailable ? <IapBlocker /> : <>
       {plans.monthly ? <PlanChoice label="Monthly option" price={plans.monthly.product.priceString} selected={billing === "monthly"} onPress={() => onBilling("monthly")} /> : null}
-      <View style={styles.checkoutTimeline}><TimelineRow active label="After purchase confirmation" detail="Full access to all ten launch lessons and both module closes. Lessons unlock in order as you finish them." /><TimelineRow label="Next renewal" detail={`Renews at ${selectedRenewal} unless cancelled beforehand.`} last /></View>
+      <View style={styles.checkoutTimeline}><TimelineRow active label="After purchase confirmation" detail={sevenDayTrial ? 'Full access begins. No charge today.' : 'Full access to all ten launch lessons and both module closes. Lessons unlock in order as you finish them.'} /><TimelineRow label={sevenDayTrial ? 'After 7 days' : 'Next renewal'} detail={`Renews at ${selectedRenewal} unless cancelled beforehand.`} last /></View>
     </>}
     {commerceState !== "ready" ? <StatusCard state={commerceState} /> : null}
     <Text style={styles.renewalCopy}>Renews automatically at {selectedRenewal} unless cancelled. Any introductory offer is subject to store eligibility and confirmation.</Text>

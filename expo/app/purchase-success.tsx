@@ -10,6 +10,8 @@ import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { nextLaunchDeck } from "@/lib/launchCurriculum";
 import { purchasedContinuity } from "@/lib/nativeCommerce";
 import { useCustomerInfo, useIsPro } from "@/lib/purchases";
+import { syncTrialReminder } from '@/lib/trialReminder';
+import type { TrialReminderStatus } from '@/lib/trialOffer';
 import { useStore } from "@/providers/store";
 
 export default function PurchaseSuccess() {
@@ -20,6 +22,12 @@ export default function PurchaseSuccess() {
   const nextDeck = nextLaunchDeck(convertedLessonProgress, moduleCloseProgress);
   const isPro = useIsPro();
   const customer = useCustomerInfo();
+  const [reminder, setReminder] = React.useState<TrialReminderStatus | null>(null);
+  React.useEffect(() => {
+    let current = true;
+    if (isPro && customer.data) void syncTrialReminder(customer.data).then(status => { if (current) setReminder(status); });
+    return () => { current = false; };
+  }, [isPro, customer.data]);
   const result = activePracticeSession?.sharedResult;
   const continuity = purchasedContinuity(result, sessions.length, pilotProgress.length);
   const moduleId: ModuleId | null = continuity.moduleId;
@@ -72,6 +80,8 @@ export default function PurchaseSuccess() {
             <View style={styles.summaryRow}><Text style={styles.summaryLabel}>First focus</Text><Text style={styles.summaryValue}>{continuity.firstFocusLabel ?? "Complete your starting step"}</Text></View>
           </GlassCard>
         </Reveal>
+        {reminder === 'scheduled' ? <Text style={styles.body}>Your trial reminder is scheduled on this device for 2 days before your trial ends.</Text> : null}
+        {reminder === 'denied' || reminder === 'unavailable' || reminder === 'off' ? <Text style={styles.body}>{reminder === 'unavailable' ? 'We couldn’t confirm a trial reminder on this device.' : 'No trial reminder is enabled on this device.'} You can check your renewal date and cancel in Apple Settings. You can still start practicing.</Text> : null}
       </ScrollView>
       <StateDock bottomInset={insets.bottom}><PrimaryButton label={continuity.hasPersonalizedStart ? "Start my first practice" : "Complete my starting step"} disabled={params.gate !== "another-rehearsal" && !nextDeck && !continuity.recoveryDestination} onPress={openNextStep} /><Text style={styles.moduleNote}>{nextDeck ? `Continues with ${nextDeck.replace(/-/g, " ").toUpperCase()}` : module ? `Recommended focus: ${module.name}` : "Uses your preserved result to establish an evidence-backed first focus."}</Text></StateDock>
     </View>

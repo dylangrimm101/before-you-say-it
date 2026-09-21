@@ -28,7 +28,7 @@ mock.module('react-native-safe-area-context',()=>({useSafeAreaInsets:()=>({top:0
 mock.module('@/components/ui',()=>({Backdrop:()=>null,MicControl:Button,Thinking:Host,Waveform:Host,Meter:Host,StateDock:Host,PressCard:Button,GhostButton:Button,PrimaryButton:Button,tap(){},useReducedMotion:()=>true}));
 mock.module('@/components/RehearsalBriefing',()=>({RehearsalBriefing:Host}));
 mock.module('@/components/ScenarioPaidPractice',()=>({ScenarioPaidPractice:()=>{throw Error('Unexpected paid route');}}));
-mock.module('@/lib/purchases',()=>({useIsPro:()=>false,clearPurchasesIdentity:async()=>{}}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, useIsPro:()=>false,clearPurchasesIdentity:async()=>{}}));
 mock.module('@/lib/reminders',()=>({cancelChallengeNudge:async()=>{},cancelDailyReminder:async()=>{},syncChallengeNudge:async()=>{}}));
 mock.module('@/lib/baselineAudio',()=>({deleteAllBaselineAudioStrict:async()=>{},deleteBaselineAudioStrict:async()=>{}}));
 const spoken:string[]=[];

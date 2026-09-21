@@ -8,7 +8,7 @@ mock.module('@/components/ui',()=>({PrimaryButton:(p:any)=>React.createElement('
 mock.module('@/components/OriginalFollowThrough',()=>({OriginalFollowThrough:()=>null}));
 mock.module('@/components/AccountLogout',()=>({AccountLogout:()=>null}));
 mock.module('@/components/PrivateWebResultPresentation',()=>({PrivateWebResultPresentation:(p:any)=>React.createElement('host',null,'RESULT:',p.record.marker)}));
-mock.module('@/lib/purchases',()=>({useNativeServerAccess:()=>({data:false,isPending:false,isFetching:false,isError:false,refetch:async()=>{}})}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, useNativeServerAccess:()=>({data:false,isPending:false,isFetching:false,isError:false,refetch:async()=>{}})}));
 mock.module('@/lib/nativeBillingRuntime',()=>({nativeBilling:null}));
 mock.module('@/lib/launchCurriculum',()=>({nextLaunchDeck:()=>null}));
 const newest={sessionId:'11111111-1111-4111-8111-111111111111',source:'normal-native-free',capturedAt:'2026-09-15T12:00:00.000Z',expiresAt:null,privateResult:{marker:'newest'}};

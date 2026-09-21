@@ -24,7 +24,7 @@ try{
  const normalResults={discoverBenefit:async()=>{lastListing=await authority.discover(user.id);return lastListing;}};
  mock.module('@/providers/auth',()=>({useAuth:()=>({user,normalResults})}));
  let access:any={data:false,isPending:false,isFetching:false,isError:false,refetch:async()=>{}};
- mock.module('@/lib/purchases',()=>({useNativeServerAccess:()=>access,useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
+ mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, useNativeServerAccess:()=>access,useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
  const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
  const {NativeBillingGate}=await import('../components/NativeBillingGate');
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});

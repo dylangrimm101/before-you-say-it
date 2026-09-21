@@ -12,7 +12,7 @@ let discoverMode:'empty'|'pending'|'saved'|'error'='empty',discoverCalls=0;
 const normalResults={discoverBenefit:async()=>{discoverCalls++;if(discoverMode==='error')throw Error('Original benefit unavailable');return {ok:true,items:discoverMode==='saved'?[{id:'11111111-1111-4111-8111-111111111111',createdAt:'2026-09-15T12:00:00.000Z',source:'reviewed_original',status:'saved'}]:discoverMode==='pending'?[{id:'22222222-2222-4222-8222-222222222222',createdAt:'2026-09-15T12:00:00.000Z',source:'original_purchase',status:'delivery_pending'}]:[],recovery:{status:'not_requested'},hasMore:false};}};
 mock.module('@/providers/auth',()=>({useAuth:()=>({user,normalResults})}));
 let access:any={data:false,isPending:false,isFetching:false,isError:false,refetch:async()=>{}};
-mock.module('@/lib/purchases',()=>({useNativeServerAccess:()=>access,useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, useNativeServerAccess:()=>access,useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
 const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
 const {NativeBillingGate}=await import('../components/NativeBillingGate');
 const client=new QueryClient({defaultOptions:{queries:{retry:false}}});

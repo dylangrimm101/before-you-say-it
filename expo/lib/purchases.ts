@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 import { hasActiveEntitlement } from "@/lib/commerce";
 import { createPurchasesIdentityBoundary } from "@/lib/purchasesIdentity";
 import { errorShape, safeLog } from "@/lib/redact";
+import { syncTrialReminder } from './trialReminder';
 
 export const PRO_ENTITLEMENT = "pro";
 
@@ -21,6 +22,7 @@ type PurchasesModule = {
   configure: (options: { apiKey: string }) => void;
   getCustomerInfo: () => Promise<CustomerInfo>;
   getOfferings: () => Promise<PurchasesOfferings>;
+  checkTrialOrIntroductoryPriceEligibility: (ids: string[]) => Promise<Record<string, { status: number }>>;
   purchasePackage: (pkg: PurchasesPackage) => Promise<{ customerInfo: CustomerInfo }>;
   restorePurchases: () => Promise<CustomerInfo>;
   logIn: (appUserID: string) => Promise<{ customerInfo: CustomerInfo; created: boolean }>;
@@ -134,12 +136,18 @@ const purchasesIdentity = createPurchasesIdentityBoundary<CustomerInfo>(async (u
 
 /** Null selects the SDK's anonymous identity, not a Supabase guest ID. */
 export function identifyPurchasesUser(userId: string | null): Promise<CustomerInfo | null> {
+  // Keep an existing OS reminder while identity refresh is pending or offline.
+  // Only a verified customer snapshot (or explicit account reset) can replace it.
   if(!userId)nativeBilling?.suspend();
-  return purchasesIdentity.sync(userId);
+  return purchasesIdentity.sync(userId).then(info => {
+    if (info) void syncTrialReminder(info);
+    return info;
+  });
 }
 
 /** Clears any authenticated RevenueCat app-user identity during data reset. */
 export async function clearPurchasesIdentity(): Promise<void> {
+  void syncTrialReminder(null);
   nativeBilling?.suspend();
   if (!sdk || !configured) return;
   const info = await purchasesIdentity.sync(null);
@@ -147,12 +155,32 @@ export async function clearPurchasesIdentity(): Promise<void> {
 }
 
 export function useCustomerInfo() {
-  return useQuery<CustomerInfo | null>({
+  const query = useQuery<CustomerInfo | null>({
     queryKey: ["rc", "customerInfo"],
-    queryFn: () => purchasesIdentity.runVerified(() => requireSdk().getCustomerInfo()),
+    queryFn: async () => {
+      const info = await purchasesIdentity.runVerified(() => requireSdk().getCustomerInfo());
+      void syncTrialReminder(info);
+      return info;
+    },
     enabled: purchasesAvailable,
     staleTime: 60_000,
   });
+  const refetch = query.refetch;
+  useEffect(() => {
+    const sub = ReactNative.AppState?.addEventListener('change', state => {
+      if (state === 'active' && purchasesAvailable) void refetch();
+    });
+    return () => sub?.remove();
+  }, [refetch]);
+  return query;
+}
+
+export async function trialEligibility(productId: string): Promise<number> {
+  if (Platform.OS !== 'ios' || !purchasesAvailable) return 0;
+  try {
+    const result = await purchasesIdentity.runVerified(() => requireSdk().checkTrialOrIntroductoryPriceEligibility([productId]));
+    return result[productId]?.status ?? 0;
+  } catch { return 0; }
 }
 
 /** True when the user has the active "pro" entitlement. */
@@ -201,6 +229,7 @@ export function usePurchasePackage() {
           return requireSdk().purchasePackage(pkg);
         });
         queryClient.setQueryData(["rc", "customerInfo"], customerInfo);
+        void syncTrialReminder(customerInfo);
         const allowed = nativeBilling ? await nativeBilling.access() : hasPro(customerInfo);
         if(nativeBilling)queryClient.setQueryData(['native','access'],allowed);
         return { status: allowed ? "purchased" as const : "entitlement_delayed" as const };
@@ -228,6 +257,7 @@ export function useRestorePurchases() {
       }
       const info = await purchasesIdentity.runVerified(() => requireSdk().restorePurchases());
       queryClient.setQueryData(["rc", "customerInfo"], info);
+      void syncTrialReminder(info);
       const allowed = nativeBilling ? await nativeBilling.access() : hasPro(info);
       if(nativeBilling)queryClient.setQueryData(['native','access'],allowed);
       return allowed;

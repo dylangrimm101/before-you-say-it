@@ -12,7 +12,7 @@ let store:any={hydrated:true,profile:null,activePracticeSession:null,nativeJourn
 mock.module('expo-router',()=>({Stack:Object.assign(Host,{Screen:()=>null}),useRouter:()=>router,useSegments:()=>[route],useGlobalSearchParams:()=>({})}));
 mock.module('@/providers/auth',()=>({AuthProvider:Host,useAuth:()=>auth}));
 mock.module('@/providers/store',()=>({StoreProvider:Host,useStore:()=>store}));
-mock.module('@/lib/purchases',()=>({}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, }));
 mock.module('@/constants/theme',()=>({C:{bg:'white'},FONT_ASSETS:{}}));
 mock.module('@/components/LaunchExperience',()=>({LaunchExperience:()=>null}));
 mock.module('@/components/MigrationNotice',()=>({MigrationNotice:()=>null}));

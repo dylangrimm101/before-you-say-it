@@ -12,7 +12,7 @@ const listeners=new Set<any>();const userA={id:'A',email:'a@invalid',is_anonymou
 let session:any={user:userA,access_token:'fixture-A'};
 const auth={getSession:async()=>({data:{session},error:null}),getUser:async()=>({data:{user:session?.user??null},error:null}),onAuthStateChange:(cb:any)=>{listeners.add(cb);return {data:{subscription:{unsubscribe(){listeners.delete(cb);}}}};},signOut:async()=>{session=null;for(const cb of listeners)cb('SIGNED_OUT',null);return {error:null};}};
 mock.module('@/lib/supabase',()=>({supabase:{auth},authEnvironment:{url:'https://pqqxaklcburdxjfeolmd.supabase.co',key:'sb_publishable_fixture',staging:true},isAuthConfigured:true}));
-mock.module('@/lib/purchases',()=>({identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>true}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>true}));
 mock.module('@/lib/reminders',()=>({cancelChallengeNudge:async()=>{},cancelDailyReminder:async()=>{},syncChallengeNudge:async()=>{}}));
 mock.module('@/lib/baselineAudio',()=>({deleteAllBaselineAudioStrict:async()=>{},deleteBaselineAudioStrict:async()=>{}}));
 

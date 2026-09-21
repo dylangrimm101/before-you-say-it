@@ -16,7 +16,7 @@ const auth={getSession:async()=>({data:{session},error:null}),getUser:async()=>{
  if(rejectReadback && process.env.BYSI_LOGIN_DENIAL==='switch'){const original=session.user;session={user:{id:'B',email:'b@invalid',is_anonymous:false},access_token:'fixture-B'};for(const cb of listeners)cb('SIGNED_IN',session);return {data:{user:original},error:null};}
  return {data:{user:rejectReadback?{...userA,id:'wrong-owner'}:session?.user??null},error:null};},onAuthStateChange:(cb:any)=>{listeners.add(cb);return {data:{subscription:{unsubscribe(){listeners.delete(cb);}}}};},signOut:async()=>{session=null;for(const cb of listeners)cb('SIGNED_OUT',null);return {error:null};}};
 mock.module('@/lib/supabase',()=>({supabase:{auth},authEnvironment:{url:'https://production.invalid',staging:false},isAuthConfigured:true}));
-mock.module('@/lib/purchases',()=>({identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>false}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>false}));
 mock.module('@/lib/reminders',()=>({cancelChallengeNudge:async()=>{},cancelDailyReminder:async()=>{},syncChallengeNudge:async()=>{}}));
 mock.module('@/lib/baselineAudio',()=>({deleteAllBaselineAudioStrict:async()=>{},deleteBaselineAudioStrict:async()=>{}}));
 mock.module('@/lib/voice',()=>({deleteGeneratedVoiceCacheStrict:async()=>{}}));

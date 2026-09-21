@@ -17,7 +17,7 @@ mock.module('@react-native-async-storage/async-storage',()=>({default:raw}));
 const listeners=new Set<any>();let session:any=null;
 const auth={getSession:async()=>({data:{session},error:null}),getUser:async()=>({data:{user:session?.user??null},error:null}),onAuthStateChange:(cb:any)=>{listeners.add(cb);return {data:{subscription:{unsubscribe(){listeners.delete(cb);}}}};},signInAnonymously:async()=>{throw Error('anonymous rollout stays disabled');},signOut:async()=>{session=null;for(const cb of listeners)cb('SIGNED_OUT',null);return {error:null};}};
 mock.module('@/lib/supabase',()=>({supabase:{auth},authEnvironment:{url:'https://production.invalid',staging:false},isAuthConfigured:true}));
-mock.module('@/lib/purchases',()=>({PRO_ENTITLEMENT:'pro',identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>syntheticPro}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, PRO_ENTITLEMENT:'pro',identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>syntheticPro}));
 mock.module('@/lib/reminders',()=>({cancelChallengeNudge:async()=>{},cancelDailyReminder:async()=>{},syncChallengeNudge:async()=>{}}));
 mock.module('@/lib/baselineAudio',()=>({deleteAllBaselineAudioStrict:async()=>{},deleteBaselineAudioStrict:async()=>{}}));
 const dictation={status:'denied',error:'synthetic permission denied',cancel:async()=>{},reset:async()=>{},requestPermission:async()=>false};
@@ -157,5 +157,4 @@ await act(async()=>root.unmount());root=null;await mount(screens.privacy);assert
 
 console.log('PASS actual remaining route controls: release denial, recovery, custom build/error, scenario create/resume, consent cold hydration; synthetic dependencies, not device/provider acceptance');
 await act(async()=>root.unmount());client.clear();
-
 

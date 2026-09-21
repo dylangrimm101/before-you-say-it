@@ -34,7 +34,7 @@
         "NSMicrophoneUsageDescription": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "33"
+      "buildNumber": "34"
     },
     "android": {
       "permissions": [

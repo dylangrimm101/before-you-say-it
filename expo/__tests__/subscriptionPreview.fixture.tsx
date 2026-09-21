@@ -37,9 +37,12 @@ const saveActivePracticeSession = async (next: any) => { activePracticeSession =
 mock.module('@/providers/store', () => ({ useStore: () => ({ activePracticeSession, convertedLessonProgress: [], moduleCloseProgress: [], sessions: [], pilotProgress: [], saveActivePracticeSession }) }));
 let catalog = true;
 let purchaseStatus = 'cancelled';
-const product = { identifier: 'byis_pro_monthly_5', priceString: '$7.49', price: 7.49, currencyCode: 'USD', subscriptionPeriod: 'P1M' };
+let eligibility = 0;
+let reminderPermission = 'denied';
+mock.module('@/lib/trialReminder', () => ({ trialReminderPreference: async () => 'off', enableTrialReminder: async () => reminderPermission, syncTrialReminder: async () => 'not-applicable' }));
+const product: any = { identifier: 'byis_pro_monthly_5', priceString: '$7.49', price: 7.49, currencyCode: 'USD', subscriptionPeriod: 'P1M' };
 const offer = { identifier: '$rc_monthly', product };
-mock.module('@/lib/purchases', () => ({
+mock.module('@/lib/purchases', () => ({trialEligibility: async () => eligibility,
   useNativeServerAccess: () => access,
   useOfferings: () => ({ data: { current: { monthly: catalog ? offer : null } }, isLoading: false }),
   usePurchasePackage: () => ({ isPending: false, mutateAsync: async () => { assert.ok(user); purchases++; if(purchaseStatus === 'purchased') access.data = true; return { status: purchaseStatus }; } }),
@@ -122,5 +125,23 @@ assert.ok(!button('Continue'), 'debrief offer still requires an earned result');
 await reset(); route('/continue-from-web'); await render(); await fill();
 await press('Sign in to save this result and continue');
 assert.equal(path, '/debrief/saved-result-id', 'ordinary result-saving login keeps its existing destination');
+product.introPrice = { price: 0, priceString: '$0.00', period: 'P1W', cycles: 1 };
+eligibility = 2;
+await reset();
+assert.ok(text().includes('Try BYSI free for 7 days.'));
+await press('Continue');
+assert.ok(text().includes('Get a reminder 2 days before your free trial ends.'));
+await press('Enable trial reminder');
+assert.ok(text().includes('Notifications are off'));
+assert.ok(button('Continue'), 'permission denial never blocks checkout');
+reminderPermission = 'enabled';
+await press('Enable trial reminder');
+assert.ok(text().includes('We’ll remind you 2 days before your free trial ends.'));
+await press('Continue');
+assert.ok(text().includes('7 days free, then'));
+assert.ok(button('Continue to account'), 'trial preserves required account gate');
+eligibility = 1;
+await reset();
+assert.ok(!text().includes('Try BYSI free for 7 days.'), 'ineligible users never get a free-trial promise');
 await act(async () => root.unmount()); client.clear();
 console.log('PASS guest subscription preview, sign-in/signup return, safe area, restore gate, cancellation, missing catalog, existing buyer guards. Mocked native/store/auth; no Apple purchase or physical-device proof.');

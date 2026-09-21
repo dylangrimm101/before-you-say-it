@@ -29,7 +29,7 @@ mock.module('@/lib/supabase',()=>({supabase:{auth},authEnvironment:{url:'https:/
 mock.module('@/lib/nativeBillingRuntime',()=>({nativeBilling:null}));
 mock.module('@/lib/normalFreeRuntime',()=>({currentNormalFreeSessionId:async()=>mode==='missing-session'?null:serverSession,requestNormalFree:async()=>Response.json({status:'ended'})}));
 mock.module('@/lib/normalResultsRuntime',()=>({normalResults:{resume(){},suspend(){},claimGuest:async(id:string,token:string)=>{assert.equal(id,serverSession);assert.equal(token,'synthetic-guest-token');claims++;serverClaimed=true;checkpoint('claim-before-ack');return id;}}}));
-mock.module('@/lib/purchases',()=>({identifyPurchasesUser:async()=>null}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, identifyPurchasesUser:async()=>null}));
 mock.module('react-native',()=>({Platform:{OS:'ios'},AppState:{addEventListener:()=>({remove(){}})}}));
 const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
 const {AuthProvider,useAuth}=await import('../providers/auth');

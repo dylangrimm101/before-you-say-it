@@ -16,7 +16,7 @@ const Stack=Object.assign(Host,{Screen:()=>null});
 mock.module('expo-router',()=>({Stack,useRouter:()=>router,useSegments:()=>segments,useGlobalSearchParams:()=>({id:segments[1],...routeParams})}));
 mock.module('@/providers/store',()=>({StoreProvider:Host,useStore:()=>store}));
 mock.module('@/providers/auth',()=>({AuthProvider:Host,useAuth:()=>account}));
-mock.module('@/lib/purchases',()=>({}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, }));
 mock.module('react-native',()=>({View:Host,Text:Host,Pressable:Host,Platform:{OS:'web',select:(v:any)=>v.web??v.default}}));
 mock.module('react-native-gesture-handler',()=>({GestureHandlerRootView:Host}));
 mock.module('expo-font',()=>({useFonts:()=>[true,null]}));

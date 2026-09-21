@@ -89,3 +89,10 @@ Standalone tests include pure helpers, source/config assertions and modeled tran
 ## Release / publication boundary
 
 No build/export was run, including unsigned Expo export. No EAS or provider operations, deployment, hosted migration, purchase, push or Rork activation. Saved-results flag remains default-off; backend selector/installer and installed-device acceptance remain separate dependencies. Publication stays blocked pending verified repository privacy, Rork access and active branch/branch-selection support, plus explicit publication approval.
+# Trial offer and reminder coverage
+
+For trial/paywall changes, also run `bun test __tests__/trialOffer.test.ts __tests__/trialReminderNative.test.ts __tests__/subscriptionPreview.test.ts __tests__/nativeCustomerJourney.test.ts __tests__/onboardingCompletion.test.ts` with the same locked external fixtures and network-denied environment as the release gate.
+
+Check eligible, ineligible, unknown, and unavailable store offers; all three offer screens; required account return; purchase cancellation and restore; notification permission denial and scheduling failure without blocking practice. A reminder must use the actual active Apple trial expiry minus 48 hours, remain idempotent, and preserve unrelated reminders. Never display a scheduled confirmation before native schedule readback succeeds.
+
+Real device acceptance remains separate: confirm the installed candidate, actual store price/trial, purchase, and notification delivery. Accelerated sandbox trials shorter than 48 hours cannot honestly produce a two-day-before reminder; do not substitute guessed dates and call that production scheduling proof.
