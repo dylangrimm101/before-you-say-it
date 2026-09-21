@@ -1,5 +1,20 @@
 # Local checks and test seams
 
+## Native layout-event regression (September 20)
+
+`test:release` now includes `resultCardStack.test.tsx` via `test:spoken`.
+The fixture releases layout events immediately after callbacks and flushes queued
+React updates afterward. This caught the build-32 result-card defect that permanent
+mock events hid. Keep this lifetime behavior, long-content measurements, CTA
+reachability and reduced-motion assertions. The release-policy suite checks that
+the regression remains wired into the gate.
+
+Run the full three-track onboarding continuation through report/cards, account,
+simulated purchase and first practice separately with the pinned connected driver.
+Those manually mounted screen tests are not native navigation or an Apple purchase.
+Use the physical-iPhone steps in SPOKEN-RELEASE-CHECKLIST.md before declaring device
+acceptance; report unavailable crash evidence and untested stages explicitly.
+
 ## Required spoken-flow gate (added September 19, 2026)
 
 The consolidated command is now `bun run test:release` from `expo/`, using the

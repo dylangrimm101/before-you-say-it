@@ -4,6 +4,11 @@ Speaking is the primary journey. Typing is a separately tested fallback, never a
 substitute for any gate below. An automated pass must not be described as a
 verified iPhone experience.
 
+Consolidated source/native-simulator/TestFlight status and added coverage:
+[NATIVE-ACCEPTANCE-MATRIX.md](NATIVE-ACCEPTANCE-MATRIX.md). This matrix supplements
+the requirements below and preserves historical evidence; simulator execution
+does not replace physical-device acceptance.
+
 ## 1. Automated gate — before an authorized TestFlight candidate
 
 Record the exact candidate commit (or explicitly label an uncommitted working-tree
@@ -36,6 +41,22 @@ that a rejected continuation cannot leave recording active behind an error scree
 Recorder/player hardware and provider responses are simulated. Separate native
 audio-byte/playback tests and joined transport tests complement this coverage;
 none establishes physical-device success.
+
+### Native event and rendering boundary
+
+- The release gate must run the mounted result-card regression. Dispatch layout
+  callbacks in one React batch and release each event (`nativeEvent = null`)
+  immediately afterward, before deferred state updates flush. Never use only
+  permanently live event objects. Copy measurements synchronously in production.
+- Verify measured long-card pinning, CTA reachability and reduced-motion access.
+  Passing navigation assertions without exercising layout is not native screen
+  rendering coverage. Inspect other event-based deferred updates when relevant.
+- Preserve a failing-before/passing-after regression for each reproduced crash.
+  A local reproduction establishes a defect, not the exact phone incident's cause
+  without matching crash evidence. Capture build/time and available Apple report.
+- State what the tools actually exercised. Code, mocked components and accessible
+  crash reports can reveal native defects, but do not substitute for operating the
+  installed iPhone app. Do not label those tests physical-device end-to-end tests.
 
 For voice-failure fixes, inject second-response TTS failure and press BOTH recovery
 paths in separate runs on every track: Keep reading through explicit transcript
@@ -104,7 +125,13 @@ Complete this flow independently for EACH track:
    and explicit approval work. Do not switch to typing to get through this step.
 5. Hear Hope's second response and check matching text/audio presentation.
 6. Review the full exchange, approve once, and reach debrief without duplicate work.
-7. Leave and start another rehearsal; confirm no stale conversation blocks entry.
+7. Continue through “See what changes with practice” → “See the practice plan”.
+   Verify the card screen renders without termination; scroll the entire evidence
+   card and overlapping plan card, then press “See my practice plan”.
+8. Complete the offer/account flow through an explicitly authorized Apple sandbox
+   purchase, success and first-practice navigation. Record actual versus simulated
+   purchase separately; no purchase authorization is granted by this checklist.
+9. Leave and start another rehearsal; confirm no stale conversation blocks entry.
 
 Also test microphone permission denial/recovery, brief background/foreground,
 leaving while recording, and stopping Hope's playback. Verify the microphone is
