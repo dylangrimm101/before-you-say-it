@@ -79,7 +79,7 @@ describe("remaining native acquisition and paid experience", () => {
     expect(paywall).toContain('label="Before purchase"');
     expect(paywall).toContain('label="When you confirm"');
     expect(paywall).toContain('label="Next renewal"');
-    expect(paywall).toContain('Continue to account');
+    expect(paywall).toContain('Create account to continue');
     expect(paywall).not.toContain("We’ll remind you");
     expect(paywall).toContain("curriculumModule(moduleId)");
     expect(paywall).toContain("monthlyTerms?.priceString");

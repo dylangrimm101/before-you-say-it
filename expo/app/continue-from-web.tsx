@@ -83,7 +83,7 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
             <Text style={styles.title}>{signup ? "Create your account" : "Enter your email"}</Text>
           </Reveal>
           {hasCurrentGuestPractice ? <Text style={styles.lede}>Save this current rehearsal to your account.</Text> : null}
-          {subscriptionIntent ? <Text style={styles.lede}>After verification, you’ll return to the monthly offer. Signing in does not start a subscription.</Text> : null}
+          {subscriptionIntent ? <Text style={styles.lede}>After verification, you’ll return to checkout. Creating an account or signing in does not start a subscription or charge you.</Text> : null}
           {continuationIssue ? <Text style={styles.error} accessibilityRole="alert">{continuationIssue}</Text> : null}
           <Reveal index={1} style={styles.formWrap}>
             <TextInput
@@ -113,7 +113,7 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
               autoCapitalize="none"
               autoCorrect={false}
               secureTextEntry
-              textContentType="password"
+              textContentType={signup && !confirmationPending ? "newPassword" : "password"}
               editable={!isSubmitting}
               style={styles.input}
               accessibilityLabel="Password"
@@ -147,9 +147,9 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
               disabled={isSubmitting}
               onPress={() => { setSignup(false); setConfirmationPending(false); setError(""); }}
               style={styles.forgotWrap}
-              accessibilityLabel="I already have an account"
+              accessibilityLabel="Already have an account? Sign in"
             >
-              <Text style={styles.forgot}>I already have an account</Text>
+              <Text style={styles.forgot}>Already have an account? Sign in</Text>
             </PressCard>
           ) : null}
           {!signup && (!session?.user || session.user.is_anonymous) ? (

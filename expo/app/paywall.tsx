@@ -55,15 +55,16 @@ export default function Paywall() {
   if (__DEV__ && stagingWebBridge && (stagingWebBridge.hasKnownWebPurchase() || stagingPurchasePresentation(webState, false) === "verify-web")) {
     return <Unavailable title="Check your web purchase first." body="Web subscription access is not currently verified. Recheck your saved result before purchasing again; this screen does not grant paid access." onBack={() => router.replace("/staging-web-result")} />;
   }
-  const verifyAccount = () => router.push({ pathname: "/continue-from-web", params: {
+  const verifyAccount = (mode: "signup" | "login" = "login") => router.push({ pathname: "/continue-from-web", params: {
+    mode,
     returnTo: "subscription",
     ...(isModuleId(params.moduleId) ? { moduleId: params.moduleId } : {}),
     ...(params.gate === "recommended-path" ? { gate: params.gate } : {}),
   } });
   if(normalBillingEnabled)return <NativeBillingGate
-    guestPreview={<ApplePaywall onVerifyAccount={verifyAccount} />}
+    guestPreview={<ApplePaywall onVerifyAccount={() => verifyAccount("signup")} />}
     renderStatus={content => <BillingStatus>{content}</BillingStatus>}
-    onContinue={()=>router.replace("/(tabs)/library")} onLogin={verifyAccount}
+    onContinue={()=>router.replace("/(tabs)/library")} onLogin={() => verifyAccount("login")}
   ><ApplePaywall /></NativeBillingGate>;
   return <ApplePaywall />;
 }
@@ -136,7 +137,7 @@ function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}
   const isApprovedStoreOffer = Boolean(
     plans.monthly && monthlyTerms?.periodLabel === "1 month" && monthlyTerms.priceString,
   );
-  const purchaseLabel = onVerifyAccount ? "Continue to account" : sevenDayTrial ? "Start my 7-day free trial" : "Subscribe monthly";
+  const purchaseLabel = onVerifyAccount ? "Create account to continue" : sevenDayTrial ? "Start my 7-day free trial" : "Subscribe monthly";
   const actions = commerceActionPresentation(commerceState, isPro, purchaseLabel);
   const hasCompleteEarnedResult = Boolean(activePracticeSession?.sharedResult?.pressure_moment && activePracticeSession.sharedResult.practice_shift && activePracticeSession.sharedResult.starting_index && activePracticeSession.sharedResult.first_focus);
   const earnedOfferBlocked = params.source === "debrief" && !hasCompleteEarnedResult;

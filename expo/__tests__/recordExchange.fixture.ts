@@ -53,9 +53,9 @@ plugin({name:'joined-record-exchange',setup(build){
         assert.equal(route.pathname,'/paywall');params={...route.params};await mount(Paywall);
         await press('Continue');await press('Continue');
         assert.ok(text().includes('$7.49'),'synthetic StoreKit catalog price');
-        await press('Continue to account');assert.equal(route.pathname,'/continue-from-web');
+        await press('Create account to continue');assert.equal(route.pathname,'/continue-from-web');
         params={...route.params};await mount(Login);
-        assert.ok(text().includes('Create an account'));
+        assert.ok(text().includes('Create your account'));
         console.log('PASS connected fresh spoken journey through report, cards, all offer screens and account entry; purchase NOT performed');
       `);
     }
