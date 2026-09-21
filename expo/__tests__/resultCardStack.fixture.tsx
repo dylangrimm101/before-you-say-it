@@ -29,10 +29,17 @@ const node = (id: string) => root.root.findAllByType('view').find((n: any) => n.
 assert.equal(node('result-card-stack').props.removeClippedSubviews, false);
 assert.equal(nativeDriver, true);
 await act(async () => {
-  node('result-card-stack').props.onLayout({ nativeEvent: { layout: { height: 750 } } });
-  node('result-index-card').props.onLayout({ nativeEvent: { layout: { height: 1000 } } });
+  // Native SyntheticEvents are released after each callback, before queued
+  // React state updaters necessarily execute. Persistent mocks hid this crash.
+  const dispatchLayout = (target: any, layout: any) => {
+    const event: any = { nativeEvent: { layout } };
+    target.props.onLayout(event);
+    event.nativeEvent = null;
+  };
+  dispatchLayout(node('result-card-stack'), { height: 750 });
+  dispatchLayout(node('result-index-card'), { height: 1000 });
   const header = root.root.findAllByType('view').find((n: any) => n.props.onLayout && !n.props.testID);
-  header.props.onLayout({ nativeEvent: { layout: { y: 79, height: 120 } } });
+  dispatchLayout(header, { y: 79, height: 120 });
 });
 assert.deepEqual(range.inputRange, [0, 569, 1569], 'long evidence finishes scrolling before it pins');
 assert.deepEqual(range.outputRange, [0, 0, 1000]);

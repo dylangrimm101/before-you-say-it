@@ -42,6 +42,38 @@ plugin({name:'joined-record-exchange',setup(build){
     }
     if(process.argv.includes('partner'))source=source.replaceAll("await press('Work')","await press('Partner or co-parent')");
     const replace=(a:string,b:string)=>{if(!source.includes(a))throw Error('Joined record seam changed: '+a.slice(0,60));source=source.replace(a,b);};
+    if(process.argv.includes('through-offer')){
+      replace("const {default:Debrief}=await import('../app/debrief/[id]');", "const {default:Debrief}=await import('../app/debrief/[id]');const {default:Paywall}=await import('../app/paywall');");
+      replace("useOfferings:()=>({data:null,isLoading:false})", "useOfferings:()=>({data:{current:{monthly:{identifier:'$rc_monthly',product:{identifier:'byis_pro_monthly_5',priceString:'$7.49',price:7.49,currencyCode:'USD',subscriptionPeriod:'P1M'}}}},isLoading:false}),useNativeServerAccess:()=>({data:false,isPending:false,isFetching:false,isError:false}),hasPro:()=>false");
+      replace("params={id};await mount(Debrief);\n        assert.equal(hasText('Practice unavailable'),false);", `params={id};await mount(Debrief);
+        assert.equal(hasText('Practice unavailable'),false);
+        await press('See what changes with practice');
+        await press('See the practice plan');
+        await press('See my practice plan');
+        assert.equal(route.pathname,'/paywall');params={...route.params};await mount(Paywall);
+        await press('Continue');await press('Continue');
+        assert.ok(text().includes('$7.49'),'synthetic StoreKit catalog price');
+        await press('Continue to account');assert.equal(route.pathname,'/continue-from-web');
+        params={...route.params};await mount(Login);
+        assert.ok(text().includes('Create an account'));
+        console.log('PASS connected fresh spoken journey through report, cards, all offer screens and account entry; purchase NOT performed');
+      `);
+    }
+    if(process.argv.includes('result-budget-block')){
+      replace("assert.ok(store.activePracticeSession.sharedResult,'second spoken turn reaches approved result');", `
+        assert.equal(bridge.responses.at(-1).status,429);
+        assert.equal(bridge.responses.at(-1).code,'spend_limit');
+        assert.ok(!store.activePracticeSession.sharedResult);
+        params={id};await mount(Debrief);
+        assert.ok(text().includes('429'));
+        await press('Recover my result');
+        for(let i=0;i<50;i++)await act(async()=>{await new Promise(r=>setTimeout(r,20));});
+        assert.ok(!store.activePracticeSession.sharedResult,'retry cannot bypass the unchanged daily limit');
+        assert.ok(text().includes('429'));
+        console.log('REPRODUCED result 429 and blocked recovery; payment NOT reached; synthetic ledger, production cost values');
+        await act(async()=>root.unmount());client.clear();Date.now=originalNow;await bridge.close();process.exit(0);
+      `);
+    }
     if(process.argv.includes('context-drift')){
       replace("await press('Stop and review your line');\n        assert.equal(counterpartCalls,1",`
         await press('Stop and review your line');

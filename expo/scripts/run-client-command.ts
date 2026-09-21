@@ -15,6 +15,7 @@ const commands: Record<LifecycleName, readonly string[]> = {
   "test-release-policy": ["bun", "test", "__tests__/releaseChecks.test.ts"],
   "test-spoken-joined": ["bun", "test", "./__tests__/recordExchange.check.ts"],
   "test-spoken": ["bun", "test",
+    "__tests__/resultCardStack.test.tsx",
     "__tests__/recordTransition.test.ts",
     "__tests__/rehearsalResponseUX.test.ts",
     "__tests__/recoveryDiagnostic.test.ts",

@@ -24,12 +24,22 @@ export function ResultCardStack({ header, first, second }: {
   }) }] } : undefined;
   const Container = reduced ? ScrollView : Animated.ScrollView;
   return <Container testID="result-card-stack" removeClippedSubviews={false}
-    onLayout={event => setLayout(current => ({ ...current, viewport: event.nativeEvent.layout.height }))}
+    onLayout={event => {
+      // Native events are pooled; copy measurements before queuing state work.
+      const height = event.nativeEvent.layout.height;
+      setLayout(current => ({ ...current, viewport: height }));
+    }}
     {...(!reduced ? { onScroll: Animated.event([{ nativeEvent: { contentOffset: { y: scroll } } }], { useNativeDriver: true }), scrollEventThrottle: 16 } : {})}
     contentContainerStyle={{ paddingHorizontal: GUTTER, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 }}
     showsVerticalScrollIndicator={false}>
-    <View onLayout={event => setLayout(current => ({ ...current, header: event.nativeEvent.layout.y + event.nativeEvent.layout.height }))}>{header}</View>
-    <Animated.View testID="result-index-card" onLayout={event => setLayout(current => ({ ...current, card: event.nativeEvent.layout.height }))}
+    <View onLayout={event => {
+      const { y, height } = event.nativeEvent.layout;
+      setLayout(current => ({ ...current, header: y + height }));
+    }}>{header}</View>
+    <Animated.View testID="result-index-card" onLayout={event => {
+      const height = event.nativeEvent.layout.height;
+      setLayout(current => ({ ...current, card: height }));
+    }}
       style={[styles.card, motion]}>{first}</Animated.View>
     <View testID="result-plan-card" style={[styles.card, styles.foreground]}>{second}</View>
   </Container>;

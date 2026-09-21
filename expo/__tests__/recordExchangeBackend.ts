@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import {createHash,randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
+import {readFile} from 'node:fs/promises';
 import {createNormalFreeSession} from '../lib/normalFreeSession';
 import {createGuestVisit} from '../lib/guestVisit';
 
@@ -17,10 +18,25 @@ export async function recordExchangeBackend(){
   const random=()=>randomBytes(32).toString('hex');
   const visit=createGuestVisit({now:Date.now,random});visit.activate(guestOwner);
   const user={id:guestOwner,is_anonymous:true};const disk=new Map<string,string>();
-  const runtime={origin:'https://beforeyousayit.app',key:'c'.repeat(64),spendLimitCents:1000,
+  const runtime={origin:'https://beforeyousayit.app',key:'c'.repeat(64),spendLimitCents:1000,alertOnly:false,measure:async(work:()=>Promise<Response>)=>work(),
     providerCosts:Object.fromEntries(['transcribe_opener','transcribe_reply','pushback','close','tts_pushback','tts_close','result'].map(k=>[k,1])),
     verifyOwner:async(h:string)=>h==='Bearer synthetic'?guestOwner:null,
     rpc:(o:string,b:unknown)=>db.call(b,'bysi_native_free_v2',o),guestRpc:(o:string,b:unknown)=>db.call(b,'bysi_native_guest_visit',o)};
+  // Read-only production configuration observed September 20, 2026. The seeded
+  // ledger below is synthetic: it is NOT a claim about the live incident's balance.
+  if(process.argv.includes('production-budget')){
+    runtime.spendLimitCents=2000;
+    runtime.providerCosts={pushback:75,close:75,result:175,tts_pushback:15,tts_close:15,transcribe_opener:10,transcribe_reply:10};
+    if(process.argv.includes('result-budget-block'))await db.db.query("insert into bysi_native_free.spend_day(spend_date,spent_cents) values((clock_timestamp() at time zone 'UTC')::date,1700)");
+  }
+  if(process.argv.includes('alert-only-budget')){
+    const {createSpendMeter,withSpendMeter}=await load('server/native-free/spend.mjs');
+    await db.db.exec(await readFile(backend+'/server/native-free/spend-alerts.sql','utf8'));
+    const meter=createSpendMeter({database:{transaction:(work:any)=>db.db.transaction(work)},voiceMicrosPerCharacter:100});
+    runtime.alertOnly=true;runtime.measure=work=>withSpendMeter(meter,work);
+    // Deliberately above the old ceiling. Must reach report/account entry anyway.
+    await db.db.query("insert into bysi_native_free.spend_day(spend_date,spent_cents) values((clock_timestamp() at time zone 'UTC')::date,1000000)");
+  }
   const route=createFreeRoute({getRuntime:()=>runtime});
   let audio:{text:string;role:string;turn:string}|null=null;
   let transcriptions=0;const responses:{operation:string;status:number;code?:string}[]=[];
@@ -88,6 +104,13 @@ export async function recordExchangeBackend(){
   return {request:transport.request,responses,get closeProviderCalls(){return closeProviderCalls;},get transcriptionCount(){return transcriptions;},
     async recording(turn:string){const form=new FormData();form.append('turn',turn);form.append('audio',new Blob([new Uint8Array([0,0,0,24,102,116,121,112,77,52,65,32,0,0,0,0])],{type:'audio/mp4'}),'synthetic.m4a');const r=await transport.request('transcribe',form);assert.equal(r.status,200);return (await r.json()).text;},
     async play(text:string){assert.ok(audio);assert.equal(text,audio.text);const r=await transport.request('tts',{text,role:audio.role});assert.equal(r.status,200);await r.arrayBuffer();},
-    async close(){transport.dispose();globalThis.fetch=previousFetch;await db.close();}
+    async close(){
+      if(process.argv.includes('alert-only-budget')){
+        const count=(await db.db.query('select count(*)::int n from bysi_spend.event')).rows[0].n;
+        assert.ok(count>=7,'usage metered for both recordings, responses, audio points and report');
+        assert.ok(responses.every(r=>r.code!=='spend_limit'),'no spending denial');
+      }
+      transport.dispose();globalThis.fetch=previousFetch;await db.close();
+    }
   };
 }
