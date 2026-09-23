@@ -1,5 +1,14 @@
 import {test,expect} from 'bun:test';
 import {createOwnerVoiceCache,quarantineOwnerVoiceCache} from '../lib/ownerVoiceCache';
+test('visit cache pruning erases only validated older visits of the same owner',async()=>{
+ const prefix='cache/rehearsal-voice/owners/';const base='env:owner';
+ const old=base+':visit:'+'a'.repeat(64),current=base+':visit:'+'b'.repeat(64),foreign='env:other:visit:'+'c'.repeat(64);
+ const files=new Map([old,current,foreign,base].map(owner=>[prefix+encodeURIComponent(owner)+'/line.mp3','synthetic']));
+ const fs:any={cacheDirectory:'cache/',getInfoAsync:async(k:string)=>({exists:[...files.keys()].some(f=>f.startsWith(k))}),readDirectoryAsync:async()=>[...files.keys()].map(k=>k.slice(prefix.length).split('/')[0]),deleteAsync:async(k:string)=>{for(const f of files.keys())if(f.startsWith(k))files.delete(f);}};
+ await createOwnerVoiceCache(fs).eraseOtherVisits(base,current);
+ expect(files.size).toBe(3);expect([...files.keys()].some(k=>k.includes(encodeURIComponent(old)))).toBe(false);
+ expect([...files.keys()].some(k=>k.includes(encodeURIComponent(current)))).toBe(true);
+});
 test('targeted generated audio erase preserves B and rejects late A writes',async()=>{
  const files=new Map<string,string>();const fs:any={cacheDirectory:'cache/',EncodingType:{Base64:'base64'},makeDirectoryAsync:async()=>{},writeAsStringAsync:async(k:string,v:string)=>{files.set(k,v);},getInfoAsync:async(k:string)=>({exists:[...files.keys()].some(f=>f===k||f.startsWith(k))}),deleteAsync:async(k:string)=>{for(const f of files.keys())if(f===k||f.startsWith(k))files.delete(f);},readDirectoryAsync:async()=>[]};
  const cache=createOwnerVoiceCache(fs);const a=cache.lease('A'),b=cache.lease('B');

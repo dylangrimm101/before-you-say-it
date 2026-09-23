@@ -19,7 +19,7 @@ mock.module('@/providers/store',()=>({useStore:()=>({activeScenarioRun:null,acti
 mock.module('expo-file-system',()=>({File:class {exists=false;delete(){}}}));
 mock.module('expo-file-system/legacy',()=>({deleteAsync:async()=>{}}));
 mock.module('expo-crypto',()=>({randomUUID:()=>crypto.randomUUID()}));
-mock.module('@/lib/purchases',()=>({useIsPro:()=>false}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, useIsPro:()=>false}));
 mock.module('@/lib/ai',()=>Object.fromEntries(['evaluatePilotAttempt','nextPilotCounterpart','generateM1L1DynamicReply','generateApprovedRehearsalDynamicReply','generateDebrief','nextCounterpartTurn','drillRoundFeedback'].map(x=>[x,async()=>{throw Error('No provider')}])));
 let generation=0,cancelled:number[]=[],resets=0;
 const pending=new AbortController();

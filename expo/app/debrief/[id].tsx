@@ -316,7 +316,7 @@ function PhaseGraph() {
 }
 
 function FreeDebrief({ id, build }: { id: string; build: ConversionBuild | null }) {
-  const {user,normalResults}=useAuth();
+  const {user,normalResults,continuationIssue}=useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { sessions, activePracticeSession, saveActivePracticeSession, isLocalGuestContinuation } = useStore();
@@ -403,6 +403,7 @@ function FreeDebrief({ id, build }: { id: string; build: ConversionBuild | null 
   if (activePracticeSession?.id === id && activePracticeSession.sharedResult) {
     return <View style={{ flex: 1 }}>
       {isLocalGuestContinuation ? <Text style={{ color: C.textSoft, backgroundColor: C.bg, paddingHorizontal: GUTTER, paddingVertical: 8 }}>Local user-provided practice · Not an authenticated web result. No paid access granted.</Text> : null}
+      {isLocalGuestContinuation && continuationIssue ? <Text accessibilityRole="alert" style={{ color: C.textSoft, paddingHorizontal: GUTTER, paddingVertical: 8 }}>{continuationIssue}</Text> : null}
       <FreeJourneyResults session={activePracticeSession} />
       {user && normalResults ? <View style={{paddingHorizontal:GUTTER,paddingBottom:insets.bottom+16,backgroundColor:C.bg}}><PrimaryButton label="Continue with saved result" onPress={()=>router.replace('/saved-result')}/></View> : null}
     </View>;

@@ -9,13 +9,7 @@ describe("TestFlight foundation", () => {
     const pkg = JSON.parse(packageText) as { dependencies?: Record<string, string> };
     expect(metro).not.toContain("withRorkMetro");
     expect(metro).not.toContain("@rork-ai/toolkit-sdk");
-    expect(pkg.dependencies?.["@rork-ai/toolkit-sdk"]).toBe("0.3.0");
-    for (const directory of ["app", "components", "providers", "lib"]) {
-      const glob = new Bun.Glob("**/*.{ts,tsx,js,jsx}");
-      for await (const file of glob.scan(`${root}/${directory}`)) {
-        expect(await text(`${directory}/${file}`)).not.toMatch(/(?:from\s*|import\s*\(|require\s*\()\s*["']@rork-ai\/toolkit-sdk/);
-      }
-    }
+    expect(pkg.dependencies?.["@rork-ai/toolkit-sdk"]).toBeUndefined();
     expect(pkg.dependencies?.["expo-location"]).toBeUndefined();
     expect(pkg.dependencies?.["expo-image-picker"]).toBeUndefined();
     expect(pkg.dependencies?.["expo-av"]).toBeUndefined();

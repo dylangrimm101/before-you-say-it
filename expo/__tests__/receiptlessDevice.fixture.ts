@@ -73,7 +73,7 @@ const Host=(p:any)=>React.createElement('host',p,p.children);
 class Value{setValue(){}stopAnimation(){}interpolate(){return this;}addListener(){return 'x';}removeListener(){}}
 const animation={start:(cb:any)=>cb?.({finished:true}),stop(){}};
 mock.module('react-native',()=>({View:Host,Text:Host,Image:Host,ScrollView:Host,Pressable:(p:any)=>React.createElement('button',p,p.children),TextInput:(p:any)=>React.createElement('input',p),AppState:{addEventListener:(_type:string,listener:(state:string)=>void)=>{appStateListeners.add(listener);return {remove(){appStateListeners.delete(listener);}}}},AccessibilityInfo:{announceForAccessibility(){}},ActivityIndicator:Host,KeyboardAvoidingView:Host,Animated:{Value,View:Host,Text:Host,ScrollView:Host,event:()=>()=>{},timing:()=>animation,parallel:()=>animation,stagger:()=>animation},Easing:{bezier:()=>()=>{},out:()=>()=>{},cubic:()=>{}},InteractionManager:{runAfterInteractions:(fn:any)=>{fn();return {cancel(){}};}},Keyboard:{dismiss(){},addListener:()=>({remove(){}})},Alert:{alert(){}},Linking:{openURL:async()=>{}},useWindowDimensions:()=>({width:390,height:844}),Platform:{OS:'ios',select:(v:any)=>v.ios??v.default},StyleSheet:{create:(v:any)=>v,absoluteFillObject:{}}}));
-mock.module('@/lib/purchases',()=>({PRO_ENTITLEMENT:'pro',useNativeServerAccess:()=>({data:false,isPending:false}),identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>false,useCustomerInfo:()=>({data:null,isLoading:false}),useOfferings:()=>({data:null,isLoading:false}),usePurchasePackage:()=>({isPending:false}),useRestorePurchases:()=>({isPending:false})}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, PRO_ENTITLEMENT:'pro',useNativeServerAccess:()=>({data:false,isPending:false}),identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>false,useCustomerInfo:()=>({data:null,isLoading:false}),useOfferings:()=>({data:null,isLoading:false}),usePurchasePackage:()=>({isPending:false}),useRestorePurchases:()=>({isPending:false})}));
 mock.module('@/lib/reminders',()=>({cancelChallengeNudge:async()=>{},cancelDailyReminder:async()=>{},syncChallengeNudge:async()=>{}}));
 mock.module('@/lib/voice',()=>({deleteGeneratedVoiceCacheStrict:async()=>{},resetSpeech:async()=>{},stopSpeech:async()=>{}}));
 mock.module('lucide-react-native',()=>Object.fromEntries(['Bookmark','Star','TrendingUp','X','AlertCircle','ChevronDown','Clock3','ArrowUp','Keyboard','Mic','RotateCcw','Square','Volume2','VolumeX','Lock','ArrowLeft','LockKeyhole','Check','ChevronRight','PenLine','Sparkles','Circle','Info','Settings','Target','Trash2','CreditCard','Database','FileText','FlaskConical','HelpCircle','Mic2','RefreshCw','ShieldCheck','UserRound'].map(k=>[k,()=>null])));
@@ -117,7 +117,7 @@ const {createPresetPracticeSession,associatePracticeSessionUser,preserveFreeRehe
 const {BASELINE_DIR_NAME,baselineFileName}=await import('../lib/baselineAudio');
 let practiceStore:any,latePractice:(()=>Promise<void>)|null=null;
 const {default:Root}=await import('../app/_layout');
-const {default:Entry}=await import('../app/entry');
+const {LegacyEntryScreen:Entry}=await import('../app/entry');
 const {default:Login}=await import('../app/continue-from-web');
 const {default:Settings}=await import('../app/settings');
 const {default:Delete}=await import('../app/delete-account');

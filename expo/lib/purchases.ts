@@ -13,6 +13,9 @@ import { useEffect } from 'react';
 import { hasActiveEntitlement } from "@/lib/commerce";
 import { createPurchasesIdentityBoundary } from "@/lib/purchasesIdentity";
 import { errorShape, safeLog } from "@/lib/redact";
+import { syncTrialReminder } from './trialReminder';
+import {checkPurchaseFirstPolicy,purchaseFirstEnabled} from './purchaseFirstPolicy';
+import {purchasePending} from './purchaseFirstPending';
 
 export const PRO_ENTITLEMENT = "pro";
 
@@ -21,6 +24,7 @@ type PurchasesModule = {
   configure: (options: { apiKey: string }) => void;
   getCustomerInfo: () => Promise<CustomerInfo>;
   getOfferings: () => Promise<PurchasesOfferings>;
+  checkTrialOrIntroductoryPriceEligibility: (ids: string[]) => Promise<Record<string, { status: number }>>;
   purchasePackage: (pkg: PurchasesPackage) => Promise<{ customerInfo: CustomerInfo }>;
   restorePurchases: () => Promise<CustomerInfo>;
   logIn: (appUserID: string) => Promise<{ customerInfo: CustomerInfo; created: boolean }>;
@@ -109,7 +113,8 @@ export function hasPro(info: CustomerInfo | null | undefined): boolean {
 
 let migrationRequired = false;
 const purchasesIdentity = createPurchasesIdentityBoundary<CustomerInfo>(async (userId) => {
-  const normalizedUserId = userId?.trim() ?? "";
+  const claimAnonymous=userId?.startsWith('claim-anonymous:')===true;
+  const normalizedUserId = claimAnonymous?userId!.slice('claim-anonymous:'.length):userId?.trim() ?? "";
   if (!sdk || !configured) return null;
   try {
     if (!normalizedUserId) {
@@ -118,7 +123,7 @@ const purchasesIdentity = createPurchasesIdentityBoundary<CustomerInfo>(async (u
       return await sdk.logOut();
     }
     const boundId = nativeBilling ? await nativeBilling.identify() : normalizedUserId;
-    if (nativeBilling && normalizedUserId !== "restore-existing-purchase" && await sdk.getAppUserID() !== boundId && hasPro(await sdk.getCustomerInfo())) {
+    if (nativeBilling && normalizedUserId !== "restore-existing-purchase" && await sdk.getAppUserID() !== boundId && hasPro(await sdk.getCustomerInfo()) && !(claimAnonymous&&await sdk.isAnonymous())) {
       // Preserve the old account/guest identity until an explicit restore action.
       migrationRequired = true;
       return null;
@@ -134,12 +139,18 @@ const purchasesIdentity = createPurchasesIdentityBoundary<CustomerInfo>(async (u
 
 /** Null selects the SDK's anonymous identity, not a Supabase guest ID. */
 export function identifyPurchasesUser(userId: string | null): Promise<CustomerInfo | null> {
+  // Keep an existing OS reminder while identity refresh is pending or offline.
+  // Only a verified customer snapshot (or explicit account reset) can replace it.
   if(!userId)nativeBilling?.suspend();
-  return purchasesIdentity.sync(userId);
+  return purchasesIdentity.sync(userId).then(info => {
+    if (info) void syncTrialReminder(info);
+    return info;
+  });
 }
 
 /** Clears any authenticated RevenueCat app-user identity during data reset. */
 export async function clearPurchasesIdentity(): Promise<void> {
+  void syncTrialReminder(null);
   nativeBilling?.suspend();
   if (!sdk || !configured) return;
   const info = await purchasesIdentity.sync(null);
@@ -147,30 +158,68 @@ export async function clearPurchasesIdentity(): Promise<void> {
 }
 
 export function useCustomerInfo() {
-  return useQuery<CustomerInfo | null>({
+  const query = useQuery<CustomerInfo | null>({
     queryKey: ["rc", "customerInfo"],
-    queryFn: () => purchasesIdentity.runVerified(() => requireSdk().getCustomerInfo()),
+    queryFn: async () => {
+      const info = await purchasesIdentity.runVerified(() => requireSdk().getCustomerInfo());
+      void syncTrialReminder(info);
+      return info;
+    },
     enabled: purchasesAvailable,
     staleTime: 60_000,
   });
+  const refetch = query.refetch;
+  useEffect(() => {
+    const sub = ReactNative.AppState?.addEventListener('change', state => {
+      if (state === 'active' && purchasesAvailable) void refetch();
+    });
+    return () => sub?.remove();
+  }, [refetch]);
+  return query;
+}
+
+export async function trialEligibility(productId: string): Promise<number> {
+  if (Platform.OS !== 'ios' || !purchasesAvailable) return 0;
+  try {
+    const result = await purchasesIdentity.runVerified(() => requireSdk().checkTrialOrIntroductoryPriceEligibility([productId]));
+    return result[productId]?.status ?? 0;
+  } catch { return 0; }
 }
 
 /** True when the user has the active "pro" entitlement. */
 export function useIsPro(): boolean {
   const { data } = useCustomerInfo();
   const access = useNativeServerAccess();
-  return normalBillingEnabled ? access.data === true && !access.isError && !access.isPending && !access.isFetching : hasPro(data);
+  return normalBillingEnabled ? access.data === true && !access.isError && !access.isPending : hasPro(data);
 }
 
-export function useNativeServerAccess() {
+export function useNativeServerAccess(enabled = true) {
   const queryClient = useQueryClient();
-  const query = useQuery<boolean>({queryKey:['native','access'],queryFn:()=>nativeBilling!.access(),enabled:!!nativeBilling,retry:false,staleTime:0,refetchInterval:15000});
+  const query = useQuery<boolean>({queryKey:['native','access'],queryFn:async()=>{
+    if(await nativeBilling!.access())return true;
+    // A successful SDK login can link an anonymous receipt without producing a
+    // new purchase webhook. Finish the existing server-owned claim protocol on
+    // this already verified identity; never restore, reidentify or buy here.
+    if(migrationRequired)throw Error('An existing purchase needs account recovery. Restore purchases in Account settings; do not buy again.');
+    return purchasesIdentity.runVerified(async()=>{
+      const info=await requireSdk().getCustomerInfo();
+      if(!hasPro(info))return false;
+      if(purchaseFirstEnabled&&await checkPurchaseFirstPolicy()){
+        const response=await nativeBilling!.request('claim');
+        const body=await response.json();
+        if(response.ok&&body.allowed===true)return true;
+      }
+      // SDK evidence prevents another offer, but only the server may admit.
+      throw Error('Your Apple purchase is awaiting account verification. Retry or restore in Account settings; do not buy again.');
+    });
+  },enabled:!!nativeBilling && enabled,retry:false,staleTime:0,refetchInterval:15000});
   useEffect(()=>{
     if(!nativeBilling)return;
     const sub=ReactNative.AppState?.addEventListener('change',next=>{
-      queryClient.setQueryData(['native','access'],false);
       nativeBilling?.invalidate();
-      if(next==='active')void queryClient.invalidateQueries({queryKey:['native','access']});
+      // Unknown is not confirmed absence of a subscription. Do not send a
+      // returning subscriber to checkout while foreground verification runs.
+      if(next==='active')void queryClient.resetQueries({queryKey:['native','access']});
     });return ()=>sub?.remove();
   },[queryClient]);
   return query;
@@ -201,6 +250,7 @@ export function usePurchasePackage() {
           return requireSdk().purchasePackage(pkg);
         });
         queryClient.setQueryData(["rc", "customerInfo"], customerInfo);
+        void syncTrialReminder(customerInfo);
         const allowed = nativeBilling ? await nativeBilling.access() : hasPro(customerInfo);
         if(nativeBilling)queryClient.setQueryData(['native','access'],allowed);
         return { status: allowed ? "purchased" as const : "entitlement_delayed" as const };
@@ -228,9 +278,70 @@ export function useRestorePurchases() {
       }
       const info = await purchasesIdentity.runVerified(() => requireSdk().restorePurchases());
       queryClient.setQueryData(["rc", "customerInfo"], info);
-      const allowed = nativeBilling ? await nativeBilling.access() : hasPro(info);
+      void syncTrialReminder(info);
+      let allowed = nativeBilling ? await nativeBilling.access() : hasPro(info);
+      // Restore is also the recovery entry point after leaving onboarding. The
+      // server, never the restored SDK snapshot, decides whether linking is safe.
+      if(nativeBilling && !allowed && hasPro(info) && purchaseFirstEnabled && await checkPurchaseFirstPolicy()) {
+        const response=await nativeBilling.request('claim');
+        const body=await response.json();
+        if(!response.ok||typeof body.allowed!=='boolean')throw Error('Purchase linking is unavailable. Retry restore; do not repurchase.');
+        allowed=body.allowed;
+      }
       if(nativeBilling)queryClient.setQueryData(['native','access'],allowed);
       return allowed;
     },
   });
+}
+
+/** Apple confirmation before signup is not lesson admission. Never resets an SDK identity. */
+export function usePreAccountPurchase(){
+ const client=useQueryClient();
+ return useMutation<{status:'account_required'|'cancelled'|'pending'},Error,{kind:'buy'|'restore'|'recover';pkg?:PurchasesPackage}>({mutationFn:async({kind,pkg})=>{
+  if(!await checkPurchaseFirstPolicy())throw Error('Purchase setup is unavailable. No purchase was started.');
+  try{
+   const info=await purchasesIdentity.runVerified(async()=>{
+    const sdk=requireSdk();if(!await sdk.isAnonymous())throw Error('Sign into your existing account to recover this purchase.');
+    const id=await sdk.getAppUserID();
+    const current=await sdk.getCustomerInfo();if(hasPro(current)){await purchasePending.clear(id);return current;}
+    if(kind==='restore'){const restored=await sdk.restorePurchases();if(hasPro(restored))await purchasePending.clear(id);return restored;}
+    if(!pkg||pkg.product.identifier!=='byis_pro_monthly_5')throw Error('Unsupported subscription');
+    if(kind==='recover'){
+      // Explicit Apple-mediated recovery, not automatic retry or proof of no charge.
+      // First recover any active subscription. Never retry known deferred payment.
+      const restored=await sdk.restorePurchases();
+      if(hasPro(restored)){await purchasePending.clear(id);return restored;}
+      if(await purchasePending.deferred(id))return restored;
+    }else if(await purchasePending.read(id))throw Error('A prior purchase is unconfirmed. Recheck or restore; do not purchase again.');
+    await purchasePending.mark(id);
+    try{const purchased=(await sdk.purchasePackage(pkg)).customerInfo;if(hasPro(purchased))await purchasePending.clear(id);return purchased;}
+    catch(e){
+      const error=e as {userCancelled?:boolean;code?:string};
+      if(error.code==='20'||error.code==='PAYMENT_PENDING')await purchasePending.markDeferred(id);
+      // Only definitive cancellation/rejection clears uncertainty. Network,
+      // store, receipt and pending errors may follow a successful transaction.
+      if(kind!=='recover'&&(error.userCancelled||['1','3','4','5'].includes(String(error.code))))await purchasePending.clear(id);
+      throw e;
+    }
+   });
+   client.setQueryData(['rc','customerInfo'],info);
+   return {status:hasPro(info)?'account_required':'pending'};
+  }catch(e){const err=e as {userCancelled?:boolean;code?:string};if(err.userCancelled)return {status:'cancelled'};if(err.code==='20'||err.code==='PAYMENT_PENDING')return {status:'pending'};throw e;}
+ }});
+}
+
+/** Explicit account-return/recovery. Server accepts no client purchase evidence. */
+export function useClaimPreAccountPurchase(){
+ const client=useQueryClient();
+ return useMutation<'linked'|'pending'|'no_purchase',Error,string>({mutationFn:async owner=>{
+  if(!nativeBilling||!owner||!await checkPurchaseFirstPolicy())throw Error('Purchase linking is unavailable. Do not repurchase.');
+  const info=await purchasesIdentity.sync(`claim-anonymous:${owner}`);
+  if(!info)throw Error('Purchase identity needs recovery. Sign into the original account or restore.');
+  client.setQueryData(['rc','customerInfo'],info);
+  if(!hasPro(info))return 'no_purchase';
+  const response=await nativeBilling.request('claim');const body=await response.json();
+  if(!response.ok||typeof body.allowed!=='boolean')throw Error('Purchase linking is unavailable. Do not repurchase.');
+  client.setQueryData(['native','access'],body.allowed);
+  return body.allowed?'linked':'pending';
+ }});
 }

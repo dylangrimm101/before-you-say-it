@@ -1,18 +1,34 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
-const { prepareReleaseEnvironment, assertReleaseClientInputs, assertReleaseToolchain } = require("./scripts/release-env.cjs");
-
 export default function configure({ config }: ConfigContext): ExpoConfig {
-  if (prepareReleaseEnvironment()) assertReleaseToolchain(__dirname);
   const mode = process.env.EXPO_PUBLIC_BYSI_BUILD_MODE;
-  // Rork's native release runner need not set an EAS profile.
-  // Apply the same reviewed checks to non-staging production exports.
-  if (process.env.EAS_BUILD_PROFILE === "testflight" || (process.env.NODE_ENV === "production" && !mode)) {
-    assertReleaseClientInputs();
+  if (process.env.EAS_BUILD_PROFILE === "testflight") {
+    if (mode || Object.keys(process.env).some(name => name.startsWith("EXPO_PUBLIC_STAGING_") && process.env[name])
+      || process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY) throw new Error("TestFlight rejects staging and Test Store inputs");
     if (config.ios?.bundleIdentifier !== "app.rork.8fc4qwsqaurkxk0pimyvx"
       || config.owner !== "dgrim101" || config.slug !== "8fc4qwsqaurkxk0pimyvx"
       || config.extra?.eas?.projectId !== "1b655360-557d-4dba-ad69-fbf26120e852") {
       throw new Error("TestFlight requires independently verified normal EAS owner/project association; staging cannot be reused");
+    }
+    // Registered free uses /api/native/free/*; paid uses /api/native/*.
+    // Both transports derive from this origin, not the old public-funnel inputs.
+    const allowedPublicInputs = new Set(["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY", "EXPO_PUBLIC_NATIVE_BILLING_ORIGIN", "EXPO_PUBLIC_NATIVE_RESULTS", "EXPO_PUBLIC_PURCHASE_FIRST", "EXPO_PUBLIC_PURCHASE_FIRST_AUDIENCE"]);
+    if (process.env.EXPO_PUBLIC_NATIVE_RESULTS && process.env.EXPO_PUBLIC_NATIVE_RESULTS !== 'normal-results-v1') throw new Error('TestFlight rejects unknown saved-result capability');
+    const purchaseFirst = process.env.EXPO_PUBLIC_PURCHASE_FIRST;
+    const purchaseAudience = process.env.EXPO_PUBLIC_PURCHASE_FIRST_AUDIENCE;
+    if ((purchaseFirst || purchaseAudience) && (purchaseFirst !== 'claim-v1' || purchaseAudience !== 'sandbox')) {
+      throw new Error('TestFlight requires the reviewed purchase-first version and sandbox audience together');
+    }
+    // Metro export:embed sets EXPO_PUBLIC_PROJECT_ROOT to the project path. That is not a product/funnel input.
+    const expoCliPublicNoise = new Set(["EXPO_PUBLIC_PROJECT_ROOT"]);
+    if (Object.keys(process.env).some(name => name.startsWith("EXPO_PUBLIC_") && process.env[name] && !allowedPublicInputs.has(name) && !expoCliPublicNoise.has(name))) {
+      throw new Error("TestFlight rejects unreviewed public inputs and legacy public-funnel endpoint overrides");
+    }
+    if (process.env.EXPO_PUBLIC_SUPABASE_URL !== "https://spvksnddzyvycfoefrcf.supabase.co"
+      || !/^sb_publishable_[A-Za-z0-9_-]+$/.test(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "")
+      || !/^appl_[A-Za-z0-9]+$/.test(process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? "")
+      || process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN !== "https://beforeyousayit.app") {
+      throw new Error("TestFlight requires reviewed normal Auth, iOS RevenueCat, billing and free-service inputs; no fallback");
     }
     // No OTA service is associated/accepted yet. TestFlight exercises embedded bytes.
     return { ...config, updates: { ...config.updates, enabled: false } } as ExpoConfig;

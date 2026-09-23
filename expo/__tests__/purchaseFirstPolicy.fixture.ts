@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+process.env.EXPO_PUBLIC_PURCHASE_FIRST='claim-v1';
+process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN='https://beforeyousayit.app';
+delete process.env.EXPO_PUBLIC_PURCHASE_FIRST_AUDIENCE;
+let audience='sandbox';
+globalThis.fetch=async()=>Response.json({purchaseFirstVersion:1,purchaseFirstAudience:audience});
+const {checkPurchaseFirstPolicy}=await import('../lib/purchaseFirstPolicy');
+assert.equal(await checkPurchaseFirstPolicy(),false,'production defaults reject sandbox readiness');
+audience='production';assert.equal(await checkPurchaseFirstPolicy(),true);
+process.env.EXPO_PUBLIC_PURCHASE_FIRST_AUDIENCE='sandbox';
+assert.equal(await checkPurchaseFirstPolicy(),false,'sandbox build requires sandbox runtime');
+audience='sandbox';assert.equal(await checkPurchaseFirstPolicy(),true);
+console.log('PASS purchase-first policy audience isolation');

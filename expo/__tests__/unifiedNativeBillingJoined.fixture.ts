@@ -10,9 +10,12 @@ if(process.env.BYSI_BASE_GATE==='1')plugin({name:'baseline-gate-proof',setup(bui
 import {verifyComponentTestDeps} from '../scripts/component-test-deps';
 const {create,act}=await import(verifyComponentTestDeps());
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;(globalThis as any).__DEV__=true;
-// Explicit retained worker-B source; never the shared live working tree.
-const web='/Users/donaldgrimm/bysi-native-release-tools/account-deletion-build/worker-b-build-services-20260911/snapshot/Users/donaldgrimm/Projects/bysi-web-claude-parity';
-const require=createRequire('/Users/donaldgrimm/bysi-testflight-foundation/artifacts/native-free-release-20260909/test-deps/package.json');const {PGlite}=require('@electric-sql/pglite');
+// Explicit reviewed local backend composition. Never fetch backend source or
+// silently fall back to a different checkout when these paths are unavailable.
+const web=process.env.BYSI_BILLING_BACKEND;
+const testDeps=process.env.BYSI_TEST_DEPS;
+assert.ok(web?.startsWith('/')&&testDeps?.startsWith('/'),'BYSI_BILLING_BACKEND and BYSI_TEST_DEPS must name reviewed absolute paths');
+const require=createRequire(testDeps+'/package.json');const {PGlite}=require('@electric-sql/pglite');
 const db=new PGlite();await db.exec(readFileSync(web+'/server/revenuecat/schema.sql','utf8'));
 const owner='11111111-1111-4111-8111-111111111111',now=1800000000000;
 const sandbox=process.env.BYSI_RC_FIXTURE_SANDBOX==='1';
@@ -107,6 +110,11 @@ await act(async()=>{await assert.rejects(buy.mutateAsync({product:{identifier:'b
 await act(async()=>{assert.equal(await restore.mutateAsync(),true);});assert.notEqual(rcId,owner);
 await event('EXPIRATION');await act(async()=>{await client.invalidateQueries({queryKey:['native','access']});});
 await act(async()=>{await new Promise(r=>setTimeout(r,25));});
+assert.ok(JSON.stringify(root.toJSON()).includes('Billing verification is unavailable'),'stale SDK entitlement must block another offer after server revocation');
+assert.equal(root.root.findAllByType('apple-offer').length,0);
+assert.equal(isPro,false,'SDK snapshot cannot override revoked server authority');
+sdkPro=false;
+await act(async()=>{await client.invalidateQueries({queryKey:['native','access']});await new Promise(r=>setTimeout(r,25));});
 await act(async()=>{root.root.findAllByType('button').find((b:any)=>b.props.label==='I already subscribed on the web').props.onPress();});
 await act(async()=>{await new Promise(r=>setTimeout(r,25));});
 assert.ok(JSON.stringify(root.toJSON()).includes('cannot currently verify web billing'));assert.equal(root.root.findAllByType('apple-offer').length,0);

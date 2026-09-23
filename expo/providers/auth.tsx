@@ -1,11 +1,16 @@
 import {nativeBilling} from '@/lib/nativeBillingRuntime';
+import {authDiagnostic} from '@/lib/authDiagnostics';
 import {normalResults} from '@/lib/normalResultsRuntime';
 import createContextHook from "@nkzw/create-context-hook";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createOwnerPracticeStorage, type OwnerPracticeStorage } from "@/lib/ownerPracticeStorage";
 import { createGuestContinuationRuntime } from "@/lib/guestContinuationRuntime";
+import {consentOnlyGuestContinuation} from '@/lib/consentOnlyGuestContinuation';
+import {createMemoryPracticeHost} from '@/lib/guestVisit';
+import {guestVisit, guestVisitsEnabled} from '@/lib/guestVisitRuntime';
 import { Platform } from "react-native";
 import { clearLiveSessionContent } from "@/lib/ephemeral";
+import { clearConversionBuild } from "@/lib/conversionBuild";
 import { createStagingPracticeAccess, type StagingPracticeAccess } from "@/lib/stagingPracticeAccess";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Session, User } from "@supabase/supabase-js";
@@ -65,8 +70,13 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const authRevision = useRef(0);
   const authInvalidationRevision = useRef(0);
   const [practiceOwner, setPracticeOwner] = useState<{ key: string; storage: OwnerPracticeStorage } | null>(null);
-  const ownerRef = useRef<{ identity: string | null; guest: boolean; key: string; storage: OwnerPracticeStorage } | null>(null);
-  const continuation = useMemo(() => createGuestContinuationRuntime(AsyncStorage, Platform.OS, JSON.stringify([authEnvironment?.url ?? "local", authEnvironment?.keychainService ?? "beforeyousayit.supabase"])), []);
+  const [startedJourneyOwnerKey, setStartedJourneyOwnerKey] = useState<string | null>(null);
+  const ownerRef = useRef<{ identity: string | null; guest: boolean; visitId?: string; key: string; storage: OwnerPracticeStorage } | null>(null);
+  const currentSessionRef=useRef<Session|null>(null);
+  const continuation = useMemo(() => {
+    const existing=createGuestContinuationRuntime(AsyncStorage, Platform.OS, JSON.stringify([authEnvironment?.url ?? "local", authEnvironment?.keychainService ?? "beforeyousayit.supabase"]));
+    return guestVisitsEnabled?consentOnlyGuestContinuation(existing,AsyncStorage):existing;
+  }, []);
   const [, setContinuationRevision] = useState(0);
   const [continuationIssue, setContinuationIssue] = useState("");
   const [restoredGuestContinuationId, setRestoredGuestContinuationId] = useState<string | null>(null);
@@ -89,11 +99,14 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     if (logoutPending.current && next) return;
     if(next && !journalReady.current)return;
     const identity = next?.user.id ?? null;
+    currentSessionRef.current=next;
     if (next && !next.user.is_anonymous) normalResults?.resume();
     else normalResults?.suspend();
     if (identity && ownerBlocked(identity)) return;
     const guest = next?.user.is_anonymous === true;
-    if (!ownerRef.current || !ownerRef.current.storage.isActive() || ownerRef.current.identity !== identity || ownerRef.current.guest !== guest) {
+    const visitId=guestVisitsEnabled&&guest?guestVisit.activate(identity)??undefined:undefined;
+    if(guestVisitsEnabled&&!guest)guestVisit.activate(null);
+    if (!ownerRef.current || !ownerRef.current.storage.isActive() || ownerRef.current.identity !== identity || ownerRef.current.guest !== guest || ownerRef.current.visitId!==visitId) {
       if (ownerRef.current && !verifiedGuestSource && !preserveContinuation) void Promise.resolve(continuation.invalidate()).catch(() => setContinuationIssue("Device handoff could not be cleared. Keep this device locked and retry sign out."));
       if (ownerRef.current && !ownerRef.current.guest) void clearNormalResultClaimRetry(ownerRef.current.identity);
       setContinuationIssue("");
@@ -102,18 +115,47 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       pendingGuestResultClaimRef.current = null;
       setPendingGuestResultClaim(null);
       clearLiveSessionContent();
+      clearConversionBuild();
       void queryClient.cancelQueries();
       queryClient.clear();
       // Signed-out practice is deliberately a new, unclaimed namespace. Old guest
       // and legacy shared records are quarantined, not relabeled as the next buyer.
-      const key = `${authEnvironment?.url ?? "local"}:${identity ?? `unclaimed-${Date.now()}-${Math.random()}`}`;
-      const owner = { identity, guest, key: `${key}:mount-${++ownerGeneration.current}`, storage: createOwnerPracticeStorage(AsyncStorage, key) };
+      const key = `${authEnvironment?.url ?? "local"}:${identity ?? `unclaimed-${Date.now()}-${Math.random()}`}${visitId?`:visit:${visitId}`:''}`;
+      const owner = { identity, guest, visitId, key: `${key}:mount-${++ownerGeneration.current}`, storage: createOwnerPracticeStorage(visitId?createMemoryPracticeHost():AsyncStorage, key) };
       ownerRef.current = owner;
+      setStartedJourneyOwnerKey(null);
       if (verifiedGuestSource) continuation.bind(verifiedGuestSource, owner.storage);
       if (!deferPublication) setPracticeOwner(owner);
     }
-    if (!deferPublication) setSession(next);
+    if (!deferPublication) {
+      authDiagnostic(!next ? 'session-published-none' : next.user.is_anonymous ? 'session-published-guest' : 'session-published-account');
+      setSession(next);
+    }
   }, [queryClient, continuation, ownerBlocked]);
+
+  useEffect(()=>{
+    if(!guestVisitsEnabled)return;
+    const unsubscribe=guestVisit.subscribe(()=>{
+      const owner=ownerRef.current;
+      if(!owner?.guest||!owner.identity||!guestVisit.current(owner.identity)||owner.visitId===guestVisit.current(owner.identity))return;
+      ++authInvalidationRevision.current;
+      applySession(currentSessionRef.current);
+    });
+    let appState: {addEventListener?:(event:string,listener:(state:string)=>void)=>{remove():void}}|undefined;
+    try {appState=typeof require==='function'?(require('react-native') as {AppState?:typeof appState}).AppState:undefined;}catch{}
+    const subscription=appState?.addEventListener?.('change',state=>guestVisit.appState(state));
+    return ()=>{unsubscribe();subscription?.remove();};
+  },[applySession]);
+
+  const endGuestVisit=useCallback(async()=>{
+    if(!guestVisitsEnabled||!ownerRef.current?.guest)return;
+    const owner=ownerRef.current;
+    const controller=new AbortController();let timer:ReturnType<typeof setTimeout>;
+    const timeout=new Promise<void>(resolve=>{timer=setTimeout(()=>{controller.abort();resolve();},3000);});
+    try {await Promise.race([timeout,import('@/lib/normalFreeRuntime').then(runtime=>runtime.requestNormalFree('endVisit',{},controller.signal))]);}
+    catch { /* No false deletion receipt: next begin retires it, or server expiry does. */ }
+    finally {clearTimeout(timer!);if(ownerRef.current===owner)guestVisit.end();}
+  },[]);
   const ensureNativeSession = useMemo(() => createNativeSessionStarter(supabase?.auth ?? null, undefined, {
     snapshot: () => ({ revision: authRevision.current, ownerId: ownerRef.current?.identity ?? null, logoutPending: logoutPending.current, invalidationRevision: authInvalidationRevision.current }),
   }), []);
@@ -226,7 +268,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         if (verifiedOwner) {
           try {
             const recovered = await continuation.resumeVerified(lease, verifiedOwner.email!.trim().toLowerCase());
-            if (recovered && isMounted && authRevision.current === restoreRevision && lease.isActive()) setRestoredGuestContinuationId(JSON.parse(recovered).id);
+            if (recovered && isMounted && authRevision.current === restoreRevision && lease.isActive()) {
+              setRestoredGuestContinuationId(JSON.parse(recovered).id);
+              // A device handoff receipt proves local ownership only. A crash
+              // may predate the protected server-claim retry record entirely.
+              if (normalResults) setContinuationIssue("Your local rehearsal was recovered on this device. Saving it to your account on the server has not been confirmed. Check saved results; an expired guest result may no longer be available to save.");
+            }
           } catch {
             if (isMounted && authRevision.current === restoreRevision) setContinuationIssue("Device continuation could not be verified. No rehearsal was restarted or account practice overwritten. Continue an existing saved rehearsal if present. Original guest records remain separate; this screen cannot recover an unconfirmed save. An uncertain save is never retried automatically.");
           }
@@ -307,6 +354,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         if (logoutPending.current || acceptedRevision !== authRevision.current || ownerRef.current?.storage !== owner.storage || ownerRef.current.identity !== result.session.user.id || !owner.storage.isActive()) {
           return changed;
         }
+        // Storage writes do not notify the mounted StoreProvider. Publish only
+        // after the write and owner checks; a new visit/owner clears this signal.
+        setStartedJourneyOwnerKey(owner.key);
       } catch {
         return { success: false as const, message: "We couldn’t start your practice. Please try again." };
       }
@@ -324,6 +374,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     if(!supabase)return {success:false,message:"Account login isn’t configured for this build."};
     if (loginPending.current) return { success: false, message: "A login is already in progress." };
     loginPending.current = true;
+    authDiagnostic('login-start');
+    const releaseVisit=guestVisitsEnabled?guestVisit.hold():()=>{};
     loginCancelled.current = false;
     try {
       const consentSource = saveCurrentResult && ownerRef.current?.guest ? ownerRef.current.storage : undefined;
@@ -352,6 +404,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (loginCancelled.current) return { success: false, message: "Login cancelled. Your rehearsal was not attached." };
       if (error || !data.session) return { success: false, message: loginMessage(error?.message ?? "Login failed") };
+      authDiagnostic('credentials-accepted');
       if (logoutPending.current) return { success: false, message: "Signing out." };
       const revision = authRevision.current;
       const verified = await supabase!.auth.getUser(data.session.access_token);
@@ -363,6 +416,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         || readback.data.session?.user.id !== owner.id
         || readback.data.session?.access_token !== data.session.access_token
         || revision !== authRevision.current || logoutPending.current) {
+        authDiagnostic('verification-rejected');
         applySession(null);
         await syncPurchases(null);
         return { success: false, message: "We couldn’t verify this account after login. No guest practice was attached. Please log in again." };
@@ -373,10 +427,15 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
       if(accountDeletionAvailable)void enrollReceiptlessDeletionNotice(owner.id);
       const guestSource = saveCurrentResult ? consentSource : undefined;
-      applySession(data.session, guestSource, saveCurrentResult);
+      // Publishing the new owner remounts StoreProvider and its login screen.
+      // Keep that remount after all awaited login work, otherwise the old
+      // screen's unmount cancellation can revoke the verified login itself.
+      applySession(data.session, guestSource, true);
       loginVerified.current = true;
       const verifiedLease = ownerRef.current?.storage;
+      authDiagnostic('identity-sync-start');
       await syncPurchases(data.session);
+      authDiagnostic('identity-sync-end');
       if (revision !== authRevision.current || ownerRef.current?.storage !== verifiedLease || !verifiedLease?.isActive()) {
         await continuation.invalidate();
         return { success: false, message: "Account changed after verification. No continuation is available; log in again." };
@@ -384,6 +443,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       let continuationId: string | undefined;
       let continuationProblem = false;
       if (saveCurrentResult && verifiedLease) {
+        if (normalResults && !guestServerClaim?.sessionId) {
+          continuationProblem = true;
+          setContinuationIssue("Your local rehearsal can continue on this device, but its server save could not be identified or confirmed. Check saved results; no server ownership was transferred by this local handoff.");
+        }
         if (guestServerClaim?.sessionId && normalResults) {
           const claimRevision = authRevision.current;
           const claimDestinationOwnerId = owner.id;
@@ -401,7 +464,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
             sourceAccessToken: guestServerClaim.accessToken,
             createdAt: Date.now(),
           };
-          try { await saveNormalResultClaimRetry(retry); } catch { continuationProblem = true; }
+          try { await saveNormalResultClaimRetry(retry); } catch {
+            continuationProblem = true;
+            setContinuationIssue("The protected retry record could not be saved on this device. Check saved results to confirm the account save before leaving this screen.");
+          }
           const claimReadback = await supabase.auth.getSession();
           if (!claimStillCurrent()
             || claimReadback.error
@@ -439,15 +505,19 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         }
         // Hydrate only after the single-key claim settles, never race a mounted
         // account store reading an empty slot against the transfer commit.
-        setPracticeOwner(ownerRef.current);
-        setSession(data.session);
       }
+      setPracticeOwner(ownerRef.current);
+      setSession(data.session);
+      authDiagnostic('login-published');
       return { success: true, userId: data.session.user.id, continuationId, continuationProblem };
     } catch {
+      authDiagnostic('login-exception');
       return { success: false, message: "We couldn’t reach your account. Check your connection and try again." };
     } finally {
       loginVerified.current = false;
       loginPending.current = false;
+      authDiagnostic('login-finished');
+      releaseVisit();
     }
     });
   }, [applySession, syncPurchases, continuation, initializeJournal, serializeMutation, ownerBlocked, checkAccountStatus]);
@@ -480,6 +550,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const cancelLogin = useCallback(() => {
     if (!loginPending.current) return;
+    authDiagnostic('login-cancelled');
     loginCancelled.current = true;
     void continuation.cancelConsent().catch(() => setContinuationIssue("Cancelled login, but device handoff revocation was not confirmed. Retry sign out before leaving this device."));
     ++authRevision.current;
@@ -577,6 +648,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, [continuation]);
 
   return {
+    isGuestVisit:guestVisitsEnabled&&session?.user.is_anonymous===true,
+    endGuestVisit,
     deletionNotice,
     checkAccountStatus,
     accountStatusAvailable: accountDeletionAvailable,
@@ -610,5 +683,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     user: (session?.user.is_anonymous === true ? null : session?.user ?? null) as User | null,
     login,
     startNativeSession,
+    startedJourneyOwnerKey,
   };
 });

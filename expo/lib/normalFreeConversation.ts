@@ -6,7 +6,7 @@ type Request=(operation:'recover'|'restart',payload:Record<string,unknown>)=>Pro
 // proof lifetime, reservation or stored approved exchange is reconstructed here.
 export async function startNormalFreeConversation(request:Request):Promise<RecoveryState>{
  const response=await request('recover',{});
- if(!response.ok)throw Error('Practice check unavailable');
+ if(!response.ok){const refusal=await response.json().catch(()=>({}));return {status:typeof refusal.code==='string'?refusal.code:'unavailable'};}
  const state:RecoveryState=await response.json();
  if(state.status==='new'||(state.status==='start'&&!state.used))return state;
  if(state.status==='resume')return state;

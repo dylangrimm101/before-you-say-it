@@ -15,7 +15,7 @@ mock.module('@/components/ui',()=>({Backdrop:()=>null,Eyebrow:Host,GlassCard:Hos
 let route:any;const router={replace:(r:any)=>{route=r;},canGoBack:()=>false};
 mock.module('expo-router',()=>({useRouter:()=>router,useLocalSearchParams:()=>({lessonId:'m1-l1'})}));
 let appleReads=0;
-mock.module('@/lib/purchases',()=>({useIsPro:()=>false,useCustomerInfo:()=>{appleReads++;throw Error('unexpected Apple offer');},useOfferings:()=>{appleReads++;throw Error('unexpected Apple offer');},usePurchasePackage:()=>{throw Error('unexpected purchase');},useRestorePurchases:()=>{throw Error('unexpected restore');}}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, useIsPro:()=>false,useCustomerInfo:()=>{appleReads++;throw Error('unexpected Apple offer');},useOfferings:()=>{appleReads++;throw Error('unexpected Apple offer');},usePurchasePackage:()=>{throw Error('unexpected purchase');},useRestorePurchases:()=>{throw Error('unexpected restore');}}));
 mock.module('@/components/ScenarioPaidPractice',()=>({ScenarioPaidPractice:()=>{throw Error('must not invent native authority');}}));
 let writes=0;
 const store={activeScenarioRun:null,convertedLessonProgress:[],moduleCloseProgress:[],devProEnabled:false,archiveActiveScenarioRunStrict:()=>{writes++;},clearActiveScenarioRunStrict:()=>{writes++;},replaceActiveScenarioRunStrict:()=>{writes++;}};

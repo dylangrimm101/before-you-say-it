@@ -5,13 +5,32 @@ import path from "node:path";
 
 import { guardClientProcessEnv, sanitizeClientEnv } from "../lib/clientEnvGuard";
 
-type LifecycleName = "start" | "start-web" | "start-web-dev" | "test" | "lint" | "check" | "export" | "probe";
+type LifecycleName = "start" | "start-web" | "start-web-dev" | "test" | "test-spoken" | "test-spoken-joined" | "test-release-policy" | "lint" | "check" | "export" | "probe";
 
 const commands: Record<LifecycleName, readonly string[]> = {
   start: ["bunx", "expo", "start"],
   "start-web": ["bunx", "expo", "start", "--web"],
   "start-web-dev": ["bunx", "expo", "start", "--web"],
   test: ["bun", "test"],
+  "test-release-policy": ["bun", "test", "__tests__/releaseChecks.test.ts"],
+  "test-spoken-joined": ["bun", "test", "./__tests__/recordExchange.check.ts"],
+  "test-spoken": ["bun", "test",
+    "__tests__/accountAccess.test.ts",
+    "__tests__/appRootNavigation.test.ts",
+    "__tests__/answerFirst.test.ts",
+    "__tests__/purchaseFirstBuildConfig.test.ts",
+    "__tests__/resultCardStack.test.tsx",
+    "__tests__/recordTransition.test.ts",
+    "__tests__/rehearsalResponseUX.test.ts",
+    "__tests__/recoveryDiagnostic.test.ts",
+    "__tests__/guestPlayback.test.ts",
+    "__tests__/nativeSpeechBytes.test.ts",
+    "__tests__/dictationAbort.test.ts",
+    "__tests__/dictationFailure.test.ts",
+    "__tests__/normalFreeRetryOrdering.test.ts",
+    "__tests__/normalFreeTextFidelity.test.ts",
+    "__tests__/phaseRecovery.test.ts",
+  ],
   lint: ["bunx", "expo", "lint"],
   check: ["bun", "scripts/run-client-checks.ts"],
   export: ["bunx", "expo", "export", "--platform", "all"],

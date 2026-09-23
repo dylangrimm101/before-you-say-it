@@ -31,7 +31,7 @@ mock.module("expo-clipboard", () => ({ setStringAsync: async (text: string) => {
   copied = text;
   return true;
 } }));
-const { default: Entry } = await import("../app/entry");
+const {LegacyEntryScreen:Entry} = await import("../app/entry");
 let root: any;
 await act(async () => { root = create(React.createElement(Entry)); });
 const screen = (): string => JSON.stringify(root.toJSON());

@@ -886,7 +886,8 @@ const [OwnerStoreProvider, useStore] = createContextHook(() => {
     convertedLessonProgress,
     moduleCloseProgress,
     saveModuleCloseCompletion,
-    nativeJourneyStarted,
+    nativeJourneyStarted: nativeJourneyStarted || (auth.startedJourneyOwnerKey !== null
+      && auth.startedJourneyOwnerKey === auth.practiceOwner?.key),
     beginNativeJourney,
     saveActivePracticeSession,
     createActiveScenarioRunStrict,

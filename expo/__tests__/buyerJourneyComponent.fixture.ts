@@ -11,7 +11,7 @@ const listeners=new Set<any>();const userA={id:'A',email:'a@invalid',is_anonymou
 let session:any={user:userA,access_token:'fixture-A'};
 const auth={getSession:async()=>({data:{session},error:null}),getUser:async()=>({data:{user:session?.user??null},error:null}),onAuthStateChange:(cb:any)=>{listeners.add(cb);return {data:{subscription:{unsubscribe(){listeners.delete(cb);}}}};},signOut:async()=>{session=null;for(const cb of listeners)cb('SIGNED_OUT',null);return {error:null};}};
 mock.module('@/lib/supabase',()=>({supabase:{auth},authEnvironment:{url:'https://pqqxaklcburdxjfeolmd.supabase.co',key:'sb_publishable_fixture',staging:true},isAuthConfigured:true}));
-mock.module('@/lib/purchases',()=>({identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>false,hasPro:()=>{throw Error('Unexpected Apple entitlement read');}}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>false}));
 mock.module('@/lib/reminders',()=>({cancelChallengeNudge:async()=>{},cancelDailyReminder:async()=>{},syncChallengeNudge:async()=>{}}));
 mock.module('@/lib/baselineAudio',()=>({deleteAllBaselineAudioStrict:async()=>{},deleteBaselineAudioStrict:async()=>{}}));
 
@@ -38,7 +38,7 @@ mock.module('@/lib/voice',()=>({deleteGeneratedVoiceCacheStrict:async()=>{},useS
 let generationCalls=0;
 mock.module('@/lib/ai',()=>({generateM1L1DynamicReply:async()=>{generationCalls++;throw Error('Protected server denied');},generateApprovedRehearsalDynamicReply:async()=>{throw Error('not used');},generateDebrief:async()=>{throw Error('not used');},nextCounterpartTurn:async()=>{throw Error('not used');}}));
 let appleReads=0;
-mock.module('@/lib/purchases',()=>({identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>false,hasPro:()=>{throw Error('Unexpected Apple entitlement read');},useCustomerInfo:()=>{appleReads++;throw Error('Unexpected Apple ask');},useOfferings:()=>{appleReads++;throw Error('Unexpected Apple ask');},usePurchasePackage:()=>{throw Error('Unexpected purchase');},useRestorePurchases:()=>{throw Error('Unexpected restore');}}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>false,useCustomerInfo:()=>{appleReads++;throw Error('Unexpected Apple ask');},useOfferings:()=>{appleReads++;throw Error('Unexpected Apple ask');},usePurchasePackage:()=>{throw Error('Unexpected purchase');},useRestorePurchases:()=>{throw Error('Unexpected restore');}}));
 const sessionId='12345678-1234-4234-8234-123456789abc';
 let paid=true;let rpcWait:Promise<Response>|null=null;const calls:any[]=[];
 globalThis.fetch=async(url:any,init:any)=>{

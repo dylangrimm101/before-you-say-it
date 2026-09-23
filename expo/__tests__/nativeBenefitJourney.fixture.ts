@@ -152,7 +152,7 @@ const purchases=await import('../lib/purchases');
 assert.ok((await import('node:fs')).existsSync(new URL('../app/saved-result.tsx',import.meta.url)),'normal consumer screen missing despite implemented SQL content contract');
 const {default:Saved}=await import('../app/saved-result');
 const {StoreProvider,useStore}=await import('../providers/store');
-const {default:Entry}=await import('../app/entry');
+const {LegacyEntryScreen:Entry}=await import('../app/entry');
 const {default:Onboarding}=await import('../app/onboarding');
 const {default:Login}=await import('../app/continue-from-web');
 const {default:Rehearse}=await import('../app/rehearse/[id]');
@@ -206,12 +206,13 @@ try{
  await go({pathname:'/debrief/[id]',params:{id:runId}});
  assert.ok(text().includes('You asked for a task.'));assert.ok(store.activePracticeSession.sharedResult);
  assert.equal(account.session.user.id,guestUser.id);assert.equal(account.user,null);
- await press('See what changes with practice');await press('See the practice plan');await press('Review monthly subscription');
- await press('Log in to verify access');
+ await press('See what changes with practice');await press('See the practice plan');await press('See my practice plan');
+ await press('Continue');await press('Continue');await press('Restore purchases');
  await act(async()=>{const inputs=root.root.findAllByType('input');inputs[0].props.onChangeText(user.email);inputs[1].props.onChangeText('synthetic-only-password');});
  await press('Sign in to save this result and continue');await flush();await flush();
  assert.equal(account.user.id,owner);
- if(routePath()==='/debrief/[id]')await press('Continue with saved result');
+ assert.equal(routePath(),'/paywall','subscription account verification returns to its offer');
+ await go('/saved-result');
  const claimed=(await db.query('select owner_id,phase from bysi_native_free.session where owner_id=$1',[owner])).rows;
  assert.ok(claimed.some((row:any)=>row.owner_id===owner&&row.phase==='result'),'registered owner owns the generated result after actual login claim');
  }

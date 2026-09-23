@@ -1,6 +1,5 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { prepareReleaseEnvironment, assertReleaseClientInputs } = require("./release-env.cjs");
 
 const allowedPublic = new Set([
   "EXPO_PUBLIC_BYSI_BUILD_MODE", "EXPO_PUBLIC_STAGING_SUPABASE_URL", "EXPO_PUBLIC_STAGING_SUPABASE_PUBLISHABLE_KEY",
@@ -8,6 +7,7 @@ const allowedPublic = new Set([
   "EXPO_PUBLIC_STAGING_FREE_GENERATE_ENDPOINT",
   "EXPO_PUBLIC_NATIVE_BILLING_ORIGIN",
   "EXPO_PUBLIC_NATIVE_RESULTS",
+  "EXPO_PUBLIC_PURCHASE_FIRST", "EXPO_PUBLIC_PURCHASE_FIRST_AUDIENCE",
   "EXPO_PUBLIC_GENERATE_ENDPOINT", "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY", "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
   "EXPO_PUBLIC_REVENUECAT_TEST_API_KEY", "EXPO_PUBLIC_RORK_API_BASE_URL", "EXPO_PUBLIC_RORK_APP_KEY",
   "EXPO_PUBLIC_RORK_AUTH_URL", "EXPO_PUBLIC_RORK_FUNCTIONS_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY",
@@ -26,11 +26,6 @@ function classification(name) {
 }
 
 function runClientEnvPreflight(rootDirectory) {
-  // Release filtering is in-memory only; do not rewrite development dotenv.
-  if (prepareReleaseEnvironment()) {
-    assertReleaseClientInputs();
-    return;
-  }
   const rejected = [];
   Object.keys(process.env).forEach((name) => {
     const kind = classification(name);

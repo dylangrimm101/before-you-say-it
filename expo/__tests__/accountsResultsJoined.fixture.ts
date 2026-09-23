@@ -138,7 +138,7 @@ const purchases=await import('../lib/purchases');
 assert.ok((await import('node:fs')).existsSync(new URL('../app/saved-result.tsx',import.meta.url)),'normal consumer screen missing despite implemented SQL content contract');
 const {default:Saved}=await import('../app/saved-result');
 const {StoreProvider,useStore}=await import('../providers/store');
-const {default:Entry}=await import('../app/entry');
+const {LegacyEntryScreen:Entry}=await import('../app/entry');
 const {default:Onboarding}=await import('../app/onboarding');
 const {default:Login}=await import('../app/continue-from-web');
 const {default:Rehearse}=await import('../app/rehearse/[id]');

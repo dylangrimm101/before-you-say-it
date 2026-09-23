@@ -27,11 +27,20 @@ function ConversationMark(): React.JSX.Element {
   );
 }
 
+// New installations start with deterministic questions, never an AI guest lease.
 export default function EntryScreen(): React.JSX.Element {
+  // Lazy boundary keeps legacy recovery fixtures independent of new commerce UI.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const AnswerOnboardingRoute = require('./answer-onboarding').default;
+  return <AnswerOnboardingRoute />;
+}
+
+// Retained for interrupted legacy free-rehearsal recovery and its regression fixtures.
+export function LegacyEntryScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { activePracticeSession } = useStore();
-  const { startNativeSession, isAuthLoading, session } = useAuth();
+  const { activePracticeSession, nativeJourneyStarted } = useStore();
+  const { startNativeSession, isAuthLoading, session, isGuestVisit, endGuestVisit } = useAuth();
   const [isStarting, setIsStarting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const starting = useRef(false);
@@ -46,6 +55,10 @@ export default function EntryScreen(): React.JSX.Element {
         setAuthError("This device has account-owned practice. Log in to that account to continue.");
         return;
       }
+      // Get Started is explicit new-journey intent, not recovery of the result
+      // still held by this guest visit, including a failed setup with no local
+      // practice object. The first untouched visit is already fresh.
+      if (isGuestVisit && (activePracticeSession || nativeJourneyStarted)) await endGuestVisit();
       const result = await startNativeSession();
       if (!result.success) {
         setAuthError(result.message);
@@ -58,7 +71,7 @@ export default function EntryScreen(): React.JSX.Element {
       starting.current = false;
       setIsStarting(false);
     }
-  }, [router, startNativeSession, isAuthLoading, activePracticeSession, session]);
+  }, [router, startNativeSession, isAuthLoading, activePracticeSession, nativeJourneyStarted, session, isGuestVisit, endGuestVisit]);
 
   return (
     <View style={styles.root}>

@@ -51,7 +51,7 @@ if(restartFile&&process.env.BYSI_GUEST_RESUME==='1'){
 let coldRefreshSent=false;
 const auth=sdk.auth;
 mock.module('@/lib/supabase',()=>({supabase:{auth},authEnvironment:{url:authOrigin,staging:false},isAuthConfigured:true}));
-mock.module('@/lib/purchases',()=>({PRO_ENTITLEMENT:'pro',identifyPurchasesUser:async(id:string|null)=>{if(id==='registered-A'&&process.env.BYSI_GUEST_DENIAL==='late-switch'){session={user:{id:'registered-B',email:'b@invalid',is_anonymous:false},access_token:'fixture-B'};for(const cb of listeners)cb('SIGNED_IN',session);}return null;},clearPurchasesIdentity:async()=>{},useIsPro:()=>false,useCustomerInfo:()=>({data:null,isLoading:false}),useOfferings:()=>({data:null,isLoading:false}),usePurchasePackage:()=>({isPending:false,mutateAsync:async()=>{throw Error('no purchase in navigation fixture');}}),useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, PRO_ENTITLEMENT:'pro',identifyPurchasesUser:async(id:string|null)=>{if(id==='registered-A'&&process.env.BYSI_GUEST_DENIAL==='late-switch'){session={user:{id:'registered-B',email:'b@invalid',is_anonymous:false},access_token:'fixture-B'};for(const cb of listeners)cb('SIGNED_IN',session);}return null;},clearPurchasesIdentity:async()=>{},useIsPro:()=>false,useCustomerInfo:()=>({data:null,isLoading:false}),useOfferings:()=>({data:null,isLoading:false}),usePurchasePackage:()=>({isPending:false,mutateAsync:async()=>{throw Error('no purchase in navigation fixture');}}),useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
 mock.module('@/lib/reminders',()=>({cancelChallengeNudge:async()=>{},cancelDailyReminder:async()=>{},syncChallengeNudge:async()=>{}}));
 mock.module('@/lib/baselineAudio',()=>({deleteAllBaselineAudioStrict:async()=>{},deleteBaselineAudioStrict:async()=>{}}));
 const dictation={status:'denied',error:'synthetic permission denied',cancel:async()=>{},reset:async()=>{},requestPermission:async()=>false};
@@ -94,7 +94,7 @@ globalThis.fetch=(async(url:any,init:any)=>{
 const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
 const {AuthProvider,useAuth}=await import('../providers/auth');
 const {StoreProvider,useStore}=await import('../providers/store');
-const {default:Entry}=await import('../app/entry');
+const {LegacyEntryScreen:Entry}=await import('../app/entry');
 const {default:Onboarding}=await import('../app/onboarding');
 const {default:Login}=await import('../app/continue-from-web');
 const {default:Rehearse}=await import('../app/rehearse/[id]');
@@ -133,7 +133,7 @@ try{
  params={id:runId};await mount(Debrief);
  if(outputMode!=='insufficient'){
   assert.ok(text().includes('You asked for a task.'));assert.ok(store.activePracticeSession.sharedResult);
-  await press('See what changes with practice');await press('See the practice plan');await press('Review monthly subscription');assert.equal(route.pathname,'/paywall');
+  await press('See what changes with practice');await press('See the practice plan');await press('See my practice plan');assert.equal(route.pathname,'/paywall');
  }else{assert.ok(text().includes('Synthetic insufficient evidence'));assert.equal(store.activePracticeSession.sharedResult,undefined);assert.equal(store.scoredPracticeHistory.length,0);await press('Back to today');}
  await db.exec('reset role');assert.equal((await db.query('select count(*)::int n from bysi_native_free.session')).rows[0].n,1);assert.deepEqual(seenOperations,outputMode==='recovery'?['session','generate','generate','generate','generate']:['session','generate','generate','generate']);
  console.log('PASS JOINED ACTUAL Auth SDK + mounted Auth/Store/onboarding/rehearsal/debrief + Next mounts + restricted SQL + private producer; '+outputMode+'; synthetic Auth/provider/native hosts, typed-first, no live/device claims');

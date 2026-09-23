@@ -15,7 +15,7 @@ mock.module('@/constants/theme',()=>({C:{},GUTTER:16,T:{body:{},caption:{}},font
 mock.module('@/components/PaidProductUI',()=>({PaidHeader:()=>null}));
 mock.module('@/components/ui',()=>({Backdrop:()=>null,GhostButton:Host}));
 mock.module('@/components/AccountLifecycleControls',()=>({AccountDeletionControls:()=>null,AccountDeletionStatusControls:(p:any)=>{clearLocal=p.clearLocal;return null;}}));
-mock.module('@/lib/purchases',()=>({PRO_ENTITLEMENT:'pro',useCustomerInfo:()=>({data:null})}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, PRO_ENTITLEMENT:'pro',useCustomerInfo:()=>({data:null})}));
 mock.module('@/lib/accountLifecycleRuntime',()=>({cleanupDeletedAccountOwner:async(owner:string)=>{assert.equal(owner,'A');await held;}}));
 mock.module('@/providers/auth',()=>({useAuth:()=>({user,logout:async()=>{genericLogouts++;return {success:true};},logoutDeletedOwner:async(owner:string)=>{scopedLogouts.push(owner);assert.equal(user.id,'B');return {success:true};}})}));
 const {default:Delete}=await import('../app/delete-account');

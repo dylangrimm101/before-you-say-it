@@ -1,16 +1,21 @@
 import {withRequestDeadline} from './requestDeadline';
 import {sessionCanTalk} from './nativeAuth';
+import {nativeResponseText} from './nativeResponseText';
 import type {createNativeBilling} from './nativeBilling';
 type Auth=NonNullable<Parameters<typeof createNativeBilling>[0]['auth']>;
 export type RecordingIdentity={turn:'opener'|'reply';identity:string};
-type Journal={nonce:string;generation?:number;restart?:{id:string;generation:number};sessionId?:string;operations:Record<string,{id:string;digest:string}>;audio?:{digest:string;turn:string;role:string}};
+type Journal={nonce:string;visitId?:string;visitCanStart?:boolean;generation?:number;restart?:{id:string;generation:number};sessionId?:string;operations:Record<string,{id:string;digest:string}>;audio?:{digest:string;turn:string;role:string}};
 const canonical=(v:unknown):unknown=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b)).map(([k,x])=>[k,canonical(x)])):v;
-export function createNormalFreeSession(config:{origin:string;authUrl:string;auth:Auth;storage:{getItem(k:string):Promise<string|null>;setItem(k:string,v:string):Promise<unknown>};random():string;hash(s:string):Promise<string>;onInvalidate?():void;fetch?:(url:string,init:RequestInit)=>Promise<Response>}){
+// React Native's locked whatwg-fetch Response has instance json(), but not the
+// newer static Response.json(). Preserve local refusal bodies/status on device.
+const localJson=(body:Record<string,unknown>,status=200):Response=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
+export function createNormalFreeSession(config:{origin:string;authUrl:string;auth:Auth;storage:{getItem(k:string):Promise<string|null>;setItem(k:string,v:string):Promise<unknown>};random():string;hash(s:string):Promise<string>;onInvalidate?():void;guestVisit?:{current(owner:string):string|null;subscribe(listener:()=>void):()=>void};fetch?:(url:string,init:RequestInit)=>Promise<Response>}){
  if(config.origin!=='https://beforeyousayit.app'||config.authUrl!=='https://spvksnddzyvycfoefrcf.supabase.co')throw Error('Normal free configuration invalid');
  let revision=0,owner:string|null=null,disposed=false,queue=Promise.resolve();const pending=new Set<AbortController>();
  const invalidate=()=>{revision++;for(const c of pending)c.abort();config.onInvalidate?.();};
+ const unsubscribeVisit=config.guestVisit?.subscribe(invalidate);
  const subscription=config.auth.onAuthStateChange((event,s)=>{const next=s?.user.id??null;if(event==='SIGNED_OUT'){invalidate();owner=null;}else if(next!==owner){if(owner!==null)invalidate();owner=next;}}).data.subscription;
- async function perform(operation:'generate'|'tts'|'transcribe'|'recover'|'restart',input:Record<string,unknown>|FormData,externalSignal?:AbortSignal,recording?:RecordingIdentity):Promise<Response>{
+ async function perform(operation:'generate'|'tts'|'transcribe'|'recover'|'restart'|'endVisit',input:Record<string,unknown>|FormData,externalSignal?:AbortSignal,recording?:RecordingIdentity):Promise<Response>{
   const before=revision,controller=new AbortController();pending.add(controller);const abort=()=>controller.abort();externalSignal?.addEventListener('abort',abort,{once:true});if(externalSignal?.aborted)abort();
   const current=()=>{if(disposed||before!==revision||controller.signal.aborted)throw Error('Account changed');};
   // Freeze JSON before asynchronous Auth. Ignore only existing non-contract hints.
@@ -27,14 +32,39 @@ export function createNormalFreeSession(config:{origin:string;authUrl:string;aut
    const verified=await config.auth.getUser(session.access_token);current();const user=verified.data.user;
    if(verified.error||!user||user.id!==session.user.id)throw Error('Confirmed account required');
    if(!sessionCanTalk({...session.user,...user}))throw Error('Confirmed account required');owner=user.id;
+   const visitId=user.is_anonymous===true&&config.guestVisit?config.guestVisit.current(user.id):null;
+   if(user.is_anonymous===true&&config.guestVisit&&!/^[a-f0-9]{64}$/.test(visitId??''))throw Error('Guest visit changed');
    const key='normal-free-v1.'+user.id;const stored=await config.storage.getItem(key);current();
    const journal:Journal=stored?JSON.parse(stored):{nonce:config.random(),operations:{}};
    if(!/^[a-f0-9]{64}$/.test(journal.nonce)||!journal.operations)throw Error('Free session recovery required');
    const save=async()=>{current();await config.storage.setItem(key,JSON.stringify(journal));current();};
    const send=async(op:string,body:Record<string,unknown>|FormData,extra:Record<string,string>={})=>{
-    current();const r=await (config.fetch??fetch)(config.origin+'/api/native/free/'+op,{method:'POST',headers:{...(body instanceof FormData?{}:{'Content-Type':'application/json'}),Authorization:'Bearer '+session.access_token,...extra},body:body instanceof FormData?body:JSON.stringify(body),signal,redirect:'error',credentials:'omit',cache:'no-store'});
-    current();const bytes=await r.arrayBuffer();current();if(signal.aborted)throw Error('Request aborted');if(r.redirected||bytes.byteLength>(op==='tts'?2097152:131072))throw Error('Invalid free response');return new Response(bytes,{status:r.status,headers:r.headers});
+    current();const r=await (config.fetch??fetch)(config.origin+'/api/native/free/'+op,{method:'POST',headers:{...(body instanceof FormData?{}:{'Content-Type':'application/json'}),Authorization:'Bearer '+session.access_token,...(visitId?{'x-bysi-guest-visit':visitId}:{}),...extra},body:body instanceof FormData?body:JSON.stringify(body),signal,redirect:'error',credentials:'omit',cache:'no-store'});
+    current();const bytes=await r.arrayBuffer();current();if(signal.aborted)throw Error('Request aborted');if(r.redirected||bytes.byteLength>(op==='tts'?2097152:131072))throw Error('Invalid free response');
+    // JSON must be UTF-8 decoded before constructing the native Response.
+    // Preserve successful MPEG audio as bytes, including non-text byte values.
+    const responseBody=op==='tts'&&r.ok?bytes:nativeResponseText(bytes);
+    return new Response(responseBody,{status:r.status,headers:r.headers});
    };
+   if(operation==='endVisit'){
+    if(!visitId||journal.visitId!==visitId)return localJson({status:'not_started'});
+    return send('session',{visit:'end'});
+   }
+   if(visitId&&journal.visitId!==visitId){
+    // Explicit new-visit protocol. No legacy fallback: an old server cannot
+    // silently restore an earlier conversation or mint an extra allowance.
+    await save();
+    const started=await send('session',{visit:'begin'});if(!started.ok)return started;
+    const allocation=await started.json();
+    if(allocation.status!=='started'||!/^[a-f0-9-]{36}$/.test(allocation.sessionId??'')||!Number.isInteger(allocation.generation)||allocation.generation<0||typeof allocation.canStart!=='boolean')throw Error('Guest visit unavailable');
+    journal.visitId=visitId;journal.visitCanStart=allocation.canStart;
+    journal.sessionId=allocation.sessionId;journal.generation=allocation.generation;
+    journal.operations={};delete journal.audio;delete journal.restart;await save();
+   }
+   if(visitId&&journal.visitCanStart===false)return operation==='recover'
+    ?localJson({status:'visit_limit',sessionId:journal.sessionId,generation:journal.generation})
+    :localJson({code:'visit_limit'},429);
+   if(visitId&&operation==='restart')return localJson({code:'visit_ended'},409);
    const issue=async(clear:boolean)=>{
     if(clear){journal.operations={};delete journal.audio;delete journal.sessionId;}
     await save();const issued=await send('session',{nonce:journal.nonce});if(!issued.ok)return issued;
@@ -62,7 +92,7 @@ export function createNormalFreeSession(config:{origin:string;authUrl:string;aut
     if(recovered.status==='new'&&journal.sessionId){
      journal.operations={};delete journal.audio;delete journal.sessionId;delete journal.generation;delete journal.restart;await save();
     }
-    if(['expired','exhausted'].includes(recovered.status)){
+    if(!visitId&&['expired','exhausted'].includes(recovered.status)){
      const issued=await issue(recovered.status==='exhausted');if(issued)return issued;
      response=await recover();if(!response.ok)return response;
      recovered=await response.clone().json();
@@ -110,7 +140,7 @@ export function createNormalFreeSession(config:{origin:string;authUrl:string;aut
    let response=await send(operation,payload,{'x-bysi-session':journal.sessionId!,'x-bysi-operation':op.id,'x-bysi-generation':String(journal.generation??0)});
    if(!response.ok){
     const result=await response.clone().json().catch(()=>({}));
-    if(['expired','exhausted'].includes(result.code)&&['pushback','transcribe_opener'].includes(kind)){
+    if(!visitId&&['expired','exhausted'].includes(result.code)&&['pushback','transcribe_opener'].includes(kind)){
      const issued=await issue(true);if(issued)return issued;
      operationKey=journal.generation?`${journal.generation}:${kind}`:kind;
      op={id:config.random(),digest:hash};journal.operations[operationKey]=op;await save();
@@ -123,8 +153,8 @@ export function createNormalFreeSession(config:{origin:string;authUrl:string;aut
    return response;
   },95000,controller.signal);}finally{pending.delete(controller);externalSignal?.removeEventListener('abort',abort);}
  }
- return {request(operation:'generate'|'tts'|'transcribe'|'recover'|'restart',payload:Record<string,unknown>|FormData,signal?:AbortSignal,recording?:RecordingIdentity){
+ return {request(operation:'generate'|'tts'|'transcribe'|'recover'|'restart'|'endVisit',payload:Record<string,unknown>|FormData,signal?:AbortSignal,recording?:RecordingIdentity){
   const snapshot=payload instanceof FormData?payload:JSON.parse(JSON.stringify(payload));const epoch=revision;
   const run=queue.then(()=>{if(epoch!==revision)throw Error('Account changed');return perform(operation,snapshot,signal,recording);});queue=run.then(()=>{},()=>{});return run;
- },dispose(){disposed=true;invalidate();subscription.unsubscribe();}};
+ },dispose(){disposed=true;invalidate();subscription.unsubscribe();unsubscribeVisit?.();}};
 }

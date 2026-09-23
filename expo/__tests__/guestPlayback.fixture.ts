@@ -1,0 +1,36 @@
+import {mock} from 'bun:test';
+import assert from 'node:assert/strict';
+process.env.EXPO_PUBLIC_NATIVE_BILLING_ORIGIN='https://beforeyousayit.app';
+delete process.env.EXPO_PUBLIC_BYSI_BUILD_MODE;
+(globalThis as any).__DEV__=false;
+mock.module('react-native',()=>({Platform:{OS:'ios'}}));
+const user={id:'synthetic-owner',is_anonymous:false};
+mock.module('../lib/supabase',()=>({supabase:{auth:{getSession:async()=>({data:{session:{user}}})}},authEnvironment:{url:'https://spvksnddzyvycfoefrcf.supabase.co'}}));
+let fail=false;const sent:any[]=[];
+mock.module('../lib/normalFreeRuntime',()=>({requestNormalFree:async(_:string,payload:any)=>{sent.push(payload);return fail?Response.json({code:'synthetic'},{status:503}):new Response(new Uint8Array([73,68,51]),{headers:{'content-type':'audio/mpeg'}});}}));
+mock.module('expo-file-system/legacy',()=>({cacheDirectory:'file:///synthetic/',EncodingType:{Base64:'base64'},makeDirectoryAsync:async()=>{},writeAsStringAsync:async()=>{}}));
+let events=new Set<(s:any)=>void>();let failCleanup=false;
+mock.module('expo-audio',()=>({setAudioModeAsync:async()=>{},createAudioPlayer:()=>{
+ events=new Set();return {isLoaded:true,currentStatus:{isLoaded:true,duration:1},volume:1,muted:false,
+ addListener:(_:string,fn:(s:any)=>void)=>{events.add(fn);return {remove(){events.delete(fn);if(failCleanup)throw Error('Synthetic listener cleanup failure');}};},play(){},remove(){},pause(){}};
+}}));
+const {speak,replaySpeech,stopSpeech,resetSpeech,onSpeechChange}=await import('../lib/voice');
+const text='Hope: “Keep these exact words.”';let started=0,fallback=0,phase='idle';
+onSpeechChange(s=>{phase=s.phase;});
+const callbacks={onPlaybackStart:()=>{started++;},onPlaybackUnavailable:()=>{fallback++;}};
+assert.equal(await speak(text,'woman-hope',callbacks),'played');assert.equal(started,0);assert.equal(phase,'generating');
+for(const fn of events)fn({isLoaded:true,playing:true,duration:1});
+assert.equal(started,1);assert.equal(phase,'speaking');
+for(const fn of events)fn({isLoaded:true,playing:true,duration:1});assert.equal(started,1);
+await stopSpeech();assert.equal(fallback,0);assert.deepEqual(sent[0],{role:'hope',text});
+await speak(text,'woman-hope',callbacks);await stopSpeech();assert.equal(fallback,1,'stop before start must reveal a readable fallback');
+await speak(text,'woman-hope',callbacks);const late=[...events];await resetSpeech();for(const fn of late)fn({playing:true,duration:1});assert.equal(started,1);assert.equal(fallback,1,'leaving must not reveal a stale line');
+assert.equal(await speak(text,'woman-hope',{...callbacks,muted:true}),'muted');assert.equal(fallback,2);
+fail=true;assert.equal(await speak(text,'woman-hope',callbacks),'failed');
+fail=false;assert.equal(await replaySpeech(),'played','retry refetches the same authorized response');
+assert.deepEqual(sent.at(-1),{role:'hope',text});
+await stopSpeech();assert.equal(phase,'idle');await resetSpeech();
+fail=false;await speak(text,'woman-hope',callbacks);failCleanup=true;
+await stopSpeech();assert.equal(phase,'idle','native cleanup errors must not trap the voice state');
+failCleanup=false;await resetSpeech();
+console.log('PASS actual voice: delayed native start, exact text, stop/mute fallback, stale event fenced. Modeled player, not device evidence.');

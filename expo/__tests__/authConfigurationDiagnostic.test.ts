@@ -160,4 +160,4 @@ test("actual compiled Supabase startup reports consumed inputs even with no runt
     for (const name of Object.keys(process.env)) if (!(name in saved)) delete process.env[name];
     Object.assign(process.env, saved);
   }
-});
+}, 30_000); // Five real Babel compilations can exceed Bun's five-second default on a cold cache.

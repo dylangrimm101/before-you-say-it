@@ -39,21 +39,23 @@ export default function SettingsScreen() {
       : isAuthConfigured
         ? "Connect the web account you already use"
         : "Your progress is stored on this device";
-  const subscriptionTitle = __DEV__ && devProEnabled ? "Developer access" : entitlement === "pro" ? "BYSI Pro" : "Free access";
+  const subscriptionTitle = __DEV__ && devProEnabled ? "Developer access" : entitlement === "pro" ? "BYSI Pro" : subscription ? "Verifying purchase" : "Subscription required";
   const subscriptionDetail = __DEV__ && devProEnabled
     ? "Testing access is active on this device"
+    : subscription && entitlement !== "pro"
+      ? "Your store purchase needs account verification. Restore purchases to retry; don’t purchase again."
     : subscription
       ? `${providerLabel(subscription.provider)}${subscription.willRenew === false ? " · Ends after the current period" : " · Subscription active"}`
       : entitlement === "pro"
         ? "Subscription active"
-        : "Your free practice remains available";
+        : "An active subscription is required to practice";
 
   const restorePurchase = async (): Promise<void> => {
     if (restore.isPending) return;
     setMessage("Checking your store account…");
     try {
       const found = await restore.mutateAsync();
-      setMessage(found ? "Restore complete. BYSI Pro is active." : "No active BYSI Pro subscription was found for this store account.");
+      setMessage(found ? "Restore complete. BYSI Pro is active." : "Access isn’t verified yet. If you already purchased, don’t buy again—retry or contact support.");
     } catch (error) {
       safeLog("[settings] restore failed", errorShape(error));
       setMessage("We couldn’t restore purchases. Check your connection and try again.");

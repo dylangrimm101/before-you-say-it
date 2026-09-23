@@ -1,13 +1,13 @@
 import { useRouter } from "expo-router";
 import Svg, { Circle, Path } from "react-native-svg";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, Easing, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import React, { useCallback, useEffect, useRef } from "react";
+import { Animated, Easing, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Backdrop, PrimaryButton, PressCard, StateDock, tap, useReducedMotion } from "@/components/ui";
 import { curriculumModule } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, shadow } from "@/constants/theme";
-import { CONVERSATION_PHASES } from "@/lib/conversion";
+import { ResultCardStack } from "@/components/ResultCardStack";
 import { clearerSpokenRequest } from "@/lib/freeJourney";
 import type { ActivePracticeSession, FreeJourneyCheckpoint } from "@/lib/practiceSession";
 import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
@@ -25,20 +25,15 @@ const SIGNAL_LABELS: Record<SharedSignalV1["signal_key"], string> = {
   repair: "Repair",
 };
 
-type ResultCard = "index" | "path";
 
 export function FreeJourneyResults({ session }: { session: ActivePracticeSession }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
   const { saveActivePracticeSession } = useStore();
   const isReduced = useReducedMotion();
-  const [resultCard, setResultCard] = useState<ResultCard>("index");
-  const cardProgress = useRef<Animated.Value>(new Animated.Value(1)).current;
   const skillBubbleProgress = useRef<Animated.Value[]>(
     Array.from({ length: 6 }, () => new Animated.Value(0)),
   ).current;
-  const cardDirection = useRef<1 | -1>(1);
   const result = session.sharedResult;
   const storedCheckpoint: FreeJourneyCheckpoint = session.freeJourneyCheckpoint ?? "pressure_moment";
   // A completed result must never fall back into an earlier rehearsal checkpoint
@@ -83,31 +78,8 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
     });
   }, [saveActivePracticeSession, session]);
 
-  const showResultCard = useCallback((next: ResultCard): void => {
-    if (next === resultCard) return;
-    tap("medium");
-    cardDirection.current = next === "path" ? 1 : -1;
-    setResultCard(next);
-  }, [resultCard]);
-
   useEffect(() => {
-    if (isReduced) {
-      cardProgress.setValue(1);
-      return;
-    }
-    cardProgress.setValue(0);
-    const animation = Animated.timing(cardProgress, {
-      toValue: 1,
-      duration: 280,
-      easing: Easing.bezier(0.22, 0.9, 0.28, 1),
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [cardProgress, isReduced, resultCard]);
-
-  useEffect(() => {
-    const isIndexVisible = checkpoint === "pressure_moment" || (checkpoint === "complete" && resultCard === "index");
+    const isIndexVisible = checkpoint === "pressure_moment" || checkpoint === "practice_shift" || checkpoint === "complete";
     if (!isIndexVisible) return;
     if (isReduced) {
       skillBubbleProgress.forEach((progress) => progress.setValue(1));
@@ -126,7 +98,7 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
     );
     entrance.start();
     return () => entrance.stop();
-  }, [checkpoint, isReduced, resultCard, skillBubbleProgress]);
+  }, [checkpoint, isReduced, skillBubbleProgress]);
 
   if (!result?.pressure_moment || !result.practice_shift || !result.starting_index || !result.first_focus) {
     return (
@@ -243,136 +215,40 @@ export function FreeJourneyResults({ session }: { session: ActivePracticeSession
     );
   }
 
-  if (checkpoint === "practice_shift") {
-    return (
-      <View style={styles.root}>
-        <Backdrop />
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: 28 }]}>
-          <PressCard onPress={() => void move("rewrite")} accessibilityLabel="Back to clearer version">
-            <Text style={styles.back}>Back</Text>
-          </PressCard>
-          <Text style={styles.title}>Your thoughts and feelings are valid and deserve to be heard.</Text>
-          <Text style={styles.observation}>Practicing your communication skills builds the confidence to find the right words when pressure shows up.</Text>
-          <ShiftComparison />
-          <PracticeImprovementGraph />
-        </ScrollView>
-        <StateDock bottomInset={insets.bottom}>
-          <PrimaryButton
-            label="Review monthly subscription"
-            onPress={async () => {
-              safeLog("[evidence] native post-rehearsal transition", {
-                platform: Platform.OS,
-                screen: "pay1",
-                step: "practice-shift-to-trial",
-              });
-              await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: "complete", postRehearsalState: transitionPostRehearsal(session.postRehearsalState, "pay1"), updatedAt: Date.now() });
-              router.push({ pathname: "/paywall", params: { gate: "recommended-path", source: "debrief", moduleId: result.first_focus?.recommended_module_id } });
-            }}
-          />
-        </StateDock>
-      </View>
-    );
-  }
-
-  const cardWidth = Math.max(280, width - GUTTER * 2);
-  const observedSignals = result.signals.filter((signal) => signal.observation_status === "observed");
-  const unobservedSignals = result.signals.filter((signal) => signal.observation_status !== "observed");
-  const cardMotion = isReduced ? undefined : {
-    opacity: cardProgress,
-    transform: [{
-      translateX: cardProgress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [cardDirection.current * 24, 0],
-      }),
-    }],
+  const observedSignals = result.signals.filter(signal => signal.observation_status === "observed");
+  const openPlan = async () => {
+    // Reopening an offer is presentation only; do not regress a persisted pay2/pay3 checkpoint.
+    const postRehearsalState = session.postRehearsalState?.startsWith("pay")
+      ? session.postRehearsalState : transitionPostRehearsal(session.postRehearsalState, "pay1");
+    await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: "complete", postRehearsalState, updatedAt: Date.now() });
+    router.push({ pathname: "/paywall", params: { gate: "recommended-path", source: "debrief", moduleId: result.first_focus?.recommended_module_id } });
   };
-
-  return (
-    <View style={styles.root}>
-      <Backdrop />
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 46 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <PressCard onPress={() => void move("practice_shift")} accessibilityLabel="Back to Practice Shift">
-          <Text style={styles.back}>Back</Text>
-        </PressCard>
-        <Text style={styles.eyebrow}>YOUR STARTING POINT</Text>
-        <Text style={styles.title}>A partial view from one approved exchange.</Text>
-        <Animated.View style={cardMotion}>
-          {resultCard === "index" ? (
-            <View style={[styles.layerCard, { width: cardWidth }]} accessibilityLabel="Partial Starting Index card">
-              <Text style={styles.cardTitle}>Where you are now</Text>
-              <View style={styles.indexRow}>
-                <View style={styles.indexScoreBadge}><Text style={styles.indexValue}>{result.starting_index.index_value ?? "—"}</Text></View>
-                <View style={styles.indexCopy}>
-                  <Text style={styles.detailLabel}>PARTIAL INDEX</Text>
-                  <Text style={styles.indexCount}>{result.starting_index.observed_count} of 6 signals observed</Text>
-                </View>
-              </View>
-              <Text style={styles.averageNote}>
-                {result.starting_index.index_value === null
-                  ? "There is not enough evidence to calculate a number yet."
-                  : `${result.starting_index.index_value} averages observed signals only.`}{" "}
-                Unobserved signals aren’t scored.
-              </Text>
-              <Text style={styles.groupLabel}>OBSERVED IN THIS REHEARSAL</Text>
-              {observedSignals.length > 0
-                ? observedSignals.map((signal) => <SignalRow key={signal.signal_key} signal={signal} />)
-                : <Text style={styles.emptyEvidence}>No signal had enough evidence for a responsible score in this short exchange.</Text>}
-              {unobservedSignals.length > 0 ? (
-                <View style={styles.untestedGroup}>
-                  <Text style={styles.untestedLabel}>SKILLS NOT OBSERVED</Text>
-                  <View style={styles.signalChips}>
-                    {unobservedSignals.map((signal, index) => (
-                      <SkillBubble
-                        key={signal.signal_key}
-                        label={SIGNAL_LABELS[signal.signal_key]}
-                        progress={skillBubbleProgress[index] ?? skillBubbleProgress[0]!}
-                      />
-                    ))}
-                  </View>
-                  <Text style={styles.untestedNote}>These skills weren’t tested in this short exchange.</Text>
-                </View>
-              ) : null}
-              <PrimaryButton label="See my practice path" onPress={() => showResultCard("path")} style={styles.cardAction} />
-            </View>
-          ) : (
-            <View style={[styles.layerCard, styles.pathCard, { width: cardWidth }]} accessibilityLabel="Practice path card">
-              <Text style={styles.cardTitle}>Your practice path</Text>
-              <Text style={styles.pathLead}>{result.first_focus.first_focus_label}</Text>
-              <Text style={styles.pathEvidence}>{session.recommendation?.immediateAction ?? "Your first focus is based on this approved exchange."}</Text>
-              <View style={styles.path}>
-                {CONVERSATION_PHASES.map((phase, index) => (
-                  <View key={phase.id} style={styles.pathRow}>
-                    <View style={styles.pathRail}>
-                      <View style={[styles.pathDot, index === 0 && styles.pathDotOn]} />
-                      {index < CONVERSATION_PHASES.length - 1 ? <View style={styles.pathLine} /> : null}
-                    </View>
-                    <View style={styles.pathCopy}>
-                      <Text style={[styles.pathName, index === 0 && styles.pathNameOn]}>{phase.name}</Text>
-                      <Text style={styles.pathDays}>{phase.days}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-              <PressCard onPress={() => showResultCard("index")} accessibilityLabel="Back to Starting Index">
-                <Text style={styles.reverseCard}>Back to Starting Index</Text>
-              </PressCard>
-              <PrimaryButton
-                label="Continue with my path"
-                onPress={async () => {
-                  await saveActivePracticeSession({ ...session, freeJourneyCheckpoint: "complete", postRehearsalState: transitionPostRehearsal(session.postRehearsalState, "pay1"), updatedAt: Date.now() });
-                  router.push({ pathname: "/paywall", params: { gate: "recommended-path", source: "debrief", moduleId: result.first_focus?.recommended_module_id } });
-                }}
-                style={styles.continueButton}
-              />
-            </View>
-          )}
-        </Animated.View>
-      </ScrollView>
-    </View>
-  );
+  return <View style={styles.root}>
+    <Backdrop />
+    <ResultCardStack
+      header={<>
+        <PressCard onPress={() => checkpoint === "practice_shift" ? void move("rewrite") : router.canGoBack() ? router.back() : router.replace("/(tabs)")} accessibilityLabel="Back"><Text style={styles.back}>Back</Text></PressCard>
+        <Text style={styles.eyebrow}>YOUR STARTING INDEX</Text>
+        <Text style={styles.title}>{result.pressure_moment.headline}</Text>
+      </>}
+      first={<>
+        <Text style={styles.cardTitle}>Where you are now</Text>
+        <View style={styles.indexRow}>
+          <Text style={styles.indexValue}>{result.starting_index.index_value ?? "—"}</Text>
+          <View style={styles.indexCopy}><Text style={styles.detailLabel}>PARTIAL INDEX</Text><Text style={styles.indexCount}>{result.starting_index.observed_count} of 6 signals observed</Text></View>
+        </View>
+        <Text style={styles.averageNote}>{result.starting_index.index_value === null ? "There is not enough evidence to calculate a number yet." : `${result.starting_index.index_value} averages observed signals only.`} Unobserved signals aren’t scored.</Text>
+        <Text style={styles.groupLabel}>OBSERVED IN THIS REHEARSAL</Text>
+        {observedSignals.map(signal => <SignalRow key={signal.signal_key} signal={signal} />)}
+        {observedSignals.length === 0 ? <Text style={styles.emptyEvidence}>No signal had enough evidence for a responsible score in this short exchange.</Text> : null}
+      </>}
+      second={<>
+        <PracticeImprovementGraph />
+        <Text style={styles.pathLead}>Next focus: {result.first_focus.first_focus_label}</Text>
+        <PrimaryButton label="See my practice plan" onPress={() => void openPlan()} style={styles.cardAction} />
+      </>}
+    />
+  </View>;
 }
 
 function SkillBubble({ label, progress }: { label: string; progress: Animated.Value }) {
@@ -405,41 +281,9 @@ function ExchangeNode({ label, text, tone, last = false }: { label: string; text
   );
 }
 
-function ShiftComparison() {
-  return (
-    <View style={styles.comparison}>
-      <ShiftSection label="WITHOUT PRACTICE" tone={C.amber} regularSteps={[
-        "The conversation starts with the same vague ask",
-        "Pushback makes the point harder to hold",
-      ]} strongSteps={[
-        "You explain more than you need to",
-        "The conversation ends without a clear next step",
-      ]} />
-      <View style={styles.divider} />
-      <ShiftSection label="WITH BYSI PRACTICE" tone={C.purple} regularSteps={[
-        "Turn the thought into one clear request",
-        "Stay steady when they get defensive",
-      ]} strongSteps={[
-        "Acknowledge them without dropping your point",
-        "Return to one clear next step",
-      ]} />
-    </View>
-  );
-}
-
-function ShiftSection({ label, regularSteps, strongSteps, tone }: { label: string; regularSteps: string[]; strongSteps: string[]; tone: string }) {
-  return (
-    <View style={styles.shiftSection}>
-      <Text style={[styles.shiftLabel, { color: tone }]}>{label}</Text>
-      {regularSteps.map((step) => <Text key={step} style={styles.shiftText}>{step}</Text>)}
-      {strongSteps.map((step) => <Text key={step} style={[styles.shiftText, styles.shiftStrong, { color: tone }]}>{step}</Text>)}
-    </View>
-  );
-}
-
 function PracticeImprovementGraph() {
   return (
-    <View style={styles.improvementCard} accessible accessibilityRole="image" accessibilityLabel="Skills improve with BYSI practice while the same ask without practice stays in the same loop.">
+    <View style={styles.improvementCard} accessible accessibilityRole="image" accessibilityLabel="Illustration of a possible practice path, not a prediction of your score.">
       <Text style={styles.improvementLabel}>IMPROVE YOUR COMMUNICATION WITH PRACTICE</Text>
       <View style={styles.graphCanvas}>
         <Svg width="100%" height="190" viewBox="0 0 320 190">
@@ -452,8 +296,8 @@ function PracticeImprovementGraph() {
         <View style={styles.practiceBadge}><Text style={styles.practiceBadgeText}>With BYSI practice</Text></View>
         <View style={styles.loopBadge}><Text style={styles.loopBadgeText}>Same ask, same loop</Text></View>
       </View>
-      <View style={styles.graphAxis}><Text style={styles.graphAxisText}>TODAY</Text><Text style={styles.graphAxisText}>IN 30 DAYS</Text></View>
-      <Text style={styles.graphCaption}>Skills improvement</Text>
+      <View style={styles.graphAxis}><Text style={styles.graphAxisText}>TODAY</Text><Text style={styles.graphAxisText}>WITH PRACTICE</Text></View>
+      <Text style={styles.graphCaption}>Illustration, not a predicted result</Text>
     </View>
   );
 }

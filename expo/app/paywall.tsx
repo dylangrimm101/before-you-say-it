@@ -1,13 +1,14 @@
 import { NativeBillingGate } from '@/components/NativeBillingGate';
+import {useQueryClient} from '@tanstack/react-query';
 import { normalBillingEnabled } from '@/lib/nativeBillingRuntime';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AlertCircle, Check, ChevronDown, Clock3, RefreshCw, ShieldCheck } from "lucide-react-native";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PurchasesPackage } from "react-native-purchases";
 
-import { Backdrop, Eyebrow, GlassCard, PressCard, PrimaryButton, Reveal, StateDock, tap, useReducedMotion } from "@/components/ui";
+import { Backdrop, Eyebrow, PressCard, PrimaryButton, StateDock, tap } from "@/components/ui";
 import { curriculumModule, isModuleId, type ModuleId } from "@/constants/modules";
 import { C, GUTTER, T, eyebrow, font, radius } from "@/constants/theme";
 import { storeProductSnapshot } from "@/lib/commerce";
@@ -24,21 +25,24 @@ import {
 import { nextLaunchDeck } from "@/lib/launchCurriculum";
 import { transitionPostRehearsal } from "@/lib/postRehearsalFlow";
 import { errorShape, safeLog } from "@/lib/redact";
-import { hasPro, useCustomerInfo, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
+import { hasPro, trialEligibility, useCustomerInfo, useOfferings, usePurchasePackage, useRestorePurchases } from "@/lib/purchases";
+import { isSevenDayTrial, type TrialReminderStatus } from '@/lib/trialOffer';
+import { enableTrialReminder, trialReminderPreference } from '@/lib/trialReminder';
 import { useStore } from "@/providers/store";
 import { useAuth } from "@/providers/auth";
 import { useStagingWebBridgeState } from "@/lib/useStagingWebBridgeState";
 import { stagingPurchasePresentation } from "@/lib/stagingWebBridge";
 import type { SharedResultContractV1 } from "@/types/sharedProduct";
 
-const DEFAULT_FOCUS_LABEL = "Focus: Specificity";
 const SUBSCRIPTION_MANAGEMENT_URL = Platform.select({
   ios: "https://apps.apple.com/account/subscriptions",
   android: "https://play.google.com/store/account/subscriptions",
 });
 
 export default function Paywall() {
+  const [recovery, setRecovery] = useState(false);
   const { stagingWebBridge } = useAuth();
+  const params = useLocalSearchParams<{ moduleId?: string; gate?: string }>();
   const webState = useStagingWebBridgeState(stagingWebBridge);
   const router = useRouter();
   const [, tick] = useState(0);
@@ -53,12 +57,36 @@ export default function Paywall() {
   if (__DEV__ && stagingWebBridge && (stagingWebBridge.hasKnownWebPurchase() || stagingPurchasePresentation(webState, false) === "verify-web")) {
     return <Unavailable title="Check your web purchase first." body="Web subscription access is not currently verified. Recheck your saved result before purchasing again; this screen does not grant paid access." onBack={() => router.replace("/staging-web-result")} />;
   }
-  if(normalBillingEnabled)return <NativeBillingGate onContinue={()=>router.replace("/(tabs)/library")} onLogin={()=>router.push("/continue-from-web")}><ApplePaywall /></NativeBillingGate>;
+  const verifyAccount = (mode: "signup" | "login" = "login") => router.push({ pathname: "/continue-from-web", params: {
+    mode,
+    returnTo: "subscription",
+    ...(isModuleId(params.moduleId) ? { moduleId: params.moduleId } : {}),
+    ...(params.gate === "recommended-path" ? { gate: params.gate } : {}),
+  } });
+  if(normalBillingEnabled)return <NativeBillingGate
+    directOffer={!recovery}
+    guestPreview={<ApplePaywall onVerifyAccount={() => verifyAccount("signup")} />}
+    renderStatus={content => <BillingStatus>{content}</BillingStatus>}
+    onContinue={()=>router.replace("/(tabs)")} onLogin={() => verifyAccount("login")}
+  ><ApplePaywall onRecovery={() => setRecovery(true)} /></NativeBillingGate>;
   return <ApplePaywall />;
 }
 
-function ApplePaywall() {
+function BillingStatus({ children }: { children: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
+  const {user} = useAuth();
+  return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24, paddingHorizontal: GUTTER, gap: 20 }}>
+    <PrimaryButton label="Back" onPress={() => normalBillingEnabled && user ? router.replace('/settings') : router.canGoBack() ? router.back() : router.replace('/entry')} />
+    <Text style={styles.title}>Subscription access</Text>
+    {children}
+    <PressCard accessibilityLabel="Account settings" onPress={() => router.push('/settings')}><Text style={styles.link}>Account settings</Text></PressCard>
+  </ScrollView></View>;
+}
+
+function ApplePaywall({ onVerifyAccount, onRecovery }: { onVerifyAccount?: () => void; onRecovery?: () => void } = {}) {
+  const router = useRouter();
+  const {user} = useAuth();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ gate?: string; source?: string; moduleId?: string }>();
   const { activePracticeSession, convertedLessonProgress, moduleCloseProgress, saveActivePracticeSession } = useStore();
@@ -68,9 +96,11 @@ function ApplePaywall() {
   const purchase = usePurchasePackage();
   const restore = useRestorePurchases();
   const customer = useCustomerInfo();
+  const queryClient = useQueryClient();
   const isPro = normalBillingEnabled ? false : hasPro(customer.data);
   const [offer, setOffer] = useState<OfferState<SharedResultContractV1 | undefined>>(() => {
     const opened = openOffer(activePracticeSession?.sharedResult);
+    if (params.source === "account-offer" || params.source === 'access-gate') opened.stage = 3;
     const checkpoint = activePracticeSession?.postRehearsalState;
     if (params.source === "debrief" && (checkpoint === "pay2" || checkpoint === "pay3")) {
       opened.stage = checkpoint === "pay2" ? 2 : 3;
@@ -86,13 +116,35 @@ function ApplePaywall() {
     return { monthly: current?.monthly?.product.identifier === "byis_pro_monthly_5" ? current.monthly : null, annual: null };
   }, [offerings]);
   const selectedPackage = billing === "annual" ? plans.annual ?? plans.monthly : plans.monthly ?? plans.annual;
+  const [eligibility, setEligibility] = useState(0);
+  const [reminder, setReminder] = useState<TrialReminderStatus>('off');
+  const [reminderPending, setReminderPending] = useState(false);
+  useEffect(() => {
+    let current = true;
+    setEligibility(0);
+    const product = plans.monthly?.product.identifier;
+    if (product) void trialEligibility(product).then(status => { if (current) setEligibility(status); });
+    return () => { current = false; };
+  }, [plans.monthly, onVerifyAccount]);
+  useEffect(() => {
+    let current = true;
+    void trialReminderPreference().then(status => { if (current) setReminder(status); });
+    return () => { current = false; };
+  }, []);
+  const sevenDayTrial = isSevenDayTrial(plans.monthly?.product, eligibility);
+  const enableReminder = async () => {
+    if (reminderPending) return;
+    setReminderPending(true);
+    setReminder(await enableTrialReminder());
+    setReminderPending(false);
+  };
   const terms = storeProductSnapshot(selectedPackage?.product);
   const monthlyTerms = storeProductSnapshot(plans.monthly?.product);
   const annualTerms = storeProductSnapshot(plans.annual?.product);
   const isApprovedStoreOffer = Boolean(
     plans.monthly && monthlyTerms?.periodLabel === "1 month" && monthlyTerms.priceString,
   );
-  const purchaseLabel = "Subscribe monthly";
+  const purchaseLabel = onVerifyAccount ? "Create account to continue" : sevenDayTrial ? "Start my 7-day free trial" : "Subscribe monthly";
   const actions = commerceActionPresentation(commerceState, isPro, purchaseLabel);
   const hasCompleteEarnedResult = Boolean(activePracticeSession?.sharedResult?.pressure_moment && activePracticeSession.sharedResult.practice_shift && activePracticeSession.sharedResult.starting_index && activePracticeSession.sharedResult.first_focus);
   const earnedOfferBlocked = params.source === "debrief" && !hasCompleteEarnedResult;
@@ -163,8 +215,11 @@ function ApplePaywall() {
   }, [commerceState, isPro, nextDeck, params.gate, router]);
 
   const leave = (): void => {
+    // A signed-in unpaid account cannot exit to Home (or a stale paid route):
+    // the root gate would immediately remount this offer at stage three.
+    if (normalBillingEnabled && user) { router.replace('/settings'); return; }
     if (router.canGoBack()) router.back();
-    else router.replace("/(tabs)");
+    else router.replace('/entry');
   };
 
   const navigateOffer = (event: "forward" | "back" | "dismiss"): void => {
@@ -174,6 +229,7 @@ function ApplePaywall() {
   };
 
   const buy = async (): Promise<void> => {
+    if (onVerifyAccount) { onVerifyAccount(); return; }
     if (isPro) {
       router.replace({ pathname: "/purchase-success", params: purchaseSuccessParams });
       return;
@@ -202,6 +258,7 @@ function ApplePaywall() {
   };
 
   const onRestore = async (): Promise<void> => {
+    if (onVerifyAccount) { onVerifyAccount(); return; }
     if (restore.isPending || purchase.isPending || actions.isRestoreDisabled) return;
     setCommerceState(transitionRestore("ready", { type: "begin" }).state);
     try {
@@ -223,7 +280,8 @@ function ApplePaywall() {
       return;
     }
     if (actions.primaryAction === "check_access") {
-      await customer.refetch();
+      if (normalBillingEnabled) await queryClient.refetchQueries({queryKey: ['native', 'access']});
+      else await customer.refetch();
       return;
     }
     if (actions.primaryAction === "purchase") await buy();
@@ -239,11 +297,11 @@ function ApplePaywall() {
       <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
         <PressCard onPress={() => navigateOffer("back")} style={styles.topHit} accessibilityLabel="Back"><Text style={styles.topText}>Back</Text></PressCard>
         <Text style={styles.step}>{stage} OF 3</Text>
-        <PressCard onPress={() => navigateOffer("dismiss")} style={[styles.topHit, styles.closeHit]} accessibilityLabel="Close offer. Keep my free debrief for now"><Text style={styles.topText}>Close</Text></PressCard>
+        <PressCard onPress={() => navigateOffer("dismiss")} style={[styles.topHit, styles.closeHit]} accessibilityLabel={normalBillingEnabled && user ? 'Close offer and open account settings' : 'Close offer. Keep my free debrief for now'}><Text style={styles.topText}>Close</Text></PressCard>
       </View>
 
       {normalBillingEnabled && (purchase.error || restore.error) ? <Text>{purchase.error?.message || restore.error?.message}</Text> : null}
-      <PrimaryButton label="Log in before purchasing" disabled={purchase.isPending || restore.isPending} onPress={() => router.push("/continue-from-web")} />
+      {!normalBillingEnabled ? <PrimaryButton label="Log in before purchasing" disabled={purchase.isPending || restore.isPending} onPress={() => router.push("/continue-from-web")} /> : null}
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -255,6 +313,7 @@ function ApplePaywall() {
       >
         {stage === 1 ? (
           <StageOne
+            sevenDayTrial={sevenDayTrial}
             moduleName={practiceModule?.name ?? "Make a Clear Ask"}
             modulePreview={practiceModule?.promise ?? "Practice saying it clearly, holding it through pushback, and putting it in your own words."}
             focus={practiceFocus}
@@ -262,9 +321,10 @@ function ApplePaywall() {
             annualPrice={annualTerms?.priceString ?? null}
           />
         ) : null}
-        {stage === 2 ? <StageTwo /> : null}
+        {stage === 2 ? <StageTwo sevenDayTrial={sevenDayTrial} reminder={reminder} reminderPending={reminderPending} onEnableReminder={() => void enableReminder()} /> : null}
         {stage === 3 ? (
           <StageThree
+            sevenDayTrial={sevenDayTrial}
             plans={plans}
             billing={billing}
             onBilling={setBilling}
@@ -281,7 +341,9 @@ function ApplePaywall() {
       </ScrollView>
 
       <StateDock bottomInset={insets.bottom}>
-        {stage < 3 ? <PrimaryButton label="Continue" onPress={() => navigateOffer("forward")} compact={stage === 1} /> : (
+        {onRecovery ? <View style={styles.links}><PressCard onPress={onRecovery} accessibilityLabel="Help with an existing purchase"><Text style={styles.link}>Help with an existing purchase</Text></PressCard><PressCard onPress={() => router.push('/settings')} accessibilityLabel="Account settings"><Text style={styles.link}>Account settings</Text></PressCard></View> : null}
+        {stage === 3 && onVerifyAccount ? <Text style={styles.link}>Create an account or sign in before purchasing. Continuing does not charge you.</Text> : null}
+        {stage < 3 ? <PrimaryButton label="Continue" onPress={() => navigateOffer("forward")}  /> : (
           <>
             <PrimaryButton
               label={actions.primaryLabel}
@@ -296,102 +358,56 @@ function ApplePaywall() {
   );
 }
 
-function StageOne({ moduleName, modulePreview, focus, monthlyPrice }: { moduleName: string; modulePreview: string; focus: string; monthlyPrice: string | null; annualPrice: string | null }) {
-  const [isPlanOpen, setIsPlanOpen] = useState<boolean>(false);
-  const isReduced = useReducedMotion();
-  const segmentProgress = useRef<Animated.Value[]>(
-    Array.from({ length: 7 }, () => new Animated.Value(isReduced ? 1 : 0)),
-  ).current;
-
-  useEffect(() => {
-    if (isReduced) {
-      segmentProgress.forEach((value) => value.setValue(1));
-      return;
-    }
-    segmentProgress.forEach((value) => value.setValue(0));
-    const entrance = Animated.stagger(
-      85,
-      segmentProgress.map((value) => Animated.timing(value, {
-        toValue: 1,
-        duration: 520,
-        easing: Easing.bezier(0.2, 0.9, 0.25, 1),
-        useNativeDriver: true,
-      })),
-    );
-    entrance.start();
-    return () => entrance.stop();
-  }, [isReduced, segmentProgress]);
-
-  const focusLabel = (focus || DEFAULT_FOCUS_LABEL.replace("Focus: ", "")).replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-
-  return (
-    <Reveal style={styles.stageOne}>
-      <View style={styles.offerHero}>
-        <Text style={styles.trialEyebrow}>YOUR PRACTICE SUBSCRIPTION</Text>
-        <Text style={styles.offerTitle}>Build your practice</Text>
-        <Text style={styles.priceLine}>{monthlyPrice ? `${monthlyPrice} monthly. Renews until cancelled.` : "Store pricing will be shown before checkout."}</Text>
-
-        <View style={styles.sevenSegments} accessibilityLabel="Your practice path">
-          {segmentProgress.map((progress, index) => (
-            <Animated.View
-              key={index}
-              style={[
-                styles.sevenSegment,
-                {
-                  opacity: progress,
-                  transform: [
-                    { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [index % 2 === 0 ? -22 : 22, 0] }) },
-                    { scaleX: progress.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] }) },
-                  ],
-                },
-              ]}
-            />
-          ))}
-        </View>
-        <Text style={styles.trialSupport}>Ten lessons and two module closes, at your own pace.</Text>
-      </View>
-
-      <PressCard
-        onPress={() => setIsPlanOpen((current) => !current)}
-        accessibilityLabel={`${isPlanOpen ? "Hide" : "Show"} your practice plan`}
-        containerStyle={styles.planDisclosureHit}
-        style={styles.planDisclosure}
-      >
-        <View>
-          <Text style={styles.planDisclosureTitle}>Your practice plan</Text>
-          <Text style={styles.planDisclosureHint}>{isPlanOpen ? "Tap to hide details" : "See where you’ll start"}</Text>
-        </View>
-        <ChevronDown
-          size={20}
-          color={C.purple}
-          style={{ transform: [{ rotate: isPlanOpen ? "180deg" : "0deg" }] }}
-        />
+function StageOne({ moduleName, modulePreview, focus, monthlyPrice, sevenDayTrial }: { moduleName: string; modulePreview: string; focus: string; monthlyPrice: string | null; annualPrice: string | null; sevenDayTrial: boolean }) {
+  const [isPlanOpen, setIsPlanOpen] = useState(false);
+  return <View style={styles.offerPage}>
+    <View>
+      <Eyebrow color={C.dim}>{sevenDayTrial ? 'YOUR 7-DAY FREE TRIAL' : 'YOUR PRACTICE SUBSCRIPTION'}</Eyebrow>
+      <Text style={styles.title}>{sevenDayTrial ? 'Try BYSI free for 7 days.' : 'Build your practice, one conversation at a time.'}</Text>
+      <Text style={styles.lede}>{sevenDayTrial ? `Full access. No charge today. Then ${monthlyPrice} monthly unless cancelled.` : monthlyPrice ? `${monthlyPrice} monthly. Renews until cancelled.` : "Store pricing will be shown before checkout."}</Text>
+    </View>
+    <View><View style={styles.monthHero} accessibilityLabel={sevenDayTrial ? '7 days free' : 'Monthly practice subscription'}>
+      <Text style={styles.monthNumber}>{sevenDayTrial ? '7' : '1'}</Text><Text style={styles.monthLabel}>{sevenDayTrial ? 'days\nfree' : 'month of\npractice'}</Text>
+    </View>{sevenDayTrial ? <View style={styles.sevenSegments}>{Array.from({ length: 7 }, (_, i) => <View key={i} style={styles.sevenSegment} />)}</View> : null}</View>
+    <View>
+      <Text style={styles.trialSupport}>Ten lessons and two module closes, at your own pace.</Text>
+      <PressCard onPress={() => setIsPlanOpen(value => !value)} accessibilityLabel={`${isPlanOpen ? "Hide" : "Show"} your practice plan`} style={styles.planDisclosure}>
+        <Text style={styles.planDisclosureTitle}>Your practice plan</Text>
+        <ChevronDown size={20} color={C.purple} style={{ transform: [{ rotate: isPlanOpen ? "180deg" : "0deg" }] }} />
       </PressCard>
-
-      {isPlanOpen ? (
-        <View style={styles.planCard}>
-          <Text style={styles.moduleEyebrow}>First module</Text>
-          <Text style={styles.moduleTitle}>{moduleName}</Text>
-          <View style={styles.focusPill}>
-            <Text style={styles.focusPillText}>Focus: {focusLabel}</Text>
-          </View>
-          <Text style={styles.modulePreview}>Start with a clear ask. {modulePreview}</Text>
-        </View>
-      ) : null}
-    </Reveal>
-  );
+      {isPlanOpen ? <View style={styles.planCard}><Text style={styles.moduleEyebrow}>First module</Text><Text style={styles.moduleTitle}>{moduleName}</Text><Text style={styles.focusPillText}>Focus: {focus.replaceAll("_", " ")}</Text><Text style={styles.modulePreview}>{modulePreview}</Text></View> : null}
+    </View>
+  </View>;
 }
 
-function StageTwo() {
-  return <Reveal><Eyebrow color={C.dim}>Your subscription</Eyebrow><Text style={styles.title}>You control whether your subscription renews.</Text><Text style={styles.lede}>Review the monthly price before confirming in the store. Any introductory offer and your eligibility are confirmed by the store, not promised here. Cancel in your store subscription settings before renewal.</Text><View style={styles.timeline}><TimelineRow active label="Today" detail="Access begins after store confirmation" /><TimelineRow label="Every month" detail="Your subscription renews unless cancelled." /><TimelineRow label="Your choice" detail="Manage or cancel in your store subscription settings." last /></View></Reveal>;
+function StageTwo({ sevenDayTrial, reminder, reminderPending, onEnableReminder }: { sevenDayTrial: boolean; reminder: TrialReminderStatus; reminderPending: boolean; onEnableReminder: () => void }) {
+  if (sevenDayTrial) return <View style={styles.offerPage}>
+    <View><Eyebrow color={C.dim}>NO SURPRISE CHARGE</Eyebrow><Text style={styles.title}>{reminder === 'enabled' ? 'We’ll remind you 2 days before your free trial ends.' : 'Get a reminder 2 days before your free trial ends.'}</Text><Text style={styles.lede}>You’ll have time to decide whether you want to continue.</Text></View>
+    <View style={styles.timeline}>
+      <TimelineRow active label="After you confirm" detail="Your 7-day free trial begins." />
+      <TimelineRow label="2 days before it ends" detail={reminder === 'enabled' ? 'We’ll schedule a notification on this device after your purchase is confirmed.' : 'Enable notifications on this device for your trial reminder.'} />
+      <TimelineRow label="Trial end" detail="Your subscription renews at the store price unless you cancel before the trial ends." last />
+    </View>
+    {reminder !== 'enabled' ? <PrimaryButton label={reminderPending ? 'Enabling reminder…' : 'Enable trial reminder'} disabled={reminderPending} onPress={onEnableReminder} /> : null}
+    <Text style={styles.renewalCopy}>{reminder === 'denied' ? 'Notifications are off. Enable them in iPhone Settings, then try again. No reminder is enabled.' : reminder === 'unavailable' ? 'We couldn’t enable your reminder. Try again, or set a reminder yourself.' : 'Reminders use this device’s notifications. Delivery depends on your notification settings; deleting the app removes the reminder.'}</Text>
+  </View>;
+  return <View style={styles.offerPage}>
+    <View><Eyebrow color={C.dim}>NO SURPRISES</Eyebrow><Text style={styles.title}>You control whether your subscription renews.</Text><Text style={styles.lede}>Review the price before you confirm. You can manage or cancel your subscription in your store settings.</Text></View>
+    <View style={styles.timeline}>
+      <TimelineRow active label="Before purchase" detail="Create an account or sign in to keep your practice together." />
+      <TimelineRow label="When you confirm" detail="The store shows your price and any eligible introductory offer." />
+      <TimelineRow label="Every month" detail="Your subscription renews unless you cancel before renewal." last />
+    </View>
+    <Text style={styles.renewalCopy}>Your subscription starts only after you confirm the purchase. Any introductory offer is subject to store eligibility.</Text>
+  </View>;
 }
 
-function StageThree({ plans, billing, onBilling, terms, isLoading, unavailable, commerceState, onPrivacy, onRestore, isRestoreDisabled, onManageSubscription }: { plans: { monthly: PurchasesPackage | null; annual: PurchasesPackage | null }; billing: "monthly" | "annual"; onBilling: (value: "monthly" | "annual") => void; terms: ReturnType<typeof storeProductSnapshot>; isLoading: boolean; unavailable: boolean; commerceState: CommercePresentationState; onPrivacy: () => void; onRestore: () => void; isRestoreDisabled: boolean; onManageSubscription?: () => void }) {
+function StageThree({ plans, billing, onBilling, terms, isLoading, unavailable, commerceState, onPrivacy, onRestore, isRestoreDisabled, onManageSubscription, sevenDayTrial }: { plans: { monthly: PurchasesPackage | null; annual: PurchasesPackage | null }; billing: "monthly" | "annual"; onBilling: (value: "monthly" | "annual") => void; terms: ReturnType<typeof storeProductSnapshot>; isLoading: boolean; unavailable: boolean; commerceState: CommercePresentationState; onPrivacy: () => void; onRestore: () => void; isRestoreDisabled: boolean; onManageSubscription?: () => void; sevenDayTrial: boolean }) {
   const selectedRenewal = terms?.priceString && terms.periodLabel ? `${terms.priceString} every ${terms.periodLabel}` : "the price confirmed by the store";
-  return <Reveal><Eyebrow color={C.dim}>Monthly subscription</Eyebrow><Text style={styles.title}>{terms ? `${selectedRenewal}.` : "Review your store offer."}</Text>
+  return <View style={styles.offerPage}><View><Eyebrow color={C.dim}>{sevenDayTrial ? 'START YOUR FREE TRIAL' : 'Monthly subscription'}</Eyebrow><Text style={styles.title}>{terms ? `${sevenDayTrial ? '7 days free, then ' : ''}${selectedRenewal}.` : "Review your store offer."}</Text></View>
     {isLoading ? <ActivityIndicator color={C.purple} style={styles.loading} /> : unavailable ? <IapBlocker /> : <>
       {plans.monthly ? <PlanChoice label="Monthly option" price={plans.monthly.product.priceString} selected={billing === "monthly"} onPress={() => onBilling("monthly")} /> : null}
-      <GlassCard style={styles.termsCard}><Text style={styles.lede}>Full access to all ten launch lessons and both module closes. Lessons unlock in order as you finish them.</Text></GlassCard>
+      <View style={styles.checkoutTimeline}><TimelineRow active label="After purchase confirmation" detail={sevenDayTrial ? 'Full access begins. No charge today.' : 'Full access to all ten launch lessons and both module closes. Lessons unlock in order as you finish them.'} /><TimelineRow label={sevenDayTrial ? 'After 7 days' : 'Next renewal'} detail={`Renews at ${selectedRenewal} unless cancelled beforehand.`} last /></View>
     </>}
     {commerceState !== "ready" ? <StatusCard state={commerceState} /> : null}
     <Text style={styles.renewalCopy}>Renews automatically at {selectedRenewal} unless cancelled. Any introductory offer is subject to store eligibility and confirmation.</Text>
@@ -401,7 +417,7 @@ function StageThree({ plans, billing, onBilling, terms, isLoading, unavailable, 
       <PressCard onPress={() => void Linking.openURL("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")} accessibilityLabel="Terms of use"><Text style={styles.link}>Terms of use</Text></PressCard>
       <PressCard onPress={onRestore} disabled={isRestoreDisabled} accessibilityLabel="Restore purchases"><Text style={styles.link}>Restore purchases</Text></PressCard>
     </View>
-  </Reveal>;
+  </View>;
 }
 
 function IapBlocker() {
@@ -430,7 +446,11 @@ function Unavailable({ title, body, onBack }: { title: string; body: string; onB
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg }, center: { alignItems: "center", justifyContent: "center", padding: GUTTER }, centerText: { textAlign: "center" }, unavailableButton: { width: "100%", marginTop: 28 },
   top: { minHeight: 58, paddingHorizontal: GUTTER, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, topHit: { width: 72, minHeight: 44, justifyContent: "center" }, closeHit: { alignItems: "flex-end" }, topText: { ...T.support, color: C.textSoft, fontSize: 15 }, step: { ...eyebrow, color: C.dim, fontSize: 10 },
-  scroll: { paddingHorizontal: GUTTER, paddingTop: 18 }, stageOneScroll: { flexGrow: 1, justifyContent: "flex-start", paddingTop: 12 }, centeredStageScroll: { flexGrow: 1, justifyContent: "center" },
+  scroll: { flexGrow: 1, paddingHorizontal: GUTTER, paddingTop: 18 }, stageOneScroll: { flexGrow: 1, justifyContent: "flex-start", paddingTop: 12 }, centeredStageScroll: { flexGrow: 1 },
+  offerPage: { flexGrow: 1, justifyContent: "space-between", gap: 28 },
+  monthHero: { flexDirection: "row", justifyContent: "center", alignItems: "center", paddingVertical: 48, gap: 12 },
+  monthNumber: { fontFamily: font.bold, fontSize: 112, lineHeight: 128, color: C.purple },
+  monthLabel: { ...T.title, color: C.purple },
   stageOne: { alignItems: "stretch" },
   title: { ...T.display, fontFamily: font.bold, fontSize: 29, lineHeight: 36, marginTop: 10 }, lede: { ...T.body, color: C.textSoft, marginTop: 14 },
   offerHero: { alignItems: "center", paddingTop: 22, paddingBottom: 28 }, trialEyebrow: { ...eyebrow, color: C.purple, fontSize: 10 }, offerTitle: { fontFamily: font.bold, fontSize: 43, lineHeight: 50, letterSpacing: -1.4, color: C.text, marginTop: 9 }, priceLine: { ...T.support, color: C.textSoft, textAlign: "center", fontSize: 15, lineHeight: 21, marginTop: 5 }, trialSupport: { ...T.caption, color: C.textSoft, textAlign: "center", fontSize: 12, marginTop: 14 },

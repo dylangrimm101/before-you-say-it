@@ -14,7 +14,7 @@ import {
 } from "@/lib/speech";
 import type { PersonaVoice } from "@/types/convo";
 import { withRequestDeadline } from "@/lib/requestDeadline";
-import {createOwnerVoiceCache} from "@/lib/ownerVoiceCache";
+import {createOwnerVoiceCache,quarantineOwnerVoiceCache} from "@/lib/ownerVoiceCache";
 import {speechBytesToBase64} from "@/lib/nativeSpeechBytes";
 import type { PilotAudioLine } from "@/types/pilotCurriculum";
 
@@ -61,6 +61,8 @@ interface Utterance {
   /** Prepared, playable source. Null until audio has been fetched. */
   source: string | null;
   paidPractice?: boolean;
+  onPlaybackStart?: () => void;
+  onPlaybackUnavailable?: () => void;
 }
 
 let snapshot: SpeechSnapshot = { phase: "idle", canReplay: false };
@@ -74,6 +76,13 @@ const listeners = new Set<(s: SpeechSnapshot) => void>();
 let token = 0;
 let pendingSpeech: AbortController | null = null;
 let lastUtterance: Utterance | null = null;
+
+function presentLine(started: boolean): void {
+  const utterance=lastUtterance;
+  const callback=started?utterance?.onPlaybackStart:utterance?.onPlaybackUnavailable;
+  if(utterance){utterance.onPlaybackStart=undefined;utterance.onPlaybackUnavailable=undefined;}
+  try {callback?.();} catch { /* Presentation must never interrupt audio cleanup. */ }
+}
 let currentPlayer: AudioPlayer | null = null;
 let currentPlaybackCleanup: (() => void) | null = null;
 type PlaybackCompletion = "completed" | "interrupted";
@@ -234,8 +243,25 @@ async function generatedOwnerCacheLease(){
   const {supabase,authEnvironment}=await import('./supabase');
   const session=await supabase?.auth.getSession();
   if(session?.error||!session?.data.session?.user.id)throw new Error('Voice account unavailable');
+  const voiceUser=session.data.session.user;
   const fs=await import('expo-file-system/legacy');
-  return createOwnerVoiceCache(fs).lease(`${authEnvironment?.url??'local'}:${session.data.session.user.id}`);
+  const cache=createOwnerVoiceCache(fs);
+  const base=`${authEnvironment?.url??'local'}:${voiceUser.id}`;
+  const {guestVisit,guestVisitsEnabled}=await import('./guestVisitRuntime');
+  if(guestVisitsEnabled&&voiceUser.is_anonymous){
+    const visit=guestVisit.current(voiceUser.id);
+    if(!visit)throw Error('Guest voice visit unavailable');
+    const owner=base+':visit:'+visit;
+    await cache.eraseOtherVisits(base,owner);
+    if(guestVisit.current(voiceUser.id)!==visit)throw Error('Guest voice visit changed');
+    const unsubscribe=guestVisit.subscribe(()=>{
+      if(guestVisit.current(voiceUser.id)===visit)return;
+      unsubscribe();quarantineOwnerVoiceCache(owner);
+      void cache.erase(owner).catch(()=>safeLog('[voice] visit cache cleanup unavailable'));
+    });
+    return cache.lease(owner);
+  }
+  return cache.lease(base);
 }
 async function prepareSource(dataUri: string, id: number, lease:Awaited<ReturnType<typeof generatedOwnerCacheLease>>): Promise<string> {
   if (Platform.OS === "web") return dataUri;
@@ -279,7 +305,11 @@ async function teardownSound(): Promise<void> {
   const cleanup = currentPlaybackCleanup;
   currentPlayer = null;
   currentPlaybackCleanup = null;
-  cleanup?.();
+  try {
+    cleanup?.();
+  } catch {
+    safeLog("[voice] listener cleanup failed", { category: "cleanup" });
+  }
   if (!player) return;
   try {
     player.pause();
@@ -320,14 +350,18 @@ function stopWeb(): void {
 
 /** Stop playback now. The last line stays available to replay. */
 export async function stopSpeech(): Promise<void> {
+  presentLine(false);
   activeCompletion?.resolve("interrupted");
   activeCompletion = null;
   token += 1;
   pendingSpeech?.abort();
   pendingSpeech = null;
   stopWeb();
-  await teardownSound();
-  publish({ phase: "idle" });
+  try {
+    await teardownSound();
+  } finally {
+    publish({ phase: "idle" });
+  }
 }
 
 /**
@@ -392,6 +426,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
       return "empty";
     }
     publish({ phase: "speaking" });
+    presentLine(true);
     return "played";
   }
 
@@ -474,6 +509,7 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
       // Already released by an explicit stop or a newer playback request.
     }
     if (id !== token) return;
+    if (!hasStarted) presentLine(false);
     settleCompletion(id, status === "completed" ? "completed" : "interrupted");
     safeLog("[evidence] BYSI TTS playback completed", {
       platform: Platform.OS,
@@ -501,8 +537,11 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
   };
 
   const subscription = player.addListener("playbackStatusUpdate", (status) => {
+    if (id !== token || isSettled) return;
     if (status.playing && !hasStarted) {
       hasStarted = true;
+      publish({ phase: "speaking" });
+      presentLine(true);
       armTerminalTimer(status.duration);
       safeLog("[evidence] BYSI TTS playback started", {
         platform: Platform.OS,
@@ -528,7 +567,6 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
     settlePlayback("timed_out");
     throw error;
   }
-  publish({ phase: "speaking" });
   return "played";
 }
 
@@ -541,15 +579,16 @@ async function playPrepared(source: string, id: number): Promise<SpeakOutcome> {
 export async function speak(
   text: string,
   persona: PersonaVoice,
-  options: { muted?: boolean } = {},
+  options: { muted?: boolean; onPlaybackStart?: () => void; onPlaybackUnavailable?: () => void } = {},
 ): Promise<SpeakOutcome> {
-  const clean = text.trim();
-  if (clean.length === 0) return "empty";
+  if (text.trim().length === 0) return "empty";
 
   // Staged so the speaker control can play it later even when muted now.
-  lastUtterance = { text: clean, persona, source: null };
+  // Do not transform server-authorized text after its digest has been recorded.
+  lastUtterance = { text, persona, source: null, onPlaybackStart:options.onPlaybackStart, onPlaybackUnavailable:options.onPlaybackUnavailable };
   publish({ canReplay: true });
   if (options.muted === true) {
+    presentLine(false);
     publish({ phase: "idle" });
     return "muted";
   }

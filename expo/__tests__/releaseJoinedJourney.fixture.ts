@@ -33,7 +33,7 @@ mock.module('@react-native-async-storage/async-storage',()=>({default:raw}));
 let syntheticPro=false;
 const auth=sdk.auth;
 mock.module('@/lib/supabase',()=>({supabase:{auth},authEnvironment:{url:authOrigin,staging:false},isAuthConfigured:true}));
-mock.module('@/lib/purchases',()=>({PRO_ENTITLEMENT:'pro',useNativeServerAccess:()=>({data:syntheticPro,isError:false,isPending:false,isFetching:false,refetch:async()=>{}}),identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>syntheticPro,useCustomerInfo:()=>({data:null,isLoading:false}),useOfferings:()=>({data:null,isLoading:false}),usePurchasePackage:()=>({isPending:false,mutateAsync:async()=>{throw Error('No purchases in this fixture');}}),useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, PRO_ENTITLEMENT:'pro',useNativeServerAccess:()=>({data:syntheticPro,isError:false,isPending:false,isFetching:false,refetch:async()=>{}}),identifyPurchasesUser:async()=>null,clearPurchasesIdentity:async()=>{},useIsPro:()=>syntheticPro,useCustomerInfo:()=>({data:null,isLoading:false}),useOfferings:()=>({data:null,isLoading:false}),usePurchasePackage:()=>({isPending:false,mutateAsync:async()=>{throw Error('No purchases in this fixture');}}),useRestorePurchases:()=>({isPending:false,mutateAsync:async()=>false})}));
 mock.module('@/lib/reminders',()=>({cancelChallengeNudge:async()=>{},cancelDailyReminder:async()=>{},syncChallengeNudge:async()=>{}}));
 mock.module('@/lib/baselineAudio',()=>({deleteAllBaselineAudioStrict:async()=>{},deleteBaselineAudioStrict:async()=>{}}));
 const dictation={status:'denied',error:'synthetic permission denied',cancel:async()=>{},reset:async()=>{},requestPermission:async()=>false};
@@ -89,7 +89,7 @@ mock.module('@/lib/ai',()=>({...actualAI,generateM1L1DynamicReply:async(input:an
 const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
 const {AuthProvider,useAuth}=await import('../providers/auth');
 const {StoreProvider,useStore}=await import('../providers/store');
-const {default:Entry}=await import('../app/entry');
+const {LegacyEntryScreen:Entry}=await import('../app/entry');
 const {default:Onboarding}=await import('../app/onboarding');
 const {default:Login}=await import('../app/continue-from-web');
 const {default:Rehearse}=await import('../app/rehearse/[id]');
@@ -141,7 +141,7 @@ try{
  await go({pathname:'/debrief/[id]',params:{id:runId}});
  if(outputMode!=='insufficient'){
   assert.ok(text().includes('You asked for a task.'));assert.ok(store.activePracticeSession.sharedResult);
-  await press('See what changes with practice');await press('See the practice plan');await press('Review monthly subscription');assert.equal(routePath(),'/paywall');
+  await press('See what changes with practice');await press('See the practice plan');await press('See my practice plan');assert.equal(routePath(),'/paywall');
   // Explicit synthetic server admission; no receipt or user benefit is created.
   syntheticPro=true;await restart();await press('Continue to practice');
   assert.equal(routePath(),'/(tabs)/library','verified normal access must leave earned result for the library');
@@ -192,6 +192,3 @@ try{
  await db.exec('reset role');assert.equal((await db.query('select count(*)::int n from bysi_native_free.session')).rows[0].n,1);assert.deepEqual(seenOperations,outputMode==='recovery'?['session','generate','generate','generate','generate']:['session','generate','generate','generate']);
  console.log('PASS JOINED ACTUAL Auth SDK + mounted Auth/Store/onboarding/rehearsal/debrief + Next mounts + restricted SQL + private producer; '+outputMode+'; synthetic Auth/provider/native hosts, typed-first, no live/device claims');
 }finally{if(root)await act(async()=>root.unmount());sdk.auth.stopAutoRefresh();await db.close();}
-
-
-

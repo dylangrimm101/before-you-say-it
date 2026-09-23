@@ -8,6 +8,7 @@ import { Backdrop, PressCard, PrimaryButton, Reveal } from "@/components/ui";
 import { C, GUTTER, T, font, radius } from "@/constants/theme";
 import { useAuth } from "@/providers/auth";
 import { authEnvironment, supabase } from "@/lib/supabase";
+import { subscriptionReturn } from "@/lib/subscriptionNavigation";
 
 
 // Confirmation is completed by Supabase in the browser. This app deliberately
@@ -20,8 +21,9 @@ const confirmationOptions = authEnvironment?.staging
 
 export default function ContinueFromWebScreen(): React.JSX.Element {
   const router = useRouter();
-  const params = useLocalSearchParams<{ mode?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; returnTo?: string; moduleId?: string; gate?: string; purchaseFirst?: string }>();
   const [signup, setSignup] = useState(params.mode === "signup");
+  const subscriptionIntent = params.returnTo === "subscription" || params.returnTo === "answer-first";
   const [confirmationPending, setConfirmationPending] = useState(false);
   const busy = useRef(false);
   const insets = useSafeAreaInsets();
@@ -32,6 +34,15 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
   const [password, setPassword] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    // Auth can remount this screen when signup establishes the new owner. Keep
+    // recovery in sign-in mode rather than offering to create that account again.
+    if (session?.user && !session.user.is_anonymous) {
+      setSignup(false);
+      setEmail(current => current || session.user.email || "");
+    }
+  }, [session?.user]);
 
   const submit = useCallback(async (): Promise<void> => {
     if (busy.current) return;
@@ -45,16 +56,33 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
         if (!supabase) { setError("Account signup isn’t configured for this build."); return; }
         const result = await supabase.auth.signUp({ email: email.trim().toLowerCase(), password, ...(confirmationOptions ? { options: confirmationOptions } : {}) });
         if (result.error) { setError("We couldn’t create your account or send confirmation. Check your details and connection, then retry."); return; }
-        setConfirmationPending(true);
-        return;
+        if (!result.data.session) {
+          // Retain recovery for older projects/accounts that still require confirmation.
+          setConfirmationPending(true);
+          return;
+        }
+        // A server-issued signup session can continue immediately. Still use the
+        // AuthProvider's verified login/owner setup before claiming any purchase.
+        // If that check fails, retry login rather than creating the account twice.
+        setSignup(false);
       }
       const result = await login(email, password, hasCurrentGuestPractice);
       if (!result.success) {
         setError(result.message ?? "We couldn’t log you in.");
         return;
       }
-      if (result.continuationId) { router.replace(`/debrief/${result.continuationId}`); return; }
       if (result.continuationProblem) { router.replace("/account-practice"); return; }
+      if (params.returnTo === 'account-existing' && !stagingWebBridge) {
+        router.replace({pathname:'/answer-onboarding',params:{source:'account-login'}});
+        return;
+      }
+      if (params.returnTo === 'answer-first' && !stagingWebBridge) {
+        router.replace({ pathname:'/answer-onboarding', params:{source:'account-return'} });
+        return;
+      }
+      const subscription = subscriptionReturn(params);
+      if (subscription && !stagingWebBridge) { router.replace(subscription); return; }
+      if (result.continuationId) { router.replace(`/debrief/${result.continuationId}`); return; }
       if (signup) { router.replace("/account-practice"); return; }
       if (stagingWebBridge) { router.replace("/staging-web-result"); return; }
       if (normalResults) { router.replace("/saved-result"); return; }
@@ -67,7 +95,7 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
       busy.current = false;
       setIsSubmitting(false);
     }
-  }, [email, login, password, router, stagingWebBridge, normalResults, session, hasCurrentGuestPractice, signup, confirmationPending]);
+  }, [email, login, password, router, stagingWebBridge, normalResults, session, hasCurrentGuestPractice, signup, confirmationPending, params]);
 
   return (
     <View style={styles.root}>
@@ -79,6 +107,7 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
             <Text style={styles.title}>{signup ? "Create your account" : "Enter your email"}</Text>
           </Reveal>
           {hasCurrentGuestPractice ? <Text style={styles.lede}>Save this current rehearsal to your account.</Text> : null}
+          {subscriptionIntent ? <Text style={styles.lede}>{params.returnTo==='answer-first'&&params.purchaseFirst==='1'?'Create your account to save your progress and connect your Apple purchase. Then start your first lesson. This does not make another purchase.':'After signing in, you’ll return to checkout. Creating an account or signing in does not start a subscription or charge you.'}</Text> : null}
           {continuationIssue ? <Text style={styles.error} accessibilityRole="alert">{continuationIssue}</Text> : null}
           <Reveal index={1} style={styles.formWrap}>
             <TextInput
@@ -108,7 +137,7 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
               autoCapitalize="none"
               autoCorrect={false}
               secureTextEntry
-              textContentType="password"
+              textContentType={signup && !confirmationPending ? "newPassword" : "password"}
               editable={!isSubmitting}
               style={styles.input}
               accessibilityLabel="Password"
@@ -127,24 +156,24 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
             {isSubmitting ? <ActivityIndicator color={C.purple} style={styles.spinner} /> : null}
           </Reveal>
 
-          {hasCurrentGuestPractice && !signup ? (
+          {(hasCurrentGuestPractice || subscriptionIntent) && !signup ? (
             <PressCard
               disabled={isSubmitting}
               onPress={() => { setSignup(true); setConfirmationPending(false); setError(""); }}
               style={styles.forgotWrap}
-              accessibilityLabel="Create an account to save this result"
+              accessibilityLabel={hasCurrentGuestPractice ? "Create an account to save this result" : "Create an account"}
             >
-              <Text style={styles.forgot}>Create an account to save this result</Text>
+              <Text style={styles.forgot}>{hasCurrentGuestPractice ? "Create an account to save this result" : "Create an account"}</Text>
             </PressCard>
           ) : null}
-          {hasCurrentGuestPractice && signup && !confirmationPending ? (
+          {(hasCurrentGuestPractice || subscriptionIntent) && signup && !confirmationPending ? (
             <PressCard
               disabled={isSubmitting}
               onPress={() => { setSignup(false); setConfirmationPending(false); setError(""); }}
               style={styles.forgotWrap}
-              accessibilityLabel="I already have an account"
+              accessibilityLabel="Already have an account? Sign in"
             >
-              <Text style={styles.forgot}>I already have an account</Text>
+              <Text style={styles.forgot}>Already have an account? Sign in</Text>
             </PressCard>
           ) : null}
           {!signup && (!session?.user || session.user.is_anonymous) ? (
