@@ -9,7 +9,7 @@ export function createNativeBilling(config:{enabled:boolean;authUrl?:string;orig
  const pending=new Set<AbortController>();
  const invalidate=()=>{revision++;for(const control of pending)control.abort();};
  const subscription=auth.onAuthStateChange((event,session)=>{const next=session?.user.id??null;if(event==='SIGNED_OUT'||(next!==owner&&owner!==null))invalidate();owner=next;}).data.subscription;
- async function request(operation:'identify'|'access'|'generate'|'tts'|'transcribe'|'results/discover'|'results/restore'|'results/delete'|'results/claim'|'follow-through/discover'|'follow-through/restore'|'follow-through/recovery',payload:Record<string,unknown>|FormData={},timeoutMs=operation==='generate'?75000:operation==='transcribe'?45000:15000,externalSignal?:AbortSignal){
+ async function request(operation:'identify'|'access'|'claim'|'generate'|'tts'|'transcribe'|'results/discover'|'results/restore'|'results/delete'|'results/claim'|'follow-through/discover'|'follow-through/restore'|'follow-through/recovery',payload:Record<string,unknown>|FormData={},timeoutMs=operation==='generate'?75000:operation==='transcribe'?45000:15000,externalSignal?:AbortSignal){
   const before=revision,control=new AbortController();pending.add(control);
   const abort=()=>control.abort();externalSignal?.addEventListener("abort",abort,{once:true});if(externalSignal?.aborted)abort();
   const current=()=>{if(disposed||(suspended&&operation!=='identify')||before!==revision||control.signal.aborted)throw Error('Account changed');};

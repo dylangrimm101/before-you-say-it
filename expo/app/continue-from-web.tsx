@@ -21,9 +21,9 @@ const confirmationOptions = authEnvironment?.staging
 
 export default function ContinueFromWebScreen(): React.JSX.Element {
   const router = useRouter();
-  const params = useLocalSearchParams<{ mode?: string; returnTo?: string; moduleId?: string; gate?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; returnTo?: string; moduleId?: string; gate?: string; purchaseFirst?: string }>();
   const [signup, setSignup] = useState(params.mode === "signup");
-  const subscriptionIntent = params.returnTo === "subscription";
+  const subscriptionIntent = params.returnTo === "subscription" || params.returnTo === "answer-first";
   const [confirmationPending, setConfirmationPending] = useState(false);
   const busy = useRef(false);
   const insets = useSafeAreaInsets();
@@ -34,6 +34,15 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
   const [password, setPassword] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    // Auth can remount this screen when signup establishes the new owner. Keep
+    // recovery in sign-in mode rather than offering to create that account again.
+    if (session?.user && !session.user.is_anonymous) {
+      setSignup(false);
+      setEmail(current => current || session.user.email || "");
+    }
+  }, [session?.user]);
 
   const submit = useCallback(async (): Promise<void> => {
     if (busy.current) return;
@@ -47,8 +56,15 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
         if (!supabase) { setError("Account signup isn’t configured for this build."); return; }
         const result = await supabase.auth.signUp({ email: email.trim().toLowerCase(), password, ...(confirmationOptions ? { options: confirmationOptions } : {}) });
         if (result.error) { setError("We couldn’t create your account or send confirmation. Check your details and connection, then retry."); return; }
-        setConfirmationPending(true);
-        return;
+        if (!result.data.session) {
+          // Retain recovery for older projects/accounts that still require confirmation.
+          setConfirmationPending(true);
+          return;
+        }
+        // A server-issued signup session can continue immediately. Still use the
+        // AuthProvider's verified login/owner setup before claiming any purchase.
+        // If that check fails, retry login rather than creating the account twice.
+        setSignup(false);
       }
       const result = await login(email, password, hasCurrentGuestPractice);
       if (!result.success) {
@@ -56,6 +72,14 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
         return;
       }
       if (result.continuationProblem) { router.replace("/account-practice"); return; }
+      if (params.returnTo === 'account-existing' && !stagingWebBridge) {
+        router.replace({pathname:'/answer-onboarding',params:{source:'account-login'}});
+        return;
+      }
+      if (params.returnTo === 'answer-first' && !stagingWebBridge) {
+        router.replace({ pathname:'/answer-onboarding', params:{source:'account-return'} });
+        return;
+      }
       const subscription = subscriptionReturn(params);
       if (subscription && !stagingWebBridge) { router.replace(subscription); return; }
       if (result.continuationId) { router.replace(`/debrief/${result.continuationId}`); return; }
@@ -83,7 +107,7 @@ export default function ContinueFromWebScreen(): React.JSX.Element {
             <Text style={styles.title}>{signup ? "Create your account" : "Enter your email"}</Text>
           </Reveal>
           {hasCurrentGuestPractice ? <Text style={styles.lede}>Save this current rehearsal to your account.</Text> : null}
-          {subscriptionIntent ? <Text style={styles.lede}>After verification, you’ll return to checkout. Creating an account or signing in does not start a subscription or charge you.</Text> : null}
+          {subscriptionIntent ? <Text style={styles.lede}>{params.returnTo==='answer-first'&&params.purchaseFirst==='1'?'Create your account to save your progress and connect your Apple purchase. Then start your first lesson. This does not make another purchase.':'After signing in, you’ll return to checkout. Creating an account or signing in does not start a subscription or charge you.'}</Text> : null}
           {continuationIssue ? <Text style={styles.error} accessibilityRole="alert">{continuationIssue}</Text> : null}
           <Reveal index={1} style={styles.formWrap}>
             <TextInput

@@ -12,11 +12,14 @@ let store:any={hydrated:true,profile:null,activePracticeSession:null,nativeJourn
 let account:any={isAuthLoading:false,user:null};
 let segments:any[]=[];let redirects:any[]=[];let routeParams:any={};
 const router={replace:(r:any)=>redirects.push(r)};
-const Stack=Object.assign(Host,{Screen:()=>null});
+const Stack=Object.assign((p:any)=>p.screenLayout ? p.screenLayout({children:React.createElement('paid-content')}) : React.createElement('paid-content'),{Screen:()=>null});
 mock.module('expo-router',()=>({Stack,useRouter:()=>router,useSegments:()=>segments,useGlobalSearchParams:()=>({id:segments[1],...routeParams})}));
 mock.module('@/providers/store',()=>({StoreProvider:Host,useStore:()=>store}));
 mock.module('@/providers/auth',()=>({AuthProvider:Host,useAuth:()=>account}));
-mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0, }));
+let access:any={data:false,isPending:false,isError:false,isFetching:false,refetch:async()=>{}};
+mock.module('@/lib/purchases',()=>({trialEligibility: async () => 0,useNativeServerAccess:()=>access}));
+mock.module('@/lib/nativeBillingRuntime',()=>({normalBillingEnabled:process.env.BYSI_ACCESS_GATE==='1'}));
+mock.module('@/components/AccountAccessStatus',()=>({AccountAccessStatus:(p:any)=>React.createElement('access-status',p)}));
 mock.module('react-native',()=>({View:Host,Text:Host,Pressable:Host,Platform:{OS:'web',select:(v:any)=>v.web??v.default}}));
 mock.module('react-native-gesture-handler',()=>({GestureHandlerRootView:Host}));
 mock.module('expo-font',()=>({useFonts:()=>[true,null]}));
@@ -24,9 +27,40 @@ mock.module('expo-status-bar',()=>({StatusBar:()=>null}));
 mock.module('expo-splash-screen',()=>({preventAutoHideAsync:async()=>{},hideAsync:async()=>{}}));
 mock.module('@/components/LaunchExperience',()=>({LaunchExperience:()=>null}));
 mock.module('@/components/MigrationNotice',()=>({MigrationNotice:()=>null}));
-const {default:Root}=await import('../app/_layout');
+const {default:Root}=await import(process.env.BYSI_ACCESS_BASELINE ?? '../app/_layout');
 let root:any;
 async function visit(path:string){segments=path.split('/').filter(Boolean);redirects=[];await act(async()=>{if(root)root.update(React.createElement(Root));else root=create(React.createElement(Root));});return redirects;}
+if(process.env.BYSI_ACCESS_GATE==='1'){
+  account={...account,user:{id:'registered-A'}};
+  const protectedRoutes=['(tabs)','(tabs)/library','(tabs)/progress','approved-lesson/m1-l1','approved-rehearsal/m1-l1','quick-rep/m1-l1','first-practice','module/1','rehearse/scene','path','custom'];
+  for(const path of protectedRoutes){
+    assert.deepEqual(await visit(path),[{pathname:'/paywall',params:{source:'access-gate'}}],`unpaid account must not enter ${path}`);
+    assert.equal(root.root.findAllByType('paid-content').length,0,'protected children must not mount before access');
+  }
+  for(const path of ['settings','privacy','safety','delete-account','paywall','continue-from-web'])assert.deepEqual(await visit(path),[]);
+  account={...account,restoredGuestContinuationId:'old-result'};store={...store,activePracticeSession:{id:'old-result',sharedResult:{}}};
+  assert.deepEqual(await visit('paywall'),[],'legacy result must not bounce paywall back into a gated route');
+  account={...account,restoredGuestContinuationId:null};store={...store,activePracticeSession:null};
+  for(const state of [{data:undefined,isPending:true},{data:undefined,isError:true},{data:false,isError:true},{data:false,isFetching:true}]){
+    access={data:undefined,isError:false,isPending:false,isFetching:false,refetch:async()=>{},...state};
+    assert.deepEqual(await visit('(tabs)'),[],'unknown/error must not send a subscriber to checkout');
+    assert.equal(root.root.findAllByType('paid-content').length,0);
+  }
+  let retries=0;access={...access,isFetching:false,isError:true,refetch:async()=>{retries++;}};
+  await visit('(tabs)');await act(async()=>root.root.findByType('access-status').props.retry());assert.equal(retries,1);
+  for(const fetching of [false,true]){
+    access={data:true,isPending:false,isError:false,isFetching:fetching};
+    for(const path of protectedRoutes){assert.deepEqual(await visit(path),[]);assert.equal(root.root.findAllByType('paid-content').length,1);}
+  }
+  assert.deepEqual(await visit('entry'),['/(tabs)']);
+  routeParams={source:'account-login'};assert.deepEqual(await visit('answer-onboarding'),['/(tabs)']);
+  routeParams={source:'account-return'};assert.deepEqual(await visit('answer-onboarding'),[],'purchase-first claim handoff stays intact');
+  // Fresh owner has no inherited query data; AuthProvider clears queries on owner change.
+  account={...account,user:{id:'registered-B'}};access={data:undefined,isPending:true};
+  assert.deepEqual(await visit('(tabs)'),[]);assert.equal(root.root.findAllByType('paid-content').length,0);
+  account={...account,user:null};assert.deepEqual(await visit('(tabs)'),['/entry']);
+  await act(async()=>root.unmount());console.log('PASS subscription-only root gate');process.exit(0);
+}
 assert.deepEqual(await visit('(tabs)'),['/entry'],'fresh installation cannot silently enter paid home');
 assert.deepEqual(await visit('entry'),[]);
 assert.deepEqual(await visit('continue-from-web'),[]);

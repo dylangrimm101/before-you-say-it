@@ -110,6 +110,11 @@ await act(async()=>{await assert.rejects(buy.mutateAsync({product:{identifier:'b
 await act(async()=>{assert.equal(await restore.mutateAsync(),true);});assert.notEqual(rcId,owner);
 await event('EXPIRATION');await act(async()=>{await client.invalidateQueries({queryKey:['native','access']});});
 await act(async()=>{await new Promise(r=>setTimeout(r,25));});
+assert.ok(JSON.stringify(root.toJSON()).includes('Billing verification is unavailable'),'stale SDK entitlement must block another offer after server revocation');
+assert.equal(root.root.findAllByType('apple-offer').length,0);
+assert.equal(isPro,false,'SDK snapshot cannot override revoked server authority');
+sdkPro=false;
+await act(async()=>{await client.invalidateQueries({queryKey:['native','access']});await new Promise(r=>setTimeout(r,25));});
 await act(async()=>{root.root.findAllByType('button').find((b:any)=>b.props.label==='I already subscribed on the web').props.onPress();});
 await act(async()=>{await new Promise(r=>setTimeout(r,25));});
 assert.ok(JSON.stringify(root.toJSON()).includes('cannot currently verify web billing'));assert.equal(root.root.findAllByType('apple-offer').length,0);

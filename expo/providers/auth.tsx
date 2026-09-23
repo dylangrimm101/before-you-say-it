@@ -1,4 +1,5 @@
 import {nativeBilling} from '@/lib/nativeBillingRuntime';
+import {authDiagnostic} from '@/lib/authDiagnostics';
 import {normalResults} from '@/lib/normalResultsRuntime';
 import createContextHook from "@nkzw/create-context-hook";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -126,7 +127,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       if (verifiedGuestSource) continuation.bind(verifiedGuestSource, owner.storage);
       if (!deferPublication) setPracticeOwner(owner);
     }
-    if (!deferPublication) setSession(next);
+    if (!deferPublication) {
+      authDiagnostic(!next ? 'session-published-none' : next.user.is_anonymous ? 'session-published-guest' : 'session-published-account');
+      setSession(next);
+    }
   }, [queryClient, continuation, ownerBlocked]);
 
   useEffect(()=>{
@@ -370,6 +374,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     if(!supabase)return {success:false,message:"Account login isn’t configured for this build."};
     if (loginPending.current) return { success: false, message: "A login is already in progress." };
     loginPending.current = true;
+    authDiagnostic('login-start');
     const releaseVisit=guestVisitsEnabled?guestVisit.hold():()=>{};
     loginCancelled.current = false;
     try {
@@ -399,6 +404,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (loginCancelled.current) return { success: false, message: "Login cancelled. Your rehearsal was not attached." };
       if (error || !data.session) return { success: false, message: loginMessage(error?.message ?? "Login failed") };
+      authDiagnostic('credentials-accepted');
       if (logoutPending.current) return { success: false, message: "Signing out." };
       const revision = authRevision.current;
       const verified = await supabase!.auth.getUser(data.session.access_token);
@@ -410,6 +416,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         || readback.data.session?.user.id !== owner.id
         || readback.data.session?.access_token !== data.session.access_token
         || revision !== authRevision.current || logoutPending.current) {
+        authDiagnostic('verification-rejected');
         applySession(null);
         await syncPurchases(null);
         return { success: false, message: "We couldn’t verify this account after login. No guest practice was attached. Please log in again." };
@@ -420,10 +427,15 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
       if(accountDeletionAvailable)void enrollReceiptlessDeletionNotice(owner.id);
       const guestSource = saveCurrentResult ? consentSource : undefined;
-      applySession(data.session, guestSource, saveCurrentResult);
+      // Publishing the new owner remounts StoreProvider and its login screen.
+      // Keep that remount after all awaited login work, otherwise the old
+      // screen's unmount cancellation can revoke the verified login itself.
+      applySession(data.session, guestSource, true);
       loginVerified.current = true;
       const verifiedLease = ownerRef.current?.storage;
+      authDiagnostic('identity-sync-start');
       await syncPurchases(data.session);
+      authDiagnostic('identity-sync-end');
       if (revision !== authRevision.current || ownerRef.current?.storage !== verifiedLease || !verifiedLease?.isActive()) {
         await continuation.invalidate();
         return { success: false, message: "Account changed after verification. No continuation is available; log in again." };
@@ -493,15 +505,18 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         }
         // Hydrate only after the single-key claim settles, never race a mounted
         // account store reading an empty slot against the transfer commit.
-        setPracticeOwner(ownerRef.current);
-        setSession(data.session);
       }
+      setPracticeOwner(ownerRef.current);
+      setSession(data.session);
+      authDiagnostic('login-published');
       return { success: true, userId: data.session.user.id, continuationId, continuationProblem };
     } catch {
+      authDiagnostic('login-exception');
       return { success: false, message: "We couldn’t reach your account. Check your connection and try again." };
     } finally {
       loginVerified.current = false;
       loginPending.current = false;
+      authDiagnostic('login-finished');
       releaseVisit();
     }
     });
@@ -535,6 +550,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const cancelLogin = useCallback(() => {
     if (!loginPending.current) return;
+    authDiagnostic('login-cancelled');
     loginCancelled.current = true;
     void continuation.cancelConsent().catch(() => setContinuationIssue("Cancelled login, but device handoff revocation was not confirmed. Retry sign out before leaving this device."));
     ++authRevision.current;

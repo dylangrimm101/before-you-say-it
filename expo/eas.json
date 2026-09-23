@@ -65,6 +65,8 @@
       "env": {
         "EXPO_NO_DOTENV": "1",
         "EXPO_PUBLIC_NATIVE_BILLING_ORIGIN": "https://beforeyousayit.app",
+        "EXPO_PUBLIC_PURCHASE_FIRST": "claim-v1",
+        "EXPO_PUBLIC_PURCHASE_FIRST_AUDIENCE": "sandbox",
         "EXPO_PUBLIC_SUPABASE_URL": "https://spvksnddzyvycfoefrcf.supabase.co"
       },
       "autoIncrement": false

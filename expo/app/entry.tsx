@@ -27,7 +27,16 @@ function ConversationMark(): React.JSX.Element {
   );
 }
 
+// New installations start with deterministic questions, never an AI guest lease.
 export default function EntryScreen(): React.JSX.Element {
+  // Lazy boundary keeps legacy recovery fixtures independent of new commerce UI.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const AnswerOnboardingRoute = require('./answer-onboarding').default;
+  return <AnswerOnboardingRoute />;
+}
+
+// Retained for interrupted legacy free-rehearsal recovery and its regression fixtures.
+export function LegacyEntryScreen(): React.JSX.Element {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activePracticeSession, nativeJourneyStarted } = useStore();

@@ -6,7 +6,7 @@ import * as purchases from '@/lib/purchases';
 import {PrimaryButton} from '@/components/ui';
 /** Normal rollout only. Web-owner durable billing has no reviewed production
  * adapter here: a claimed web purchase blocks offers, never grants access. */
-export function NativeBillingGate({children,guestPreview,renderStatus=content=>content,onContinue,onLogin}:{children?:React.ReactNode;guestPreview?:React.ReactNode;renderStatus?:(content:React.ReactNode)=>React.ReactNode;onContinue:()=>void;onLogin:()=>void}) {
+export function NativeBillingGate({children,guestPreview,renderStatus=content=>content,onContinue,onLogin,directOffer=false}:{children?:React.ReactNode;guestPreview?:React.ReactNode;renderStatus?:(content:React.ReactNode)=>React.ReactNode;onContinue:()=>void;onLogin:()=>void;directOffer?:boolean}) {
  const {user,normalResults}=useAuth();const access=purchases.useNativeServerAccess();const restore=purchases.useRestorePurchases();const client=useQueryClient();
  const key=['native','known-web-buyer',user?.id];
  const web=useQuery<boolean>({queryKey:key,queryFn:async()=>false,enabled:false});
@@ -27,11 +27,11 @@ export function NativeBillingGate({children,guestPreview,renderStatus=content=>c
  };
  if(!user)return guestPreview ?? renderStatus(<View><Text>Log in to verify purchases before viewing an Apple offer.</Text><PrimaryButton label="Log in to verify access" onPress={onLogin}/></View>);
  // Purchase-warning memory is not authority and cannot veto independent paid access.
- if(access.data===true&&!access.isError&&!access.isPending&&!access.isFetching)return renderStatus(<View><Text>Your current access is verified.</Text><PrimaryButton label="Continue to practice" onPress={onContinue}/></View>);
+ if(access.data===true&&!access.isError&&!access.isPending)return renderStatus(<View><Text>Your current access is verified.</Text><PrimaryButton label="Continue to practice" onPress={onContinue}/></View>);
  if(web.data)return renderStatus(<View><Text>Your existing web purchase needs account migration verification. This service cannot currently verify web billing. Do not subscribe again in Apple. Your existing purchase is unchanged. Its account ownership and overlapping benefits still need verification; contact support for recovery.</Text><PrimaryButton label="Recheck access" onPress={()=>void access.refetch()}/></View>);
- if(access.isPending||access.isFetching)return renderStatus(<View><Text>Verifying current subscription access…</Text></View>);
+ if(access.isPending||(access.data===undefined&&!access.isError))return renderStatus(<View><Text>Verifying current subscription access…</Text></View>);
  if(access.isError)return renderStatus(<View><Text>Billing verification is unavailable. Existing purchases are unchanged. Retry rather than buying again.</Text><PrimaryButton label="Retry access verification" onPress={()=>void access.refetch()}/></View>);
- if(newBuyer)return children;
+ if(newBuyer||directOffer)return children;
  return renderStatus(<View>
   <Text>Already subscribed? Restore an Apple purchase or identify a web purchase before viewing another offer. Older purchases may require recovery; a restore or SDK login does not itself grant access.</Text>
   <Text>The one-time Follow-Through plan keeps its original terms. It is not a subscription. It must be verified by the server before this app treats it as an existing original benefit. The ordinary subscription offer is for additional practice access, not a replacement or repurchase of that plan.</Text>

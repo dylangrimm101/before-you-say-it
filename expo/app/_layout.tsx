@@ -8,11 +8,15 @@ import { View, Text, Pressable } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { LaunchExperience } from "@/components/LaunchExperience";
+import { routeDiagnostic } from '@/lib/authDiagnostics';
 import { MigrationNotice } from "@/components/MigrationNotice";
 import { C, FONT_ASSETS } from "@/constants/theme";
-import "@/lib/purchases";
 import { AuthProvider, useAuth } from "@/providers/auth";
 import { StoreProvider, useStore } from "@/providers/store";
+import {normalBillingEnabled} from '@/lib/nativeBillingRuntime';
+import {useNativeServerAccess} from '@/lib/purchases';
+import {accountAccessRoute, accountAccessState} from '@/lib/accountAccess';
+import {AccountAccessStatus} from '@/components/AccountAccessStatus';
 
 // Expo Go does not always have a splash screen registered for the current view
 // controller, and this rejects when it doesn't. An unhandled rejection here
@@ -28,7 +32,17 @@ function RootLayoutNav() {
   const { isAuthLoading, user, session, normalResults, restoredGuestContinuationId, acknowledgeGuestContinuation,isGuestVisit } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+  const diagnosticRoute = segments[0];
+  const diagnosticAccount = Boolean(user);
+  useEffect(() => {
+    routeDiagnostic(diagnosticRoute, diagnosticAccount, isAuthLoading);
+  }, [diagnosticRoute, diagnosticAccount, isAuthLoading]);
   const routeParams = useGlobalSearchParams<{ id?: string; source?: string; returnTo?: string }>();
+  const serverAccess = useNativeServerAccess(Boolean(user));
+  const accessRoute = accountAccessRoute(segments[0], Boolean(user), routeParams.source);
+  const accessState = accountAccessState(Boolean(user), serverAccess);
+  const gated = normalBillingEnabled && accessRoute.protected;
+  const blockContent = gated && (accessState !== 'allowed' || accessRoute.landing);
   const [showLaunch, setShowLaunch] = useState<boolean>(() => {
     if (hasPresentedLaunch) return false;
     hasPresentedLaunch = true;
@@ -43,9 +57,22 @@ function RootLayoutNav() {
   useEffect(() => {
     if (!ready) return;
     SplashScreen.hideAsync().catch(() => {});
+    if (gated) {
+      if (accessState === 'login') router.replace('/entry');
+      else if (accessState === 'paywall') router.replace({pathname: '/paywall', params: {source: 'access-gate'}});
+      else if (accessState === 'allowed' && accessRoute.landing) router.replace('/(tabs)');
+      // Paid app navigation must never be captured by a legacy free journey.
+      return;
+    }
+    // Public/account recovery destinations own their continuation. A legacy
+    // saved guest result must not bounce an unpaid account out of the paywall.
+    if (normalBillingEnabled && user) return;
     const firstSegment = segments[0];
     const onboarding = firstSegment === "onboarding";
     const entry = firstSegment === "entry";
+    // Answer-first onboarding performs no rehearsal or paid operation. Its own
+    // final handoff gates access; keep it reachable without a guest AI lease.
+    if (firstSegment === "answer-onboarding" || firstSegment === "first-practice") return;
     const stagingResult = firstSegment === "staging-web-result";
     const deletionStatus = firstSegment === "delete-account";
     const normalContinuation = Boolean(user && ["saved-result", "approved-lesson", "approved-rehearsal", "quick-rep", "path", "settings", "paywall", "(tabs)"].includes(firstSegment));
@@ -106,7 +133,7 @@ function RootLayoutNav() {
       };
       router.replace({ pathname: "/rehearse/[id]", params: sharedParams });
     }
-  }, [activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user, session, normalResults, restoredGuestContinuationId, routeParams.id, routeParams.source, routeParams.returnTo, acknowledgeGuestContinuation,isGuestVisit]);
+  }, [gated, accessState, accessRoute.landing, activePracticeSession, nativeJourneyStarted, ready, profile, segments, router, user, session, normalResults, restoredGuestContinuationId, routeParams.id, routeParams.source, routeParams.returnTo, acknowledgeGuestContinuation,isGuestVisit]);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: C.bg }} />;
 
@@ -114,6 +141,7 @@ function RootLayoutNav() {
     <>
       <StatusBar style={showLaunch ? "light" : "dark"} />
       <Stack
+        screenLayout={({children}) => blockContent ? <AccountAccessStatus unavailable={accessState === 'unavailable'} retry={() => { void serverAccess.refetch(); }}/> : <>{children}</>}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: C.bg },
@@ -128,6 +156,8 @@ function RootLayoutNav() {
         <Stack.Screen name="forgot-password" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="reset-password" options={{ animation: "slide_from_bottom" }} />
         <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
+        <Stack.Screen name="answer-onboarding" options={{ animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="first-practice" options={{ animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="scenario/[id]" />
         <Stack.Screen name="rehearse/[id]" options={{ animation: "fade", gestureEnabled: false }} />
         <Stack.Screen name="drill/[id]" options={{ animation: "fade" }} />

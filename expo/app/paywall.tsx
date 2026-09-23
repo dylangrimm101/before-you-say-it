@@ -1,4 +1,5 @@
 import { NativeBillingGate } from '@/components/NativeBillingGate';
+import {useQueryClient} from '@tanstack/react-query';
 import { normalBillingEnabled } from '@/lib/nativeBillingRuntime';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AlertCircle, Check, ChevronDown, Clock3, RefreshCw, ShieldCheck } from "lucide-react-native";
@@ -39,6 +40,7 @@ const SUBSCRIPTION_MANAGEMENT_URL = Platform.select({
 });
 
 export default function Paywall() {
+  const [recovery, setRecovery] = useState(false);
   const { stagingWebBridge } = useAuth();
   const params = useLocalSearchParams<{ moduleId?: string; gate?: string }>();
   const webState = useStagingWebBridgeState(stagingWebBridge);
@@ -62,25 +64,29 @@ export default function Paywall() {
     ...(params.gate === "recommended-path" ? { gate: params.gate } : {}),
   } });
   if(normalBillingEnabled)return <NativeBillingGate
+    directOffer={!recovery}
     guestPreview={<ApplePaywall onVerifyAccount={() => verifyAccount("signup")} />}
     renderStatus={content => <BillingStatus>{content}</BillingStatus>}
-    onContinue={()=>router.replace("/(tabs)/library")} onLogin={() => verifyAccount("login")}
-  ><ApplePaywall /></NativeBillingGate>;
+    onContinue={()=>router.replace("/(tabs)")} onLogin={() => verifyAccount("login")}
+  ><ApplePaywall onRecovery={() => setRecovery(true)} /></NativeBillingGate>;
   return <ApplePaywall />;
 }
 
 function BillingStatus({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const {user} = useAuth();
   return <View style={styles.root}><Backdrop /><ScrollView contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24, paddingHorizontal: GUTTER, gap: 20 }}>
-    <PrimaryButton label="Back" onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} />
+    <PrimaryButton label="Back" onPress={() => normalBillingEnabled && user ? router.replace('/settings') : router.canGoBack() ? router.back() : router.replace('/entry')} />
     <Text style={styles.title}>Subscription access</Text>
     {children}
+    <PressCard accessibilityLabel="Account settings" onPress={() => router.push('/settings')}><Text style={styles.link}>Account settings</Text></PressCard>
   </ScrollView></View>;
 }
 
-function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}) {
+function ApplePaywall({ onVerifyAccount, onRecovery }: { onVerifyAccount?: () => void; onRecovery?: () => void } = {}) {
   const router = useRouter();
+  const {user} = useAuth();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ gate?: string; source?: string; moduleId?: string }>();
   const { activePracticeSession, convertedLessonProgress, moduleCloseProgress, saveActivePracticeSession } = useStore();
@@ -90,10 +96,11 @@ function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}
   const purchase = usePurchasePackage();
   const restore = useRestorePurchases();
   const customer = useCustomerInfo();
+  const queryClient = useQueryClient();
   const isPro = normalBillingEnabled ? false : hasPro(customer.data);
   const [offer, setOffer] = useState<OfferState<SharedResultContractV1 | undefined>>(() => {
     const opened = openOffer(activePracticeSession?.sharedResult);
-    if (params.source === "account-offer") opened.stage = 3;
+    if (params.source === "account-offer" || params.source === 'access-gate') opened.stage = 3;
     const checkpoint = activePracticeSession?.postRehearsalState;
     if (params.source === "debrief" && (checkpoint === "pay2" || checkpoint === "pay3")) {
       opened.stage = checkpoint === "pay2" ? 2 : 3;
@@ -208,8 +215,11 @@ function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}
   }, [commerceState, isPro, nextDeck, params.gate, router]);
 
   const leave = (): void => {
+    // A signed-in unpaid account cannot exit to Home (or a stale paid route):
+    // the root gate would immediately remount this offer at stage three.
+    if (normalBillingEnabled && user) { router.replace('/settings'); return; }
     if (router.canGoBack()) router.back();
-    else router.replace("/(tabs)");
+    else router.replace('/entry');
   };
 
   const navigateOffer = (event: "forward" | "back" | "dismiss"): void => {
@@ -270,7 +280,8 @@ function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}
       return;
     }
     if (actions.primaryAction === "check_access") {
-      await customer.refetch();
+      if (normalBillingEnabled) await queryClient.refetchQueries({queryKey: ['native', 'access']});
+      else await customer.refetch();
       return;
     }
     if (actions.primaryAction === "purchase") await buy();
@@ -286,7 +297,7 @@ function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}
       <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
         <PressCard onPress={() => navigateOffer("back")} style={styles.topHit} accessibilityLabel="Back"><Text style={styles.topText}>Back</Text></PressCard>
         <Text style={styles.step}>{stage} OF 3</Text>
-        <PressCard onPress={() => navigateOffer("dismiss")} style={[styles.topHit, styles.closeHit]} accessibilityLabel="Close offer. Keep my free debrief for now"><Text style={styles.topText}>Close</Text></PressCard>
+        <PressCard onPress={() => navigateOffer("dismiss")} style={[styles.topHit, styles.closeHit]} accessibilityLabel={normalBillingEnabled && user ? 'Close offer and open account settings' : 'Close offer. Keep my free debrief for now'}><Text style={styles.topText}>Close</Text></PressCard>
       </View>
 
       {normalBillingEnabled && (purchase.error || restore.error) ? <Text>{purchase.error?.message || restore.error?.message}</Text> : null}
@@ -330,6 +341,7 @@ function ApplePaywall({ onVerifyAccount }: { onVerifyAccount?: () => void } = {}
       </ScrollView>
 
       <StateDock bottomInset={insets.bottom}>
+        {onRecovery ? <View style={styles.links}><PressCard onPress={onRecovery} accessibilityLabel="Help with an existing purchase"><Text style={styles.link}>Help with an existing purchase</Text></PressCard><PressCard onPress={() => router.push('/settings')} accessibilityLabel="Account settings"><Text style={styles.link}>Account settings</Text></PressCard></View> : null}
         {stage === 3 && onVerifyAccount ? <Text style={styles.link}>Create an account or sign in before purchasing. Continuing does not charge you.</Text> : null}
         {stage < 3 ? <PrimaryButton label="Continue" onPress={() => navigateOffer("forward")}  /> : (
           <>

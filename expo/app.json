@@ -31,10 +31,10 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.rork.8fc4qwsqaurkxk0pimyvx",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal.",
+        "NSMicrophoneUsageDescription": "Before You Say It needs microphone access so you can practice speaking during lessons and rehearsals.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "35"
+      "buildNumber": "43"
     },
     "android": {
       "permissions": [
@@ -68,7 +68,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Before You Say It needs microphone access so you can dictate what you need to say during onboarding and rehearsal."
+          "microphonePermission": "Before You Say It needs microphone access so you can practice speaking during lessons and rehearsals."
         }
       ],
       "expo-asset",

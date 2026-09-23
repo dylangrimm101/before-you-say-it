@@ -2,6 +2,7 @@ import { mock } from 'bun:test';
 import { plugin } from 'bun';
 import assert from 'node:assert/strict';
 import React from 'react';
+import {accountAccessRoute, accountAccessState} from '../lib/accountAccess';
 import { verifyComponentTestDeps } from '../scripts/component-test-deps';
 plugin({ name: 'subscription-assets', setup(b) { b.onLoad({ filter: /\.(png|ttf)$/ }, () => ({ contents: 'export default 1', loader: 'js' })); } });
 const { create, act } = await import(verifyComponentTestDeps());
@@ -32,7 +33,7 @@ let user: any = null, loginMode = 'success', logins = 0, signups = 0, purchases 
 let access: any = { data: false, isError: false, isPending: false, isFetching: false, refetch: async () => {} };
 const login = async () => { logins++; if (loginMode === 'failed') return { success: false, message: 'Synthetic sign-in rejected' }; user = { id: 'owner-A' }; activePracticeSession = null; return { success: true, continuationId: 'saved-result-id', ...(loginMode === 'claim-problem' ? { continuationProblem: true } : {}) }; };
 mock.module('@/providers/auth', () => ({ useAuth: () => ({ user, session: user ? { user } : { user: { is_anonymous: true } }, isAuthConfigured: true, hasCurrentGuestPractice, login, cancelLogin() {} }) }));
-mock.module('@/lib/supabase', () => ({ authEnvironment: { staging: false }, supabase: { auth: { signUp: async () => { signups++; return { error: null }; } } } }));
+mock.module('@/lib/supabase', () => ({ authEnvironment: { staging: false }, supabase: { auth: { signUp: async () => { signups++; return { data: { user: null, session: null }, error: null }; } } } }));
 const saveActivePracticeSession = async (next: any) => { activePracticeSession = next; };
 mock.module('@/providers/store', () => ({ useStore: () => ({ activePracticeSession, convertedLessonProgress: [], moduleCloseProgress: [], sessions: [], pilotProgress: [], saveActivePracticeSession }) }));
 let catalog = true;
@@ -84,9 +85,7 @@ loginMode = 'success'; await press('Sign in to save this result and continue');
 assert.equal(path, '/paywall'); assert.equal(params.source, 'account-offer');
 assert.equal(activePracticeSession, null, 'return does not copy the previous owner’s result into the new store');
 assert.equal(params.moduleId, 'make_a_clear_ask'); assert.equal(purchases, 0);
-const safeScroll = root.root.findAllByType('view').find((n: any) => n.props.contentContainerStyle?.paddingTop === 75);
-assert.ok(safeScroll, 'billing status uses real safe-area inset plus spacing');
-await press('I have not subscribed — view Apple offer');
+assert.equal(button('I have not subscribed — view Apple offer'), undefined, 'confirmed no access opens offer without recovery questionnaire');
 assert.ok(button('Subscribe monthly')); assert.equal(button('Continue'), undefined, 'return directly to terms, not onboarding');
 assert.equal(purchases, 0, 'login never auto-purchases');
 await press('Subscribe monthly'); assert.equal(purchases, 1); assert.equal(path, '/paywall', 'cancelled purchase stays on offer');
@@ -121,7 +120,10 @@ assert.ok(button('Create account to continue').props.disabled); assert.ok(!text(
 await reset(); user = { id: 'owner-A' }; access = { ...access, data: true }; await render();
 assert.ok(button('Continue to practice')); assert.equal(button('Subscribe monthly'), undefined);
 access = { ...access, data: false, isError: true }; await render(); assert.ok(button('Retry access verification'));
-access = { ...access, isError: false }; await render(); await press('I already subscribed on the web');
+access = { ...access, isError: false }; await render(); await press('Help with an existing purchase');
+const safeScroll = root.root.findAllByType('view').find((n: any) => n.props.contentContainerStyle?.paddingTop === 75);
+assert.ok(safeScroll, 'optional recovery status uses real safe-area inset plus spacing');
+await press('I already subscribed on the web');
 await act(async () => { await new Promise(r => setTimeout(r, 10)); }); await render();
 assert.ok(text().includes('Do not subscribe again in Apple')); assert.equal(button('Subscribe monthly'), undefined);
 assert.equal(purchases, 0); assert.equal(restores, 0); assert.ok(logins >= 4);
@@ -152,5 +154,24 @@ assert.ok(button('Create account to continue'), 'trial preserves required accoun
 eligibility = 1;
 await reset();
 assert.ok(!text().includes('Try BYSI free for 7 days.'), 'ineligible users never get a free-trial promise');
+// Follow actual mounted exit controls, then apply the same account policy used
+// by RootLayout. A router-only assertion previously missed the Home → offer loop.
+for (const prior of [null, '/(tabs)', '/approved-lesson/first', '/entry']) {
+  for (const exit of ['close', 'back', 'recovery'] as const) {
+    await reset(); user = {id: 'owner-A'}; activePracticeSession = null;
+    history.length = 0; if (prior) history.push({pathname: prior, params: {}});
+    route({pathname: '/paywall', params: {source: 'access-gate'}}); await render();
+    if (exit === 'back') { await press('Back'); await press('Back'); await press('Back'); }
+    else if (exit === 'recovery') { await press('Help with an existing purchase'); await press('Back'); }
+    else { const close = root.root.findAllByType('button').find((b: any) => b.props.accessibilityLabel?.startsWith('Close offer')); assert.ok(close); await act(async () => close.props.onPress()); await render(); }
+    const first = path.split('/')[1];
+    if (accountAccessRoute(first, true, params.source).protected && accountAccessState(true, access) === 'paywall') {
+      route({pathname: '/paywall', params: {source: 'access-gate'}}); await render();
+    }
+    assert.equal(path, '/settings', `${exit} must leave the unpaid offer without bouncing back (prior ${prior})`);
+    assert.equal(access.data, false, 'exit must not grant paid access');
+    assert.equal(purchases, 0, 'exit must not purchase');
+  }
+}
 await act(async () => root.unmount()); client.clear();
 console.log('PASS guest subscription preview, sign-in/signup return, safe area, restore gate, cancellation, missing catalog, existing buyer guards. Mocked native/store/auth; no Apple purchase or physical-device proof.');

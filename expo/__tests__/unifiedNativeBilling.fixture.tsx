@@ -27,9 +27,12 @@ assert.equal(offerMounts,0);
 access={...access,data:true};await act(async()=>{root.update(app());});
 assert.ok(button('Continue to practice'),'independently server-verified native access must win over known web purchase warning');
 await act(async()=>button('Continue to practice').props.onPress());assert.equal(continued,1);assert.equal(offerMounts,0);
-for(const transition of [{isFetching:true},{isPending:true}]){
+access={...access,isFetching:true};await act(async()=>root.update(app()));
+assert.ok(button('Continue to practice'),'routine refresh retains last successful server grant; paid operations still reauthorize');
+access={...access,isFetching:false};
+for(const transition of [{isPending:true}]){
  access={...access,...transition};await act(async()=>root.update(app()));
- assert.equal(button('Continue to practice'),undefined,'cached positive must not admit while current query is pending or fetching');
+ assert.equal(button('Continue to practice'),undefined,'initial verification must not admit while pending');
  access={...access,isFetching:false,isPending:false};
 }
 access={...access,data:false};await act(async()=>root.update(app()));

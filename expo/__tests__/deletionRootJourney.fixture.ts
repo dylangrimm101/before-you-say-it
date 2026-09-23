@@ -86,7 +86,7 @@ const requestFetch:typeof fetch=async(input,init)=>handler(new Request(input,ini
 mock.module('@/lib/accountLifecycleRuntime',()=>({...actualRuntime,accountDeletionAvailable:true,deleteAccountIdentity:(owner:string,password:string,billing:any)=>requestAccountDeletion(sdk.auth,url+'/functions/v1/account-delete',owner,password,billing,receiptStore,requestFetch),checkAccountDeletionStatus:(owner:string|null=null)=>checkAccountDeletionStatus(url+'/functions/v1/account-delete',owner,receiptStore,requestFetch)}));
 const {useAuth}=await import('../providers/auth');
 const {default:Root}=await import('../app/_layout');
-const {default:Entry}=await import('../app/entry');
+const {LegacyEntryScreen:Entry}=await import('../app/entry');
 const {default:Login}=await import('../app/continue-from-web');
 const {default:Settings}=await import('../app/settings');
 const {default:Delete}=await import('../app/delete-account');

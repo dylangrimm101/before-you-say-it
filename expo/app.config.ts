@@ -12,8 +12,13 @@ export default function configure({ config }: ConfigContext): ExpoConfig {
     }
     // Registered free uses /api/native/free/*; paid uses /api/native/*.
     // Both transports derive from this origin, not the old public-funnel inputs.
-    const allowedPublicInputs = new Set(["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY", "EXPO_PUBLIC_NATIVE_BILLING_ORIGIN", "EXPO_PUBLIC_NATIVE_RESULTS"]);
+    const allowedPublicInputs = new Set(["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY", "EXPO_PUBLIC_NATIVE_BILLING_ORIGIN", "EXPO_PUBLIC_NATIVE_RESULTS", "EXPO_PUBLIC_PURCHASE_FIRST", "EXPO_PUBLIC_PURCHASE_FIRST_AUDIENCE"]);
     if (process.env.EXPO_PUBLIC_NATIVE_RESULTS && process.env.EXPO_PUBLIC_NATIVE_RESULTS !== 'normal-results-v1') throw new Error('TestFlight rejects unknown saved-result capability');
+    const purchaseFirst = process.env.EXPO_PUBLIC_PURCHASE_FIRST;
+    const purchaseAudience = process.env.EXPO_PUBLIC_PURCHASE_FIRST_AUDIENCE;
+    if ((purchaseFirst || purchaseAudience) && (purchaseFirst !== 'claim-v1' || purchaseAudience !== 'sandbox')) {
+      throw new Error('TestFlight requires the reviewed purchase-first version and sandbox audience together');
+    }
     // Metro export:embed sets EXPO_PUBLIC_PROJECT_ROOT to the project path. That is not a product/funnel input.
     const expoCliPublicNoise = new Set(["EXPO_PUBLIC_PROJECT_ROOT"]);
     if (Object.keys(process.env).some(name => name.startsWith("EXPO_PUBLIC_") && process.env[name] && !allowedPublicInputs.has(name) && !expoCliPublicNoise.has(name))) {

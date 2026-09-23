@@ -34,7 +34,7 @@ const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
 const {AuthProvider,useAuth}=await import('../providers/auth');
 const {StoreProvider,useStore}=await import('../providers/store');
 const {default:Login}=await import('../app/continue-from-web');
-const {default:Entry}=await import('../app/entry');
+const {LegacyEntryScreen:Entry}=await import('../app/entry');
 let Screen=Login;
 let account:any,store:any;
 const Probe=()=>{account=useAuth();store=useStore();return React.createElement(Screen);};

@@ -69,7 +69,7 @@ mock.module('expo-router',()=>({useRouter:()=>router,useLocalSearchParams:()=>pa
 const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
 const {AuthProvider,useAuth}=await import('../providers/auth');
 const {StoreProvider,useStore}=await import('../providers/store');
-const {default:Entry}=await import('../app/entry');
+const {LegacyEntryScreen:Entry}=await import('../app/entry');
 const {default:Login}=await import('../app/continue-from-web');
 let Screen:any=Entry;let screenKey=0;let account:any,store:any;let root:any;
 const Probe=()=>{account=useAuth();store=useStore();return React.createElement(Screen,{key:screenKey});};

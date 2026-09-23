@@ -89,7 +89,7 @@ mock.module('@/lib/ai',()=>({...actualAI,generateM1L1DynamicReply:async(input:an
 const {QueryClient,QueryClientProvider}=await import('@tanstack/react-query');
 const {AuthProvider,useAuth}=await import('../providers/auth');
 const {StoreProvider,useStore}=await import('../providers/store');
-const {default:Entry}=await import('../app/entry');
+const {LegacyEntryScreen:Entry}=await import('../app/entry');
 const {default:Onboarding}=await import('../app/onboarding');
 const {default:Login}=await import('../app/continue-from-web');
 const {default:Rehearse}=await import('../app/rehearse/[id]');
@@ -192,4 +192,3 @@ try{
  await db.exec('reset role');assert.equal((await db.query('select count(*)::int n from bysi_native_free.session')).rows[0].n,1);assert.deepEqual(seenOperations,outputMode==='recovery'?['session','generate','generate','generate','generate']:['session','generate','generate','generate']);
  console.log('PASS JOINED ACTUAL Auth SDK + mounted Auth/Store/onboarding/rehearsal/debrief + Next mounts + restricted SQL + private producer; '+outputMode+'; synthetic Auth/provider/native hosts, typed-first, no live/device claims');
 }finally{if(root)await act(async()=>root.unmount());sdk.auth.stopAutoRefresh();await db.close();}
-

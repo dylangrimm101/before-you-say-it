@@ -33,7 +33,9 @@ mock.module('expo-crypto',()=>({randomUUID:()=>crypto.randomUUID()}));
 mock.module('@/lib/approvedDeckLoader',()=>({loadApprovedDeckHtml:async()=>'<html>canonical asset host substitute</html>',loadConvertedHandoffDeckHtml:async()=>'<html>canonical asset host substitute</html>',loadModuleCloseDeckHtml:async()=>'<html>canonical asset host substitute</html>'}));
 mock.module('@/lib/lessonFeedbackService',()=>({submitLessonFeedback:async()=>{throw Error('No external feedback');}}));
 const cancel=async()=>{};
-mock.module('@/lib/useDictation',()=>({useDictation:()=>({status:'idle',cancel,start:async()=>{},stop:async()=>null})}));
+const spokenAudit=process.argv.includes('--spoken-audit');
+let spokenDraft='',recordStarts=0,recordStops=0;
+mock.module('@/lib/useDictation',()=>({useDictation:()=>({status:'idle',cancel,requestPermission:async()=>true,start:async()=>{recordStarts++;return true;},stop:async()=>{recordStops++;return spokenDraft;}})}));
 mock.module('@/lib/voice',()=>({deleteGeneratedVoiceCacheStrict:async()=>{},useSpeech:()=>({status:'idle',phase:'idle'}),resetSpeech:cancel,replaySpeech:cancel,unlockAudioPlayback:cancel,preparePaidPilotAudio:async()=>false,playPreparedPilotAudio:cancel,speakPaidPilotAudio:cancel,speakPaidPilotAudioToCompletion:cancel}));
 
 
@@ -67,16 +69,28 @@ const flush=()=>act(async()=>{await new Promise(r=>setTimeout(r,15));});
 const nodeText=(node:any):string=>typeof node==='string'?node:Array.isArray(node)?node.map(nodeText).join(' '):node&&typeof node==='object'?nodeText(node.children??[]):'';
 const text=()=>nodeText(root.toJSON());
 const buttons=()=>root.root.findAllByType('button');
-const button=(label:string)=>buttons().find((x:any)=>x.props.label===label||nodeText(x).includes(label));
+const button=(label:string)=>buttons().find((x:any)=>x.props.label===label||x.props.accessibilityLabel===label||nodeText(x).includes(label));
 async function press(label:string){const b=button(label);assert.ok(b,`Missing ${label} at ${JSON.stringify(location)} state ${store.activeScenarioRun?.run.state}; buttons ${buttons().map((b:any)=>b.props.label)}`);assert.ok(!b.props.disabled);await act(async()=>{await b.props.onPress();});await flush();}
 async function route(r:any){await act(async()=>navigate(r));await flush();}
 async function mount(){await act(async()=>{root=create(app());});await flush();await flush();await flush();}
 async function restart(){await act(async()=>root.unmount());await mount();}
 async function message(type:string){await act(async()=>{await root.root.findByType('webview').props.onMessage({nativeEvent:{data:JSON.stringify({type})}});});await flush();}
-async function input(value:string){assert.equal(root.root.findAllByType('input').length,1,`input unavailable: ${text()} run ${store.activeScenarioRun?.run.state}`);await act(async()=>root.root.findByType('input').props.onChangeText(value));await press('Review typed transcript');}
+async function input(value:string){
+ if(spokenAudit){
+  spokenDraft=value;const before=recordStarts;
+  await press('Start recording');if(button('Allow microphone'))await press('Allow microphone');
+  assert.equal(recordStarts,before+1,'Record must start capture exactly once');
+  assert.ok(store.activeScenarioRun.run.state.startsWith('listening_'));
+  await press('Done speaking');assert.equal(recordStops,recordStarts);
+  assert.ok(store.activeScenarioRun.run.state.startsWith('confirm_'));
+  assert.equal(root.root.findByType('input').props.value,value,'Stop must present transcript for approval');
+  return;
+ }
+ assert.equal(root.root.findAllByType('input').length,1,`input unavailable: ${text()} run ${store.activeScenarioRun?.run.state}`);await act(async()=>root.root.findByType('input').props.onChangeText(value));await press('Review typed transcript');
+}
 const ledger:any={schemaVersion:1,evidenceClass:'mounted-component-controls with real owner StoreProvider and serialized synthetic AsyncStorage',substitutes:['Auth','Pro entitlement','native primitives','WebView/asset loading','AI replies','audio unavailable'],notProven:['real WebView cards or pointer hit testing','live AI semantics','native device media/restart','payments'],entries:[]};
 ledger.sourceDigests=Object.fromEntries(['app/approved-lesson/[lessonId].tsx','app/approved-rehearsal/[lessonId].tsx','components/M1L1PaidPractice.tsx','components/ScenarioPaidPractice.tsx','constants/approvedLessons.ts','lib/approvedRehearsals.ts','lib/convertedLesson.ts'].map(path=>[path,createHash('sha256').update(readFileSync(new URL('../'+path,import.meta.url))).digest('hex')]));
-function save(){writeFileSync(new URL('../../docs/NATIVE-ALL-LESSON-TRAJECTORIES.json',import.meta.url),JSON.stringify(ledger,null,2)+'\n');}
+function save(){ledger.captureMode=spokenAudit?'Record/Stop controls, simulated dictation':'typed';ledger.recordStarts=recordStarts;ledger.recordStops=recordStops;writeFileSync(process.env.BYSI_LESSON_AUDIT_OUTPUT??new URL('../../docs/NATIVE-ALL-LESSON-TRAJECTORIES.json',import.meta.url),JSON.stringify(ledger,null,2)+'\n');}
 await mount();
 for(const id of LAUNCH_DECK_IDS){
  const deck=approvedLessonDeck(id)!;const entry:any={id,kind:deck.isCloseDeck?'module-close':'lesson',status:'running',steps:[]};ledger.entries.push(entry);save();
